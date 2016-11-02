@@ -2,6 +2,8 @@
 
 Clojure2D is a lightweight library supporting generative coding or glitching. It's based on Java2D directly. It's Clojure only, no ClojureScript version.
 
+<img src="https://github.com/Clojure2D/clojure2d/blob/master/results/ex04/9973D635.jpg" alight="center" />
+
 ## Motivation
 
 This project is the answer to personal needs to optimize my own workflow for generative or glitch creations. I've been producing a lot of Processing code and started to suffer from limitations of working in 'write sketch and run' mode. Too much copy&paste between sketches, zillions of folders, zillions of processed images. And one day I fell in love with FP. This code is the answer.
@@ -28,6 +30,8 @@ In points:
 * Easy live coding possible (Emacs/Cider/REPL), 'notebook' way of making (like iPython)
 * FastMath as main math library
 * Main focus on higher level generative/glitch concepts (like sonification support, vector field functions, colorspace operations, things like pixelsorting, slitscan etc. See my Processing sketches, link below)
+
+Check examples and results folders
 
 ### What's odd?
 
