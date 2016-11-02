@@ -37,6 +37,7 @@ Check examples and results folders
 
 It's kind of personal library which supports my (probably not optimal, not convenient for others) way of creating.
 There are still plenty of bugs and not idiomatic code. It's slower than Processing. Eats memory (Pixels code is generally immutable). Still not stable API and architecture.
+No docs, no tests (yet)
 
 ## Installation
 
@@ -131,6 +132,7 @@ I've prepared several examples with results where you can check current state of
   - analog filters (for sonification part)
 * Canvas drawing functions (not filled shapes, PShape implementation)
 * Session handling (saving results in session, logging actions)
+* Sanity tests
 
 ### Low priority or ideas
 
@@ -138,6 +140,7 @@ I've prepared several examples with results where you can check current state of
 * More window events
 * Deeper joise bindings
 * Wavelets bindings
+* Tests...
 
 ## Community
 
