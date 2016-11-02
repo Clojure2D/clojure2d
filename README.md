@@ -17,7 +17,7 @@ This project is the answer to personal needs to optimize my own workflow for gen
 
 ### Why not use...
 
-... quil, thi.ng, possibly other?
+... quil, thi.ng, clisk, possibly other?
 
 The main reason was that I wanted to learn Clojure making something from the scratch. Quil is still Processing. Thi.ng was to complex to me at the beginning (but I plan to investigate what can be usable).
 
