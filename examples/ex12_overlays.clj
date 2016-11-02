@@ -3,7 +3,7 @@
 (ns examples.ex12-overlays
   (:require [clojure2d.core :as core]
             [clojure2d.extra.overlays :as o])
-  (:import [java.awt.BufferedImage]))
+  (:import [java.awt.image BufferedImage]))
 
 ;; load image and store
 (def ^BufferedImage img (core/load-image "results/test.jpg"))

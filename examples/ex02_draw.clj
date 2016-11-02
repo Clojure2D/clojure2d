@@ -9,7 +9,7 @@
 
 (defn draw
   ""
-  [canvas framecount]
+  [canvas framecount & res]
   (let [fc (/ framecount 100.0)
         n (->> fc
                (m/tan)

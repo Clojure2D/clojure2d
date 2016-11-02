@@ -178,13 +178,12 @@
 
 (defmacro with-canvas
   [canvas & body]
-  `(do 
-     (make-graphics ~canvas)
-     (-> ~canvas
-         ~@body)
-     (flush-graphics ~canvas)
-     ~canvas))
-
+  `(let [canvas# ~canvas] (do 
+             (make-graphics canvas#)
+             (-> canvas#
+                 ~@body)
+             (flush-graphics canvas#)
+             canvas#)))
 ;;
 
 (declare set-background)
@@ -498,14 +497,16 @@
 (defn- refresh-screen-task
   "Task repainting canvas on window. Repaints with set FPS."
   [^JFrame frame is-display-running? draw-fun canvas stime]
-  (loop [cnt 0]
+  (loop [cnt 0
+         result nil]
     (let [thr (future (do
-                        (when draw-fun (draw-fun canvas cnt))
-                        (doto frame
-                          (.validate)
-                          (.repaint))))]
+                        (let [curr-res (when draw-fun (draw-fun canvas cnt result))]
+                             (doto frame
+                               (.validate)
+                               (.repaint))
+                             curr-res)))]
       (Thread/sleep stime)
-      (when (and @thr @is-display-running?) (recur (inc cnt))))))
+      (when @is-display-running? (recur (inc cnt) @thr)))))
 
 ;; You may want to replace canvas to the other one on window. To make it pass `JFrame` object and new canvas.
 ;; See examples/ex01_events.clj to see how it works.

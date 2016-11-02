@@ -20,8 +20,8 @@
 
 (def sinusoidal (vr/make-variation :sinusoidal 3.0 {}))
 
-(def s80 (get-spots 80 [60 120 180] 646 800))
-(def n80 (get-noise 80 646 800))
+(def s80 (make-spots 80 [60 120 180] 646 800))
+(def n80 (make-noise 80 646 800))
 
 (defn create-field
   ""
@@ -76,7 +76,5 @@
                (save-canvas canvas (str "results/ex08/" r ".jpg"))))
 
   [canvas disp]))
-
-(def window-info (example-08))
 
 (draw-folds (example-08))

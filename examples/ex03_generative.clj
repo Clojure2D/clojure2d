@@ -19,7 +19,7 @@
 
 (defn draw
   ""
-  [canvas framecount]
+  [canvas framecount & res]
   (with-canvas canvas
     (set-color foreground)
     (set-stroke 1.85)

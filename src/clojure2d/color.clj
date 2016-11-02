@@ -72,7 +72,7 @@
 (defn clamp255
   ""
   [a]
-  (m/constrain (int a) 0 255))
+  (int (m/constrain a 0 255)))
 
 (def mod255 (partial bit-and 0xff))
 

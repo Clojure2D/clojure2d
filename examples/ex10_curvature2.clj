@@ -34,7 +34,7 @@
   [canvas ^Vec2 vshift fun noise time ^Vec3 in]
   (let [step-x-shift (* shift-x-step (m/noise time (/ (.x in) shift-x-scale)))
         step-y-shift (m/norm (m/noise (/ (.y in) shift-y-scale) time) 0 1 (- shift-y-step) shift-y-step)
-        nx (+ (.x in) step-right (* point-step (m/qcos (.z in))))
+        nx (+ (.x in) step-x-shift (* point-step (m/qcos (.z in))))
         ny (+ (.y in) step-y-shift (* point-step (m/qsin (.z in))))
         xx (m/norm nx 0 width -1 1)
         yy (m/norm ny 0 height -1 1)
