@@ -76,7 +76,8 @@
       (get-color pixels (+ x (* y w)))))
 
   (set-value [_ ch idx v]
-    (aset-int p ^int (pos ch idx) v))
+    (aset-int p ^int (pos ch idx) v)
+    p)
 
   (set-value [pixels ch x y v]
     (set-value pixels ch (+ x (* y w)) v))
@@ -86,7 +87,8 @@
       (aset-int p ^int (pos 0 idx) (.x v))
       (aset-int p ^int (pos 1 idx) (.y v))
       (aset-int p ^int (pos 2 idx) (.z v))
-      (aset-int p ^int (pos 3 idx) (.w v))))
+      (aset-int p ^int (pos 3 idx) (.w v)))
+    p)
 
   (set-color [pixels x y v]
     (set-color pixels (+ x (* y w)) v))
@@ -185,6 +187,24 @@
 
 ;; processors
 
+(defn filter-colors
+  ""
+  [f ^Pixels p]
+  (let [^Pixels target (clone-pixels p)
+        pre-step (max 40000 (/ (.size p) cores))
+        step (int (m/ceil pre-step))
+        parts (range 0 (.size p) step)
+        ftrs (doall
+              (map
+               #(future (let [end (min (+ % step) (.size p))]
+                          (loop [idx (int %)]
+                            (when (< idx end)
+                              (set-color target idx (f (get-color p idx)))
+                              (recur (inc idx))))))
+               parts))]
+    (dorun (map deref ftrs))
+    target))
+
 (defn filter-channel
   "Filter one channel, write result into target. Works only on planar"
   [f ch ^Pixels target ^Pixels p]
@@ -219,10 +239,10 @@
      target))
   ([f p]
    (filter-channels f f f f p))
-  ([f skip-alpha p]
-   (if skip-alpha
-     (filter-channels f f f nil p)
-     (filter-channels f f f f p))))
+  ([f do-alpha p]
+   (if do-alpha
+     (filter-channels f f f f p)
+     (filter-channels f f f nil p))))
 
 (defn blend-channel
   "Blend one channel, write result into target. Works only on planar"
@@ -258,10 +278,10 @@
      target))
   ([f p1 p2]
    (blend-channels f f f f p1 p2))
-  ([f skip-alpha p1 p2]
-   (if skip-alpha
-     (blend-channels f f f nil p1 p2)
-     (blend-channels f f f f p1 p2))))
+  ([f do-alpha p1 p2]
+   (if do-alpha
+     (blend-channels f f f f p1 p2)
+     (blend-channels f f f nil p1 p2))))
 
 ;; compose channels
 
@@ -281,10 +301,10 @@
    (blend-channels (make-compose n1) (make-compose n2) (make-compose n3) (make-compose n4) p1 p2))
   ([n p1 p2]
    (compose-channels n n n n p1 p2))
-  ([n skip-alpha p1 p2]
-   (if skip-alpha
-     (compose-channels n n n nil p1 p2)
-     (compose-channels n n n n p1 p2))))
+  ([n do-alpha p1 p2]
+   (if do-alpha
+     (compose-channels n n n n p1 p2)
+     (compose-channels n n n nil p1 p2))))
 
 ;; convolution
 
@@ -514,3 +534,53 @@
          (filter-channel tinter ch target p)))))
   ([r g b]
    (make-tint-filter r g b 256)))
+
+(defn normalize
+  "Normalize channel values to whole (0-255) range"
+  [ch target ^Pixels p]
+  (let [[mn mx] (loop [idx (int 0)
+                       currmn (int Integer/MAX_VALUE)
+                       currmx (int Integer/MIN_VALUE)]
+                  (if (< idx (.size p))
+                    (let [v (get-value p ch idx)]
+                      (recur (inc idx)
+                             (int (if (< v currmn) v currmn))
+                             (int (if (> v currmx) v currmx))))
+                    [currmn currmx]))]
+    (filter-channel #(m/norm % mn mx 0 255) ch target p)))
+
+(defn- equalize-make-histogram
+  ""
+  [ch ^Pixels p]
+  (let [^doubles hist (double-array 256 0.0)
+        d (/ 1.0 (.size p))]
+    (loop [idx (int 0)]
+      (if (< idx (.size p))
+        (let [c (get-value p ch idx)]
+          (aset-double hist c (+ d ^double (aget hist c)))
+          (recur (inc idx)))
+        hist))))
+
+(defn- equalize-make-lookup
+  ""
+  [^doubles hist]
+  (let [^ints lookup (int-array 256 0)]
+    (loop [currmn (int Integer/MAX_VALUE)
+           currmx (int Integer/MIN_VALUE)
+           sum (double 0.0)
+           idx (int 0)]
+      (if (< idx 256)
+        (let [currsum (+ sum (aget hist idx))
+              val (int (m/constrain (m/round (* sum 255.0)) 0 255))]
+          (aset-int lookup idx val)
+          (recur (int (if (< val currmn) val currmn))
+                 (int (if (> val currmx) val currmx))
+                 (double currsum)
+                 (inc idx)))
+        lookup))))
+
+(defn equalize-filter
+  "Equalize histogram"
+  [ch target p]
+  (let [^ints lookup (equalize-make-lookup (equalize-make-histogram ch p))]
+    (filter-channel #(aget lookup %) ch target p)))

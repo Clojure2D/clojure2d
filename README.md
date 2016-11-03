@@ -117,6 +117,7 @@ I've prepared several examples with results where you can check current state of
 * ex12 - 3 overlays
 * ex13 - image segmentation example
 * ex14 - metaballs animation (https://gist.github.com/yogthos/3411106)
+* ex15 - colorspace converters + equalize histogram
 
 ## TODO
 

@@ -21,7 +21,7 @@
 (set! *unchecked-math* true)
 
 ;; some constants
-(def ^:const jpeg-image-quality 0.98)
+(def ^:const jpeg-image-quality 0.97)
 
 ;; loading image with ImageIcon
 
