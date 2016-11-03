@@ -3,6 +3,9 @@
             [clojure2d.math :as m])
   (:import  [java.awt Color]))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
+
 (def foreground (Color. 240 240 240 100))
 (def background (Color. 10 20 40 100))
 

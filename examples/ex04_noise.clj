@@ -5,6 +5,9 @@
             [clojure2d.utils :as u])
   (:import  [java.awt Color]))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
+
 (def canvas (create-canvas 200 200))
 
 (defn loop-noise

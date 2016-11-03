@@ -9,6 +9,8 @@
   (:import [java.awt.event MouseEvent]
            [java.awt Color]))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
 
 ;; In this example you can see how to create event methods for different windows
 ;;

@@ -6,6 +6,8 @@
   (:import [java.awt.event MouseEvent]
            [java.awt Color]))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
 
 (defn draw
   ""

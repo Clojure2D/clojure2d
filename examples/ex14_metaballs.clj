@@ -41,9 +41,9 @@
 (defn color
   ""
   [r g b]
-  (Color. (int (c/clamp255 r))
-          (int (c/clamp255 g))
-          (int (c/clamp255 b))))
+  (Color. ^int (c/clamp255 r)
+          ^int( c/clamp255 g)
+          ^int (c/clamp255 b)))
 
 (defn influence 
   ""

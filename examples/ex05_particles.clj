@@ -8,6 +8,9 @@
   (:import  [java.awt Color]
             [clojure2d.math.vector Vec2]))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
+
 (def ^:const width 1200)
 (def ^:const height 1200)
 
@@ -67,7 +70,6 @@
         (recur (doall (map mv-fun xs)))))
     
     ))
-
 
 (example-05)
 

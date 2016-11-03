@@ -5,6 +5,9 @@
             [clojure2d.extra.overlays :as o])
   (:import [java.awt.image BufferedImage]))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
+
 ;; load image and store
 (def ^BufferedImage img (core/load-image "results/test.jpg"))
 

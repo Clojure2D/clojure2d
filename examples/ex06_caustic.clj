@@ -6,6 +6,9 @@
   (:import [clojure2d.math.vector Vec2]
            [java.awt Color]))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
+
 (def ^:const min-range -2.0)
 (def ^:const max-range 2.0)
 (def ^:const tilt-scale 4)

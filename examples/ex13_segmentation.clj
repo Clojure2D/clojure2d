@@ -8,6 +8,9 @@
   (:import [clojure2d.pixels Pixels]
            [java.awt Color]))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
+
 (def ^:const min-size 4) ; minimal block size
 (def ^:const max-size 32) ; maximum block size
 (def ^:const threshold 15) ; dividing threshold
@@ -25,9 +28,9 @@
              iter (u/make-counter 0)
 
              draw (fn [canv] (doseq [[x y size] segm]
-                               (let [defcol (Color. (p/get-value img 0 x y)
-                                                    (p/get-value img 1 x y)
-                                                    (p/get-value img 2 x y))
+                               (let [defcol (Color. ^int (p/get-value img 0 x y)
+                                                    ^int (p/get-value img 1 x y)
+                                                    ^int (p/get-value img 2 x y))
                                      col (condp = strategy
                                            :bw (if (even? (iter))
                                                  Color/black

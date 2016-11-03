@@ -6,6 +6,8 @@
   (:import [clojure2d.math.vector Vec2]
            [java.awt Color]))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
 
 (defn create-field
   ""

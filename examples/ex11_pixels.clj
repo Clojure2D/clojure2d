@@ -5,6 +5,9 @@
             [clojure2d.pixels :as p]
             [clojure2d.color :as c]))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
+
 ;; first let's load an image into ^Pixels type
 ;; pixels are layout in planar mode (first red channel, then green, blue and alpha)
 (def img (core/load-pixels "results/test.jpg"))
