@@ -1,95 +1,43 @@
 (ns clojure2d.color
   (:require [clojure2d.math :as m]
             [clojure2d.math.vector :as v])
-  (:import [clojure2d.math.vector Vec4]))
+  (:import [clojure2d.math.vector Vec4]
+           [java.awt Color]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
 (def ^:dynamic *blend-threshold* 128)
 
-;; construct array which maps 0-255 value to 0.0-1.0 doubles
-(def c255-to-double (amap (double-array 256) idx ret (/ idx 255.0)))
-
-(defn norm-color
-  "Normalize color from int:0-255 to double:0-1"
-  [color]
-  (aget ^doubles c255-to-double color))
-
-(defn get-b
-  "get red from color"
-  [c]
-  (let [cc (unchecked-int c)]
-    (bit-and cc 0xff)))
-
-(defn get-g
-  "get red from color"
-  [c]
-  (let [cc (unchecked-int c)]
-    (bit-and (bit-shift-right cc 8) 0xff)))
-
-(defn get-r
-  "get red from color"
-  [c]
-  (let [cc (unchecked-int c)]
-    (bit-and (bit-shift-right cc 16) 0xff)))
-
-(defn get-a
-  "get red from color"
-  [c]
-  (let [cc (unchecked-int c)]
-    (bit-and (bit-shift-right cc 24) 0xff)))
-
-(defn get-luma
-  "get luma from color"
-  [c]
-  (let [cc (unchecked-int c)]
-    (int (m/constrain (+ (* 0.2126 (get-r c))
-                         (* 0.7152 (get-g c))
-                         (* 0.0722 (get-b c))) 0 255))))
-
-(def get-nb (comp norm-color get-b))
-(def get-ng (comp norm-color get-g))
-(def get-nr (comp norm-color get-r))
-(def get-na (comp norm-color get-a))
-
-(defn to-vec4
-  ""
-  [c]
-  (Vec4. (get-r c)
-         (get-g c)
-         (get-b c)
-         (get-a c)))
-
-(defn to-nvec4
-  ""
-  [c]
-  (Vec4. (get-nr c)
-         (get-ng c)
-         (get-nb c)
-         (get-na c)))
-
 (defn clamp255
   ""
   [a]
-  (int (m/constrain a 0 255)))
+  (int (m/constrain (m/round a) 0 255)))
 
 (def mod255 (partial bit-and 0xff))
 
-(defn make-color
-  "make ARGB packed int color from"
-  ([f r g b a]
-   (unchecked-int (bit-or (f b)
-                          (bit-shift-left (f g) 8)
-                          (bit-shift-left (f r) 16)
-                          (bit-shift-left (f a) 24))))
-  ([f r g b]
-   (make-color f r g b 0xff))
-  ([f ^Vec4 v]
-   (make-color f (.x v) (.y v) (.z v) (.w v))))
+(defn get-luma
+  "get luma from color"
+  [^Vec4 c]
+  (m/round (+ (* 0.2126 (.x c))
+              (* 0.7152 (.y c))
+              (* 0.0722 (.z c)))))
 
-(def make-color-clamp (partial make-color clamp255))
-(def make-color-mod (partial make-color mod255))
+(defn to-color
+  ""
+  [^Vec4 v]
+  (Color. ^int (clamp255 (.x v))
+          ^int (clamp255 (.y v))
+          ^int (clamp255 (.z v))
+          ^int (clamp255 (.w v))))
+
+(defn from-color
+  ""
+  [^Color c]
+  (Vec4. (.getRed c)
+         (.getGreen c)
+         (.getBlue c)
+         (.getAlpha c)))
 
 (defn- umult
   ""
@@ -376,6 +324,31 @@
 
 ;;; Colorspace functions
 
+(defn test-colors
+  "to remove, check ranges"
+  [f]
+  (loop [cc (int 0)
+         mnr ^int Integer/MAX_VALUE
+         mxr ^int Integer/MIN_VALUE
+         mng ^int Integer/MAX_VALUE
+         mxg ^int Integer/MIN_VALUE
+         mnb ^int Integer/MAX_VALUE
+         mxb ^int Integer/MIN_VALUE]
+    (let [r (bit-and 0xff (bit-shift-right cc 16))
+          g (bit-and 0xff (bit-shift-right cc 8))
+          b (bit-and 0xff cc)
+          ^Vec4 res (f (Vec4. r g b 255))
+          nmnr (int (if (< (.x res) mnr) (.x res) mnr))
+          nmxr (int (if (> (.x res) mxr) (.x res) mxr))
+          nmng (int (if (< (.y res) mng) (.y res) mng))
+          nmxg (int (if (> (.y res) mxg) (.y res) mxg))
+          nmnb (int (if (< (.z res) mnb) (.z res) mnb))
+          nmxb (int (if (> (.z res) mxb) (.z res) mxb))]
+      (if (< cc 0x1000000)
+        (recur (inc cc) nmnr nmxr nmng nmxg nmnb nmxb)
+        [nmnr nmxr nmng nmxg nmnb nmxb]))))
+
+
 ;; CMY
 
 (defn to-CMY
@@ -390,15 +363,47 @@
 
 ;; OHTA
 
+(defn to-OHTA
+  "RGB -> OHTA, normalized"
+  [^Vec4 c]
+  (let [i1 (clamp255 (/ (+ (.x c) (.y c) (.z c)) 3.0))
+        i2 (clamp255 (/ (+ 255.0 (- (.x c) (.z c))) 2.0))
+        i3 (clamp255 (/ (+ 510.0 (+ (.x c) (.z c) (- (+ (.y c) (.y c))))) 4.0))]
+    (Vec4. i1 i2 i3 (.w c))))
+
+(def ^:const c46 (/ 4.0 6.0))
+
 (defn from-OHTA
   "OHTA -> RGB"
   [^Vec4 c]
-  (let [I1 (.x c)
-        I2 (m/norm (.y c) 0 255 -127.5 127.5)
-        I3 (m/norm (.z c) 0 255 -127.5 127.5)
-        I3v (* 0.66668 I3)
-        R (int (- (+ I1 I2) I3v))
-        G (int (+ I1 (* 1.33333 I3)))
-        B (int (- I1 I2 I3v))]
-    (Vec4. R G B (.w c))))
+  (let [i1 (.x c) ; divided by 3
+        i2  (- (.y c) 127.5) ; divided by 2
+        i3 (- (* c46 (.z c)) 85.0) ; divided by 6
+        r (clamp255 (+ i1 i2 i3))
+        g (clamp255 (- i1 i3 i3))
+        b (clamp255 (- (+ i1 i3) i2))]
+    (Vec4. r g b (.w c))))
+
+;; YPbPr
+
+(defn to-YPbPr
+  "RGB -> YPbPr, normalized"
+  [^Vec4 c]
+  (let [y (+ (* 0.2126 (.x c))
+             (* 0.7152 (.y c))
+             (* 0.0722 (.z c)))
+        pb (clamp255 (m/norm (- (.z c) y) -237.0 237.0 0.0 255.0))
+        pr (clamp255 (m/norm (- (.x c) y) -201.0 201.0 0.0 255.0))]
+    (Vec4. (clamp255 y) pb pr (.w c))))
+
+(defn from-YPbPr
+  "YPbPr -> RGB"
+  [^Vec4 c]
+  (let [b (+ (.x c) (m/norm (.y c) 0.0 255.0 -237.0 237.0))
+        r (+ (.x c) (m/norm (.z c) 0.0 255.0 -201.0 201.0))
+        g (/ (- (.x c) (* 0.2126 r) (* 0.0722 b)) 0.7152)]
+    (Vec4. (clamp255 r) (clamp255 g) (clamp255 b) (.w c))))
+
+;;(test-colors (comp from-YPbPr to-YPbPr))
+
 
