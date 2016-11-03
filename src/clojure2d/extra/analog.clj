@@ -1,4 +1,7 @@
-(ns clojure2d.extra.filters
+;; several analog audio/video filters and effects
+;; can be applied in sequence on channels separately (by filter-channels function from pixels)
+
+(ns clojure2d.extra.analog
   (:require [clojure2d.math :as m]))
 
 (defn lowpass-filter
@@ -25,7 +28,7 @@
 (defn make-lowpass-filter
   ""
   [conf]
-  (partial lowpass-filter (calc-filter-alpha (conf :rate) (conf :cutoff))))
+  (partial lowpass-filter (calc-filter-alpha (:rate conf) (:cutoff conf))))
 
 (defn make-highpass-filter
   ""

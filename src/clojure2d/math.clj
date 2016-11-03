@@ -251,8 +251,8 @@
    (+ start2 (* (- stop2 start2) (norm v start1 stop1))))
   ([v start stop] ;; norm
    (if (= start stop)
-     (constrain v start stop)
-     (/ (- v start) (- stop start)))))
+     (if (< v start) 0 1)
+     (/ (double (- v start)) (- stop start)))))
 
 ;; Map and constrain values
 ;; `(cnorm 1.5 0 1 100 200) => 200`
