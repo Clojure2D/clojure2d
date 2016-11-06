@@ -14,7 +14,10 @@
   [a]
   (int (m/constrain (m/round a) 0 255)))
 
-(def mod255 (partial bit-and 0xff))
+(defn mod255
+  ""
+  [a]
+  (bit-and 0xff (int a)))
 
 (defn get-luma
   "get luma from color"

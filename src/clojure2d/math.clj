@@ -118,6 +118,8 @@
 ;; \\(\ln 2\\)
 (def ^:const LN2 (log 2.0))
 
+(def ^:const LN2_2 (* 0.5 LN2))
+
 ;; \\(\ln 10\\)
 (def ^:const LN10 (log 10.0))
 
