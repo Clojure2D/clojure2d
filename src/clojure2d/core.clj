@@ -499,12 +499,11 @@
   [^JFrame frame is-display-running? draw-fun canvas stime]
   (loop [cnt 0
          result nil]
-    (let [thr (future (do
-                        (let [curr-res (when draw-fun (draw-fun canvas cnt result))]
-                             (doto frame
-                               (.validate)
-                               (.repaint))
-                             curr-res)))]
+    (let [thr (future (let [curr-res (when draw-fun (draw-fun canvas cnt result))]
+                        (doto frame
+                          (.validate)
+                          (.repaint))
+                        curr-res))]
       (Thread/sleep stime)
       (when @is-display-running? (recur (inc cnt) @thr)))))
 

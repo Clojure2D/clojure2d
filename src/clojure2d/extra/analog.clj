@@ -139,7 +139,7 @@
         a0r (/ 1.0 (+ 1.0 (/ g J)))
 
         b0 (* a0r (+ 1.0 (* g J)))
-        b1 (* a0r (* -2.0 cw))
+        b1 (* a0r -2.0 cw)
         b2 (* a0r (- 1.0 (* g J)))
         a1 (- b1)
         a2 (* a0r (- (/ g J) 1.0))]
@@ -201,6 +201,56 @@
         a2 (* a0r (+ bs (- (dec (- A)) amc)))]
     [b0 b1 b2 a1 a2]))
 
+(defn biquad-lp-params
+  ""
+  [fc bw fs]
+  (let [omega (* m/TWO_PI (/ fc fs))
+        sn (m/sin omega)
+        cs (m/cos omega)
+        alpha (* sn (m/sinh (* m/LN2_2 bw (/ omega sn))))
+        a0r (/ 1.0 (inc alpha))
+        cs- (- 1.0 cs)
+        
+        b0 (* a0r 0.5 cs-)
+        b1 (* a0r cs-)
+        b2 b0
+        a1 (* a0r 2.0 cs)
+        a2 (* a0r (dec alpha))]
+    [b0 b1 b2 a1 a2]))
+
+(defn biquad-hp-params
+  ""
+  [fc bw fs]
+  (let [omega (* m/TWO_PI (/ fc fs))
+        sn (m/sin omega)
+        cs (m/cos omega)
+        alpha (* sn (m/sinh (* m/LN2_2 bw (/ omega sn))))
+        a0r (/ 1.0 (inc alpha))
+        cs+ (inc cs)
+        
+        b0 (* a0r 0.5 cs+)
+        b1 (* a0r (- cs+))
+        b2 b0
+        a1 (* a0r 2.0 cs)
+        a2 (* a0r (dec alpha))]
+    [b0 b1 b2 a1 a2]))
+
+(defn biquad-bp-params
+  ""
+  [fc bw fs]
+  (let [omega (* m/TWO_PI (/ fc fs))
+        sn (m/sin omega)
+        cs (m/cos omega)
+        alpha (* sn (m/sinh (* m/LN2_2 bw (/ omega sn))))
+        a0r (/ 1.0 (inc alpha))
+        
+        b0 (* a0r alpha)
+        b1 0.0
+        b2 (* a0r (- alpha))
+        a1 (* a0r 2.0 cs)
+        a2 (* a0r (dec alpha))]
+    [b0 b1 b2 a1 a2]))
+
 (defn biquad-filter
   ""
   ([[b0 b1 b2 a1 a2] [x2 x1 y2 y1] sample]
@@ -222,6 +272,15 @@
 (defmethod make-effect :biquad-ls [_ conf]
   (partial biquad-filter (biquad-ls-params (:fc conf) (:gain conf) (:slope conf) (:fs conf))))
 
+(defmethod make-effect :biquad-lp [_ conf]
+  (partial biquad-filter (biquad-lp-params (:fc conf) (:bw conf) (:fs conf))))
+
+(defmethod make-effect :biquad-hp [_ conf]
+  (partial biquad-filter (biquad-hp-params (:fc conf) (:bw conf) (:fs conf))))
+
+(defmethod make-effect :biquad-bp [_ conf]
+  (partial biquad-filter (biquad-bp-params (:fc conf) (:bw conf) (:fs conf))))
+
 (defn dj-eq
   ""
   ([b1 b2 b3 [s1 s2 s3] sample]
@@ -238,3 +297,39 @@
         b3 (make-effect :biquad-hs {:fc 10000.0 :gain (:hi conf) :slope (:shelf_slope conf) :fs (:rate conf)})]
     (partial dj-eq b1 b2 b3)))
 
+(defn phaser-allpass
+  ""
+  ([a1 [zm1] sample]
+   (let [y (+ zm1 (* sample (- a1)))
+         new-zm1 (+ sample (* y a1))]
+     [y new-zm1]))
+  ([a1 [zm1]]
+   (if (nil? zm1) [0.0] [zm1])))
+
+(defmethod make-effect :phaser-allpass [_ conf]
+  (let [d (:delay conf)]
+    (partial phaser-allpass (/ (- 1.0 d) (inc d)))))
+
+(defn divider
+  ""
+  ([denominator [out amp count lamp last zeroxs] sample]
+   (let [count (inc count)
+         [out lamp zeroxs count amp] (if (or (and (> sample 0.0) (<= last 0.0))
+                                             (and (neg? sample) (>= last)))
+                                       (if (== denominator 1)
+                                         [(if (pos? out) -1.0 1.0) (/ amp count) 0 0.0 0.0]
+                                         [out lamp (inc zeroxs) count amp])
+                                       [out lamp zeroxs count amp])
+         amp (+ amp (m/abs sample))
+         [out lamp zeroxs count amp] (if (and (> denominator 1)
+                                              (== (mod zeroxs denominator) (dec denominator)))
+                                       [(if (pos? out) -1.0 1.0) (/ amp count) 0 0.0 0.0]
+                                       [out lamp zeroxs count amp]
+                                       )
+         last sample]
+     [(* out lamp) out amp count lamp last zeroxs]))
+  ([_ [out amp count lamp last zeroxs]]
+   (map #(or %1 %2) [out amp count lamp last zeroxs] [1.0 0.0 0.0 0.0 0.0 0.0])))
+
+(defmethod make-effect :divider [_ conf]
+  (partial divider (:denominator conf)))
