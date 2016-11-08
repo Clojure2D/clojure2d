@@ -24,22 +24,24 @@
 (defn draw-grid
   ""
   [canvas]
-  (let [nx (m/irand 1 200)
-        ny (m/irand 1 200)
-        noise (j/make-random-fractal)
-        scale (m/drand 5)
+  (let [nx (m/irand 2 200)
+        ny (m/irand 2 200)
+        noise (m/make-perlin-noise)
+        scale (m/irand 5)
         nnx (inc (int (* scale nx)))
-        nny (inc (int (* scale ny)))]
+        nny (inc (int (* scale ny)))
+        div (* (- 201 nx) (- 201 ny))
+        shift (m/drand -10 10)]
     (println (str "nx=" nx))
     (println (str "ny=" ny))
     (dotimes [y 600]
       (dotimes [x 600]
-        (let [time (int (/ (+ x (* y 600)) (* (- 200 nx) (- 200 ny))))
-              yy (* (quot x nnx) (int (* nnx (inc (noise (quot x nnx) time)))))
-              xx (* (quot y nny) (int (* nny (inc (noise (quot y nny) time)))))
-              n (< (noise (quot (+ x xx) nx) (quot (+ y yy) ny)) 0.5)]
+        (let [time (+ shift (int (/ (+ x (* y 600)) div)))
+              yy (* (quot x nnx) (int (* nnx (inc (m/noise (quot x nnx) time )))))
+              xx (* (quot y nny) (int (* nny (inc (m/noise (quot y nny) (- time))))))
+              n (< (m/noise (quot (+ x xx) nx) (quot (+ y yy) ny)) 0.5)]
           (set-color canvas (if n dark light))
-          (point canvas x y))))))
+          (rect canvas x y 1 1))))))
 
 (do
   (with-canvas canvas

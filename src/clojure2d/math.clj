@@ -48,13 +48,6 @@
   (:import [net.jafama FastMath NumbersUtils]
            [org.apache.commons.math3.random RandomGenerator ISAACRandom JDKRandomGenerator MersenneTwister
             Well512a Well1024a Well19937a Well19937c Well44497a Well44497b]
-           [com.sudoplay.joise.module Module SourcedModule ScalarParameter
-            ModuleBasisFunction ModuleBasisFunction$BasisType ModuleBasisFunction$InterpolationType
-            ModuleCellular ModuleCellGen
-            ModuleAutoCorrect
-            ModuleFractal ModuleFractal$FractalType
-            ModuleTriangle ModuleSawtooth
-            ModuleScaleDomain]
            [com.flowpowered.noise.module.source Perlin]))
 
 (set! *warn-on-reflection* true)
