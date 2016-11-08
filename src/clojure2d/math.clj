@@ -231,6 +231,11 @@
         (neg? value) -1
         :else 0))
 
+(defn sgn
+  "Return -1 when value is negative, 1 otherwise"
+  [value]
+  (if (neg? value) -1 1))
+
 ;;`(constrain 0.5 1 2) => 1`  
 ;;`(constrain 1.5 1 2) => 1.5`  
 ;;`(constrain 2.5 1 2) => 2`  

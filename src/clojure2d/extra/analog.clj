@@ -15,8 +15,6 @@
 ;; `(lp lp-state 10) => [4.160172294378693 4.160172294378693]`
 ;; to restore state you have to use destructuring [result & state] to use on another sample
 ;;
-;; You operate on Pixels you can use helper function `make-effects-filter` where you pass list of the filters with or without inital state. Such filter can be used on Pixels like any other filter (like blur, normalize, etc.) with `p/filter-channels`
-;;
 ;; See examples 16
 ;;
 ;; Check description about each effect to see what configuration is required and what contains state.
@@ -31,6 +29,67 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
+
+;; represent signal as array of doubles, values -1.0 to 1.0
+
+(deftype Signal [^doubles s])
+
+;; helper functions
+(def ^:const alaw-A 87.6)
+(def ^:const alaw-rA (/ 1.0 alaw-A))
+(def ^:const alaw-lA (inc (m/log alaw-A)))
+(def ^:const alaw-rlA (/ 1.0 alaw-lA))
+
+(defn alaw
+  ""
+  [x]
+  (let [absx (m/abs x)
+        f (* alaw-rlA (m/sgn x))]
+    (* f (if (< absx alaw-rA)
+           (* alaw-A absx)
+           (+ alaw-lA (m/log absx))))))
+
+(defn alaw-rev
+  ""
+  [y]
+  (let [absy (m/abs y)
+        f (* alaw-rA (m/sgn y))
+        v (* absy alaw-lA)]
+    (* f (if (< absy alaw-rlA)
+           v
+           (* (m/exp (dec v)))))))
+
+(def ^:const ulaw-U 255.0)
+(def ^:const ulaw-rU (/ 1.0 255.0))
+(def ^:const ulaw-U1 (inc ulaw-U))
+(def ^:const ulaw-rlnU1 (/ 1.0 (m/log ulaw-U1)))
+
+(defn ulaw
+  ""
+  [x]
+  (* (m/sgn x)
+     ulaw-rlnU1
+     (m/log (inc (* ulaw-U (m/abs x))))))
+
+(defn ulaw-rev
+  ""
+  [y]
+  (* (m/sgn y)
+     ulaw-rU
+     (dec (m/pow ulaw-U1 (m/abs y)))))
+
+;; convert from Pixels to Signal and vice versa
+;; :layout [:planar :interleaved]
+;; :processing [:none :alaw :ulaw :alaw-rev :ulaw-rev]
+;; :sign [:signed :unsigned]
+;; :bits [:b8 :b16 :b24]
+;; :endianess [:little :big]
+;; :colorspace, one of the defined in clojure2d.color
+(defn from-Pixels
+  ""
+  [^Pixels in conf]
+  )
+
 
 ;; c/clamp255 or c/mod255
 (def ^:dynamic *clamp-method* c/clamp255)
@@ -314,20 +373,21 @@
   ""
   ([denominator [out amp count lamp last zeroxs] sample]
    (let [count (inc count)
-         [out lamp zeroxs count amp] (if (or (and (> sample 0.0) (<= last 0.0))
-                                             (and (neg? sample) (>= last)))
+         s (m/norm sample 0 255 -1.0 1.0)
+         [out lamp zeroxs count amp] (if (or (and (> s 0.0) (<= last 0.0))
+                                             (and (neg? s) (>= last)))
                                        (if (== denominator 1)
                                          [(if (pos? out) -1.0 1.0) (/ amp count) 0 0.0 0.0]
                                          [out lamp (inc zeroxs) count amp])
                                        [out lamp zeroxs count amp])
-         amp (+ amp (m/abs sample))
+         amp (+ amp (m/abs s))
          [out lamp zeroxs count amp] (if (and (> denominator 1)
                                               (== (mod zeroxs denominator) (dec denominator)))
                                        [(if (pos? out) -1.0 1.0) (/ amp count) 0 0.0 0.0]
                                        [out lamp zeroxs count amp]
                                        )
-         last sample]
-     [(* out lamp) out amp count lamp last zeroxs]))
+         last s]
+     [(m/norm (* out lamp) -1.0 1.0 0 255) out amp count lamp last zeroxs]))
   ([_ [out amp count lamp last zeroxs]]
    (map #(or %1 %2) [out amp count lamp last zeroxs] [1.0 0.0 0.0 0.0 0.0 0.0])))
 

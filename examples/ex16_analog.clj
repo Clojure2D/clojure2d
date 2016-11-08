@@ -33,14 +33,13 @@
                  (p/filter-colors c/from-YPbPr))]
     (save-pixels res "results/ex16/combined.jpg")))
 
-(binding [*clamp-method* c/mod255]
-  (let [filter (make-effects-filter [(make-effect :divider {:denominator 1})])
-        res (->> p
-                 (p/filter-colors c/to-OHTA)
-                 (p/filter-channels p/normalize)
-                 (p/filter-channels p/equalize-filter)
-                 (p/filter-channels filter filter filter nil)
-                 (p/filter-channels p/normalize)
-                 (p/filter-channels p/equalize-filter)
-                 (p/filter-colors c/from-YPbPr))]
-    (save-pixels res "results/ex16/divider.jpg")))
+(let [filter (make-effects-filter [(make-effect :divider {:denominator 7})])
+      res (->> p
+               (p/filter-colors c/to-OHTA)
+               (p/filter-channels p/normalize)
+               (p/filter-channels p/equalize-filter)
+               (p/filter-channels filter filter filter nil)
+               (p/filter-channels p/normalize)
+               (p/filter-channels p/equalize-filter)
+               (p/filter-colors c/from-YPbPr))]
+  (save-pixels res "results/ex16/divider.jpg"))
