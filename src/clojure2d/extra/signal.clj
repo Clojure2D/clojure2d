@@ -20,7 +20,7 @@
 ;; Check description about each effect to see what configuration is required and what contains state.
 ;;
 
-(ns clojure2d.extra.analog
+(ns clojure2d.extra.signal
   (:require [clojure2d.math :as m]
             [clojure2d.pixels :as p]
             [clojure2d.core :refer :all]
@@ -30,9 +30,11 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-;; represent signal as array of doubles, values -1.0 to 1.0
+;; represent signal is a collection of arrays of doubles, values -1.0 to 1.0
 
-(deftype Signal [^doubles s])
+(deftype Signal [^doubles signal]
+  Object
+  (toString [_] (str "size=" (alength signal))))
 
 ;; helper functions
 (def ^:const alaw-A 87.6)
@@ -78,21 +80,215 @@
      ulaw-rU
      (dec (m/pow ulaw-U1 (m/abs y)))))
 
+(defn- apply-sign
+  ""
+  [in bits]
+  (let [sh (- 64 bits)]
+    (-> in
+         (bit-shift-left sh)
+         (bit-shift-right sh))))
+
+;; TODO: move me to bit operations!!!
+(defn- pack-with-endianess-and-sign
+  ""
+  ([x little-endian signed]
+   (if signed (apply-sign x 8) x))
+  ([x y little-endian signed]
+   (let [[a b] (if little-endian [y x] [x y])
+         val (bit-or (bit-shift-left (bit-and a 0xff) 8)
+                     (bit-and b 0xff))]
+     (if signed (apply-sign val 16) val))
+   )
+  ([x y z little-endian signed]
+   (let [[a b c] (if little-endian [z y x] [x y z])
+         val (bit-or (bit-shift-left (bit-and a 0xff) 16)
+                     (bit-shift-left (bit-and b 0xff) 8)
+                     (bit-and c 0xff))]
+     (if signed (apply-sign val 24) val))))
+
+
+(def s8-min (apply-sign 0x80 8))
+(def s8-max (apply-sign 0x7f 8))
+(def s16-min (apply-sign 0x8000 16))
+(def s16-max (apply-sign 0x7fff 16))
+(def s24-min (apply-sign 0x800000 24))
+(def s24-max (apply-sign 0x7fffff 24))
+
+(defn- int-to-float
+  ""
+  ([x endianess sign]
+   (let [v (pack-with-endianess-and-sign x endianess sign)]
+     (if sign
+       (m/norm v s8-min s8-max -1.0 1.0)
+       (m/norm v 0 0xff -1.0 1.0))))
+  ([x y endianess sign]
+   (let [v (pack-with-endianess-and-sign x y endianess sign)]
+     (if sign
+       (m/norm v s16-min s16-max -1.0 1.0)
+       (m/norm v 0 0xffff -1.0 1.0))))
+  ([x y z endianess sign]
+   (let [v (pack-with-endianess-and-sign x y z endianess sign)]
+     (if sign
+       (m/norm v s24-min s24-max -1.0 1.0)
+       (m/norm v 0 0xffffff -1.0 1.0)))))
+
+(defn- float-to-int
+  ""
+  [bits v little-endian sign]
+  (let [vv (m/constrain v -1.0 1.0)
+        restored (long (condp = bits
+                         8 (if sign
+                               (m/norm vv -1.0 1.0 s8-min s8-max)
+                               (m/norm vv -1.0 1.0 0 0xff))
+                         16 (if sign
+                                (m/norm vv -1.0 1.0 s16-min s16-max)
+                                (m/norm vv -1.0 1.0 0 0xffff))
+                         24 (if sign
+                                (m/norm vv -1.0 1.0 s24-min s24-max)
+                                (m/norm vv -1.0 1.0 0 0xffffff))))]
+    (condp = bits
+      8 (bit-and restored 0xff)
+      16 (let [a (bit-and restored 0xff)
+                 b (bit-and (bit-shift-right restored 8) 0xff)]
+             (if little-endian [a b] [b a]))
+      24 (let [a (bit-and restored 0xff)
+                 b (bit-and (bit-shift-right restored 8) 0xff)
+                 c (bit-and (bit-shift-right restored 16) 0xff)]
+             (if little-endian [a b c] [c b a])))))
+
+(defn- pre-layout-planar
+  "dir == true: pixels -> buffer"
+  ([dir ^Pixels p channels ^ints buff]
+   (loop [ch channels
+          iter (int 0)]
+     (when ch
+       (let [channel (first ch)
+             curr-iter (loop [idx (int 0)
+                              titer iter]
+                         (if (< idx (.size p))
+                           (do
+                             (if dir
+                               (aset-int buff titer ^int (p/get-value p channel idx))
+                               (p/set-value p channel idx ^int (aget buff titer)))
+                             (recur (inc idx) (inc titer)))
+                           titer))]
+         (recur (next ch) (int curr-iter)))))
+   buff)
+  ([dir ^Pixels p channels]
+   (let [buff (int-array (* (count channels) (.size p)))]
+     (pre-layout-planar dir p channels buff))))
+
+(defn- pre-layout-interleaved
+  "dir == true: pixels -> buffer"
+  ([dir ^Pixels p channels ^ints buff]
+   (loop [idx (int 0)
+          iter (int 0)]
+     (when (< idx (.size p))
+       (let [curr-iter (loop [ch channels
+                              titer iter]
+                         (if ch
+                           (let [channel (first ch)]
+                             (if dir
+                               (aset-int buff titer ^int (p/get-value p channel idx))
+                               (p/set-value p channel idx ^int (aget buff titer)))
+                             (recur (next ch) (inc titer)))
+                           titer))]
+         (recur (inc idx) (int curr-iter)))))
+   buff)
+  ([dir ^Pixels p channels]
+   (let [buff (int-array (* (count channels) (.size p)))]
+     (pre-layout-interleaved dir p channels buff))))
+
+
 ;; convert from Pixels to Signal and vice versa
 ;; :layout [:planar :interleaved]
-;; :processing [:none :alaw :ulaw :alaw-rev :ulaw-rev]
-;; :sign [:signed :unsigned]
-;; :bits [:b8 :b16 :b24]
-;; :endianess [:little :big]
-;; :colorspace, one of the defined in clojure2d.color
-(defn from-Pixels
+;; :coding [:none :alaw :ulaw :alaw-rev :ulaw-rev]
+;; :signed [true false]
+;; :bits [8 16 24]
+;; :little-endian [true false]
+;; :channels :all or list of channels
+
+(def pixels-default-configuration
+  {:layout :interleaved
+   :coding :none
+   :signed false
+   :bits 8
+   :little-endian true
+   :channels [0 1 2]})
+
+(defn signal-from-pixels
   ""
-  [^Pixels in conf]
-  )
+  [^Pixels p conf]
+  (let [config (merge pixels-default-configuration conf)
+        channels (if (= :all (:channels config)) [0 1 2 3] (:channels config))
+        b (:bits config)
+        e (:little-endian config)
+        s (:signed config)
+        nb (bit-shift-right b 3)
+        tsize (int (m/ceil (/ (* (count channels) (.size p)) nb)))
+        ^doubles buff (double-array tsize)
+        ^ints layout (if (= :planar (:layout config))
+                       (pre-layout-planar true p channels)
+                       (pre-layout-interleaved true p channels))
+        limit (- (alength layout) (dec nb))
+        coding (condp = (:coding config)
+                 :none identity
+                 :alaw alaw
+                 :ulaw ulaw
+                 :alaw-rev alaw-rev
+                 :ulaw-rev ulaw-rev)]
 
+    (loop [idx (int 0)
+           bidx (int 0)]
+      (when (< idx limit)
+        (condp = nb
+          1 (aset-double buff bidx (coding (int-to-float (aget layout idx) e s)))
+          2 (aset-double buff bidx (coding (int-to-float (aget layout idx) (aget layout (inc idx)) e s)))
+          3 (aset-double buff bidx (coding (int-to-float (aget layout idx) (aget layout (inc idx)) (aget layout (+ 2 idx)) e s))))
+        (recur (+ idx nb) (inc bidx))))
 
-;; c/clamp255 or c/mod255
-(def ^:dynamic *clamp-method* c/clamp255)
+    (Signal. buff)))
+
+(defn signal-to-pixels
+  ""
+  [^Pixels target ^Signal sig conf]
+  (let [config (merge pixels-default-configuration conf)
+        channels (if (= :all (:channels config)) [0 1 2 3] (:channels config))
+        b (:bits config)
+        e (:little-endian config)
+        s (:signed config)
+        nb (bit-shift-right b 3)
+        tsize (int (m/ceil (/ (* (count channels) (.size target)) nb)))
+        ^doubles buff (.signal sig)
+        ^ints layout (int-array (* (count channels) (.size target)))
+        limit (- (alength layout) (dec nb))
+        coding (condp = (:coding config)
+                 :none identity
+                 :alaw alaw
+                 :ulaw ulaw
+                 :alaw-rev alaw-rev
+                 :ulaw-rev ulaw-rev)]
+
+    (loop [idx (int 0)
+           bidx (int 0)]
+      (when (< idx limit)
+        (let [v (coding (aget buff bidx))]
+          (condp = nb
+            1 (aset-int layout idx (float-to-int 8 v e s))
+            2 (let [[a b] (float-to-int 16 v e s)]
+                (aset-int layout idx a)
+                (aset-int layout (inc idx) b))
+            3 (let [[a b c] (float-to-int 24 v e s)]
+                (aset-int layout idx ^int a)
+                (aset-int layout (inc idx) ^int b)
+                (aset-int layout (+ 2 idx) ^int c))))
+        (recur (+ idx nb) (inc bidx))))
+
+    (if (= :planar (:layout config))
+      (pre-layout-planar false target channels layout)
+      (pre-layout-interleaved false target channels layout))
+
+    target))
 
 ;; state management functions and transducer operations
 
@@ -116,24 +312,33 @@
   ([effects initial-state]
    (map (fn [f c] [f (f c)]) effects initial-state)))
 
-(defn- apply-effects
-  "Apply effects on Pixels (channel)"
-  [state ch ^Pixels target ^Pixels p]
-  (loop [idx (int 0)
-         effects_and_state state]
-    (when (< idx (.size target))
-      (let [sample (p/get-value p ch idx)
-            [res conf] (process-effects-one-pass sample effects_and_state)]
-        (p/set-value target ch idx (*clamp-method* res))
-        (recur (inc idx) conf))))
-  :done)
+(defn apply-effects
+  "Apply effects on signal"
+  ([effects ^Signal s]
+   (let [len (alength ^doubles (.signal s))
+         ^doubles in (.signal s)
+         ^doubles out (double-array len)]
+     (loop [idx (int 0)
+            effects_and_state (create-state effects)]
+       (when (< idx len)
+         (let [sample (aget in idx)
+               [res conf] (process-effects-one-pass sample effects_and_state)]
+           (aset-double out idx res)
+           (recur (inc idx) conf))))
+     (Signal. out))))
 
 (defn make-effects-filter
   ""
-  ([effects initial-state]
-   (partial apply-effects (create-state effects initial-state)))
+  ([effects config config-back]
+   (fn [ch target p]
+     (let [c {:channels [ch]}
+           sig (signal-from-pixels p (merge config c))
+           res (apply-effects effects sig)]
+       (signal-to-pixels target res (merge config-back c)))))
   ([effects]
-   (partial apply-effects (create-state effects))))
+   (make-effects-filter effects {} {}))
+  ([effects config]
+   (make-effects-filter effects config config)))
 
 ;;; multimethod - effect creators
 
@@ -373,7 +578,7 @@
   ""
   ([denominator [out amp count lamp last zeroxs] sample]
    (let [count (inc count)
-         s (m/norm sample 0 255 -1.0 1.0)
+         s sample
          [out lamp zeroxs count amp] (if (or (and (> s 0.0) (<= last 0.0))
                                              (and (neg? s) (>= last)))
                                        (if (== denominator 1)
@@ -387,7 +592,7 @@
                                        [out lamp zeroxs count amp]
                                        )
          last s]
-     [(m/norm (* out lamp) -1.0 1.0 0 255) out amp count lamp last zeroxs]))
+     [(* out lamp) out amp count lamp last zeroxs]))
   ([_ [out amp count lamp last zeroxs]]
    (map #(or %1 %2) [out amp count lamp last zeroxs] [1.0 0.0 0.0 0.0 0.0 0.0])))
 
