@@ -341,14 +341,14 @@
           g (bit-and 0xff (bit-shift-right cc 8))
           b (bit-and 0xff cc)
           ^Vec4 res (f (Vec4. r g b 255))
-          nmnr (int (if (< (.x res) mnr) (.x res) mnr))
-          nmxr (int (if (> (.x res) mxr) (.x res) mxr))
-          nmng (int (if (< (.y res) mng) (.y res) mng))
-          nmxg (int (if (> (.y res) mxg) (.y res) mxg))
-          nmnb (int (if (< (.z res) mnb) (.z res) mnb))
-          nmxb (int (if (> (.z res) mxb) (.z res) mxb))]
+          nmnr (if (< (.x res) mnr) (.x res) mnr)
+          nmxr (if (> (.x res) mxr) (.x res) mxr)
+          nmng (if (< (.y res) mng) (.y res) mng)
+          nmxg (if (> (.y res) mxg) (.y res) mxg)
+          nmnb (if (< (.z res) mnb) (.z res) mnb)
+          nmxb (if (> (.z res) mxb) (.z res) mxb)]
       (if (< cc 0x1000000)
-        (recur (inc cc) nmnr nmxr nmng nmxg nmnb nmxb)
+        (recur (inc cc) (int nmnr) (int nmxr) (int nmng) (int nmxg) (int nmnb) (int nmxb))
         [nmnr nmxr nmng nmxg nmnb nmxb]))))
 
 
@@ -380,7 +380,7 @@
   "OHTA -> RGB"
   [^Vec4 c]
   (let [i1 (.x c) ; divided by 3
-        i2  (- (.y c) 127.5) ; divided by 2
+        i2 (- (.y c) 127.5) ; divided by 2
         i3 (- (* c46 (.z c)) 85.0) ; divided by 6
         r (clamp255 (+ i1 i2 i3))
         g (clamp255 (- i1 i3 i3))
@@ -407,6 +407,82 @@
         g (/ (- (.x c) (* 0.2126 r) (* 0.0722 b)) 0.7152)]
     (Vec4. (clamp255 r) (clamp255 g) (clamp255 b) (.w c))))
 
-;;(test-colors (comp from-YPbPr to-YPbPr))
+;; XYZ
+
+(defn- xyz-correct
+  ""
+  [v]
+  (* 100.0 (if (> v 0.04045)
+             (m/pow (/ (+ 0.055 v) 1.055) 2.4)
+             (/ v 12.92))))
+
+(defn to-XYZ-
+  ""
+  [^Vec4 c]
+  (let [r (xyz-correct (/ (.x c) 255.0))
+        g (xyz-correct (/ (.y c) 255.0))
+        b (xyz-correct (/ (.z c) 255.0))
+        x (+ (* r 0.4124) (* g 0.3576) (* b 0.1805))
+        y (+ (* r 0.2126) (* g 0.7152) (* b 0.0722))
+        z (+ (* r 0.0193) (* g 0.1192) (* b 0.9505))]
+    (Vec4. x y z (.w c))))
+
+(defn to-XYZ
+  ""
+  [c]
+  (let [^Vec4 cc (to-XYZ- c)]
+    (Vec4. (clamp255 (m/norm (.x cc) 0.0 95.05 0 255))
+           (clamp255 (* 2.55 (.y cc)))
+           (clamp255 (m/norm (.z cc) 0.0 108.899999999999 0 255))
+           (.w cc))))
+
+(def ^:const xyz-f (/ 1.0 2.4))
+
+(defn- xyz-decorrect
+  ""
+  [v]
+  (if (> v 0.0031308)
+    (- (* 1.055 (m/pow v xyz-f)) 0.055)
+    (* v 12.92)))
+
+(defn from-XYZ-
+  ""
+  [^Vec4 c]
+  (let [x (/ (.x c) 100.0)
+        y (/ (.y c) 100.0)
+        z (/ (.z c) 100.0)
+        r (xyz-decorrect (+ (* x  3.2406) (* y -1.5372) (* z -0.4986)))
+        g (xyz-decorrect (+ (* x -0.9689) (* y  1.8758) (* z  0.0415)))
+        b (xyz-decorrect (+ (* x  0.0557) (* y -0.2040) (* z  1.0570)))]
+    (Vec4. (* 255.0 r)
+           (* 255.0 g)
+           (* 255.0 b)
+           (.w c))))
+
+(defn from-XYZ
+  ""
+  [^Vec4 c]
+  (let [x (m/norm (.x c) 0 255 0.0 95.05)
+        y (/ (.y c) 2.55)
+        z (m/norm (.z c) 0 255 0.0 108.899999999999)
+        ^Vec4 rgb (from-XYZ- (Vec4. x y z (.w c)))]
+    (comment Vec4. (clamp255 (.x rgb))
+           (clamp255 (.y rgb))
+           (clamp255 (.z rgb))
+           (.w rgb))
+    rgb))
+
+;(to-XYZ (Vec4. 25 253 1 255))
+;; => #object[clojure2d.math.vector.Vec4 0x2552bd63 "[95.0, 180.0, 28.0, 255.0]"]
+;; => #object[clojure2d.math.vector.Vec4 0x6a9fb697 "[95.32428871945548, 179.67153095742873, 27.527914426466822, 255.0]"]
+
+;(from-XYZ (Vec4. 96 180 28 255))
+
+;((comp from-XYZ to-XYZ) (Vec4. 25 253 1 255))
+
+
+;(test-colors (comp from-XYZ to-XYZ))
+
+;; => [0.0 95.05 0.0 100.0 0.0 108.89999999999999]
 
 
