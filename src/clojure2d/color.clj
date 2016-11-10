@@ -331,12 +331,12 @@
   "to remove, check ranges"
   [f]
   (loop [cc (int 0)
-         mnr ^int Integer/MAX_VALUE
-         mxr ^int Integer/MIN_VALUE
-         mng ^int Integer/MAX_VALUE
-         mxg ^int Integer/MIN_VALUE
-         mnb ^int Integer/MAX_VALUE
-         mxb ^int Integer/MIN_VALUE]
+         mnr (double Integer/MAX_VALUE)
+         mxr (double Integer/MIN_VALUE)
+         mng (double Integer/MAX_VALUE)
+         mxg (double Integer/MIN_VALUE)
+         mnb (double Integer/MAX_VALUE)
+         mxb (double Integer/MIN_VALUE)]
     (let [r (bit-and 0xff (bit-shift-right cc 16))
           g (bit-and 0xff (bit-shift-right cc 8))
           b (bit-and 0xff cc)
@@ -348,7 +348,7 @@
           nmnb (if (< (.z res) mnb) (.z res) mnb)
           nmxb (if (> (.z res) mxb) (.z res) mxb)]
       (if (< cc 0x1000000)
-        (recur (inc cc) (int nmnr) (int nmxr) (int nmng) (int nmxg) (int nmnb) (int nmxb))
+        (recur (inc cc) (double nmnr) (double nmxr) (double nmng) (double nmxg) (double nmnb) (double nmxb))
         [nmnr nmxr nmng nmxg nmnb nmxb]))))
 
 
@@ -412,9 +412,13 @@
 (defn- xyz-correct
   ""
   [v]
-  (* 100.0 (if (> v 0.04045)
-             (m/pow (/ (+ 0.055 v) 1.055) 2.4)
-             (/ v 12.92))))
+  (if (> v 0.04045)
+    (m/pow (/ (+ 0.055 v) 1.055) 2.4)
+    (/ v 12.92)))
+
+(def ^:const xyz-xmax 0.9504716671128306)
+(def ^:const xyz-ymax 0.9999570331323426)
+(def ^:const xyz-zmax 1.0889782052041752)
 
 (defn to-XYZ-
   ""
@@ -422,18 +426,18 @@
   (let [r (xyz-correct (/ (.x c) 255.0))
         g (xyz-correct (/ (.y c) 255.0))
         b (xyz-correct (/ (.z c) 255.0))
-        x (+ (* r 0.4124) (* g 0.3576) (* b 0.1805))
-        y (+ (* r 0.2126) (* g 0.7152) (* b 0.0722))
-        z (+ (* r 0.0193) (* g 0.1192) (* b 0.9505))]
+        x (+ (* r 0.41239558896741421610) (* g 0.35758343076371481710) (* b 0.18049264738170157350))
+        y (+ (* r 0.21258623078559555160) (* g 0.71517030370341084990) (* b 0.07220049864333622685))
+        z (+ (* r 0.01929721549174694484) (* g 0.11918386458084853180) (* b 0.95049712513157976600))]
     (Vec4. x y z (.w c))))
 
 (defn to-XYZ
   ""
   [c]
   (let [^Vec4 cc (to-XYZ- c)]
-    (Vec4. (clamp255 (m/norm (.x cc) 0.0 95.05 0 255))
-           (clamp255 (* 2.55 (.y cc)))
-           (clamp255 (m/norm (.z cc) 0.0 108.899999999999 0 255))
+    (Vec4. (clamp255 (m/norm (.x cc) 0.0 xyz-xmax 0 255))
+           (clamp255 (m/norm (.y cc) 0.0 xyz-ymax 0 255))
+           (clamp255 (m/norm (.z cc) 0.0 xyz-zmax 0 255))
            (.w cc))))
 
 (def ^:const xyz-f (/ 1.0 2.4))
@@ -448,9 +452,9 @@
 (defn from-XYZ-
   ""
   [^Vec4 c]
-  (let [x (/ (.x c) 100.0)
-        y (/ (.y c) 100.0)
-        z (/ (.z c) 100.0)
+  (let [x (.x c)
+        y (.y c)
+        z (.z c)
         r (xyz-decorrect (+ (* x  3.2406) (* y -1.5372) (* z -0.4986)))
         g (xyz-decorrect (+ (* x -0.9689) (* y  1.8758) (* z  0.0415)))
         b (xyz-decorrect (+ (* x  0.0557) (* y -0.2040) (* z  1.0570)))]
@@ -462,27 +466,74 @@
 (defn from-XYZ
   ""
   [^Vec4 c]
-  (let [x (m/norm (.x c) 0 255 0.0 95.05)
-        y (/ (.y c) 2.55)
-        z (m/norm (.z c) 0 255 0.0 108.899999999999)
+  (let [x (m/norm (.x c) 0 255 0.0 xyz-xmax)
+        y (m/norm (.y c) 0 255 0.0 xyz-ymax)
+        z (m/norm (.z c) 0 255 0.0 xyz-zmax)
         ^Vec4 rgb (from-XYZ- (Vec4. x y z (.w c)))]
-    (comment Vec4. (clamp255 (.x rgb))
+    (Vec4. (clamp255 (.x rgb))
            (clamp255 (.y rgb))
            (clamp255 (.z rgb))
-           (.w rgb))
-    rgb))
+           (.w rgb))))
 
-;(to-XYZ (Vec4. 25 253 1 255))
-;; => #object[clojure2d.math.vector.Vec4 0x2552bd63 "[95.0, 180.0, 28.0, 255.0]"]
-;; => #object[clojure2d.math.vector.Vec4 0x6a9fb697 "[95.32428871945548, 179.67153095742873, 27.527914426466822, 255.0]"]
+;; LUV
 
-;(from-XYZ (Vec4. 96 180 28 255))
+(def ^:const D65X 0.950456)
+(def ^:const D65Z 1.088754)
+(def ^:const CIEEpsilon (/ 216.0 24389.0))
+(def ^:const CIEK (/ 24389.0 27.0))
+(def ^:const OneThird (/ 1.0 3.0))
+(def ^:const D65FX-4 (/ (* 4.0 D65X) (+ D65X 15 (* 3.0 D65Z))))
+(def ^:const D65FY-9 (/ 9.0 (+ D65X 15 (* 3.0 D65Z))))
 
-;((comp from-XYZ to-XYZ) (Vec4. 25 253 1 255))
+(defn perceptible-reciprocal
+  ""
+  [x]
+  (if (>= (m/abs x) m/EPSILON)
+    (/ 1.0 x)
+    (/ (m/sgn x) m/EPSILON)))
+
+(defn to-LUV
+  ""
+  [^Vec4 c]
+  (let [^Vec4 xyz (to-XYZ- c)
+        L (if (> (.y xyz) CIEEpsilon)
+            (- (* 116.0 (m/pow (.y xyz) OneThird)) 16.0)
+            (* (.y xyz) CIEK))
+        alpha (perceptible-reciprocal (+ (.x xyz) (* 15.0 (.y xyz)) (* 3.0 (.z xyz))))
+        L13 (* L 13.0)
+        u (* L13 (- (* 4.0 alpha (.x xyz)) D65FX-4))
+        v (* L13 (- (* 9.0 alpha (.y xyz)) D65FY-9))
+        L (/ L 100.0)
+        u (/ (+ u 134.0) 354.0)
+        v (/ (+ v 140.0) 262.0)]
+    (Vec4. (clamp255 (m/norm L 0.0 0.9999833859065517 0 255)) 
+           (clamp255 (m/norm u 0.1438470144487729 0.8730615053231279 0 255))
+           (clamp255 (m/norm v 0.022447496915761492 0.944255184334379 0 255))
+           (.w c))))
+
+(def ^:const CIEK2Epsilon (* CIEK CIEEpsilon))
 
 
-;(test-colors (comp from-XYZ to-XYZ))
+(defn from-LUV
+  ""
+  [^Vec4 c]
+  (let [L (* 100.0 (m/norm (.x c) 0 255 0.0 0.9999833859065517))
+        u (- (* 354.0 (m/norm (.y c) 0 255 0.1438470144487729 0.8730615053231279)) 134.0)
+        v (- (* 262.0 (m/norm (.z c) 0 255 0.022447496915761492 0.944255184334379)) 140.0)
+        Y (if (> L CIEK2Epsilon)
+            (m/pow (/ (+ L 16.0) 116.0) 3.0)
+            (/ L CIEK))
+        L13 (* 13.0 L)
+        L52 (* 52.0 L)
+        Y5 (* 5.0 Y)
+        L13u (/ (dec (/ L52 (+ u (* L13 D65FX-4)))) 3.0)
+        X (/ (+ Y5 (* Y (- (/ (* 39.0 L) (+ v (* L13 D65FY-9))) 5.0))) (+ L13u OneThird))
+        Z (- (* X L13u) Y5)
+        ^Vec4 rgb (from-XYZ- (Vec4. X Y Z (.w c)))]
+    (Vec4. (clamp255 (.x rgb))
+           (clamp255 (.y rgb))
+           (clamp255 (.z rgb))
+           (.w c))))
 
-;; => [0.0 95.05 0.0 100.0 0.0 108.89999999999999]
-
+;(test-colors (comp from-LUV to-LUV))
 

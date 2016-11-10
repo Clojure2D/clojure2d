@@ -173,8 +173,8 @@
   ([^BufferedImage b x y ^Pixels pin]
    (let [^Pixels p (if (.planar pin) (from-planar pin) pin)] 
      (.. b
-               (getRaster)
-               (setPixels ^int x ^int y ^int (.w p) ^int (.h p) ^ints (.p p))))
+         (getRaster)
+         (setPixels ^int x ^int y ^int (.w p) ^int (.h p) ^ints (.p p))))
    b)
   ([^BufferedImage b ^Pixels p]
    (set-image-pixels b 0 0 p)))
@@ -583,4 +583,4 @@
   "Equalize histogram"
   [ch target p]
   (let [^ints lookup (equalize-make-lookup (equalize-make-histogram ch p))]
-    (filter-channel #(aget lookup %) ch target p)))
+    (filter-channel #(aget ^ints lookup %) ch target p)))
