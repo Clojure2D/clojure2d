@@ -14,6 +14,7 @@
 (def ^:const TOLERANCE 1.0e-6)
 
 (defprotocol VectorProto
+  (applyf [v f])
   (magsq [v1])
   (mag [v1])
   (dot [v1 v2])
@@ -46,6 +47,7 @@
   Object
   (toString [_] (str "[" x ", " y "]"))
   VectorProto
+  (applyf [_ f] (Vec2. (f x) (f y)))
   (magsq [_] (+ (* x x) (* y y)))
   (mag [_] (m/hypot x y))
   (dot [_ v2] 
@@ -93,6 +95,7 @@
   Object
   (toString [_] (str "[" x ", " y ", " z "]"))
   VectorProto
+  (applyf [_ f] (Vec3. (f x) (f y) (f z)))
   (magsq [_] (+ (* x x) (* y y) (* z z)))
   (mag [_] (m/hypot x y z))
   (dot [_ v2]
@@ -208,6 +211,7 @@
   Object
   (toString [_] (str "[" x ", " y ", " z ", " w "]"))
   VectorProto
+  (applyf [_ f] (Vec4. (f x) (f y) (f z) (f w)))
   (magsq [_] (+ (* x x) (* y y) (* z z) (* w w)))
   (mag [v1] (m/sqrt (magsq v1)))
   (dot [_ v2]

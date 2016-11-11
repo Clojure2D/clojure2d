@@ -12,7 +12,7 @@
 (defn clamp255
   ""
   [a]
-  (int (m/constrain (m/round a) 0 255)))
+  (m/constrain (m/round a) 0 255))
 
 (defn mod255
   ""
@@ -41,6 +41,8 @@
          (.getGreen c)
          (.getBlue c)
          (.getAlpha c)))
+
+;; blending part
 
 (defn- umult
   ""
@@ -387,26 +389,6 @@
         b (clamp255 (- (+ i1 i3) i2))]
     (Vec4. r g b (.w c))))
 
-;; YPbPr
-
-(defn to-YPbPr
-  "RGB -> YPbPr, normalized"
-  [^Vec4 c]
-  (let [y (+ (* 0.2126 (.x c))
-             (* 0.7152 (.y c))
-             (* 0.0722 (.z c)))
-        pb (clamp255 (m/norm (- (.z c) y) -237.0 237.0 0.0 255.0))
-        pr (clamp255 (m/norm (- (.x c) y) -201.0 201.0 0.0 255.0))]
-    (Vec4. (clamp255 y) pb pr (.w c))))
-
-(defn from-YPbPr
-  "YPbPr -> RGB"
-  [^Vec4 c]
-  (let [b (+ (.x c) (m/norm (.y c) 0.0 255.0 -237.0 237.0))
-        r (+ (.x c) (m/norm (.z c) 0.0 255.0 -201.0 201.0))
-        g (/ (- (.x c) (* 0.2126 r) (* 0.0722 b)) 0.7152)]
-    (Vec4. (clamp255 r) (clamp255 g) (clamp255 b) (.w c))))
-
 ;; XYZ
 
 (defn- xyz-correct
@@ -420,7 +402,7 @@
 (def ^:const xyz-ymax 0.9999570331323426)
 (def ^:const xyz-zmax 1.0889782052041752)
 
-(defn to-XYZ-
+(defn- to-XYZ-
   ""
   [^Vec4 c]
   (let [r (xyz-correct (/ (.x c) 255.0))
@@ -435,9 +417,9 @@
   ""
   [c]
   (let [^Vec4 cc (to-XYZ- c)]
-    (Vec4. (clamp255 (m/norm (.x cc) 0.0 xyz-xmax 0 255))
-           (clamp255 (m/norm (.y cc) 0.0 xyz-ymax 0 255))
-           (clamp255 (m/norm (.z cc) 0.0 xyz-zmax 0 255))
+    (Vec4. (clamp255 (m/norm (.x cc) 0.0 xyz-xmax 0.0 255.0))
+           (clamp255 (m/norm (.y cc) 0.0 xyz-ymax 0.0 255.0))
+           (clamp255 (m/norm (.z cc) 0.0 xyz-zmax 0.0 255.0))
            (.w cc))))
 
 (def ^:const xyz-f (/ 1.0 2.4))
@@ -449,7 +431,7 @@
     (- (* 1.055 (m/pow v xyz-f)) 0.055)
     (* v 12.92)))
 
-(defn from-XYZ-
+(defn- from-XYZ-
   ""
   [^Vec4 c]
   (let [x (.x c)
@@ -466,14 +448,11 @@
 (defn from-XYZ
   ""
   [^Vec4 c]
-  (let [x (m/norm (.x c) 0 255 0.0 xyz-xmax)
-        y (m/norm (.y c) 0 255 0.0 xyz-ymax)
-        z (m/norm (.z c) 0 255 0.0 xyz-zmax)
+  (let [x (m/norm (.x c) 0.0 255.0 0.0 xyz-xmax)
+        y (m/norm (.y c) 0.0 255.0 0.0 xyz-ymax)
+        z (m/norm (.z c) 0.0 255.0 0.0 xyz-zmax)
         ^Vec4 rgb (from-XYZ- (Vec4. x y z (.w c)))]
-    (Vec4. (clamp255 (.x rgb))
-           (clamp255 (.y rgb))
-           (clamp255 (.z rgb))
-           (.w rgb))))
+    (v/applyf rgb clamp255)))
 
 ;; LUV
 
@@ -506,13 +485,12 @@
         L (/ L 100.0)
         u (/ (+ u 134.0) 354.0)
         v (/ (+ v 140.0) 262.0)]
-    (Vec4. (clamp255 (m/norm L 0.0 0.9999833859065517 0 255)) 
-           (clamp255 (m/norm u 0.1438470144487729 0.8730615053231279 0 255))
-           (clamp255 (m/norm v 0.022447496915761492 0.944255184334379 0 255))
+    (Vec4. (clamp255 (m/norm L 0.0 0.9999833859065517 0.0 255.0)) 
+           (clamp255 (m/norm u 0.1438470144487729 0.8730615053231279 0.0 255.0))
+           (clamp255 (m/norm v 0.022447496915761492 0.944255184334379 0.0 255.0))
            (.w c))))
 
 (def ^:const CIEK2Epsilon (* CIEK CIEEpsilon))
-
 
 (defn from-LUV
   ""
@@ -530,10 +508,362 @@
         X (/ (+ Y5 (* Y (- (/ (* 39.0 L) (+ v (* L13 D65FY-9))) 5.0))) (+ L13u OneThird))
         Z (- (* X L13u) Y5)
         ^Vec4 rgb (from-XYZ- (Vec4. X Y Z (.w c)))]
-    (Vec4. (clamp255 (.x rgb))
-           (clamp255 (.y rgb))
-           (clamp255 (.z rgb))
+    (v/applyf rgb clamp255)))
+
+(defn- to-lab-correct
+  ""
+  [v]
+  (if (> v CIEEpsilon)
+    (m/pow v OneThird)
+    (/ (+ 16.0 (* v CIEK)) 116.0)))
+
+(defn to-LAB
+  ""
+  [^Vec4 c]
+  (let [^Vec4 xyz (to-XYZ- c)
+        x (/ (.x xyz) D65X)
+        y (.y xyz)
+        z (/ (.z xyz) D65Z)
+        x (to-lab-correct x)
+        y (to-lab-correct y)
+        z (to-lab-correct z)
+        L (/ (- (* y 116.0) 16.0) 100.0)
+        a (+ 0.5 (/ (* 500.0 (- x y)) 255.0))
+        b (+ 0.5 (/ (* 200.0 (- y z)) 255.0))]
+    (Vec4. (clamp255 (m/norm L 0.0 0.9999833859065517 0.0 255.0))
+           (clamp255 (m/norm a 0.16203039020156618 0.8853278445843099 0.0 255.0))
+           (clamp255 (m/norm b 0.07698923890750631 0.8705163895243013 0.0 255.0)) 
            (.w c))))
 
-;(test-colors (comp from-LUV to-LUV))
+(defn from-lab-correct
+  ""
+  [v]
+  (let [v3 (* v v v)]
+    (if (> v3 CIEEpsilon)
+      v3
+      (/ (- (* 116.0 v) 16.0) CIEK))))
 
+(defn from-LAB
+  ""
+  [^Vec4 c]
+  (let [L (* 100.0 (m/norm (.x c) 0.0 255.0 0.0 0.9999833859065517))
+        a (m/norm (.y c) 0.0 255.0 0.16203039020156618 0.8853278445843099)
+        b (m/norm (.z c) 0.0 255.0 0.07698923890750631 0.8705163895243013)
+        y (/ (+ L 16.0) 116.0)
+        x (* D65X (from-lab-correct (+ y (/ (* 255.0 (- a 0.5)) 500.0))))
+        z (* D65Z (from-lab-correct (- y (/ (* 255.0 (- b 0.5)) 200.0))))
+        y3 (* y y y)
+        y (if (> y3 CIEEpsilon)
+            y3
+            (/ L CIEK))
+        ^Vec4 rgb (from-XYZ- (Vec4. x y z (.w c)))]
+    (v/applyf rgb clamp255)))
+
+(defn to-YXY
+  ""
+  [^Vec4 c]
+  (let [^Vec4 xyz (to-XYZ- c)
+        d (+ (.x xyz) (.y xyz) (.z xyz))
+        Y (m/norm (.y xyz) 0.0 0.9999570331323426 0.0 255.0)
+        x (m/norm (/ (.x xyz) d) 0.150011724420108 0.6400884809339611 0.0 255.0)
+        y (m/norm (/ (.y xyz) d) 0.060007548576610774 0.6000064972148145 0.0 255.0)]
+    (v/applyf (Vec4. Y x y (.w c)) clamp255)))
+
+(defn from-YXY
+  ""
+  [^Vec4 c]
+  (let [Y (m/norm (.x c) 0.0 255.0 0.0 0.9999570331323426)
+        x (m/norm (.y c) 0.0 255.0 0.150011724420108 0.6400884809339611)
+        y (m/norm (.z c) 0.0 255.0 0.060007548576610774 0.6000064972148145)
+        Yy (/ Y y)
+        X (* x Yy)
+        Z (* (- 1.0 x y) Yy)
+        ^Vec4 rgb (from-XYZ- (Vec4. X Y Z (.w c)))]
+    (v/applyf rgb clamp255)))
+
+(defn to-HCL
+  ""
+  [^Vec4 c]
+  (let [mx (max (.x c) (.y c) (.z c))
+        chr (- mx (min (.x c) (.y c) (.z c)))
+        h (* 255.0 (/ (if (zero? chr) 0
+                          (condp = mx
+                            (.x c) (mod (+ 6.0 (/ (- (.y c) (.z c)) chr)) 6.0)
+                            (.y c) (+ 2.0 (/ (- (.z c) (.x c)) chr))
+                            (.z c) (+ 4.0 (/ (- (.x c) (.y c)) chr)))) 6.0))
+        luma (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
+        ]
+    (v/applyf (Vec4. h chr luma (.w c)) clamp255)))
+
+(defn from-HCL
+  ""
+  [^Vec4 c]
+  (let [h (* 6.0 (/ (.x c) 255.0))
+        chr (.y c)
+        l (.z c)
+        x (* chr (- 1.0 (m/abs (dec (mod h 2.0)))))
+        [r g b] (cond
+                  (and (<= 0.0 h) (< h 1.0)) [chr x 0]
+                  (and (<= 1.0 h) (< h 2.0)) [x chr 0]
+                  (and (<= 2.0 h) (< h 3.0)) [0 chr x]
+                  (and (<= 3.0 h) (< h 4.0)) [0 x chr]
+                  (and (<= 4.0 h) (< h 5.0)) [x 0 chr]
+                  :else                      [chr 0 x])
+        m (- l (* 0.298839 r) (* 0.586811 g) (* 0.114350 b))]
+    (v/applyf (Vec4. (+ r m) (+ g m) (+ b m) (.w c)) clamp255)))
+
+(defn to-HSB
+  ""
+  [^Vec4 c]
+  (let [mn (min (.x c) (.y c) (.z c))
+        mx (max (.x c) (.y c) (.z c))
+        delta (- mx mn)
+        [h s b] (if (zero? mx) [0.0 0.0 0.0]
+                    (let [s (* 255.0 (/ delta mx))
+                          h (if (zero? delta) 0.0 
+                                (/ (condp = mx
+                                     (.x c) (/ (- (.y c) (.z c)) delta)
+                                     (.y c) (+ 2.0 (/ (- (.z c) (.x c)) delta))
+                                     (.z c) (+ 4.0 (/ (- (.x c) (.y c)) delta))) 6.0))]
+                      [(* 255.0 (if (neg? h) (inc h) h)) s mx]))]
+    (v/applyf (Vec4. h s b (.w c)) clamp255)))
+
+(defn from-HSB
+  ""
+  [^Vec4 c]
+  (if (zero? (.y c)) (Vec4. (.z c) (.z c) (.z c) (.w c))
+    (let [h (/ (.x c) 255.0)
+          s (/ (.y c) 255.0)
+          b (/ (.z c) 255.0)
+          h (* 6.0 (- h (m/floor h)))
+          f (- h (m/floor h))
+          p (* b (- 1.0 s))
+          q (* b (- 1.0 (* s f)))
+          t (* b (- 1.0 (* s (- 1.0 f))))
+          [r g b] (condp = (int h)
+                    0 [b t p]
+                    1 [q b p]
+                    2 [p b t]
+                    3 [p q b]
+                    4 [t p b]
+                    5 [b p q])]
+      (v/applyf (Vec4. (* 255.0 r) (* 255.0 g) (* 255.0 b) (.w c)) clamp255))))
+
+
+(def ^:const to-hsi-const (/ (/ 180.0 m/PI) 360.0))
+
+(defn to-HSI
+  ""
+  [^Vec4 c]
+  (let [i (/ (+ (.x c) (.y c) (.z c)) 3.0)]
+    (if (zero? i) (Vec4. 0.0 0.0 0.0 (.w c))
+        (let [s (- 1.0 (/ (min (.x c) (.y c) (.z c)) i))
+              alpha (* 0.5 (- (* 2.0 (.x c)) (.y c) (.z c)))
+              beta (* 0.8660254037844385 (- (.y c) (.z c)))
+              hue (* to-hsi-const (m/atan2 beta alpha))
+              hue (if (neg? hue) (inc hue) hue)]
+          (v/applyf (Vec4. (* 255.0 hue) (* 255.0 s) i (.w c)) clamp255)))))
+
+(def ^:const from-hsi-const (/ m/PI 180.0))
+
+(defn from-hsi-helper
+  ""
+  [^Vec4 cc h]
+  (* (.z cc) (inc (/ (* (.y cc) (m/cos (* h from-hsi-const))) (m/cos (* (- 60.0 h) from-hsi-const))))))
+
+(defn from-HSI
+  ""
+  [^Vec4 c]
+  (let [^Vec4 cc (v/div c 255)
+        h (* 360.0 (.x cc))
+        h (- h (* 360.0 (m/floor (/ h 360.0))))
+        v1 (* (.z cc) (- 1.0 (.y cc)))
+        [r g b] (cond
+                  (< h 120.0) (let [b v1
+                                    r (from-hsi-helper cc h)
+                                    g (- (* 3.0 (.z cc)) r b)]
+                                [r g b])
+                  (< h 240.0) (let [r v1
+                                    g (from-hsi-helper cc (- h 120.0))
+                                    b (- (* 3.0 (.z cc)) r g)]
+                                [r g b])
+                  :else (let [g v1
+                              b (from-hsi-helper cc (- h 240.0))
+                              r (- (* 3.0 (.z cc)) g b)]
+                          [r g b]))]
+    (v/applyf (v/mult (Vec4. r g b (.w cc)) 255.0) clamp255)))
+
+(defn to-HWB
+  ""
+  [^Vec4 c]
+  (let [w (min (.x c) (.y c) (.z c))
+        v (max (.x c) (.y c) (.z c))
+        h (if (= w v) 0.0
+              (let [f (condp = w
+                        (.x c) (- (.y c) (.z c))
+                        (.y c) (- (.z c) (.x c))
+                        (.z c) (- (.x c) (.y c)))
+                    p (condp = w
+                        (.x c) 3.0
+                        (.y c) 5.0
+                        (.z c) 1.0)]
+                (m/norm (/ (- p (/ f (- v w))) 6.0) 0.0 1.0 1.0 255.0)))]
+    (v/applyf (Vec4. h w (- 255 v) (.w c)) clamp255)))
+
+(defn from-HWB
+  ""
+  [^Vec4 c]
+  (if (zero? (.x c)) 
+    (let [v (- 255.0 (.z c))]
+      (Vec4. v v v (.w c)))
+    (let [h (m/norm (.x c) 1.0 255.0 0.0 6.0)
+          v (- 1.0 (/ (.z c) 255.0))
+          w (/ (.y c) 255.0)
+          i (int (m/floor h))
+          f (- h i)
+          f (if (odd? i) (- 1.0 f) f)
+          n (+ w (* f (- v w)))
+          [r g b] (condp == i
+                    0 [v n w]
+                    1 [n v w]
+                    2 [w v n]
+                    3 [w n v]
+                    4 [n w v]
+                    5 [v w n]
+                    6 [v n w])]
+      (v/applyf (Vec4. (* 255.0 r) (* 255.0 g) (* 255.0 b) (.w c)) clamp255))))
+
+;; YPbPr
+;; Luma + channel differences
+(defn to-YPbPr
+  "RGB -> YPbPr, normalized"
+  [^Vec4 c]
+  (let [y (+ (* 0.2126 (.x c))
+             (* 0.7152 (.y c))
+             (* 0.0722 (.z c)))
+        pb (clamp255 (m/norm (- (.z c) y) -237.0 237.0 0.0 255.0))
+        pr (clamp255 (m/norm (- (.x c) y) -201.0 201.0 0.0 255.0))]
+    (Vec4. (clamp255 y) pb pr (.w c))))
+
+(defn from-YPbPr
+  "YPbPr -> RGB"
+  [^Vec4 c]
+  (let [b (+ (.x c) (m/norm (.y c) 0.0 255.0 -237.0 237.0))
+        r (+ (.x c) (m/norm (.z c) 0.0 255.0 -201.0 201.0))
+        g (/ (- (.x c) (* 0.2126 r) (* 0.0722 b)) 0.7152)]
+    (v/applyf (Vec4. r g b (.w c)) clamp255)))
+
+;; 
+
+(defn to-YDbDr
+  ""
+  [^Vec4 c]
+  (let [Y (+ (* 0.299 (.x c)) (* 0.587 (.y c)) (* 0.114 (.z c)))
+        Db (+ (* -0.45 (.x c)) (* -0.883 (.y c)) (* 1.333 (.z c)))
+        Dr (+ (* -1.333 (.x c)) (* 1.116 (.y c)) (* 0.217 (.z c)))]
+    (v/applyf (Vec4. Y
+                     (m/norm Db -339.91499999999996 339.91499999999996 0.0 255.0)
+                     (m/norm Dr -339.91499999999996 339.915 0.0 255.0)
+                     (.w c)) clamp255)))
+
+(defn from-YDbDr
+  ""
+  [^Vec4 c]
+  (let [Y (.x c)
+        Db (m/norm (.y c) 0.0 255.0 -339.91499999999996 339.91499999999996)
+        Dr (m/norm (.z c) 0.0 255.0 -339.91499999999996 339.915)
+        r (+ Y (* 9.2303716147657e-05 Db) (* -0.52591263066186533 Dr))
+        g (+ Y (* -0.12913289889050927 Db) (* 0.26789932820759876 Dr))
+        b (+ Y (* 0.66467905997895482 Db) (* -7.9202543533108e-05 Dr))]
+    (v/applyf (Vec4. r g b (.w c)) clamp255)))
+
+;; JPEG version
+(defn to-YCbCr
+  ""
+  [^Vec4 c]
+  (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
+        Cb (+ 127.5 (* -0.168736 (.x c)) (* -0.331264 (.y c)) (* 0.5 (.z c)))
+        Cr (+ 127.5 (* 0.5 (.x c)) (* -0.418688 (.y c)) (* -0.081312 (.z c)))]
+    (v/applyf (Vec4. Y Cb Cr (.w c)) clamp255)))
+
+(defn from-YCbCr
+  ""
+  [^Vec4 c]
+  (let [Cb (- (.y c) 127.5)
+        Cr (- (.z c) 127.5)
+        r (+ (* 0.99999999999914679361 (.x c)) (* -1.2188941887145875e-06 Cb) (* 1.4019995886561440468 Cr))
+        g (+ (* 0.99999975910502514331 (.x c)) (* -0.34413567816504303521 Cb) (* -0.71413649331646789076 Cr))
+        b (+ (* 1.00000124040004623180 (.x c)) (* 1.77200006607230409200 Cb) (* 2.1453384174593273e-06 Cr))]
+    (v/applyf (Vec4. r g b (.w c)) clamp255)))
+
+(defn to-YUV
+  ""
+  [^Vec4 c]
+  (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
+        U (+ (* -0.147 (.x c)) (* -0.289 (.y c)) (* 0.436 (.z c)))
+        V (+ (* 0.615 (.x c)) (* -0.515 (.y c)) (* -0.1 (.z c)))]
+    (v/applyf (Vec4. Y 
+                     (m/norm U -111.17999999999999 111.17999999999999 0.0 255.0)
+                     (m/norm V -156.82500000000002 156.825 0.0 255.0)
+                     (.w c)) clamp255)))
+
+(defn from-YUV
+  ""
+  [^Vec4 c]
+  (let [Y (.x c)
+        U (m/norm (.y c) 0.0 255.0 -111.17999999999999 111.17999999999999)
+        V (m/norm (.z c) 0.0 255.0 -156.82500000000002 156.825)
+        r (+ Y (* -3.945707070708279e-05 U) (* 1.1398279671717170825 V))
+        g (+ Y (* -0.3946101641414141437 U) (* -0.5805003156565656797 V))
+        b (+ Y (* 2.0319996843434342537 U) (* -4.813762626262513e-04 V))]
+    (v/applyf (Vec4. r g b (.w c)) clamp255)))
+
+
+(defn to-YIQ
+  ""
+  [^Vec4 c]
+  (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
+        I (+ (* 0.595716 (.x c)) (* -0.274453 (.y c)) (* -0.321263 (.z c)))
+        Q (+ (* 0.211456 (.x c)) (* -0.522591 (.y c)) (* 0.311135 (.z c)))]
+    (v/applyf (Vec4. Y 
+                     (m/norm I -151.90758 151.90758 0.0 255.0)
+                     (m/norm Q -133.260705 133.260705 0.0 255.0)
+                     (.w c)) clamp255)))
+
+(defn from-YIQ
+  ""
+  [^Vec4 c]
+  (let [Y (.x c)
+        I (m/norm (.y c) 0.0 255.0 -151.90758 151.90758)
+        Q (m/norm (.z c) 0.0 255.0 -133.260705 133.260705)
+        r (+ Y (* +0.9562957197589482261 I) (* 0.6210244164652610754 Q))
+        g (+ Y (* -0.2721220993185104464 I) (* -0.6473805968256950427 Q))
+        b (+ Y (* -1.1069890167364901945 I) (* 1.7046149983646481374 Q))]
+    (v/applyf (Vec4. r g b (.w c)) clamp255)))
+
+
+(def colorspaces {:CMY [to-CMY from-CMY]
+                  :OHTA [to-OHTA from-OHTA]
+                  :XYZ [to-XYZ from-XYZ]
+                  :YXY [to-YXY from-YXY]
+                  :LUV [to-LUV from-LUV]
+                  :LAB [to-LAB from-LAB]
+                  :HCL [to-HCL from-HCL]
+                  :HSB [to-HSB from-HSB]
+                  :HSI [to-HSI from-HSI]
+                  :HWB [to-HWB from-HWB]
+                  :YPbPr [to-YPbPr from-YPbPr]
+                  :YDbDr [to-YDbDr from-YDbDr]
+                  :YCbCr [to-YCbCr from-YCbCr]
+                  :YUV [to-YUV from-YUV]
+                  :YIQ [to-YIQ from-YIQ]})
+
+(defn to-cs
+  "return colorspace converter by keyword (RGB -> ...)"
+  [cs]
+  ((cs colorspaces) 0))
+
+(defn from-cs
+  "return colorspace converter by keyword (... -> RGB)"
+  [cs]
+  ((cs colorspaces) 1))
