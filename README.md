@@ -125,13 +125,13 @@ I've prepared several examples with results where you can check current state of
 
 * Marginalia docs + github.io page
 * Cleaning, optimizations
-* Parallel color operations on Pixels
-* Color namespace cleaning
-* Colorspace converters
+* ~~Parallel color operations on Pixels~~
+* ~~Color namespace cleaning~~
+* ~~Colorspace converters~~
 * More in extra ns:
   - variations
   - code in extra namespace (moved from Processing)
-  - analog filters (for sonification part)
+  - more analog filters (for sonification part)
 * Canvas drawing functions (not filled shapes, PShape implementation)
 * Session handling (saving results in session, logging actions)
 * Sanity tests
@@ -154,7 +154,7 @@ Yes! You can help with this project:
 
 * Beginners:
   - create more variations
-  - create colorspace converters
+  - ~~create colorspace converters~~
   - create pixel filters
   - create analog (audio) filters
 * Advanced:
