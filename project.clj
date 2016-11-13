@@ -22,6 +22,7 @@
                  [com.sudoplay.joise/joise "1.0.1"]
 		 [de.sciss/jwave "1.0.3"]
                  [criterium "0.4.4"]]
+  :resource-path "resources/"
   :repl-options {:timeout 120000}
 ;;  :main ^:skip-aot clojure2d.core
   :target-path "target/%s"

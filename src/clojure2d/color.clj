@@ -1,6 +1,8 @@
 (ns clojure2d.color
   (:require [clojure2d.math :as m]
-            [clojure2d.math.vector :as v])
+            [clojure2d.math.vector :as v]
+            [clojure.xml :as xml]
+            [clojure.java.io :as io])
   (:import [clojure2d.math.vector Vec4]
            [java.awt Color]))
 
@@ -867,3 +869,51 @@
   "return colorspace converter by keyword (... -> RGB)"
   [cs]
   ((cs colorspaces) 1))
+
+
+;;;; read 200 palettes from colourlovers
+;;
+
+(defn- hex-to-vec
+  ""
+  [s]
+  (let [x (Integer/parseInt s 16)
+        x1 (bit-and 0xff (bit-shift-right x 16))
+        x2 (bit-and 0xff (bit-shift-right x 8))
+        x3 (bit-and 0xff x)]
+    (Vec4. x1 x2 x3 255)))
+
+(defn- hex-to-vecs
+  ""
+  [xs]
+  (into [] (map hex-to-vec xs)))
+
+(def palettes
+  (let [p1 (xml/parse (io/file (io/resource "colourlovers1.xml")))
+        p2 (xml/parse (io/file (io/resource "colourlovers2.xml")))
+        f (fn [xml-in] (map (fn [x] (map #((:content %) 0) (:content (first (filter #(= (:tag %) :colors) (:content ((:content xml-in) x))))))) (range 100)))
+        l1 (f p1)
+        l2 (f p2)]
+    (into [] (map hex-to-vecs (concat l1 l2)))))
+
+;; 
+
+(defn nearest-color
+  ""
+  ([f xf ^Vec4 c]
+   (first (reduce (fn [[currc currdist] ^Vec4 c1]
+                    (let [dist (f c1 c)]
+                      (if (< dist currdist)
+                        [c1 dist]
+                        [currc currdist]))) [c Double/MAX_VALUE] xf)))
+  ([xf c]
+   (nearest-color v/dist xf c)))
+
+(defn make-reduce-color-filter
+  ""
+  ([]
+   (partial nearest-color (rand-nth palettes)))
+  ([pal]
+   (partial nearest-color pal))
+  ([f pal]
+   (partial nearest-color f pal)))
