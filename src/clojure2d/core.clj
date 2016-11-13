@@ -130,7 +130,8 @@
 (defn save-pixels
   "Save pixels to file"
   [p n]
-  (save-image (p/image-from-pixels p) n))
+  (save-image (p/image-from-pixels p) n)
+  p)
 
 ;;;;;;;;;;;;;;;;;;; CANVAS
 

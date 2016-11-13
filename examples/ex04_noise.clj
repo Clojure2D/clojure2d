@@ -13,15 +13,13 @@
 (defn loop-noise
   ""
   [canvas n]
-  (u/doloop 
-   [y 180]
-   (u/doloop
-    [x 180]
-    (let [xx (/ x 50.0)
-          yy (/ y 50.0)
-          n (int (m/cnorm (n xx yy) 0 1 0 255))]
-      (set-color canvas (Color. n n n))
-      (rect canvas (+ x 10) (+ y 10) 1 1))))
+  (dotimes [y 180]
+    (dotimes [x 180]
+      (let [xx (/ x 50.0)
+            yy (/ y 50.0)
+            n (int (m/cnorm (n xx yy) 0 1 0 255))]
+        (set-color canvas (Color. n n n))
+        (rect canvas (+ x 10) (+ y 10) 1 1))))
   canvas)
 
 (defn draw-noise

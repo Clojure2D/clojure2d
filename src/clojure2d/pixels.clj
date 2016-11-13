@@ -220,11 +220,9 @@
 (defn filter-channel-xy
   "Filter one channel, write result into target. Works on planar/interleaved"
   [f ch ^Pixels target p]
-  (u/doloop
-   [y (.h target)]
-   (u/doloop
-    [x (.w target)]
-    (set-value target ch x y (f ch p x y))))
+  (dotimes [y (.h target)]
+    (dotimes [x (.w target)]
+      (set-value target ch x y (f ch p x y))))
   true)
 
 (defn filter-channels
@@ -259,10 +257,8 @@
 (defn blend-channel-xy
   "Blend one channel, write result into target. Works on planar/interleaved"
   [f ch ^Pixels target p1 p2]
-  (u/doloop
-   [y (.h target)]
-   (u/doloop
-    [x (.w target)]
+  (dotimes [y (.h target)]
+   (dotimes [x (.w target)]
     (set-value target ch x y (f ch p1 p2 x y))))
   true)
 
@@ -344,8 +340,7 @@
         iarr (/ 1.0 (inc (+ r r)))
         r+ (inc r)
         rang (range (- r+) r)]
-    (u/doloop 
-     [x w]
+    (dotimes [x w]
      (let [val (reduce #(+ %1 (u/aget-2d in w h x %2)) 0 rang)]
        (loop [y (int 0)
               v (int val)]
@@ -364,8 +359,7 @@
         iarr (/ 1.0 (inc (+ r r)))
         r+ (inc r)
         rang (range (- r+) r)]
-    (u/doloop
-     [y h]
+    (dotimes [y h]
      (let [val (reduce #(+ %1 (u/aget-2d in w h %2 y)) 0 rang)
            off (* w y)]
        (loop [x (int 0)

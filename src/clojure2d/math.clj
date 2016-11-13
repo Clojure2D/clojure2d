@@ -490,7 +490,8 @@
            `(* ~mx2 (~func ~r))))
        ([~r ~mn ~mx]
         (let [diff# (- ~mx ~mn)]
-          (+ ~mn (self# ~r diff#)))))))
+          (if (zero? diff#) ~mn
+            (+ ~mn (self# ~r diff#))))))))
 
 ;; Create protocol Randomizer with following functions:
 ;;

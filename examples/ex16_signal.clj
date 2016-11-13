@@ -56,3 +56,13 @@
                                                              :channels [2 0 1]
                                                              :bits 16})]
   (save-pixels (p/filter-channels p/normalize resp) "results/ex16/biquadeq.jpg"))
+
+
+;; saving and loading signal to and from file
+(save-signal (signal-from-pixels p {:layout :interleaved
+                                    :coding :alaw
+                                    :signed true
+                                    :channels [2 0 1]
+                                    :bits 16}) "results/ex16/signal.raw")
+
+(load-signal "results/ex16/signal.raw")

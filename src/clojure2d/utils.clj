@@ -86,13 +86,3 @@
   (let [tick (atom (dec v))]
     #(swap! tick inc)))
 
-(defmacro doloop
-  [bindings & body]
-  (let [i (first bindings)
-        n (second bindings)]
-    `(let [n# (int ~n)]
-       (loop [~i (int 0)]
-         (when (< ~i n#)
-           ~@body
-           (recur (unchecked-inc ~i)))))))
-

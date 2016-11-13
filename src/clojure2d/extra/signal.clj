@@ -24,7 +24,9 @@
   (:require [clojure2d.math :as m]
             [clojure2d.pixels :as p]
             [clojure2d.core :refer :all]
-            [clojure2d.color :as c])
+            [clojure2d.color :as c]
+            [clojure.java.io :refer :all]
+            [clojure2d.math.joise :as j])
   (:import [clojure2d.pixels Pixels]))
 
 (set! *warn-on-reflection* true)
@@ -598,3 +600,107 @@
 
 (defmethod make-effect :divider [_ conf]
   (partial divider (:denominator conf)))
+
+;;; load and save signal
+;;; file representation is 16 bit signed, big endian file
+;;; please use Audacity/SOX utilities to convert files
+(defn save-signal
+  ""
+  [^Signal s filename]
+  (make-parents filename)
+  (let [^java.io.DataOutputStream out (java.io.DataOutputStream. (output-stream filename))]
+    (try
+      (dotimes [i (alength ^doubles (.signal s))]
+        (.writeShort out (short (m/cnorm (aget ^doubles (.signal s) i) -1.0 1.0 Short/MIN_VALUE Short/MAX_VALUE))))
+      (.flush out)
+      (finally (. out clojure.core/close)))
+    s))
+
+
+(defn load-signal
+  ""
+  [filename]
+  (let [^java.io.File f (file filename)
+        len (/ (.length f) 2)
+        ^java.io.DataInputStream in (java.io.DataInputStream. (input-stream filename))
+        ^doubles buffer (double-array len)]
+    (try
+      (dotimes [i len]
+        (aset-double buffer i (double (m/cnorm (.readShort in) Short/MIN_VALUE Short/MAX_VALUE -1.0 1.0))))
+      (finally (. in clojure.core/close)))
+    (Signal. buffer)))
+
+
+;;;;;;;;;;;;;;;
+;;; wave generators
+
+(defn sin-wave
+  ""
+  [freq amp phase x]
+  (* amp
+     (m/sin (+ (* phase m/TWO_PI) (* x m/TWO_PI freq)))))
+
+(def snoise (j/make-noise (j/auto-correct (j/make-basis) 10000 -1.0 1.0)))
+
+(defn noise-wave
+  ""
+  [freq amp phase x]
+  (* amp
+     (snoise (* (+ phase x) freq))))
+
+(defn saw-wave
+  ""
+  [freq amp phase x]
+  (let [rp (* 2.0 amp)
+        p2 (* freq (mod (+ (* amp phase) amp x) 1.0))]
+    (* rp (- p2 (m/floor p2) 0.5))))
+
+(defn square-wave
+  ""
+  [freq amp phase x]
+  (if (< (mod (+ phase (* x freq)) 1.0) 0.5)
+    amp
+    (- amp)))
+
+(defn triangle-wave
+  ""
+  [saw amp x]
+  (- (* 2.0 (m/abs (saw x))) amp))
+
+(defn cut-triangle-wave
+  ""
+  [tri amp x]
+  (let [namp (* 0.5 amp)]
+    (* 2.0 (m/constrain (tri x) (- namp) namp))))
+
+(defmulti make-wave (fn [f _ _ _] f))
+(defmethod make-wave :sin [_ f a p] (partial sin-wave f a p))
+(defmethod make-wave :noise [_ f a p] (partial noise-wave f a p))
+(defmethod make-wave :saw [_ f a p] (partial saw-wave f a p))
+(defmethod make-wave :square [_ f a p] (partial square-wave f a p))
+(defmethod make-wave :triangle [_ f a p]
+  (let [saw (make-wave :saw f a p)]
+    (partial triangle-wave saw a)))
+(defmethod make-wave :cut-triangle [_ f a p] (partial cut-triangle-wave (make-wave :triangle f a p) a))
+
+(def waves [:sin :noise :saw :square :triangle :cut-triangle])
+
+(defn sum-waves
+  ""
+  [fs x]
+  (reduce #(+ %1 (%2 x)) 0 fs))
+
+(defn make-sum-wave
+  ""
+  [fs]
+  (partial sum-waves fs))
+
+(defn make-signal-from-wave
+  ""
+  [f samplerate seconds]
+  (let [len (* samplerate seconds)
+        ^doubles buffer (double-array len)
+        limit (dec seconds)]
+    (dotimes [i len]
+      (aset-double buffer i (f (m/norm i 0 len 0 limit))))
+    (Signal. buffer)))
