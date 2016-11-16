@@ -4,7 +4,6 @@
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
             [clojure2d.math.joise :as j]
-            [clojure2d.utils :as u]
             [clojure2d.pixels :as p])
   (:import  [java.awt Color]
             [clojure2d.pixels Pixels]))
@@ -15,7 +14,7 @@
 (show-window canvas "grid" 600 600 10)
 
 (defmethod key-pressed ["grid" \space] [_]
-  (let [r (u/to-hex (m/irand) 8)]
+  (let [r (to-hex (m/irand) 8)]
     (save-canvas canvas (str "results/ex17/" r ".jpg"))))
 
 (def dark (Color. 2 22 52))

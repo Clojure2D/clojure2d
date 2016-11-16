@@ -61,7 +61,7 @@
         v (* absy alaw-lA)]
     (* f (if (< absy alaw-rlA)
            v
-           (* (m/exp (dec v)))))))
+           (m/exp (dec v))))))
 
 (def ^:const ulaw-U 255.0)
 (def ^:const ulaw-rU (/ 1.0 255.0))
@@ -578,21 +578,20 @@
 
 (defn divider
   ""
-  ([denominator [out amp count lamp last zeroxs] sample]
+  ([denom [out amp count lamp last zeroxs] sample]
    (let [count (inc count)
          s sample
          [out lamp zeroxs count amp] (if (or (and (> s 0.0) (<= last 0.0))
-                                             (and (neg? s) (>= last)))
-                                       (if (== denominator 1)
+                                             (and (neg? s) (>= last 0.0)))
+                                       (if (== denom 1)
                                          [(if (pos? out) -1.0 1.0) (/ amp count) 0 0.0 0.0]
                                          [out lamp (inc zeroxs) count amp])
                                        [out lamp zeroxs count amp])
          amp (+ amp (m/abs s))
-         [out lamp zeroxs count amp] (if (and (> denominator 1)
-                                              (== (mod zeroxs denominator) (dec denominator)))
+         [out lamp zeroxs count amp] (if (and (> denom 1)
+                                              (== (mod zeroxs denom) (dec denom)))
                                        [(if (pos? out) -1.0 1.0) (/ amp count) 0 0.0 0.0]
-                                       [out lamp zeroxs count amp]
-                                       )
+                                       [out lamp zeroxs count amp])
          last s]
      [(* out lamp) out amp count lamp last zeroxs]))
   ([_ [out amp count lamp last zeroxs]]
@@ -615,7 +614,6 @@
       (.flush out)
       (finally (. out clojure.core/close)))
     s))
-
 
 (defn load-signal
   ""

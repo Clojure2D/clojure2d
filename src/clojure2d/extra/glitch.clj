@@ -7,8 +7,8 @@
 
 ;; Simple 2d SLITSCAN
 
-(def freqs (into [] (map #(bit-shift-left 1 %) (range 16))))
-(def amps (into [] (map #(/ 1.0 %) freqs)))
+(def freqs (vec (map #(bit-shift-left 1 %) (range 16))))
+(def amps (vec (map #(/ 1.0 %) freqs)))
 
 (defn make-random-waves
   ""

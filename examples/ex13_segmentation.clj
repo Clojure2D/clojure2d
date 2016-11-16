@@ -3,7 +3,6 @@
             [clojure2d.pixels :as p]
             [clojure2d.color :as clr]
             [clojure2d.extra.segmentation :as segm]
-            [clojure2d.utils :as u]
             [clojure2d.math :as m])
   (:import [clojure2d.pixels Pixels]
            [java.awt Color]))
@@ -25,7 +24,7 @@
        (let [^Pixels img (core/load-pixels filename)
              canvas (core/create-canvas (.w img) (.h img))
              segm (segm/segment-pixels-divide img channel min-size max-size threshold)
-             iter (u/make-counter 0)
+             iter (make-counter 0)
 
              draw (fn [canv] (doseq [[x y size] segm]
                                (let [defcol (Color. ^int (p/get-value img 0 x y)

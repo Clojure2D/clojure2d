@@ -5,7 +5,6 @@
             [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
             [clojure2d.math.joise :as n]
-            [clojure2d.utils :as u]
             [clojure2d.extra.variations :refer :all])
   (:import  [java.awt Color]
             [clojure2d.math.vector Vec2 Vec3]))
@@ -55,7 +54,7 @@
         particles (repeatedly 5000 make-particle)]
     
     (defmethod key-pressed ["curvature" \space] [_]
-      (let [r (u/to-hex (m/irand) 8)]
+      (let [r (to-hex (m/irand) 8)]
     (save-canvas canvas (str "results/ex09/" r ".jpg"))))
 
     (println (str variation1 " " variation2))

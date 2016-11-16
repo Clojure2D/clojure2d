@@ -895,7 +895,7 @@
 (defn- hex-to-vecs
   ""
   [xs]
-  (into [] (map hex-to-vec xs)))
+  (vec (map hex-to-vec xs)))
 
 (def palettes
   (let [p1 (xml/parse (io/file (io/resource "colourlovers1.xml")))
@@ -908,7 +908,7 @@
                                                                 :content))) (range 100)))
         l1 (f p1)
         l2 (f p2)]
-    (into [] (map hex-to-vecs (concat l1 l2)))))
+    (vec (map hex-to-vecs (concat l1 l2)))))
 
 ;; 
 

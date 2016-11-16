@@ -1,7 +1,6 @@
 (ns clojure2d.extra.overlays
   (:require [clojure2d.core :as core]
             [clojure2d.pixels :as p]
-            [clojure2d.utils :refer :all]
             [clojure2d.color :as c]
             [clojure2d.math :as m])
   (:import [java.awt.image BufferedImage]
@@ -52,7 +51,7 @@
                  (core/image (p/image-from-pixels l1))
                  (draw-lines w h))]
     
-    (let [^Pixels l1 (core/get-canvas-pixels canvas)]
+    (let [^Pixels l1 (p/get-canvas-pixels canvas)]
       (p/image-from-pixels (p/blend-channels (partial p/blend-channel-xy blend-shift-and-add-f) l1 l2)))))
 
 ;; noise canvas

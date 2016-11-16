@@ -213,25 +213,6 @@
   (let [[g b] @canvas]
     (swap! canvas (fn [c] [g b (rendering-hints hints)]))))
 
-;; taking and putting pixel array (as ints)
-
-(defn get-canvas-pixels
-  ""
-  ([canvas x y w h]
-   (let [[_ b] @canvas]
-     (p/get-image-pixels b x y w h)))
-  ([canvas]
-   (let [[_ b] @canvas]
-     (p/get-image-pixels b))))
-
-(defn set-canvas-pixels
-  ""
-  ([canvas p x y]
-   (let [[_ b] @canvas]
-     (p/set-image-pixels b x y p)))
-  ([canvas p]
-   (set-canvas-pixels canvas p 0 0)))
-
 (defn save-canvas
   "save image buffer"
   [canvas filename]

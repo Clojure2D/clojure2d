@@ -3,8 +3,7 @@
 (ns examples.ex14-metaballs
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
-            [clojure2d.color :as c]
-            [clojure2d.utils :as u])
+            [clojure2d.color :as c])
   (:import [java.awt Color]))
 
 (set! *warn-on-reflection* true)

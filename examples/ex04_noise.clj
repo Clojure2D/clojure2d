@@ -1,8 +1,7 @@
 (ns examples.ex04-noise
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
-            [clojure2d.math.joise :as j]
-            [clojure2d.utils :as u])
+            [clojure2d.math.joise :as j])
   (:import  [java.awt Color]))
 
 (set! *warn-on-reflection* true)
@@ -33,7 +32,7 @@
 (show-window canvas "noise" 600 600 1)
 
 (defmethod key-pressed ["noise" \space] [_]
-  (let [r (u/to-hex (m/irand) 8)]
+  (let [r (to-hex (m/irand) 8)]
     (save-canvas canvas (str "results/ex04/" r ".jpg"))))
 
 ; results/ex04/B129FE12.jpg

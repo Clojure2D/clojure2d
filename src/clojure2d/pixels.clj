@@ -186,6 +186,27 @@
     (set-image-pixels bimg p)))
 
 ;;
+
+;; taking and putting pixel array (as ints)
+
+(defn get-canvas-pixels
+  ""
+  ([canvas x y w h]
+   (let [[_ b] @canvas]
+     (get-image-pixels b x y w h)))
+  ([canvas]
+   (let [[_ b] @canvas]
+     (get-image-pixels b))))
+
+(defn set-canvas-pixels
+  ""
+  ([canvas p x y]
+   (let [[_ b] @canvas]
+     (set-image-pixels b x y p)))
+  ([canvas p]
+   (let [[_ b] @canvas]
+     (set-image-pixels b p))))
+
 ;;
 
 (defn load-pixels
