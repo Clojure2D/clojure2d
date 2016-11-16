@@ -1,7 +1,7 @@
 (ns clojure2d.core
   ""
   (:require [clojure.java.io :refer :all]
-            [clojure2d.pixels :as p])  
+            [clojure2d.math :as m])  
   (:import [java.awt.image BufferedImage]
            [javax.swing ImageIcon]
            [javax.imageio ImageIO ImageWriter ImageWriteParam IIOImage]
@@ -14,8 +14,7 @@
             Ellipse2D Ellipse2D$Double]
            [java.awt.event KeyAdapter KeyEvent MouseAdapter MouseMotionAdapter
             MouseEvent WindowAdapter WindowEvent ComponentEvent]
-           [javax.swing JFrame JPanel SwingUtilities]
-           [clojure2d.pixels Pixels]))
+           [javax.swing JFrame JPanel SwingUtilities]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -120,43 +119,30 @@
     (.dispose g)
     target))
 
-;;
-
-(defn load-pixels
-  "Load pixels from file"
-  [n]
-  (p/get-image-pixels (load-image n)))
-
-(defn save-pixels
-  "Save pixels to file"
-  [p n]
-  (save-image (p/image-from-pixels p) n)
-  p)
-
 ;;;;;;;;;;;;;;;;;;; CANVAS
 
 ;; rendering quality options
-(def rendering-hints { :low { RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_OFF
-                             RenderingHints/KEY_INTERPOLATION RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR
+(def rendering-hints { :low { RenderingHints/KEY_ANTIALIASING       RenderingHints/VALUE_ANTIALIAS_OFF
+                             RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR
                              RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
-                             RenderingHints/KEY_COLOR_RENDERING RenderingHints/VALUE_COLOR_RENDER_SPEED
-                             RenderingHints/KEY_RENDERING RenderingHints/VALUE_RENDER_SPEED
-                             RenderingHints/KEY_FRACTIONALMETRICS RenderingHints/VALUE_FRACTIONALMETRICS_OFF
-                             RenderingHints/KEY_TEXT_ANTIALIASING RenderingHints/VALUE_TEXT_ANTIALIAS_OFF}
-                      :mid { RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON
-                             RenderingHints/KEY_INTERPOLATION RenderingHints/VALUE_INTERPOLATION_BILINEAR
+                             RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED
+                             RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED
+                             RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF
+                             RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_OFF}
+                      :mid  { RenderingHints/KEY_ANTIALIASING       RenderingHints/VALUE_ANTIALIAS_ON
+                             RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BILINEAR
                              RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
-                             RenderingHints/KEY_COLOR_RENDERING RenderingHints/VALUE_COLOR_RENDER_SPEED
-                             RenderingHints/KEY_RENDERING RenderingHints/VALUE_RENDER_SPEED
-                             RenderingHints/KEY_FRACTIONALMETRICS RenderingHints/VALUE_FRACTIONALMETRICS_OFF
-                             RenderingHints/KEY_TEXT_ANTIALIASING RenderingHints/VALUE_TEXT_ANTIALIAS_ON}
-                      :high { RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON
-                             RenderingHints/KEY_INTERPOLATION RenderingHints/VALUE_INTERPOLATION_BICUBIC
+                             RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED
+                             RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED
+                             RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF
+                             RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON}
+                      :high { RenderingHints/KEY_ANTIALIASING       RenderingHints/VALUE_ANTIALIAS_ON
+                             RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC
                              RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY
-                             RenderingHints/KEY_COLOR_RENDERING RenderingHints/VALUE_COLOR_RENDER_QUALITY
-                             RenderingHints/KEY_RENDERING RenderingHints/VALUE_RENDER_QUALITY
-                             RenderingHints/KEY_FRACTIONALMETRICS RenderingHints/VALUE_FRACTIONALMETRICS_ON
-                             RenderingHints/KEY_TEXT_ANTIALIASING RenderingHints/VALUE_TEXT_ANTIALIAS_ON}})
+                             RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY
+                             RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY
+                             RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON
+                             RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON}})
 
 ;;
 
@@ -536,3 +522,143 @@
      [frame is-display-running?]))
   ([canvas wname width height fps]
    (show-window canvas wname width height fps nil)))
+
+
+;; various utilities
+
+(defn to-hex
+  "return hex value of given number, padded with leading zeroes if given length"
+  ([n]
+   (format "%X" n))
+  ([n pad]
+   (format (str "%0" pad "X") n)))
+
+(defmacro time-with-name
+  "Evaluates expr and prints the time it took.  Returns the value of
+ expr."
+  [ss expr]
+  `(let [start# (. System (nanoTime))
+         ret# ~expr]
+     (prn (str ~ss " Elapsed time: " (/ (double (- (. System (nanoTime)) start#)) 1000000.0) " msecs"))
+     ret#))
+
+;; array
+
+(defn array-mutate!
+  "Mutate int array value with function f"
+  [f ^ints array idx]
+  (let [v (aget array idx)]
+    (aset array idx ^int (f v))))
+
+(defmacro amap!
+  "Mutating version of amap"
+  {:added "1.0"}
+  [a idx expr]
+  `(let [a# ~a]
+     (loop  [~idx 0]
+       (if (< ~idx  (alength a#))
+         (do
+           (aset-int a# ~idx ~expr)
+           (recur (unchecked-inc ~idx)))
+         a#))))
+
+(defn aget-2d
+  "Get value from int array, treat as 2d"
+  [^ints array w h x y]
+  (if (or (neg? x)
+          (neg? y)
+          (>= x w)
+          (>= y h))
+    (aget-2d array w h (m/constrain x 0 (dec w)) (m/constrain y 0 (dec h)))
+    (aget array (int (+ x (* y w))))))
+
+(defn array-clone
+  "Clone array using System/arraycopy"
+  [^ints array]
+  (let [len (int (alength array))
+        res (int-array len)]
+      (System/arraycopy array 0 ^ints res 0 len)
+      res))
+
+;;
+(defn make-counter [v] 
+  (let [tick (atom (dec v))]
+    #(swap! tick inc)))
+
+(defn make-session-name
+  ""
+  ([]
+   (let [^java.text.SimpleDateFormat sdf (java.text.SimpleDateFormat. "yyyyMMddHHmmss")
+         date (java.util.Date.)]
+     [(.format sdf date) (to-hex (hash date))])))
+
+(def ^:dynamic *log-to-file* false)
+
+(let [session-name (atom nil) ; store session name as a current date
+      session-file (agent nil) ; logger Writer, created and used when *log-to-file* is true
+      session-cnt (atom nil) ; counter for next filename fn
+      ^java.text.SimpleDateFormat sdf (java.text.SimpleDateFormat. "yyyy-MM-dd HH:mm:ss")
+      nilfn (fn [_] nil)]
+
+  (defn close-session
+    ""
+    []
+    (when-not (nil? @session-file)
+      (send session-file (fn [^java.io.Writer o]
+                           (.flush o)
+                           (.close o)
+                           nil)))
+    (swap! session-name nilfn)
+    (swap! session-cnt nilfn))
+
+  (defn make-session
+    ""
+    []
+    (let [nname (make-session-name)]
+      (swap! session-name (fn [_] nname))
+
+      (when *log-to-file*
+        (let [fname (str "log/" (first nname) ".log")]
+          (make-parents fname)
+          (send session-file (fn [^java.io.Writer o]
+                               (do
+                                 (when-not (nil? o)
+                                   (.flush o)
+                                   (.close o))
+                                 (let [^java.io.Writer no (writer fname :append true)]
+                                   (.write no (str "Session id: " (second nname) "\n"))
+                                   no))))))
+
+      (swap! session-cnt (fn [_] (make-counter 0)))))
+
+  (defn log
+    ""
+    [s]
+    (when *log-to-file*
+      (if (nil? @session-file)
+        (do
+          (make-session)
+          (log s))
+        (let [to-log (str (.format sdf (java.util.Date.)) ": " s "\n")]
+          (send session-file (fn [^java.io.Writer o]
+                               (.write o to-log)
+                               (.flush o)
+                               o)))))
+    true)
+
+  (defn next-filename
+    ""
+    [prefix]
+    (if (nil? @session-name)
+      (do
+        (make-session)
+        (next-filename prefix))
+      (str prefix (second @session-name) "_" (format "%06d" (@session-cnt)))))
+
+  (defn get-session-name
+    ""
+    []
+    @session-name)
+
+
+)

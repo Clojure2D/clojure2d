@@ -506,7 +506,10 @@
         L13 (* 13.0 L)
         L52 (* 52.0 L)
         Y5 (* 5.0 Y)
-        L13u (/ (dec (/ L52 (+ u (* L13 D65FX-4)))) 3.0)
+        L13u (-> L52
+                 (/ (+ u (* L13 D65FX-4)))
+                 dec
+                 (/ 3.0))
         X (/ (+ Y5 (* Y (- (/ (* 39.0 L) (+ v (* L13 D65FY-9))) 5.0))) (+ L13u OneThird))
         Z (- (* X L13u) Y5)
         ^Vec4 rgb (from-XYZ- (Vec4. X Y Z (.w c)))]
@@ -652,7 +655,9 @@
       (v/applyf (Vec4. (* 255.0 r) (* 255.0 g) (* 255.0 b) (.w c)) clamp255))))
 
 
-(def ^:const to-hsi-const (/ (/ 180.0 m/PI) 360.0))
+(def ^:const to-hsi-const (-> 180.0
+                              (/ m/PI)
+                              (/ 360.0)))
 
 (defn to-HSI
   ""
@@ -671,7 +676,11 @@
 (defn from-hsi-helper
   ""
   [^Vec4 cc h]
-  (* (.z cc) (inc (/ (* (.y cc) (m/cos (* h from-hsi-const))) (m/cos (* (- 60.0 h) from-hsi-const))))))
+  (* (.z cc) (-> cc
+                 .y
+                 (* (m/cos (* h from-hsi-const)))
+                 (/ (m/cos (* (- 60.0 h) from-hsi-const)))
+                 inc)))
 
 (defn from-HSI
   ""
@@ -844,21 +853,21 @@
     (v/applyf (Vec4. r g b (.w c)) clamp255)))
 
 
-(def colorspaces {:CMY [to-CMY from-CMY]
-                  :OHTA [to-OHTA from-OHTA]
-                  :XYZ [to-XYZ from-XYZ]
-                  :YXY [to-YXY from-YXY]
-                  :LUV [to-LUV from-LUV]
-                  :LAB [to-LAB from-LAB]
-                  :HCL [to-HCL from-HCL]
-                  :HSB [to-HSB from-HSB]
-                  :HSI [to-HSI from-HSI]
-                  :HWB [to-HWB from-HWB]
+(def colorspaces {:CMY   [to-CMY from-CMY]
+                  :OHTA  [to-OHTA from-OHTA]
+                  :XYZ   [to-XYZ from-XYZ]
+                  :YXY   [to-YXY from-YXY]
+                  :LUV   [to-LUV from-LUV]
+                  :LAB   [to-LAB from-LAB]
+                  :HCL   [to-HCL from-HCL]
+                  :HSB   [to-HSB from-HSB]
+                  :HSI   [to-HSI from-HSI]
+                  :HWB   [to-HWB from-HWB]
                   :YPbPr [to-YPbPr from-YPbPr]
                   :YDbDr [to-YDbDr from-YDbDr]
                   :YCbCr [to-YCbCr from-YCbCr]
-                  :YUV [to-YUV from-YUV]
-                  :YIQ [to-YIQ from-YIQ]})
+                  :YUV   [to-YUV from-YUV]
+                  :YIQ   [to-YIQ from-YIQ]})
 
 (defn to-cs
   "return colorspace converter by keyword (RGB -> ...)"
@@ -891,7 +900,12 @@
 (def palettes
   (let [p1 (xml/parse (io/file (io/resource "colourlovers1.xml")))
         p2 (xml/parse (io/file (io/resource "colourlovers2.xml")))
-        f (fn [xml-in] (map (fn [x] (map #((:content %) 0) (:content (first (filter #(= (:tag %) :colors) (:content ((:content xml-in) x))))))) (range 100)))
+        f (fn [xml-in] (map (fn [x] (map #((:content %) 0) (->> x
+                                                                ((:content xml-in))
+                                                                :content
+                                                                (filter #(= (:tag %) :colors))
+                                                                first
+                                                                :content))) (range 100)))
         l1 (f p1)
         l2 (f p2)]
     (into [] (map hex-to-vecs (concat l1 l2)))))

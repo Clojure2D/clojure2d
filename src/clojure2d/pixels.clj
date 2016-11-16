@@ -2,7 +2,7 @@
   (:require [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
             [clojure2d.color :as c]
-            [clojure2d.utils :as u]
+            [clojure2d.core :as core]
             [criterium.core :as b])
   (:import [clojure2d.math.vector Vec4 Vec2]
            [java.awt.image BufferedImage]))
@@ -33,7 +33,7 @@
           off (* ch size)]
       (if planar
         (System/arraycopy p ^int off res 0 ^int size)
-        (u/amap! p idx (aget p ^int (+ ch (bit-shift-left idx 2)))))
+        (core/amap! p idx (aget p ^int (+ ch (bit-shift-left idx 2)))))
       res))
 
   (set-channel [_ ch v]
@@ -133,7 +133,7 @@
 (defn clone-pixels
   "Clone Pixels"
   [^Pixels p]
-  (replace-pixels p (u/array-clone (.p p))))
+  (replace-pixels p (core/array-clone (.p p))))
 
 ;; interleaved/planar
 
@@ -184,6 +184,21 @@
   [^Pixels p]
   (let [^BufferedImage bimg (BufferedImage. (.w p) (.h p) BufferedImage/TYPE_INT_ARGB)]
     (set-image-pixels bimg p)))
+
+;;
+;;
+
+(defn load-pixels
+  "Load pixels from file"
+  [n]
+  (get-image-pixels (core/load-image n)))
+
+(defn save-pixels
+  "Save pixels to file"
+  [p n]
+  (core/save-image (image-from-pixels p) n)
+  p)
+
 
 ;; processors
 
@@ -341,12 +356,12 @@
         r+ (inc r)
         rang (range (- r+) r)]
     (dotimes [x w]
-     (let [val (reduce #(+ %1 (u/aget-2d in w h x %2)) 0 rang)]
+     (let [val (reduce #(+ %1 (core/aget-2d in w h x %2)) 0 rang)]
        (loop [y (int 0)
               v (int val)]
          (when (< y h)
-           (let [nv (int (- (+ v (u/aget-2d in w h x (+ y r)))
-                            (u/aget-2d in w h x (- y r+))))]
+           (let [nv (int (- (+ v (core/aget-2d in w h x (+ y r)))
+                            (core/aget-2d in w h x (- y r+))))]
              (aset-int target ^int (+ x (* w y)) (* nv iarr))
              (recur (inc y) nv))))))
     target))
@@ -360,13 +375,13 @@
         r+ (inc r)
         rang (range (- r+) r)]
     (dotimes [y h]
-     (let [val (reduce #(+ %1 (u/aget-2d in w h %2 y)) 0 rang)
+     (let [val (reduce #(+ %1 (core/aget-2d in w h %2 y)) 0 rang)
            off (* w y)]
        (loop [x (int 0)
               v (int val)]
          (when (< x w)
-           (let [nv (int (- (+ v (u/aget-2d in w h (+ x r) y))
-                            (u/aget-2d in w h (- x r+) y)))]
+           (let [nv (int (- (+ v (core/aget-2d in w h (+ x r) y))
+                            (core/aget-2d in w h (- x r+) y)))]
              (aset-int target ^int (+ x off) (* nv iarr))
              (recur (inc x) nv))))))
     target))
