@@ -1,6 +1,6 @@
 ;; visualize wave generators
 
-(ns examples.ex16-analog
+(ns examples.ex18-waves
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
             [clojure2d.extra.signal :as s]))
@@ -10,7 +10,7 @@
 (def display (show-window canvas "waves" 600 600 25))
 
 (defmethod key-pressed ["waves" \space] [_]
-  (let [r (clojure2d.utils/to-hex (m/irand) 8)]
+  (let [r (to-hex (m/irand) 8)]
     (save-canvas canvas (str "results/ex18/" r ".jpg"))))
 
 ;; frequencies and amplitudes

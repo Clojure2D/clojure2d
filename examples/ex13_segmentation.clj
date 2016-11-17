@@ -21,10 +21,10 @@
    (example-13 filename resfilename :default))
   ([filename resfilename strategy]
    (binding [p/*pixels-edge* 128] ; let's be sure we have some fixed value outside the image
-       (let [^Pixels img (core/load-pixels filename)
+       (let [^Pixels img (p/load-pixels filename)
              canvas (core/create-canvas (.w img) (.h img))
              segm (segm/segment-pixels-divide img channel min-size max-size threshold)
-             iter (make-counter 0)
+             iter (core/make-counter 0)
 
              draw (fn [canv] (doseq [[x y size] segm]
                                (let [defcol (Color. ^int (p/get-value img 0 x y)

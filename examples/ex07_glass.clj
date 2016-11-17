@@ -51,7 +51,7 @@
         [_ disp] (show-window canvas "glass" 800 800 25)]
 
     (defmethod key-pressed ["glass" \space] [_]
-      (let [r (clojure2d.utils/to-hex (m/irand) 8)]
+      (let [r (to-hex (m/irand) 8)]
         (save-canvas canvas (str "results/ex07/" r ".jpg"))))
 
 

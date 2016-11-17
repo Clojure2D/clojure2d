@@ -60,9 +60,8 @@
         [_ disp] (show-window canvas "caustic" 800 800 25)]
 
     (defmethod key-pressed ["caustic" \space] [_]
-      (let [r (clojure2d.utils/to-hex (m/irand) 8)]
+      (let [r (to-hex (m/irand) 8)]
         (save-canvas canvas (str "results/ex06/" r ".jpg"))))
-
 
     (with-canvas canvas
       (set-color (Color. 10 20 40 30))

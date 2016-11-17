@@ -24,7 +24,7 @@
     (with-canvas canvas
       (set-background (Color. 45 45 41 20)))
     
-    (set-canvas-pixels canvas (p/filter-channels p/gaussian-blur-2 (get-canvas-pixels canvas)))
+    (p/set-canvas-pixels canvas (p/filter-channels p/gaussian-blur-2 (p/get-canvas-pixels canvas)))
 
     (with-canvas canvas
       (set-color (Color. (- 146 cn) (- 199 cn) (- 163 cn)))

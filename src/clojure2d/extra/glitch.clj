@@ -36,4 +36,13 @@
   ([fx fy]
    (partial p/filter-channel-xy (partial slitscan fx fy))))
 
+;; channel shifts
 
+(defn make-shift-channels-filter
+  ""
+  [amount h v]
+  (let [mv (fn [_] amount)
+        zr (fn [_] 0.0)]
+   (make-slitscan-filter (if h mv zr) (if v mv zr))))
+
+;; mirrorimage

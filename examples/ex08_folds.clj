@@ -75,7 +75,7 @@
         [_ disp] (show-window canvas "folds" w h 25)]
 
     (defmethod key-pressed ["folds" \space] [_]
-             (let [r (clojure2d.utils/to-hex (m/irand) 8)]
+             (let [r (to-hex (m/irand) 8)]
                (save-canvas canvas (str "results/ex08/" r ".jpg"))))
 
   [canvas disp]))
