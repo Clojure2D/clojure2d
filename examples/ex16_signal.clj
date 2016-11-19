@@ -4,6 +4,7 @@
   (:require [clojure2d.core :refer :all]
             [clojure2d.pixels :as p]
             [clojure2d.color :as c]
+            [clojure2d.math :as m]
             [clojure2d.extra.signal :refer :all]))
 
 ;; load image
@@ -57,6 +58,11 @@
                                                              :bits 16})]
   (p/save-pixels (p/filter-channels p/normalize resp) "results/ex16/biquadeq.jpg"))
 
+;; fm filter
+
+(let [effect (make-effects-filter [(make-effect :fm {:quant 10 :omega (* m/TWO_PI 0.00225857) :phase 0.00822})] (.w p))
+      res (p/filter-channels effect nil p)]
+  (p/save-pixels res "results/ex16/fm.jpg"))
 
 ;; saving and loading signal to and from file
 (save-signal (signal-from-pixels p {:layout :interleaved
@@ -66,3 +72,4 @@
                                     :bits 16}) "results/ex16/signal.raw")
 
 (load-signal "results/ex16/signal.raw")
+

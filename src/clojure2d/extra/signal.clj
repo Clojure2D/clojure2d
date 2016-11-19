@@ -211,7 +211,7 @@
 ;; :channels :all or list of channels
 
 (def pixels-default-configuration
-  {:layout :interleaved
+  {:layout :planar
    :coding :none
    :signed false
    :bits 8
@@ -316,7 +316,7 @@
 
 (defn apply-effects
   "Apply effects on signal"
-  ([effects ^Signal s]
+  ([effects ^Signal s rst]
    (let [len (alength ^doubles (.signal s))
          ^doubles in (.signal s)
          ^doubles out (double-array len)]
@@ -324,23 +324,28 @@
             effects_and_state (create-state effects)]
        (when (< idx len)
          (let [sample (aget in idx)
-               [res conf] (process-effects-one-pass sample effects_and_state)]
+               [res conf] (process-effects-one-pass sample effects_and_state)
+               nidx (inc idx)]
            (aset-double out idx res)
-           (recur (inc idx) conf))))
-     (Signal. out))))
+           (recur nidx (if (and (pos? rst) (zero? (mod nidx rst))) (create-state effects) conf)))))
+     (Signal. out)))
+  ([effects s]
+   (apply-effects effects s 0)))
 
 (defn make-effects-filter
   ""
-  ([effects config config-back]
+  ([effects rst config config-back]
    (fn [ch target p]
      (let [c {:channels [ch]}
            sig (signal-from-pixels p (merge config c))
-           res (apply-effects effects sig)]
+           res (apply-effects effects sig rst)]
        (signal-to-pixels target res (merge config-back c)))))
+  ([effects rst]
+   (make-effects-filter effects rst {} {}))
+  ([effects rst config]
+   (make-effects-filter effects rst config config))
   ([effects]
-   (make-effects-filter effects {} {}))
-  ([effects config]
-   (make-effects-filter effects config config)))
+   (make-effects-filter effects 0)))
 
 ;;; multimethod - effect creators
 
@@ -599,6 +604,30 @@
 
 (defmethod make-effect :divider [_ conf]
   (partial divider (:denominator conf)))
+
+;; FM
+
+(defn fm
+  ""
+  ([lp-chain quant omega phase [pre integral t lp] sample]
+   (let [sig (* sample phase)
+         new-integral (+ integral sig)
+         m (m/cos (+ new-integral (* omega t)))
+         m (if (pos? quant)
+             (m/norm (int (m/norm m -1.0 1.0 0 quant)) 0 quant -1.0 1.0)
+             m)
+         dem (m/abs (- m pre))
+         [res newlp] (process-effects-one-pass dem lp)
+         demf (/ (* 2.0 (- res omega)) phase)]
+     [(m/constrain demf -1.0 1.0) m new-integral (inc t) newlp]))
+  ([lp-chain _ _ _ [pre integral t lp]]
+   (map #(or %1 %2) [pre integral t lp] [0.0 0.0 0 (create-state lp-chain)])))
+
+(defmethod make-effect :fm [_ conf]
+  (let [lp-chain [(make-effect :simple-lowpass {:rate 100000 :cutoff 25000})
+                  (make-effect :simple-lowpass {:rate 100000 :cutoff 10000})
+                  (make-effect :simple-lowpass {:rate 100000 :cutoff 1000})]]
+    (partial fm lp-chain (:quant conf) (:omega conf) (:phase conf))))
 
 ;;; load and save signal
 ;;; file representation is 16 bit signed, big endian file
