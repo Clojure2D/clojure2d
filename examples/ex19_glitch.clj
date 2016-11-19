@@ -30,3 +30,18 @@
                                        (g/make-shift-channels-filter -0.1 true false)
                                        nil)
                     (p/filter-colors c/from-HWB)) "results/ex19/chshifthwb.jpg")
+
+;; mirror image
+
+(defn make-random-mirror
+  ""
+  []
+  (partial p/filter-channels 
+           (g/make-mirror-filter (rand-nth (keys g/mirror-types)))
+           (g/make-mirror-filter (rand-nth (keys g/mirror-types)))
+           (g/make-mirror-filter (rand-nth (keys g/mirror-types)))
+           nil))
+
+(p/save-pixels (->> img
+                    ((make-random-mirror))
+                    ((make-random-mirror))) "results/ex19/mirror.jpg")
