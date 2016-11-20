@@ -166,12 +166,12 @@
      (when ch
        (let [channel (first ch)
              curr-iter (loop [idx (int 0)
-                              titer iter]
+                              titer (int iter)]
                          (if (< idx (.size p))
                            (do
                              (if dir
-                               (aset-int buff titer ^int (p/get-value p channel idx))
-                               (p/set-value p channel idx ^int (aget buff titer)))
+                               (aset ^ints buff titer (int (p/get-value p channel idx)))
+                               (p/set-value p channel idx (int (aget ^ints buff titer))))
                              (recur (inc idx) (inc titer)))
                            titer))]
          (recur (next ch) (int curr-iter)))))
@@ -187,12 +187,12 @@
           iter (int 0)]
      (when (< idx (.size p))
        (let [curr-iter (loop [ch channels
-                              titer iter]
+                              titer (int iter)]
                          (if ch
                            (let [channel (first ch)]
                              (if dir
-                               (aset-int buff titer ^int (p/get-value p channel idx))
-                               (p/set-value p channel idx ^int (aget buff titer)))
+                               (aset ^ints buff titer (int (p/get-value p channel idx)))
+                               (p/set-value p channel idx (int (aget ^ints buff titer))))
                              (recur (next ch) (inc titer)))
                            titer))]
          (recur (inc idx) (int curr-iter)))))
@@ -200,7 +200,6 @@
   ([dir ^Pixels p channels]
    (let [buff (int-array (* (count channels) (.size p)))]
      (pre-layout-interleaved dir p channels buff))))
-
 
 ;; convert from Pixels to Signal and vice versa
 ;; :layout [:planar :interleaved]
@@ -220,36 +219,38 @@
 
 (defn signal-from-pixels
   ""
-  [^Pixels p conf]
-  (let [config (merge pixels-default-configuration conf)
-        channels (if (= :all (:channels config)) [0 1 2 3] (:channels config))
-        b (:bits config)
-        e (:little-endian config)
-        s (:signed config)
-        nb (bit-shift-right b 3)
-        tsize (int (m/ceil (/ (* (count channels) (.size p)) nb)))
-        ^doubles buff (double-array tsize)
-        ^ints layout (if (= :planar (:layout config))
-                       (pre-layout-planar true p channels)
-                       (pre-layout-interleaved true p channels))
-        limit (- (alength layout) (dec nb))
-        coding (condp = (:coding config)
-                 :none identity
-                 :alaw alaw
-                 :ulaw ulaw
-                 :alaw-rev alaw-rev
-                 :ulaw-rev ulaw-rev)]
+  ([^Pixels p conf]
+   (let [config (merge pixels-default-configuration conf)
+         channels (if (= :all (:channels config)) [0 1 2 3] (:channels config))
+         b (:bits config)
+         e (:little-endian config)
+         s (:signed config)
+         nb (bit-shift-right b 3)
+         tsize (int (m/ceil (/ (* (count channels) (.size p)) nb)))
+         ^doubles buff (double-array tsize)
+         ^ints layout (if (= :planar (:layout config))
+                        (pre-layout-planar true p channels)
+                        (pre-layout-interleaved true p channels))
+         limit (- (alength layout) (dec nb))
+         coding (condp = (:coding config)
+                  :none identity
+                  :alaw alaw
+                  :ulaw ulaw
+                  :alaw-rev alaw-rev
+                  :ulaw-rev ulaw-rev)]
 
-    (loop [idx (int 0)
-           bidx (int 0)]
-      (when (< idx limit)
-        (condp = nb
-          1 (aset-double buff bidx (coding (int-to-float (aget layout idx) e s)))
-          2 (aset-double buff bidx (coding (int-to-float (aget layout idx) (aget layout (inc idx)) e s)))
-          3 (aset-double buff bidx (coding (int-to-float (aget layout idx) (aget layout (inc idx)) (aget layout (+ 2 idx)) e s))))
-        (recur (+ idx nb) (inc bidx))))
+     (loop [idx (int 0)
+            bidx (int 0)]
+       (when (< idx limit)
+         (condp = nb
+           1 (aset ^doubles buff bidx (double (coding (int-to-float (aget ^ints layout idx) e s))))
+           2 (aset ^doubles buff bidx (double (coding (int-to-float (aget ^ints layout idx) (aget ^ints layout (inc idx)) e s))))
+           3 (aset ^doubles buff bidx (double (coding (int-to-float (aget ^ints layout idx) (aget ^ints layout (inc idx)) (aget ^ints layout (+ 2 idx)) e s)))))
+         (recur (+ idx nb) (inc bidx))))
 
-    (Signal. buff)))
+     (Signal. buff)))
+  ([p]
+   (signal-from-pixels p {})))
 
 (defn signal-to-pixels
   ""
@@ -274,16 +275,16 @@
     (loop [idx (int 0)
            bidx (int 0)]
       (when (< idx limit)
-        (let [v (coding (aget buff bidx))]
+        (let [v (coding (aget ^doubles buff bidx))]
           (condp = nb
-            1 (aset-int layout idx (float-to-int 8 v e s))
+            1 (aset ^ints layout idx (int (float-to-int 8 v e s)))
             2 (let [[a b] (float-to-int 16 v e s)]
-                (aset-int layout idx a)
-                (aset-int layout (inc idx) b))
+                (aset ^ints layout idx (int a))
+                (aset ^ints layout (inc idx) (int b)))
             3 (let [[a b c] (float-to-int 24 v e s)]
-                (aset-int layout idx ^int a)
-                (aset-int layout (inc idx) ^int b)
-                (aset-int layout (+ 2 idx) ^int c))))
+                (aset ^ints layout idx (int a))
+                (aset ^ints layout (inc idx) (int b))
+                (aset ^ints layout (+ 2 idx) (int c)))))
         (recur (+ idx nb) (inc bidx))))
 
     (if (= :planar (:layout config))
@@ -303,16 +304,21 @@
 (defn- process-effects-one-pass
   ""
   [sample effects]
-  (reduce #(let [[s fs] %1
-                 [res & ns] (next-effect %2 s)]
-             [res (conj fs ns)]) [sample []] effects))
+  (let [size (count effects)]
+    (loop [i (int 0)
+           acc [sample []]]
+      (if (< i size)
+        (let [[s fs] acc
+              [res & ns] (next-effect (effects i) s)]
+          (recur (inc i) [res (conj fs ns)]))
+        acc))))
 
 (defn- create-state
   ""
   ([effects]
-   (map (fn [f] [f (f [])]) effects))
+   (vec (map (fn [f] [f (f [])]) effects)))
   ([effects initial-state]
-   (map (fn [f c] [f (f c)]) effects initial-state)))
+   (vec (map (fn [f c] [f (f c)]) effects initial-state))))
 
 (defn apply-effects
   "Apply effects on signal"
@@ -323,29 +329,32 @@
      (loop [idx (int 0)
             effects_and_state (create-state effects)]
        (when (< idx len)
-         (let [sample (aget in idx)
+         (let [sample (aget ^doubles in idx)
                [res conf] (process-effects-one-pass sample effects_and_state)
                nidx (inc idx)]
-           (aset-double out idx res)
-           (recur nidx (if (and (pos? rst) (zero? (mod nidx rst))) (create-state effects) conf)))))
+           (aset ^doubles out idx (double res))
+           (recur nidx 
+                  (if (and (pos? rst) (zero? (mod nidx rst)))
+                    (create-state effects)
+                    conf)))))
      (Signal. out)))
   ([effects s]
    (apply-effects effects s 0)))
 
 (defn make-effects-filter
   ""
-  ([effects rst config config-back]
+  ([effects config config-back rst]
    (fn [ch target p]
      (let [c {:channels [ch]}
            sig (signal-from-pixels p (merge config c))
            res (apply-effects effects sig rst)]
        (signal-to-pixels target res (merge config-back c)))))
   ([effects rst]
-   (make-effects-filter effects rst {} {}))
-  ([effects rst config]
-   (make-effects-filter effects rst config config))
+   (make-effects-filter effects {} {} rst))
+  ([effects config config-back]
+   (make-effects-filter effects config config-back 0))
   ([effects]
-   (make-effects-filter effects 0)))
+   (make-effects-filter effects {} {} 0)))
 
 ;;; multimethod - effect creators
 
@@ -653,7 +662,7 @@
         ^doubles buffer (double-array len)]
     (try
       (dotimes [i len]
-        (aset-double buffer i (double (m/cnorm (.readShort in) Short/MIN_VALUE Short/MAX_VALUE -1.0 1.0))))
+        (aset ^doubles buffer (int i) (double (m/cnorm (.readShort in) Short/MIN_VALUE Short/MAX_VALUE -1.0 1.0))))
       (finally (. in clojure.core/close)))
     (Signal. buffer)))
 
@@ -729,5 +738,5 @@
         ^doubles buffer (double-array len)
         limit (dec seconds)]
     (dotimes [i len]
-      (aset-double buffer i (f (m/norm i 0 len 0 limit))))
+      (aset ^doubles buffer (int i) (double (f (m/norm i 0 len 0 limit)))))
     (Signal. buffer)))

@@ -33,7 +33,7 @@
           off (* ch size)]
       (if planar
         (System/arraycopy p ^int off res 0 ^int size)
-        (core/amap! p idx (aget p ^int (+ ch (bit-shift-left idx 2)))))
+        (core/amap! p idx (aget ^ints p (int (+ ch (bit-shift-left idx 2))))))
       res))
 
   (set-channel [_ ch v]
@@ -43,7 +43,7 @@
   ;; TODO: implement mutating copy of array into interleaved version of pixels
 
   (get-value [_ ch idx]
-    (aget p ^int (pos ch idx)))
+    (aget ^ints p (int (pos ch idx))))
 
   (get-value [pixels ch x y]
     (if (or (neg? x)
@@ -58,10 +58,10 @@
       (get-value pixels ch (+ x (* y w)))))
 
   (get-color [_ idx]
-    (Vec4. (aget p ^int (pos 0 idx))
-           (aget p ^int (pos 1 idx))
-           (aget p ^int (pos 2 idx))
-           (aget p ^int (pos 3 idx))))
+    (Vec4. (aget ^ints p (int (pos 0 idx)))
+           (aget ^ints p (int (pos 1 idx)))
+           (aget ^ints p (int (pos 2 idx)))
+           (aget ^ints p (int (pos 3 idx)))))
 
   (get-color [pixels x y]
     (if (or (neg? x)
@@ -76,7 +76,7 @@
       (get-color pixels (+ x (* y w)))))
 
   (set-value [_ ch idx v]
-    (aset-int p ^int (pos ch idx) v)
+    (aset ^ints p (int (pos ch idx)) (int v))
     p)
 
   (set-value [pixels ch x y v]
@@ -84,10 +84,10 @@
 
   (set-color [_ idx v]
     (let [^Vec4 v v]
-      (aset-int p ^int (pos 0 idx) (.x v))
-      (aset-int p ^int (pos 1 idx) (.y v))
-      (aset-int p ^int (pos 2 idx) (.z v))
-      (aset-int p ^int (pos 3 idx) (.w v)))
+      (aset ^ints p (int (pos 0 idx)) (int (.x v)))
+      (aset ^ints p (int (pos 1 idx)) (int (.y v)))
+      (aset ^ints p (int (pos 2 idx)) (int (.z v)))
+      (aset ^ints p (int (pos 3 idx)) (int (.w v))))
     p)
 
   (set-color [pixels x y v]
@@ -144,7 +144,7 @@
             (let [q (quot x (.size p))
                   r (rem x (.size p))]
               (+ q (bit-shift-left r 2))))]
-    (replace-pixels p (amap ^ints (.p p) idx ret (aget ^ints (.p p) (f idx))) true)))
+    (replace-pixels p (amap ^ints (.p p) idx ret (int (aget ^ints (.p p) (int (f idx))))) true)))
 
 (defn from-planar
   "Convert planar pixel layout to interleaved"
@@ -153,7 +153,7 @@
             (let [q (bit-shift-right x 0x2)
                   r (bit-and x 0x3)]
               (+ q (* (.size p) r))))]
-    (replace-pixels p (amap ^ints (.p p) idx ret (aget ^ints (.p p) (f idx))) false)))
+    (replace-pixels p (amap ^ints (.p p) idx ret (int (aget ^ints (.p p) (int (f idx))))) false)))
 
 ;; load and save
 
@@ -245,11 +245,11 @@
   "Filter one channel, write result into target. Works only on planar"
   [f ch ^Pixels target ^Pixels p]
   (let [size (.size target)
-        start (long (* ch size))
-        stop (long (* (inc ch) size))]
+        start (int (* ch size))
+        stop (int (* (inc ch) size))]
     (loop [idx start]
       (when (< idx stop)
-        (aset-int (.p target) idx (f (aget ^ints (.p p) idx)))
+        (aset ^ints (.p target) idx (int (f (aget ^ints (.p p) idx))))
         (recur (inc idx))))
     true))
 
@@ -282,11 +282,11 @@
   "Blend one channel, write result into target. Works only on planar"
   [f ch ^Pixels target ^Pixels p1 ^Pixels p2]
   (let [size (.size target)
-        start (long (* ch size))
-        stop (long (* (inc ch) size))]
+        start (int (* ch size))
+        stop (int (* (inc ch) size))]
     (loop [idx start]
       (when (< idx stop)
-        (aset-int (.p target) idx (f (aget ^ints (.p p1) idx) (aget ^ints (.p p2) idx)))
+        (aset ^ints (.p target) idx (int (f (aget ^ints (.p p1) idx) (aget ^ints (.p p2) idx))))
         (recur (inc idx))))
     true))
 
@@ -383,7 +383,7 @@
          (when (< y h)
            (let [nv (int (- (+ v (core/aget-2d in w h x (+ y r)))
                             (core/aget-2d in w h x (- y r+))))]
-             (aset-int target ^int (+ x (* w y)) (* nv iarr))
+             (aset ^ints target (int (+ x (* w y))) (int (* nv iarr)))
              (recur (inc y) nv))))))
     target))
 
@@ -403,7 +403,7 @@
          (when (< x w)
            (let [nv (int (- (+ v (core/aget-2d in w h (+ x r) y))
                             (core/aget-2d in w h (- x r+) y)))]
-             (aset-int target ^int (+ x off) (* nv iarr))
+             (aset ^ints target (int (+ x off)) (int (* nv iarr)))
              (recur (inc x) nv))))))
     target))
 
@@ -487,8 +487,8 @@
 
 (defn posterize-pixel
   ""
-  [^ints levels v]
-  (aget levels v))
+  [levels v]
+  (aget ^ints levels (int v)))
 
 (defn make-posterize
   ""
@@ -553,7 +553,7 @@
 (defn make-tinter
   ""
   [^ints a]
-  (fn [v] (aget a ^int v)))
+  (fn [v] (aget ^ints a (int v))))
 
 (defn make-tint-filter
   ""
@@ -579,15 +579,18 @@
                     [currmn currmx]))]
     (filter-channel #(m/norm % mn mx 0 255) ch target p)))
 
+(def normalize-filter normalize)
+
 (defn- equalize-make-histogram
   ""
   [ch ^Pixels p]
   (let [^doubles hist (double-array 256 0.0)
+        sz (int (.size p))
         d (/ 1.0 (.size p))]
     (loop [idx (int 0)]
-      (if (< idx (.size p))
+      (if (< idx sz)
         (let [c (get-value p ch idx)]
-          (aset-double hist c (+ d ^double (aget hist c)))
+          (aset ^doubles hist (int c) (double (+ d (aget ^doubles hist (int c)))))
           (recur (inc idx)))
         hist))))
 
@@ -600,9 +603,9 @@
            sum (double 0.0)
            idx (int 0)]
       (if (< idx 256)
-        (let [currsum (+ sum (aget hist idx))
+        (let [currsum (+ sum (aget ^doubles hist idx))
               val (int (m/constrain (m/round (* sum 255.0)) 0 255))]
-          (aset-int lookup idx val)
+          (aset ^ints lookup idx val)
           (recur (int (if (< val currmn) val currmn))
                  (int (if (> val currmx) val currmx))
                  (double currsum)
@@ -613,4 +616,9 @@
   "Equalize histogram"
   [ch target p]
   (let [^ints lookup (equalize-make-lookup (equalize-make-histogram ch p))]
-    (filter-channel #(aget ^ints lookup %) ch target p)))
+    (filter-channel #(aget ^ints lookup (int %)) ch target p)))
+
+(defn negate-filter
+  ""
+  [ch target p]
+  (filter-channel #(- 255 %) ch target p))

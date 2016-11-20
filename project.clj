@@ -21,11 +21,16 @@
                  [com.flowpowered/flow-noise "1.0.0"]
                  [com.sudoplay.joise/joise "1.0.1"]
 		 [de.sciss/jwave "1.0.3"]
-                 [criterium "0.4.4"]]
+                 [criterium "0.4.4"]
+                 [com.taoensso/tufte "1.1.0"]]
   :resource-path "resources/"
   :repl-options {:timeout 120000}
 ;;  :main ^:skip-aot clojure2d.core
   :target-path "target/%s"
-  :jvm-opts ["-Xmx4096M"]
+  :jvm-opts ["-Xmx4096M"
+             "-Dcom.sun.management.jmxremote"
+             "-Dcom.sun.management.jmxremote.ssl=false"
+             "-Dcom.sun.management.jmxremote.authenticate=false"
+             "-Dcom.sun.management.jmxremote.port=43210"]
   :marginalia {:javascript ["https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML"]}
   :profiles {:uberjar {:aot :all}})
