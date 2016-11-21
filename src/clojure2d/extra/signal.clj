@@ -394,18 +394,15 @@
 
 ;; SIMPLE LOWPASS/HIGHPASS
 
-(deftype StateSimpleLowpass [^double prev])
-
 (defn simple-lowpass
   ""
-  ([alpha ^StateSimpleLowpass state sample]
-   (let [prev (.prev state)
-         s1 (* sample alpha)
+  ([alpha prev sample]
+   (let [s1 (* sample alpha)
          s2 (- prev (* prev alpha))
          nprev (+ s1 s2)]
-     (StateWithS. nprev (StateSimpleLowpass. nprev))))
+     (StateWithS. nprev nprev)))
   ([_]
-   (StateSimpleLowpass. 0.0)))
+   0.0))
 
 (defn simple-highpass
   ""
