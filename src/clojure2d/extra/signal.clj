@@ -298,8 +298,8 @@
 (defn- next-effect
   ""
   [[f state] sample]
-  (let [[res & resstate] (f state sample)]
-    [res f resstate]))
+  (let [[res resstate] (f state sample)]
+    [res [f resstate]]))
 
 (defn- process-effects-one-pass
   ""
@@ -309,7 +309,7 @@
            acc [sample []]]
       (if (< i size)
         (let [[s fs] acc
-              [res & ns] (next-effect (effects i) s)]
+              [res ns] (next-effect (effects i) s)]
           (recur (inc i) [res (conj fs ns)]))
         acc))))
 
@@ -341,20 +341,44 @@
   ([effects s]
    (apply-effects effects s 0)))
 
-(defn make-effects-filter
+(defn apply-effect
   ""
-  ([effects config config-back rst]
+  ([effect ^Signal s rst]
+   (let [len (alength ^doubles (.signal s))
+         ^doubles in (.signal s)
+         ^doubles out (double-array len)]
+     (loop [idx (int 0)
+            effect_and_state (effect [])]
+       (when (< idx len)
+         (let [sample (aget ^doubles in idx)
+               [res conf] (effect effect_and_state sample)
+               nidx (inc idx)]
+           (aset ^doubles out idx (double res))
+           (recur nidx 
+                  (if (and (pos? rst) (zero? (mod nidx rst)))
+                    (effect [])
+                    conf)))))
+     (Signal. out)))
+  ([effect s]
+   (apply-effect effect s 0)))
+
+(defn- make-filter-fn
+  ""
+  ([f effects config config-back rst]
    (fn [ch target p]
      (let [c {:channels [ch]}
            sig (signal-from-pixels p (merge config c))
-           res (apply-effects effects sig rst)]
+           res (f effects sig rst)]
        (signal-to-pixels target res (merge config-back c)))))
-  ([effects rst]
-   (make-effects-filter effects {} {} rst))
-  ([effects config config-back]
-   (make-effects-filter effects config config-back 0))
-  ([effects]
-   (make-effects-filter effects {} {} 0)))
+  ([f effects rst]
+   (make-filter-fn f effects {} {} rst))
+  ([f effects config config-back]
+   (make-filter-fn f effects config config-back 0))
+  ([f effects]
+   (make-filter-fn f effects {} {} 0)))
+
+(def make-effects-filter (partial make-filter-fn apply-effects))
+(def make-effect-filter (partial make-filter-fn apply-effect))
 
 ;;; multimethod - effect creators
 
@@ -371,7 +395,7 @@
    (let [s1 (* sample alpha)
          s2 (- prev (* prev alpha))
          nprev (+ s1 s2)]
-     [nprev nprev]))
+     [nprev [nprev]]))
   ([_ [prev]]
    (if (nil? prev)
      [0]
@@ -539,7 +563,7 @@
                (+ (* b2 x2))
                (+ (* a1 y1))
                (+ (* a2 y2)))]
-     [y x1 sample y1 y]))
+     [y [x1 sample y1 y]]))
   ([_ [x2 x1 y2 y1]]
    (map #(or % 0.0) [x2 x1 y2 y1])))
 
@@ -564,10 +588,10 @@
 (defn dj-eq
   ""
   ([b1 b2 b3 [s1 s2 s3] sample]
-   (let [[r1 & rs1] (b1 s1 sample)
-         [r2 & rs2] (b2 s2 r1)
-         [r3 & rs3] (b3 s3 r2)]
-     [r3 rs1 rs2 rs3]))
+   (let [[r1 rs1] (b1 s1 sample)
+         [r2 rs2] (b2 s2 r1)
+         [r3 rs3] (b3 s3 r2)]
+     [r3 [rs1 rs2 rs3]]))
   ([b1 b2 b3 [s1 s2 s3]]
    [(b1 s1) (b2 s2) (b3 s3)]))
 
@@ -582,7 +606,7 @@
   ([a1 [zm1] sample]
    (let [y (+ zm1 (* sample (- a1)))
          new-zm1 (+ sample (* y a1))]
-     [y new-zm1]))
+     [y [new-zm1]]))
   ([a1 [zm1]]
    (if (nil? zm1) [0.0] [zm1])))
 
@@ -607,7 +631,7 @@
                                        [(if (pos? out) -1.0 1.0) (/ amp count) 0 0.0 0.0]
                                        [out lamp zeroxs count amp])
          last s]
-     [(* out lamp) out amp count lamp last zeroxs]))
+     [(* out lamp) [out amp count lamp last zeroxs]]))
   ([_ [out amp count lamp last zeroxs]]
    (map #(or %1 %2) [out amp count lamp last zeroxs] [1.0 0.0 0.0 0.0 0.0 0.0])))
 
@@ -623,12 +647,12 @@
          new-integral (+ integral sig)
          m (m/cos (+ new-integral (* omega t)))
          m (if (pos? quant)
-             (m/norm (int (m/norm m -1.0 1.0 0 quant)) 0 quant -1.0 1.0)
+             (m/norm (int (m/norm m -1.0 1.0 0.0 quant)) 0.0 quant -1.0 1.0)
              m)
          dem (m/abs (- m pre))
          [res newlp] (process-effects-one-pass dem lp)
          demf (/ (* 2.0 (- res omega)) phase)]
-     [(m/constrain demf -1.0 1.0) m new-integral (inc t) newlp]))
+     [(m/constrain demf -1.0 1.0) [m new-integral (inc t) newlp]]))
   ([lp-chain _ _ _ [pre integral t lp]]
    (map #(or %1 %2) [pre integral t lp] [0.0 0.0 0 (create-state lp-chain)])))
 

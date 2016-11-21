@@ -252,7 +252,7 @@
   ([v start stop] ;; norm
    (if (= start stop)
      (if (< v start) 0 1)
-     (/ (double (- v start)) (- stop start)))))
+     (* (- v start) (/ 1.0 (- stop start))))))
 
 ;; Map and constrain values
 ;; `(cnorm 1.5 0 1 100 200) => 200`
