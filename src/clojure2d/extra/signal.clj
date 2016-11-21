@@ -26,8 +26,10 @@
             [clojure2d.core :refer :all]
             [clojure2d.color :as c]
             [clojure.java.io :refer :all]
-            [clojure2d.math.joise :as j])
-  (:import [clojure2d.pixels Pixels]))
+            [clojure2d.math.joise :as j]
+            [clojure2d.math.vector :as v])
+  (:import [clojure2d.pixels Pixels]
+           [clojure2d.math.vector Vec2 Vec3]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -151,12 +153,12 @@
     (condp = bits
       8 (bit-and restored 0xff)
       16 (let [a (bit-and restored 0xff)
-                 b (bit-and (bit-shift-right restored 8) 0xff)]
-             (if little-endian [a b] [b a]))
+               b (bit-and (bit-shift-right restored 8) 0xff)]
+           (if little-endian (Vec2. a b) (Vec2. b a)))
       24 (let [a (bit-and restored 0xff)
-                 b (bit-and (bit-shift-right restored 8) 0xff)
-                 c (bit-and (bit-shift-right restored 16) 0xff)]
-             (if little-endian [a b c] [c b a])))))
+               b (bit-and (bit-shift-right restored 8) 0xff)
+               c (bit-and (bit-shift-right restored 16) 0xff)]
+           (if little-endian (Vec3. a b c) (Vec3. c b a))))))
 
 (defn- pre-layout-planar
   "dir == true: pixels -> buffer"
@@ -278,13 +280,13 @@
         (let [v (coding (aget ^doubles buff bidx))]
           (condp = nb
             1 (aset ^ints layout idx (int (float-to-int 8 v e s)))
-            2 (let [[a b] (float-to-int 16 v e s)]
-                (aset ^ints layout idx (int a))
-                (aset ^ints layout (inc idx) (int b)))
-            3 (let [[a b c] (float-to-int 24 v e s)]
-                (aset ^ints layout idx (int a))
-                (aset ^ints layout (inc idx) (int b))
-                (aset ^ints layout (+ 2 idx) (int c)))))
+            2 (let [^Vec2 v (float-to-int 16 v e s)]
+                (aset ^ints layout idx (int (.x v)))
+                (aset ^ints layout (inc idx) (int (.y v))))
+            3 (let [^Vec3 v (float-to-int 24 v e s)]
+                (aset ^ints layout idx (int (.x v)))
+                (aset ^ints layout (inc idx) (int (.y v)))
+                (aset ^ints layout (+ 2 idx) (int (.z v))))))
         (recur (+ idx nb) (inc bidx))))
 
     (if (= :planar (:layout config))
@@ -294,31 +296,34 @@
     target))
 
 ;; state management functions and transducer operations
+;; minimizing destructuring as much as possible...
+
+(deftype StateWithS [^double sample state]) ; sample and effect state, StateWithF or vector of StateWithF
+(deftype StateWithF [f state]) ; effect and its state
 
 (defn- next-effect
   ""
-  [[f state] sample]
-  (let [[res resstate] (f state sample)]
-    [res [f resstate]]))
+  [^StateWithF state sample]
+  (let [^StateWithS res ((.f state) (.state state) sample)]
+    (StateWithS. (.sample res) (StateWithF. (.f state) (.state res)))))
 
 (defn- process-effects-one-pass
   ""
   [sample effects]
   (let [size (count effects)]
     (loop [i (int 0)
-           acc [sample []]]
+           ^StateWithS acc (StateWithS. sample [])]
       (if (< i size)
-        (let [[s fs] acc
-              [res ns] (next-effect (effects i) s)]
-          (recur (inc i) [res (conj fs ns)]))
+        (let [^StateWithS ne (next-effect (effects i) (.sample acc))]
+          (recur (inc i) (StateWithS. (.sample ne) (conj (.state acc) (.state ne)))))
         acc))))
 
 (defn- create-state
   ""
   ([effects]
-   (vec (map (fn [f] [f (f [])]) effects)))
+   (vec (map #(StateWithF. % (%)) effects)))
   ([effects initial-state]
-   (vec (map (fn [f c] [f (f c)]) effects initial-state))))
+   (vec (map #(StateWithF. %1 %2) effects initial-state))))
 
 (defn apply-effects
   "Apply effects on signal"
@@ -330,13 +335,13 @@
             effects_and_state (create-state effects)]
        (when (< idx len)
          (let [sample (aget ^doubles in idx)
-               [res conf] (process-effects-one-pass sample effects_and_state)
+               ^StateWithS res (process-effects-one-pass sample effects_and_state)
                nidx (inc idx)]
-           (aset ^doubles out idx (double res))
+           (aset ^doubles out idx (double (.sample res)))
            (recur nidx 
                   (if (and (pos? rst) (zero? (mod nidx rst)))
                     (create-state effects)
-                    conf)))))
+                    (.state res))))))
      (Signal. out)))
   ([effects s]
    (apply-effects effects s 0)))
@@ -348,16 +353,16 @@
          ^doubles in (.signal s)
          ^doubles out (double-array len)]
      (loop [idx (int 0)
-            effect_and_state (effect [])]
+            effect_and_state (effect)]
        (when (< idx len)
          (let [sample (aget ^doubles in idx)
-               [res conf] (effect effect_and_state sample)
+               ^StateWithS state (effect effect_and_state sample)
                nidx (inc idx)]
-           (aset ^doubles out idx (double res))
+           (aset ^doubles out idx (double (.sample state)))
            (recur nidx 
                   (if (and (pos? rst) (zero? (mod nidx rst)))
-                    (effect [])
-                    conf)))))
+                    (effect)
+                    (.state state))))))
      (Signal. out)))
   ([effect s]
    (apply-effect effect s 0)))
@@ -389,25 +394,26 @@
 
 ;; SIMPLE LOWPASS/HIGHPASS
 
+(deftype StateSimpleLowpass [^double prev])
+
 (defn simple-lowpass
   ""
-  ([alpha [prev] sample]
-   (let [s1 (* sample alpha)
+  ([alpha ^StateSimpleLowpass state sample]
+   (let [prev (.prev state)
+         s1 (* sample alpha)
          s2 (- prev (* prev alpha))
          nprev (+ s1 s2)]
-     [nprev [nprev]]))
-  ([_ [prev]]
-   (if (nil? prev)
-     [0]
-     [prev])))
+     (StateWithS. nprev (StateSimpleLowpass. nprev))))
+  ([_]
+   (StateSimpleLowpass. 0.0)))
 
 (defn simple-highpass
   ""
-  ([lpfilter conf sample]
-   (let [[res rprev] (lpfilter conf sample)]
-     [(- sample res) rprev]))
-  ([lpfilter conf]
-   (lpfilter conf)))
+  ([lpfilter state sample]
+   (let [^StateWithS res (lpfilter state sample)]
+     (StateWithS. (- sample (.sample res)) (.state res))))
+  ([lpfilter]
+   (lpfilter)))
 
 (defn- calc-filter-alpha
   ""
@@ -423,6 +429,8 @@
   (partial simple-highpass (make-effect :simple-lowpass conf) ))
 
 ;; BIQUAD FILTERS
+
+(deftype BiquadConf [^double b0 ^double b1 ^double b2 ^double a1 ^double a2])
 
 (defn biquad-eq-params
   "fc - center frequency
@@ -447,7 +455,7 @@
         b2 (* a0r (- 1.0 (* g J)))
         a1 (- b1)
         a2 (* a0r (- (/ g J) 1.0))]
-    [b0 b1 b2 a1 a2]))
+    (BiquadConf. b0 b1 b2 a1 a2)))
 
 (defn biquad-hs-params
   "fc - center frequency
@@ -475,7 +483,7 @@
         b2 (* a0r A (- (+ iA amc) bs))
         a1 (* a0r -2.0 (- dA apc))
         a2 (* a0r (+ (dec (- A)) amc bs))]
-    [b0 b1 b2 a1 a2]))
+    (BiquadConf. b0 b1 b2 a1 a2)))
 
 (defn biquad-ls-params
   "fc - center frequency
@@ -503,7 +511,7 @@
         b2 (* a0r A (- iA amc bs))
         a1 (* a0r 2.0 (+ dA apc))
         a2 (* a0r (+ bs (- (dec (- A)) amc)))]
-    [b0 b1 b2 a1 a2]))
+    (BiquadConf. b0 b1 b2 a1 a2)))
 
 (defn biquad-lp-params
   ""
@@ -520,7 +528,7 @@
         b2 b0
         a1 (* a0r 2.0 cs)
         a2 (* a0r (dec alpha))]
-    [b0 b1 b2 a1 a2]))
+    (BiquadConf. b0 b1 b2 a1 a2)))
 
 (defn biquad-hp-params
   ""
@@ -537,7 +545,7 @@
         b2 b0
         a1 (* a0r 2.0 cs)
         a2 (* a0r (dec alpha))]
-    [b0 b1 b2 a1 a2]))
+    (BiquadConf. b0 b1 b2 a1 a2)))
 
 (defn biquad-bp-params
   ""
@@ -553,19 +561,21 @@
         b2 (* a0r (- alpha))
         a1 (* a0r 2.0 cs)
         a2 (* a0r (dec alpha))]
-    [b0 b1 b2 a1 a2]))
+    (BiquadConf. b0 b1 b2 a1 a2)))
+
+(deftype StateBiquad [^double x2 ^double x1 ^double y2 ^double y1])
 
 (defn biquad-filter
   ""
-  ([[b0 b1 b2 a1 a2] [x2 x1 y2 y1] sample]
-   (let [y (-> (* b0 sample)
-               (+ (* b1 x1))
-               (+ (* b2 x2))
-               (+ (* a1 y1))
-               (+ (* a2 y2)))]
-     [y [x1 sample y1 y]]))
-  ([_ [x2 x1 y2 y1]]
-   (map #(or % 0.0) [x2 x1 y2 y1])))
+  ([^BiquadConf c ^StateBiquad state sample]
+   (let [y (-> (* (.b0 c) sample)
+               (+ (* (.b1 c) (.x1 state)))
+               (+ (* (.b2 c) (.x2 state)))
+               (+ (* (.a1 c) (.y1 state)))
+               (+ (* (.a2 c) (.y2 state))))]
+     (StateWithS. y (StateBiquad. (.x1 state) sample (.y1 state) y))))
+  ([_]
+   (StateBiquad. 0.0 0.0 0.0 0.0)))
 
 (defmethod make-effect :biquad-eq [_ conf]
   (partial biquad-filter (biquad-eq-params (:fc conf) (:gain conf) (:bw conf) (:fs conf))))
@@ -585,15 +595,17 @@
 (defmethod make-effect :biquad-bp [_ conf]
   (partial biquad-filter (biquad-bp-params (:fc conf) (:bw conf) (:fs conf))))
 
+(deftype StateDjEq [^StateBiquad s1 ^StateBiquad s2 ^StateBiquad s3])
+
 (defn dj-eq
   ""
-  ([b1 b2 b3 [s1 s2 s3] sample]
-   (let [[r1 rs1] (b1 s1 sample)
-         [r2 rs2] (b2 s2 r1)
-         [r3 rs3] (b3 s3 r2)]
-     [r3 [rs1 rs2 rs3]]))
-  ([b1 b2 b3 [s1 s2 s3]]
-   [(b1 s1) (b2 s2) (b3 s3)]))
+  ([b1 b2 b3 ^StateDjEq state sample]
+   (let [^StateWithS r1 (b1 (.s1 state) sample)
+         ^StateWithS r2 (b2 (.s2 state) (.sample r1))
+         ^StateWithS r3 (b3 (.s3 state) (.sample r2))]
+     (StateWithS. (.sample r3) (StateDjEq. (.state r1) (.state r2) (.state r3)))))
+  ([b1 b2 b3]
+   (StateDjEq. (b1) (b2) (b3))))
 
 (defmethod make-effect :dj-eq [_ conf]
   (let [b1 (make-effect :biquad-eq {:fc 100.0 :gain (:lo conf) :bw (:peak_bw conf) :fs (:rate conf)})
@@ -614,53 +626,94 @@
   (let [d (:delay conf)]
     (partial phaser-allpass (/ (- 1.0 d) (inc d)))))
 
+;; 
+
+(deftype StateDivider [^double out ^double amp ^double count ^double lamp ^double last ^int zeroxs])
+
 (defn divider
   ""
-  ([denom [out amp count lamp last zeroxs] sample]
-   (let [count (inc count)
-         s sample
-         [out lamp zeroxs count amp] (if (or (and (> s 0.0) (<= last 0.0))
-                                             (and (neg? s) (>= last 0.0)))
-                                       (if (== denom 1)
-                                         [(if (pos? out) -1.0 1.0) (/ amp count) 0 0.0 0.0]
-                                         [out lamp (inc zeroxs) count amp])
-                                       [out lamp zeroxs count amp])
-         amp (+ amp (m/abs s))
-         [out lamp zeroxs count amp] (if (and (> denom 1)
-                                              (== (mod zeroxs denom) (dec denom)))
-                                       [(if (pos? out) -1.0 1.0) (/ amp count) 0 0.0 0.0]
-                                       [out lamp zeroxs count amp])
-         last s]
-     [(* out lamp) [out amp count lamp last zeroxs]]))
-  ([_ [out amp count lamp last zeroxs]]
-   (map #(or %1 %2) [out amp count lamp last zeroxs] [1.0 0.0 0.0 0.0 0.0 0.0])))
+  ([denom ^StateDivider state sample]
+   (let [count (inc (.count state))
+         ^StateDivider s1 (if (or (and (> sample 0.0) (<= (.last state) 0.0))
+                                  (and (neg? sample) (>= (.last state) 0.0)))
+                            (if (== denom 1)
+                              (StateDivider. (if (pos? (.out state)) -1.0 1.0) 0.0 0.0 (/ (.amp state) count) (.last state) 0)
+                              (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (inc (.zeroxs state))))
+                            (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (.zeroxs state)))
+         amp (+ (.amp s1) (m/abs sample))
+         ^StateDivider s2 (if (and (> denom 1)
+                                   (== (mod (.zeroxs s1) denom) (dec denom)))
+                            (StateDivider. (if (pos? (.out s1)) -1.0 1.0) 0.0 0 (/ amp (.count s1)) (.last s1) 0)
+                            (StateDivider. (.out s1) amp (.count s1) (.lamp s1) (.last s1) (.zeroxs s1)))]
+     (StateWithS. (* (.out s2) (.lamp s2)) (StateDivider. (.out s2) (.amp s2) (.count s2) (.lamp s2) sample (.zeroxs s2)))))
+  ([_]
+   (StateDivider. 1.0 0.0 0.0 0.0 0.0 0.0)))
 
 (defmethod make-effect :divider [_ conf]
   (partial divider (:denominator conf)))
 
 ;; FM
+(deftype StateFm [^double pre ^double integral ^int t lp])
 
 (defn fm
   ""
-  ([lp-chain quant omega phase [pre integral t lp] sample]
+  ([lp-chain quant omega phase ^StateFm state sample]
    (let [sig (* sample phase)
-         new-integral (+ integral sig)
-         m (m/cos (+ new-integral (* omega t)))
+         new-integral (+ (.integral state) sig)
+         m (m/cos (+ new-integral (* omega (.t state))))
          m (if (pos? quant)
              (m/norm (int (m/norm m -1.0 1.0 0.0 quant)) 0.0 quant -1.0 1.0)
              m)
-         dem (m/abs (- m pre))
-         [res newlp] (process-effects-one-pass dem lp)
-         demf (/ (* 2.0 (- res omega)) phase)]
-     [(m/constrain demf -1.0 1.0) [m new-integral (inc t) newlp]]))
-  ([lp-chain _ _ _ [pre integral t lp]]
-   (map #(or %1 %2) [pre integral t lp] [0.0 0.0 0 (create-state lp-chain)])))
+         dem (m/abs (- m (.pre state)))
+         ^StateWithS res (process-effects-one-pass dem (.lp state))
+         demf (/ (* 2.0 (- (.sample res) omega)) phase)]
+     (StateWithS. (m/constrain demf -1.0 1.0) (StateFm. m new-integral (inc (.t state)) (.state res)))))
+  ([lp-chain _ _ _]
+   (StateFm. 0.0 0.0 0 (create-state lp-chain))))
 
 (defmethod make-effect :fm [_ conf]
   (let [lp-chain [(make-effect :simple-lowpass {:rate 100000 :cutoff 25000})
                   (make-effect :simple-lowpass {:rate 100000 :cutoff 10000})
                   (make-effect :simple-lowpass {:rate 100000 :cutoff 1000})]]
     (partial fm lp-chain (:quant conf) (:omega conf) (:phase conf))))
+
+;; foverdrive
+
+(defn foverdrive
+  "Fast overdrive, swh ladspa"
+  ([drive drivem1 state sample]
+   (let [fx (m/abs sample)
+         res (/ (* sample (+ fx drive)) (inc (+ (* sample sample) (* fx drivem1))))]
+     (StateWithS. res state)))
+  ([_ _] nil))
+
+(defmethod make-effect :foverdrive [_ conf]
+  (partial foverdrive (:drive conf) (dec (:drive conf))))
+
+;; decimator
+
+(deftype StateDecimator [^double count ^double last])
+
+(defn decimator
+  ""
+  ([ratio step stepr ^StateDecimator state sample]
+   (let [ncount (+ (.count state) ratio)]
+     (if (>= ncount 1.0)
+       (let [delta (* step (mod (->> sample
+                                     m/sgn
+                                     (* step 0.5)
+                                     (+ sample)
+                                     (* stepr)) 1.0))
+             last (- sample delta)]
+         (StateWithS. last (StateDecimator. (dec ncount) last)))
+       (StateWithS. (.last state) (StateDecimator. ncount (.last state))))))
+  ([_ _ _] (StateDecimator. 0.0 0.0)))
+
+(defmethod make-effect :decimator [_ conf]
+  (let [step (m/pow 0.5 (- (:bits conf) 0.9999))
+        stepr (/ 1.0 step)
+        ratio (/ (:fs conf) (:rate conf))]
+    (partial decimator ratio step stepr)))
 
 ;;; load and save signal
 ;;; file representation is 16 bit signed, big endian file
