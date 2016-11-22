@@ -3,7 +3,7 @@
             [clojure2d.math.vector :as v]
             [clojure.xml :as xml]
             [clojure.java.io :as io])
-  (:import [clojure2d.math.vector Vec4]
+  (:import [clojure2d.math.vector Vec4 Vec3]
            [java.awt Color]))
 
 (set! *warn-on-reflection* true)
@@ -912,6 +912,34 @@
 
 ;; 
 
+;; http://iquilezles.org/www/articles/palettes/palettes.htm
+(defn create-palette-fn
+  ""
+  [^Vec3 a ^Vec3 b ^Vec3 c ^Vec3 d]
+  (fn [t]
+    (let [cc (-> (->> t
+                     (v/mult c)
+                     (v/add d))
+                (v/mult m/TWO_PI)
+                (v/applyf m/cos)
+                (v/emult b)
+                (v/add a))]
+      (-> (Vec4. (.x cc) (.y cc) (.z cc) 1.0)
+          (v/mult 255)
+          (v/applyf clamp255)))))
+
+(defn make-random-palette
+  ""
+  [num]
+  (let [a (v/generate-vec3 (partial m/drand 0.3 0.7))
+        b (v/sub (Vec3. 1.0 1.0 1.1) a)
+        c (v/generate-vec3 (partial m/drand 2))
+        d (v/generate-vec3 m/drand)
+        f (create-palette-fn a b c d)]
+    (vec (map #(f %) (range 0.0 1.0 (/ 1.0 num))))))
+
+;;
+
 (defn nearest-color
   ""
   ([f xf ^Vec4 c]
@@ -931,3 +959,5 @@
    (partial nearest-color pal))
   ([f pal]
    (partial nearest-color f pal)))
+
+;; 

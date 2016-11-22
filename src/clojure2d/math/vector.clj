@@ -21,6 +21,7 @@
   (add [v1] [v1 v2])
   (sub [v1] [v1 v2])
   (mult [v1 v])
+  (emult [v1 v])
   (div [v1 v])
   (abs [v1])
   (mx [v1])
@@ -59,6 +60,7 @@
   (sub [_ v2]
     (let [^Vec2 v2 v2] (Vec2. (- x (.x v2)) (- y (.y v2)))))
   (mult [_ v] (Vec2. (* x v) (* y v)))
+  (emult [_ v] (Vec2. (* x (.x v)) (* y (.y v))))
   (div [_ v] (Vec2. (/ x v) (/ y v)))
   (abs [_] (Vec2. (m/abs x) (m/abs y)))
   (mx [_] (max x y))
@@ -107,6 +109,7 @@
   (sub [_ v2]
     (let [^Vec3 v2 v2] (Vec3. (- x (.x v2)) (- y (.y v2)) (- z (.z v2)))))
   (mult [_ v] (Vec3. (* x v) (* y v) (* z v)))
+  (emult [_ v] (Vec3. (* x (.x v)) (* y (.y v)) (* z (.z v))))
   (div [_ v] (Vec3. (/ x v) (/ y v) (/ z v)))
   (abs [_] (Vec3. (m/abs x) (m/abs y) (m/abs z)))
   (mx [_] (max x y z))
@@ -223,6 +226,7 @@
   (sub [_ v2] 
     (let [^Vec4 v2 v2] (Vec4. (- x (.x v2)) (- y (.y v2)) (- z (.z v2)) (- w (.w v2)))))
   (mult [_ v] (Vec4. (* x v) (* y v) (* z v) (* w v)))
+  (emult [_ v] (Vec4. (* x (.x v)) (* y (.y v)) (* z (.z v)) (* w (.w v))))
   (div [_ v] (Vec4. (/ x v) (/ y v) (/ z v) (/ w v)))
   (abs [_] (Vec4. (m/abs x) (m/abs y) (m/abs z) (m/abs w)))
   (mx [_] (max x y z w))
@@ -291,6 +295,27 @@
         (<= amt -1) m/PI
         (>= amt 1) 0
         :else (m/acos amt)))))
+
+(defn generate-vec2
+  ""
+  ([f1 f2]
+   (Vec2. (f1) (f2)))
+  ([f]
+   (Vec2. (f) (f))))
+
+(defn generate-vec3
+  ""
+  ([f1 f2 f3]
+   (Vec3. (f1) (f2) (f3)))
+  ([f]
+   (Vec3. (f) (f) (f))))
+
+(defn generate-vec4
+  ""
+  ([f1 f2 f3 f4]
+   (Vec4. (f1) (f2) (f3) (f4)))
+  ([f]
+   (Vec4. (f) (f) (f) (f))))
 
 (defn aligned?
   "Are vectors aligned (have the same direction)?"
