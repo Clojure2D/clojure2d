@@ -20,7 +20,7 @@
 (time (p/save-pixels (p/filter-channels p/normalize (p/filter-channels (make-effect-filter effect1 {:coding :alaw-rev} {:coding :ulaw}) p)) "results/ex16/djeq.jpg"))
 
 ;; filter with 3 lowpass
-(p/save-pixels (p/filter-channels (make-effects-filter [effect2 effect2 effect2] {:signed true} {:signed true}) p) "results/ex16/lowpass3.jpg")
+(time (p/save-pixels (p/filter-channels (make-effects-filter [effect2 effect2 effect2] {:signed true} {:signed true}) p) "results/ex16/lowpass3.jpg"))
 
 ;; filter with all in YPbPr colorspace
 (time (let [filter (make-effects-filter [effect1 effect2])

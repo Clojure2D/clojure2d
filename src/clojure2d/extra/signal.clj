@@ -303,8 +303,8 @@
 
 (defn- next-effect
   ""
-  [^StateWithF state sample]
-  (let [^StateWithS res ((.f state) (.state state) sample)]
+  [sample ^StateWithF state]
+  (let [^StateWithS res ((.f state) sample (.state state))]
     (StateWithS. (.sample res) (StateWithF. (.f state) (.state res)))))
 
 (defn- process-effects-one-pass
@@ -314,7 +314,7 @@
     (loop [i (int 0)
            ^StateWithS acc (StateWithS. sample [])]
       (if (< i size)
-        (let [^StateWithS ne (next-effect (effects i) (.sample acc))]
+        (let [^StateWithS ne (next-effect (.sample acc) (effects i))]
           (recur (inc i) (StateWithS. (.sample ne) (conj (.state acc) (.state ne)))))
         acc))))
 
@@ -356,7 +356,7 @@
             effect_and_state (effect)]
        (when (< idx len)
          (let [sample (aget ^doubles in idx)
-               ^StateWithS state (effect effect_and_state sample)
+               ^StateWithS state (effect sample effect_and_state)
                nidx (inc idx)]
            (aset ^doubles out idx (double (.sample state)))
            (recur nidx 
@@ -394,24 +394,6 @@
 
 ;; SIMPLE LOWPASS/HIGHPASS
 
-(defn simple-lowpass
-  ""
-  ([alpha prev sample]
-   (let [s1 (* sample alpha)
-         s2 (- prev (* prev alpha))
-         nprev (+ s1 s2)]
-     (StateWithS. nprev nprev)))
-  ([_]
-   0.0))
-
-(defn simple-highpass
-  ""
-  ([lpfilter state sample]
-   (let [^StateWithS res (lpfilter state sample)]
-     (StateWithS. (- sample (.sample res)) (.state res))))
-  ([lpfilter]
-   (lpfilter)))
-
 (defn- calc-filter-alpha
   ""
   [rate cutoff]
@@ -420,10 +402,23 @@
     (/ tinterval (+ tau tinterval))))
 
 (defmethod make-effect :simple-lowpass [_ conf]
-  (partial simple-lowpass (calc-filter-alpha (:rate conf) (:cutoff conf))))
+  (let [alpha (calc-filter-alpha (:rate conf) (:cutoff conf))]
+    (fn
+      ([sample prev]
+       (let [s1 (* sample alpha)
+             s2 (- prev (* prev alpha))
+             nprev (+ s1 s2)]
+         (StateWithS. nprev nprev)))
+      ([] 0.0))))
 
 (defmethod make-effect :simple-highpass [_ conf]
-  (partial simple-highpass (make-effect :simple-lowpass conf) ))
+  (let [lpfilter (make-effect :simple-lowpass conf)]
+    (fn
+      ([sample state]
+       (let [^StateWithS res (lpfilter state sample)]
+         (StateWithS. (- sample (.sample res)) (.state res))))
+      ([]
+       (lpfilter)))))
 
 ;; BIQUAD FILTERS
 
@@ -564,7 +559,7 @@
 
 (defn biquad-filter
   ""
-  ([^BiquadConf c ^StateBiquad state sample]
+  ([^BiquadConf c sample ^StateBiquad state]
    (let [y (-> (* (.b0 c) sample)
                (+ (* (.b1 c) (.x1 state)))
                (+ (* (.b2 c) (.x2 state)))
@@ -594,123 +589,110 @@
 
 (deftype StateDjEq [^StateBiquad s1 ^StateBiquad s2 ^StateBiquad s3])
 
-(defn dj-eq
-  ""
-  ([b1 b2 b3 ^StateDjEq state sample]
-   (let [^StateWithS r1 (b1 (.s1 state) sample)
-         ^StateWithS r2 (b2 (.s2 state) (.sample r1))
-         ^StateWithS r3 (b3 (.s3 state) (.sample r2))]
-     (StateWithS. (.sample r3) (StateDjEq. (.state r1) (.state r2) (.state r3)))))
-  ([b1 b2 b3]
-   (StateDjEq. (b1) (b2) (b3))))
-
 (defmethod make-effect :dj-eq [_ conf]
   (let [b1 (make-effect :biquad-eq {:fc 100.0 :gain (:lo conf) :bw (:peak_bw conf) :fs (:rate conf)})
         b2 (make-effect :biquad-eq {:fc 1000.0 :gain (:mid conf) :bw (:peak_bw conf) :fs (:rate conf)})
         b3 (make-effect :biquad-hs {:fc 10000.0 :gain (:hi conf) :slope (:shelf_slope conf) :fs (:rate conf)})]
-    (partial dj-eq b1 b2 b3)))
-
-(defn phaser-allpass
-  ""
-  ([a1 [zm1] sample]
-   (let [y (+ zm1 (* sample (- a1)))
-         new-zm1 (+ sample (* y a1))]
-     [y [new-zm1]]))
-  ([a1 [zm1]]
-   (if (nil? zm1) [0.0] [zm1])))
+    (fn
+      ([sample ^StateDjEq state]
+       (let [^StateWithS r1 (b1 sample (.s1 state))
+             ^StateWithS r2 (b2 (.sample r1) (.s2 state))
+             ^StateWithS r3 (b3 (.sample r2) (.s3 state))]
+         (StateWithS. (.sample r3) (StateDjEq. (.state r1) (.state r2) (.state r3)))))
+      ([]
+       (StateDjEq. (b1) (b2) (b3))))))
 
 (defmethod make-effect :phaser-allpass [_ conf]
-  (let [d (:delay conf)]
-    (partial phaser-allpass (/ (- 1.0 d) (inc d)))))
-
+  (let [d (:delay conf)
+        a1 (/ (- 1.0 d) (inc d))]
+    (fn
+      ([sample zm1]
+       (let [y (+ zm1 (* sample (- a1)))
+             new-zm1 (+ sample (* y a1))]
+         (StateWithS. y new-zm1)))
+      ([] 0.0))))
 ;; 
 
 (deftype StateDivider [^double out ^double amp ^double count ^double lamp ^double last ^int zeroxs])
 
-(defn divider
-  ""
-  ([denom ^StateDivider state sample]
-   (let [count (inc (.count state))
-         ^StateDivider s1 (if (or (and (> sample 0.0) (<= (.last state) 0.0))
-                                  (and (neg? sample) (>= (.last state) 0.0)))
-                            (if (== denom 1)
-                              (StateDivider. (if (pos? (.out state)) -1.0 1.0) 0.0 0.0 (/ (.amp state) count) (.last state) 0)
-                              (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (inc (.zeroxs state))))
-                            (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (.zeroxs state)))
-         amp (+ (.amp s1) (m/abs sample))
-         ^StateDivider s2 (if (and (> denom 1)
-                                   (== (mod (.zeroxs s1) denom) (dec denom)))
-                            (StateDivider. (if (pos? (.out s1)) -1.0 1.0) 0.0 0 (/ amp (.count s1)) (.last s1) 0)
-                            (StateDivider. (.out s1) amp (.count s1) (.lamp s1) (.last s1) (.zeroxs s1)))]
-     (StateWithS. (* (.out s2) (.lamp s2)) (StateDivider. (.out s2) (.amp s2) (.count s2) (.lamp s2) sample (.zeroxs s2)))))
-  ([_]
-   (StateDivider. 1.0 0.0 0.0 0.0 0.0 0.0)))
-
 (defmethod make-effect :divider [_ conf]
-  (partial divider (:denominator conf)))
+  (let [denom (:denominator conf)]
+    (fn
+      ([sample ^StateDivider state]
+       (let [count (inc (.count state))
+             ^StateDivider s1 (if (or (and (> sample 0.0) (<= (.last state) 0.0))
+                                      (and (neg? sample) (>= (.last state) 0.0)))
+                                (if (== denom 1)
+                                  (StateDivider. (if (pos? (.out state)) -1.0 1.0) 0.0 0.0 (/ (.amp state) count) (.last state) 0)
+                                  (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (inc (.zeroxs state))))
+                                (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (.zeroxs state)))
+             amp (+ (.amp s1) (m/abs sample))
+             ^StateDivider s2 (if (and (> denom 1)
+                                       (== (mod (.zeroxs s1) denom) (dec denom)))
+                                (StateDivider. (if (pos? (.out s1)) -1.0 1.0) 0.0 0 (/ amp (.count s1)) (.last s1) 0)
+                                (StateDivider. (.out s1) amp (.count s1) (.lamp s1) (.last s1) (.zeroxs s1)))]
+         (StateWithS. (* (.out s2) (.lamp s2)) (StateDivider. (.out s2) (.amp s2) (.count s2) (.lamp s2) sample (.zeroxs s2)))))
+      ([]
+       (StateDivider. 1.0 0.0 0.0 0.0 0.0 0.0)))))
 
 ;; FM
 (deftype StateFm [^double pre ^double integral ^int t lp])
 
-(defn fm
-  ""
-  ([lp-chain quant omega phase ^StateFm state sample]
-   (let [sig (* sample phase)
-         new-integral (+ (.integral state) sig)
-         m (m/cos (+ new-integral (* omega (.t state))))
-         m (if (pos? quant)
-             (m/norm (int (m/norm m -1.0 1.0 0.0 quant)) 0.0 quant -1.0 1.0)
-             m)
-         dem (m/abs (- m (.pre state)))
-         ^StateWithS res (process-effects-one-pass dem (.lp state))
-         demf (/ (* 2.0 (- (.sample res) omega)) phase)]
-     (StateWithS. (m/constrain demf -1.0 1.0) (StateFm. m new-integral (inc (.t state)) (.state res)))))
-  ([lp-chain _ _ _]
-   (StateFm. 0.0 0.0 0 (create-state lp-chain))))
-
 (defmethod make-effect :fm [_ conf]
   (let [lp-chain [(make-effect :simple-lowpass {:rate 100000 :cutoff 25000})
                   (make-effect :simple-lowpass {:rate 100000 :cutoff 10000})
-                  (make-effect :simple-lowpass {:rate 100000 :cutoff 1000})]]
-    (partial fm lp-chain (:quant conf) (:omega conf) (:phase conf))))
+                  (make-effect :simple-lowpass {:rate 100000 :cutoff 1000})]
+        quant (:quant conf)
+        omega (:omega conf)
+        phase (:phase conf)]
+    (fn
+      ([sample ^StateFm state]
+       (let [sig (* sample phase)
+             new-integral (+ (.integral state) sig)
+             m (m/cos (+ new-integral (* omega (.t state))))
+             m (if (pos? quant)
+                 (m/norm (int (m/norm m -1.0 1.0 0.0 quant)) 0.0 quant -1.0 1.0)
+                 m)
+             dem (m/abs (- m (.pre state)))
+             ^StateWithS res (process-effects-one-pass dem (.lp state))
+             demf (/ (* 2.0 (- (.sample res) omega)) phase)]
+         (StateWithS. (m/constrain demf -1.0 1.0) (StateFm. m new-integral (inc (.t state)) (.state res)))))
+      ([]
+       (StateFm. 0.0 0.0 0 (create-state lp-chain))))))
 
 ;; foverdrive
 
-(defn foverdrive
-  "Fast overdrive, swh ladspa"
-  ([drive drivem1 state sample]
-   (let [fx (m/abs sample)
-         res (/ (* sample (+ fx drive)) (inc (+ (* sample sample) (* fx drivem1))))]
-     (StateWithS. res state)))
-  ([_ _] nil))
-
 (defmethod make-effect :foverdrive [_ conf]
-  (partial foverdrive (:drive conf) (dec (:drive conf))))
+  (let [drive (:drive conf)
+        drivem1 (dec (:drive conf))]
+    (fn
+      ([sample state]
+       (let [fx (m/abs sample)
+             res (/ (* sample (+ fx drive)) (inc (+ (* sample sample) (* fx drivem1))))]
+         (StateWithS. res state)))
+      ([] nil))))
 
 ;; decimator
 
 (deftype StateDecimator [^double count ^double last])
 
-(defn decimator
-  ""
-  ([ratio step stepr ^StateDecimator state sample]
-   (let [ncount (+ (.count state) ratio)]
-     (if (>= ncount 1.0)
-       (let [delta (* step (mod (->> sample
-                                     m/sgn
-                                     (* step 0.5)
-                                     (+ sample)
-                                     (* stepr)) 1.0))
-             last (- sample delta)]
-         (StateWithS. last (StateDecimator. (dec ncount) last)))
-       (StateWithS. (.last state) (StateDecimator. ncount (.last state))))))
-  ([_ _ _] (StateDecimator. 0.0 0.0)))
-
 (defmethod make-effect :decimator [_ conf]
   (let [step (m/pow 0.5 (- (:bits conf) 0.9999))
         stepr (/ 1.0 step)
         ratio (/ (:fs conf) (:rate conf))]
-    (partial decimator ratio step stepr)))
+    (fn
+      ([sample ^StateDecimator state]
+       (let [ncount (+ (.count state) ratio)]
+         (if (>= ncount 1.0)
+           (let [delta (* step (mod (->> sample
+                                         m/sgn
+                                         (* step 0.5)
+                                         (+ sample)
+                                         (* stepr)) 1.0))
+                 last (- sample delta)]
+             (StateWithS. last (StateDecimator. (dec ncount) last)))
+           (StateWithS. (.last state) (StateDecimator. ncount (.last state))))))
+      ([] (StateDecimator. 0.0 0.0)))))
 
 ;;; load and save signal
 ;;; file representation is 16 bit signed, big endian file
@@ -744,54 +726,42 @@
 ;;;;;;;;;;;;;;;
 ;;; wave generators
 
-(defn sin-wave
-  ""
-  [freq amp phase x]
-  (* amp
-     (m/sin (+ (* phase m/TWO_PI) (* x m/TWO_PI freq)))))
-
 (def snoise (j/make-noise (j/auto-correct (j/make-basis) 10000 -1.0 1.0)))
 
-(defn noise-wave
-  ""
-  [freq amp phase x]
-  (* amp
-     (snoise (* (+ phase x) freq))))
-
-(defn saw-wave
-  ""
-  [freq amp phase x]
-  (let [rp (* 2.0 amp)
-        p2 (* freq (mod (+ (* amp phase) amp x) 1.0))]
-    (* rp (- p2 (m/floor p2) 0.5))))
-
-(defn square-wave
-  ""
-  [freq amp phase x]
-  (if (< (mod (+ phase (* x freq)) 1.0) 0.5)
-    amp
-    (- amp)))
-
-(defn triangle-wave
-  ""
-  [saw amp x]
-  (- (* 2.0 (m/abs (saw x))) amp))
-
-(defn cut-triangle-wave
-  ""
-  [tri amp x]
-  (let [namp (* 0.5 amp)]
-    (* 2.0 (m/constrain (tri x) (- namp) namp))))
-
 (defmulti make-wave (fn [f _ _ _] f))
-(defmethod make-wave :sin [_ f a p] (partial sin-wave f a p))
-(defmethod make-wave :noise [_ f a p] (partial noise-wave f a p))
-(defmethod make-wave :saw [_ f a p] (partial saw-wave f a p))
-(defmethod make-wave :square [_ f a p] (partial square-wave f a p))
+
+(defmethod make-wave :sin [_ f a p]
+  (fn [x]
+    (* a
+     (m/sin (+ (* p m/TWO_PI) (* x m/TWO_PI f))))))
+
+(defmethod make-wave :noise [_ f a p]
+  (fn [x]
+    (* a
+       (snoise (* (+ p x) f)))))
+
+(defmethod make-wave :saw [_ f a p] 
+  (fn [x]
+    (let [rp (* 2.0 a)
+          p2 (* f (mod (+ (* a p) a x) 1.0))]
+      (* rp (- p2 (m/floor p2) 0.5)))))
+
+(defmethod make-wave :square [_ f a p]
+  (fn [x]
+    (if (< (mod (+ p (* x f)) 1.0) 0.5)
+      a
+      (- a))))
+
 (defmethod make-wave :triangle [_ f a p]
   (let [saw (make-wave :saw f a p)]
-    (partial triangle-wave saw a)))
-(defmethod make-wave :cut-triangle [_ f a p] (partial cut-triangle-wave (make-wave :triangle f a p) a))
+    (fn [x]
+      (- (* 2.0 (m/abs (saw x))) a))))
+
+(defmethod make-wave :cut-triangle [_ f a p]
+  (let [tri (make-wave :triangle f a p)]
+    (fn [x]
+      (let [namp (* 0.5 a)]
+        (* 2.0 (m/constrain (tri x) (- namp) namp))))))
 
 (def waves [:sin :noise :saw :square :triangle :cut-triangle])
 

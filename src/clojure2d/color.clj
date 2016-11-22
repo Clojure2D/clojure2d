@@ -917,13 +917,13 @@
   ""
   [^Vec3 a ^Vec3 b ^Vec3 c ^Vec3 d]
   (fn [t]
-    (let [cc (-> (->> t
-                     (v/mult c)
-                     (v/add d))
-                (v/mult m/TWO_PI)
-                (v/applyf m/cos)
-                (v/emult b)
-                (v/add a))]
+    (let [^Vec3 cc (-> (->> t
+                            (v/mult c)
+                            (v/add d))
+                       (v/mult m/TWO_PI)
+                       (v/applyf m/cos)
+                       (v/emult b)
+                       (v/add a))]
       (-> (Vec4. (.x cc) (.y cc) (.z cc) 1.0)
           (v/mult 255)
           (v/applyf clamp255)))))
