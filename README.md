@@ -90,7 +90,7 @@ Additionally in following namespaces:
 
 This is namespace for common generative/glitch specific libraries:
 
-* filters - analog audio/video filters
+* signal - signal processing, wave generators, effects and filters
 * overlays - 3 overlays (noise, spots and rgb scanlines) to finish your images
 * segmentation - segment Pixels into rectangles
 * variariations - vector field functions / variations taken from Fractal Flame world
@@ -118,22 +118,26 @@ I've prepared several examples with results where you can check current state of
 * ex13 - image segmentation example
 * ex14 - metaballs animation (https://gist.github.com/yogthos/3411106)
 * ex15 - colorspace converters + equalize histogram
+* ex16 - signal processing, sonification examples
+* ex17 - generative grids
+* ex18 - wave generator visualizations
+* ex19 - glitch filters: slitscan, channels shift, mirror image
 
 ## TODO
 
 ### High priority
 
 * Marginalia docs + github.io page
-* Cleaning, optimizations
+* Cleaning, optimizations - still in progress (more profiling)
 * ~~Parallel color operations on Pixels~~
 * ~~Color namespace cleaning~~
 * ~~Colorspace converters~~
 * More in extra ns:
   - variations
-  - code in extra namespace (moved from Processing)
-  - more analog filters (for sonification part)
+  - glitch filters in extra namespace (moved from Processing)
+  - analog filters (for sonification part)
 * Canvas drawing functions (not filled shapes, PShape implementation)
-* Session handling (saving results in session, logging actions)
+* Session handling (saving results in session, logging actions) - done, not tested
 * Sanity tests
 
 ### Low priority or ideas
