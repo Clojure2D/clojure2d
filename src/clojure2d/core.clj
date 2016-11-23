@@ -20,7 +20,7 @@
 (set! *unchecked-math* true)
 
 ;; some constants
-(def ^:const jpeg-image-quality 0.97)
+(def ^:dynamic *jpeg-image-quality* 0.97)
 
 ;; loading image with ImageIcon
 
@@ -84,7 +84,7 @@
   (let [^BufferedImage nimg (drop-alpha-in-image img)
         ^ImageWriteParam param (.getDefaultWriteParam writer)]
     (.setCompressionMode param ImageWriteParam/MODE_EXPLICIT)
-    (.setCompressionQuality param jpeg-image-quality)
+    (.setCompressionQuality param *jpeg-image-quality*)
     (do-save filename nimg writer param)))
 
 (defmethod save-to-image :bmp
