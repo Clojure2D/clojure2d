@@ -60,7 +60,8 @@
   (sub [_ v2]
     (let [^Vec2 v2 v2] (Vec2. (- x (.x v2)) (- y (.y v2)))))
   (mult [_ v] (Vec2. (* x v) (* y v)))
-  (emult [_ v] (Vec2. (* x (.x v)) (* y (.y v))))
+  (emult [_ v] 
+    (let [^Vec2 v v] (Vec2. (* x (.x v)) (* y (.y v)))))
   (div [_ v] (Vec2. (/ x v) (/ y v)))
   (abs [_] (Vec2. (m/abs x) (m/abs y)))
   (mx [_] (max x y))
@@ -109,7 +110,8 @@
   (sub [_ v2]
     (let [^Vec3 v2 v2] (Vec3. (- x (.x v2)) (- y (.y v2)) (- z (.z v2)))))
   (mult [_ v] (Vec3. (* x v) (* y v) (* z v)))
-  (emult [_ v] (Vec3. (* x (.x v)) (* y (.y v)) (* z (.z v))))
+  (emult [_ v] 
+    (let [^Vec3 v v] (Vec3. (* x (.x v)) (* y (.y v)) (* z (.z v)))))
   (div [_ v] (Vec3. (/ x v) (/ y v) (/ z v)))
   (abs [_] (Vec3. (m/abs x) (m/abs y) (m/abs z)))
   (mx [_] (max x y z))
@@ -226,7 +228,8 @@
   (sub [_ v2] 
     (let [^Vec4 v2 v2] (Vec4. (- x (.x v2)) (- y (.y v2)) (- z (.z v2)) (- w (.w v2)))))
   (mult [_ v] (Vec4. (* x v) (* y v) (* z v) (* w v)))
-  (emult [_ v] (Vec4. (* x (.x v)) (* y (.y v)) (* z (.z v)) (* w (.w v))))
+  (emult [_ v]
+    (let [^Vec4 v v] (Vec4. (* x (.x v)) (* y (.y v)) (* z (.z v)) (* w (.w v)))))
   (div [_ v] (Vec4. (/ x v) (/ y v) (/ z v) (/ w v)))
   (abs [_] (Vec4. (m/abs x) (m/abs y) (m/abs z) (m/abs w)))
   (mx [_] (max x y z w))

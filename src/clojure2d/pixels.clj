@@ -371,41 +371,43 @@
 (defn box-blur-v
   ""
   [r w h ^ints in]
-  (let [size (* w h)
-        ^ints target (int-array size)
-        iarr (/ 1.0 (inc (+ r r)))
-        r+ (inc r)
-        rang (range (- r+) r)]
-    (dotimes [x w]
-     (let [val (reduce #(+ %1 (core/aget-2d in w h x %2)) 0 rang)]
-       (loop [y (int 0)
-              v (int val)]
-         (when (< y h)
-           (let [nv (int (- (+ v (core/aget-2d in w h x (+ y r)))
-                            (core/aget-2d in w h x (- y r+))))]
-             (aset ^ints target (int (+ x (* w y))) (int (* nv iarr)))
-             (recur (inc y) nv))))))
-    target))
+  (if (zero? r) in
+      (let [size (* w h)
+            ^ints target (int-array size)
+            iarr (/ 1.0 (inc (+ r r)))
+            r+ (inc r)
+            rang (range (- r+) r)]
+        (dotimes [x w]
+          (let [val (reduce #(+ %1 (core/aget-2d in w h x %2)) 0 rang)]
+            (loop [y (int 0)
+                   v (int val)]
+              (when (< y h)
+                (let [nv (int (- (+ v (core/aget-2d in w h x (+ y r)))
+                                 (core/aget-2d in w h x (- y r+))))]
+                  (aset ^ints target (int (+ x (* w y))) (int (* nv iarr)))
+                  (recur (inc y) nv))))))
+        target)))
 
 (defn box-blur-h
   ""
   [r w h ^ints in]
-  (let [size (* w h)
-        ^ints target (int-array size)
-        iarr (/ 1.0 (inc (+ r r)))
-        r+ (inc r)
-        rang (range (- r+) r)]
-    (dotimes [y h]
-     (let [val (reduce #(+ %1 (core/aget-2d in w h %2 y)) 0 rang)
-           off (* w y)]
-       (loop [x (int 0)
-              v (int val)]
-         (when (< x w)
-           (let [nv (int (- (+ v (core/aget-2d in w h (+ x r) y))
-                            (core/aget-2d in w h (- x r+) y)))]
-             (aset ^ints target (int (+ x off)) (int (* nv iarr)))
-             (recur (inc x) nv))))))
-    target))
+  (if (zero? r) in
+      (let [size (* w h)
+            ^ints target (int-array size)
+            iarr (/ 1.0 (inc (+ r r)))
+            r+ (inc r)
+            rang (range (- r+) r)]
+        (dotimes [y h]
+          (let [val (reduce #(+ %1 (core/aget-2d in w h %2 y)) 0 rang)
+                off (* w y)]
+            (loop [x (int 0)
+                   v (int val)]
+              (when (< x w)
+                (let [nv (int (- (+ v (core/aget-2d in w h (+ x r) y))
+                                 (core/aget-2d in w h (- x r+) y)))]
+                  (aset ^ints target (int (+ x off)) (int (* nv iarr)))
+                  (recur (inc x) nv))))))
+        target)))
 
 (defn box-blur
   ""
@@ -437,14 +439,13 @@
                     (/ n)
                     (inc)
                     (m/sqrt)
-                    (m/floor)
-                    (int))
-        wl (if (even? w-ideal) (dec w-ideal) w-ideal)
+                    (m/floor))
+        wl (if (even? (int w-ideal)) (dec w-ideal) w-ideal)
         wu (+ wl 2)
         m-ideal (/ (- sigma* (* n (m/sq wl)) (* 4 n wl) (* 3 n))
                    (- (* -4 wl) 4))
-        m (int (m/round m-ideal))]
-    (vec (map #(/ (dec (if (< % m) wl wu)) 2) (range n)))))
+        m (m/round m-ideal)]
+    (vec (map #(int (/ (dec (if (< % m) wl wu)) 2)) (range n)))))
 
 (def radius-for-gauss-memo (memoize radius-for-gauss))
 
