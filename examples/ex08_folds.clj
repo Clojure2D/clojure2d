@@ -29,16 +29,25 @@
 (defn create-field
   ""
   []
-  (let [one-field? (m/brand 0.5)
+  (let [one-field? (m/brand 0.25)
+        derivative? (m/brand 0.2)
+        sinusoidal? (m/brand 0.75)
         field-name1 (rand-nth vr/variation-list)
         field-name2 (rand-nth vr/variation-list)
         field (if one-field?
                 (vr/make-variation field-name1 1.0 {})
-                (comp (vr/make-variation field-name2 1.0 {}) (vr/make-variation field-name1 1.0 {})))]
+                (comp (vr/make-variation field-name2 1.0 {}) (vr/make-variation field-name1 1.0 {})))
+        field (if derivative? (vr/derivative field) field)
+        field (if sinusoidal? (comp sinusoidal field) field)]
+    (when sinusoidal?
+      (print "sinusoidal "))
+    (when derivative?
+      (print "derivative "))
     (if one-field?
       (println field-name1)
       (println (str field-name1 " " field-name2)))
-    field))
+    field)
+  )
 
 (defn make-me
   ""

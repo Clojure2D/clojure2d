@@ -87,6 +87,9 @@
     rand
     (* -1 rand))))
 
+(def ^Vec2 unitx (Vec2. 1.0 0.0))
+(def ^Vec2 zerov (Vec2. 0.0 0.0))
+
 ;; ## A
 ;;
 ;; ### Auger
@@ -115,6 +118,20 @@
       (Vec2. xx yy))))
 (make-var-method auger)
 
+;; ### Arch
+
+(defn make-arch
+  ""
+  [amount _]
+  (fn [^Vec2 v]
+    (let [ang (* amount (m/drand m/PI))
+          sinr (m/sin ang)
+          cosr (m/cos ang)]
+      (if (zero? cosr) zerov
+          (Vec2. (* amount sinr)
+                 (* amount (/ (m/sq sinr) cosr)))))))
+(make-var-method arch)
+
 ;; ## B
 
 ;; ### bCollide
@@ -132,8 +149,6 @@
            :pi-bcn pi-bcn
            :bca-bcn bca-bcn)))
 (make-config-method bcollide)
-
-(def ^Vec2 unitx (Vec2. 1.0 0.0))
 
 (defn make-bcollide
   "bCollide by Michael Faber, http://michaelfaber.deviantart.com/art/bSeries-320574477"
@@ -158,6 +173,36 @@
       (Vec2. xx yy))))
 (make-var-method bcollide)
 
+;; ### bCollide
+(defn config-bswirl
+  "bSwirl configuration
+  params: `:in` `:out`"
+  [p]
+  (merge {:in (m/drand -2.0 2.0)
+          :out (m/drand -2.0 2.0)} p))
+(make-config-method bswirl)
+
+(defn make-bswirl
+  "bSwirl by Michael Faber, http://michaelfaber.deviantart.com/art/bSeries-320574477"
+  [amount {:keys [in out]}]
+  (fn [^Vec2 v]
+    (let [v+ (v/add v unitx)
+          v- (Vec2. (- 1.0 (.x v)) (.y v))
+          tau (* 0.5 (- (m/log (v/magsq v+))
+                        (m/log (v/magsq v-))))
+          pre-sigma (- m/PI (v/heading v+) (v/heading v-))
+          sigma (+ pre-sigma (* tau out) (/ in tau))
+          sinht (m/sinh tau)
+          cosht (m/cosh tau)
+          sins (m/sin sigma)
+          coss (m/cos sigma)
+          temp (- cosht coss)]
+      (if (zero? temp)
+        (Vec2. 0.0 0.0)
+        (Vec2. (* amount (/ sinht temp))
+               (* amount (/ sins temp)))))))
+(make-var-method bswirl)
+
 ;; ### BesselJ
 (defn make-besselj
   ""
@@ -175,6 +220,87 @@
     (Vec2. (* amount (Beta/logBeta (+ m/EPSILON (m/abs (.x v))) (+ m/EPSILON (m/abs (.y v)))))
            (* amount (v/heading v)))))
 (make-var-method beta)
+
+;; ## Bent
+
+(defn make-bent
+  ""
+  [amount _]
+  (fn [^Vec2 v]
+    (let [nx (if (neg? (.x v)) (+ (.x v) (.x v)) (.x v))
+          ny (if (neg? (.y v)) (* (.y v) 0.5) (.y v))]
+      (Vec2. (* amount nx)
+             (* amount ny)))))
+(make-var-method bent)
+
+;; ## Blade
+
+(defn make-blade
+  ""
+  [amount _]
+  (fn [^Vec2 v]
+    (let [r (* (m/drand amount) (v/mag v))
+          sinr (m/sin r)
+          cosr (m/cos r)]
+      (Vec2. (* amount (.x v) (+ cosr sinr))
+             (* amount (.x v) (- cosr sinr))))))
+(make-var-method blade)
+
+(defn make-blade2
+  ""
+  [amount _]
+  (fn [^Vec2 v]
+    (let [r (* (m/drand amount) (v/mag v))
+          sinr (m/sin r)
+          cosr (m/cos r)]
+      (Vec2. (* amount (.x v) (+ cosr sinr))
+             (* amount (.y v) (- cosr sinr))))))
+(make-var-method blade2)
+
+;; ## Boarders
+
+(defn make-boarders
+  ""
+  [amount _]
+  (fn [^Vec2 v]
+    (let [roundx (m/rint (.x v))
+          roundy (m/rint (.y v))
+          offsetx (- (.x v) roundx)
+          offsety (- (.y v) roundy)
+          hoffsetx (* 0.5 offsetx)
+          hoffsety (* 0.5 offsety)]
+      (if (m/brand 0.75)
+        (Vec2. (* amount (+ roundx hoffsetx))
+               (* amount (+ roundy hoffsety)))
+        (if (>= (m/abs offsetx) (m/abs offsety))
+          
+          (if (>= offsetx 0.0)
+            (Vec2. (* amount (+ hoffsetx roundx 0.25))
+                   (* amount (+ hoffsety roundy (/ (* 0.25 offsety) offsetx))))
+            (Vec2. (* amount (- (+ hoffsetx roundx) 0.25))
+                   (* amount (- (+ hoffsety roundy) (/ (* 0.25 offsety) offsetx)))))
+          
+          (if (>= offsety 0.0)
+            (Vec2. (* amount (+ hoffsetx roundx (/ (* 0.25 offsetx) offsety)))
+                   (* amount (+ hoffsety roundy 0.25)))
+            (Vec2. (* amount (- (+ hoffsetx roundx) (/ (* 0.25 offsetx) offsety)))
+                   (* amount (- (+ hoffsety roundy) 0.25)))))))))
+(make-var-method boarders)
+
+;; ## Butterfly
+
+(defn make-butterfly
+  ""
+  [amount _]
+  (fn [^Vec2 v]
+    (let [wx (* amount 1.3029400317411197908970256609023)
+          y2 (* 2.0 (.y v))
+          r (* wx (m/sqrt (/ (m/abs (* (.y v) (.x v)))
+                             (+ m/EPSILON (m/sq (.x v)) (m/sq y2)))))]
+      (Vec2. (* r (.x v))
+             (* r y2)))))
+
+(make-var-method butterfly)
 
 ;; ## C
 
@@ -366,6 +492,19 @@
     (Vec2. (* amount (Gamma/logGamma (v/mag v)))
            (* amount (v/heading v)))))
 (make-var-method gamma)
+
+;; ## H
+;;
+;; ### Hemisphere
+
+(defn make-hemisphere
+  ""
+  [amount _]
+  (fn [^Vec2 v]
+    (let [r (/ amount (m/sqrt (inc (v/magsq v))))]
+      (Vec2. (* r (.x v))
+             (* r (.y v))))))
+(make-var-method hemisphere)
 
 ;; ## J
 ;;
@@ -580,16 +719,40 @@
 
 (make-var-method foucaut)
 
+;;;;
+
+(defn derivative
+  ""
+  ([f a]
+   (let [^Vec2 d (Vec2. a a)]
+     (fn [^Vec2 v]
+       (let [v1 (f v)
+             v2 (f (v/add v d))]
+         (v/div (v/sub v2 v1) a)))))
+  ([f]
+   (derivative f 0.001)))
+
+
+;;;;
+
+(def variation-list-random [:arch
+                            :blade :blade2 :boarders
+                            :julia :julian :juliaq])
+
+(def variation-list-not-random [:default
+                                :auger 
+                                :bcollide :besselj :beta :bswirl :bent :butterfly
+                                :circlelinear :csin 
+                                :emod :erf :exp
+                                :foucaut :fan2
+                                :gamma 
+                                :hemisphere
+                                :miller :millerrev
+                                :popcorn2 
+                                :sinusoidal :stwin
+                                :trade])
+
+
 ;; list of all variations defined in the file
-(def variation-list [:default 
-                     :auger 
-                     :bcollide :besselj :beta 
-                     :circlelinear :csin 
-                     :emod :erf :exp
-                     :foucaut :fan2
-                     :gamma 
-                     :julia :julian :juliaq
-                     :miller :millerrev
-                     :popcorn2 
-                     :sinusoidal :stwin
-                     :trade])
+(def variation-list (concat variation-list-random variation-list-not-random))
+
