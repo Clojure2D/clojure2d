@@ -10,13 +10,25 @@
 (def freqs (vec (map #(bit-shift-left 1 %) (range 16))))
 (def amps (vec (map #(/ 1.0 %) freqs)))
 
-(defn make-random-waves
+(defn slitscan-random-setup
   ""
-  []
-  (s/make-sum-wave (->> (m/irand 2 6)
-                        (range)
-                        (map #(s/make-wave (rand-nth s/waves) (freqs %) (amps %) (m/drand 1)))
-                        (filterv (fn [_] (m/brand 0.8))))))
+  ([n]
+   (let [f (fn []
+             (let [r (m/irand 4)]
+               {:wave (rand-nth s/waves)
+                :freq (freqs r)
+                :amp (amps r)
+                :phase (m/drand)}))]
+     (filter (fn [_] (m/brand 0.8)) (repeatedly n f))))
+  ([]
+   (slitscan-random-setup (m/irand 2 6))))
+
+(defn make-slitscan-waves
+  ""
+  ([waves]
+   (s/make-sum-wave (map #(s/make-wave (:wave %) (:freq %) (:amp %) (:phase %)) waves)))
+  ([]
+   (make-slitscan-waves (slitscan-random-setup))))
 
 (defn slitscan
   ""
@@ -32,7 +44,7 @@
 (defn make-slitscan-filter
   ""
   ([]
-   (partial p/filter-channel-xy (partial slitscan (make-random-waves) (make-random-waves))))
+   (partial p/filter-channel-xy (partial slitscan (make-slitscan-waves) (make-slitscan-waves))))
   ([fx fy]
    (partial p/filter-channel-xy (partial slitscan fx fy))))
 
