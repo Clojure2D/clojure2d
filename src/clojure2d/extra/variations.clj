@@ -670,8 +670,6 @@
         (v/mult v amount)))))
 (make-var-method trade)
 
-
-
 ;;;;; https://github.com/d3/d3-geo-projection/tree/master/src
 
 (defn make-miller
@@ -721,20 +719,6 @@
 
 ;;;;
 
-(defn derivative
-  ""
-  ([f a]
-   (let [^Vec2 d (Vec2. a a)]
-     (fn [^Vec2 v]
-       (let [v1 (f v)
-             v2 (f (v/add v d))]
-         (v/div (v/sub v2 v1) a)))))
-  ([f]
-   (derivative f 0.001)))
-
-
-;;;;
-
 (def variation-list-random [:arch
                             :blade :blade2 :boarders
                             :julia :julian :juliaq])
@@ -756,3 +740,58 @@
 ;; list of all variations defined in the file
 (def variation-list (concat variation-list-random variation-list-not-random))
 
+
+;;; combinator & randomizer
+
+;;;;
+
+(defn derivative
+  ""
+  ([f amount a]
+   (let [^Vec2 d (Vec2. a a)]
+     (fn [^Vec2 v]
+       (let [v1 (f v)
+             v2 (f (v/add v d))]
+         (v/mult (v/div (v/sub v2 v1) a) amount)))))
+  ([f amount]
+   (derivative f amount 0.001))
+  ([f]
+   (derivative f 1.0)))
+
+;;;;
+
+(defn- binary-op
+  ""
+  [op f1 f2 amount]
+  (fn [^Vec2 v]
+    (v/mult (op (f1 v) (f2 v)) amount)))
+
+;;;;
+(def addf (partial binary-op v/add))
+(def subf (partial binary-op v/sub))
+(def mulf (partial binary-op v/emult))
+
+(defn divf
+  ""
+  [f1 f2 amount]
+  (fn [^Vec2 v]
+    (let [^Vec2 v1 (f1 v)
+          ^Vec2 v2 (f2 v)
+          x (if (zero? (.x v2)) 1.0 (.x v2))
+          y (if (zero? (.y v2)) 1.0 (.y v2))]
+      (v/mult (Vec2. (/ (.x v1) x) (/ (.y v1) y)) amount))))
+
+(defn compf
+  ""
+  [f1 f2 amount]
+  (v/mult (comp f1 f2) amount))
+
+(defn make-random-configuration
+  ""
+  []
+  ())
+
+(defn make-random-combination
+  ""
+  []
+  )

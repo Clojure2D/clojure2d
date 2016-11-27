@@ -2,8 +2,13 @@
   (:require [clojure2d.math :as m]
             [clojure2d.pixels :as p]
             [clojure2d.core :refer :all]
+            [clojure2d.math.vector :as v]
             [clojure2d.extra.signal :as s])
-  (:import [clojure2d.pixels Pixels]))
+  (:import [clojure2d.pixels Pixels]
+           [clojure2d.math.vector Vec2]))
+
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
 
 ;; Simple 2d SLITSCAN
 
@@ -127,29 +132,29 @@
           (mi-draw-point ch target source x y (- (.w source) x 1) (- (.h source) y 1)))))))
 
 (def mirror-ts {:U    (partial mi-do-horizontal true)
-                   :D    (partial mi-do-horizontal false)
-                   :L    (partial mi-do-vertical true)
-                   :R    (partial mi-do-vertical false)
-                   :DL   (partial mi-do-diag-ul 0 false)
-                   :UR   (partial mi-do-diag-ul 1 false)
-                   :DL2  (partial mi-do-diag-ul 2 false)
-                   :UR2  (partial mi-do-diag-ul 3 false)
-                   :SDL  (partial mi-do-diag-ul 0 true)
-                   :SUR  (partial mi-do-diag-ul 1 true)
-                   :SDL2 (partial mi-do-diag-ul 2 true)
-                   :SUR2 (partial mi-do-diag-ul 3 true)
-                   :DR   (partial mi-do-diag-ur 0 false)
-                   :UL   (partial mi-do-diag-ur 1 false)
-                   :DR2  (partial mi-do-diag-ur 2 false)
-                   :UL2  (partial mi-do-diag-ur 3 false)
-                   :SDR  (partial mi-do-diag-ur 0 true)
-                   :SUL  (partial mi-do-diag-ur 1 true)
-                   :SDR2 (partial mi-do-diag-ur 2 true)
-                   :SUL2 (partial mi-do-diag-ur 3 true)
-                   :RUR  (partial mi-do-diag-rect true true)
-                   :RDR  (partial mi-do-diag-rect false true)
-                   :RDL  (partial mi-do-diag-rect true false)
-                   :RUL  (partial mi-do-diag-rect false false)})
+                :D    (partial mi-do-horizontal false)
+                :L    (partial mi-do-vertical true)
+                :R    (partial mi-do-vertical false)
+                :DL   (partial mi-do-diag-ul 0 false)
+                :UR   (partial mi-do-diag-ul 1 false)
+                :DL2  (partial mi-do-diag-ul 2 false)
+                :UR2  (partial mi-do-diag-ul 3 false)
+                :SDL  (partial mi-do-diag-ul 0 true)
+                :SUR  (partial mi-do-diag-ul 1 true)
+                :SDL2 (partial mi-do-diag-ul 2 true)
+                :SUR2 (partial mi-do-diag-ul 3 true)
+                :DR   (partial mi-do-diag-ur 0 false)
+                :UL   (partial mi-do-diag-ur 1 false)
+                :DR2  (partial mi-do-diag-ur 2 false)
+                :UL2  (partial mi-do-diag-ur 3 false)
+                :SDR  (partial mi-do-diag-ur 0 true)
+                :SUL  (partial mi-do-diag-ur 1 true)
+                :SDR2 (partial mi-do-diag-ur 2 true)
+                :SUL2 (partial mi-do-diag-ur 3 true)
+                :RUR  (partial mi-do-diag-rect true true)
+                :RDR  (partial mi-do-diag-rect false true)
+                :RDL  (partial mi-do-diag-rect true false)
+                :RUL  (partial mi-do-diag-rect false false)})
 
 
 (defn make-mirror-filter
@@ -157,3 +162,23 @@
   [t]
   (t mirror-ts))
 
+;;
+
+(defn make-slitscan2-filter
+  "f: Vec2 -> Vec2 (use variation)
+   r: value 1.0-3.0"
+  ([f r]
+   (let [r- (- r)]
+     (fn [ch ^Pixels t ^Pixels p]
+       (dotimes [y (.h p)]
+         (let [yv (m/norm y 0 (.h p) r- r)]
+           (dotimes [x (.w p)]
+             (let [xlerp (m/norm x 0 (.w p) 0.0 1.0)
+                   ^Vec2 v1 (f (Vec2. r- yv))
+                   ^Vec2 v2 (f (Vec2. r yv))
+                   ^Vec2 vv (v/interpolate v1 v2 xlerp)
+                   xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
+                   yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
+               (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
+  ([f]
+   (make-slitscan2-filter f 2.0)))
