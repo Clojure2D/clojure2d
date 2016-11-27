@@ -186,6 +186,7 @@
 
 ;; \\(\sqrt{2}\\)
 (def ^:const SQRT2 (sqrt 2.0))
+(def ^:const SQRT2_2 (* 0.5 SQRT2))
 
 ;; \\(\sqrt{3}\\)
 (def ^:const SQRT3 (sqrt 3.0))
@@ -242,7 +243,11 @@
 (defn constrain
   "Clamp value between mn and mx"
   [value mn mx]
-  (min mx (max value mn)))
+  (if (> value mx) 
+    mx
+    (if (< value mn) 
+      mn 
+      value)))
 
 ;; Map value from range `[start1,stop1]` to new range `[start2,stop2]` or if new range is not given map to `[0,1]`
 (defn norm
@@ -274,7 +279,7 @@
 (defn cos-interpolation
   "oF interpolateCosine"
   [start stop t]
-  (let [t1 (* 0.5 (- 1.0 (cos (* t PI))))]
+  (let [t1 (* 0.5 (- 1.0 (qcos (* t PI))))]
     (lerp start stop t1)))
 
 ;;`(wrap 0 -1 1) => 0.0`  
@@ -290,6 +295,7 @@
     (if (zero? cycle)
       to
       (->> cycle
+           (double)
            (/ (- value from))
            (floor)
            (* cycle)

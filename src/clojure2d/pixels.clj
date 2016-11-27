@@ -236,7 +236,7 @@
                           (loop [idx (int %)]
                             (when (< idx end)
                               (set-color target idx (f (get-color p idx)))
-                              (recur (inc idx))))))
+                              (recur (unchecked-inc idx))))))
                parts))]
     (dorun (map deref ftrs))
     target))
@@ -250,7 +250,7 @@
     (loop [idx start]
       (when (< idx stop)
         (aset ^ints (.p target) idx (int (f (aget ^ints (.p p) idx))))
-        (recur (inc idx))))
+        (recur (unchecked-inc idx))))
     true))
 
 (defn filter-channel-xy
@@ -287,7 +287,7 @@
     (loop [idx start]
       (when (< idx stop)
         (aset ^ints (.p target) idx (int (f (aget ^ints (.p p1) idx) (aget ^ints (.p p2) idx))))
-        (recur (inc idx))))
+        (recur (unchecked-inc idx))))
     true))
 
 (defn blend-channel-xy
@@ -385,7 +385,7 @@
                 (let [nv (int (- (+ v (core/aget-2d in w h x (+ y r)))
                                  (core/aget-2d in w h x (- y r+))))]
                   (aset ^ints target (int (+ x (* w y))) (int (* nv iarr)))
-                  (recur (inc y) nv))))))
+                  (recur (unchecked-inc y) nv))))))
         target)))
 
 (defn box-blur-h
@@ -406,7 +406,7 @@
                 (let [nv (int (- (+ v (core/aget-2d in w h (+ x r) y))
                                  (core/aget-2d in w h (- x r+) y)))]
                   (aset ^ints target (int (+ x off)) (int (* nv iarr)))
-                  (recur (inc x) nv))))))
+                  (recur (unchecked-inc x) nv))))))
         target)))
 
 (defn box-blur
@@ -574,7 +574,7 @@
                        currmx (int Integer/MIN_VALUE)]
                   (if (< idx (.size p))
                     (let [v (get-value p ch idx)]
-                      (recur (inc idx)
+                      (recur (unchecked-inc idx)
                              (int (if (< v currmn) v currmn))
                              (int (if (> v currmx) v currmx))))
                     [currmn currmx]))]
@@ -592,7 +592,7 @@
       (if (< idx sz)
         (let [c (get-value p ch idx)]
           (aset ^doubles hist (int c) (double (+ d (aget ^doubles hist (int c)))))
-          (recur (inc idx)))
+          (recur (unchecked-inc idx)))
         hist))))
 
 (defn- equalize-make-lookup
@@ -610,7 +610,7 @@
           (recur (int (if (< val currmn) val currmn))
                  (int (if (> val currmx) val currmx))
                  (double currsum)
-                 (inc idx)))
+                 (unchecked-inc idx)))
         lookup))))
 
 (defn equalize-filter

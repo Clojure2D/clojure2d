@@ -81,8 +81,6 @@
   [^Complex z]
   (Complex. (- (.real z)) (- (.imag z))))
 
-(def ^:const SQRT2_2 (* 0.5 m/SQRT2))
-
 (defn sqrt
   "Sqrt of complex number"
   [^Complex z]
@@ -91,7 +89,7 @@
         l (abs z)
         xx (m/sqrt (+ l x))
         yy (* (m/signum y) (m/sqrt (- l x)))]
-    (Complex. (* SQRT2_2 xx) (* SQRT2_2 yy))))
+    (Complex. (* m/SQRT2_2 xx) (* m/SQRT2_2 yy))))
 
 (defn sqrt1z
   "Sqrt(1-z^2)"
