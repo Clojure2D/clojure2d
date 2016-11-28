@@ -36,6 +36,13 @@
           ^int (clamp255 (.z v))
           ^int (clamp255 (.w v))))
 
+(defn to-color3
+  ""
+  [^Vec3 v]
+  (Color. ^int (clamp255 (.x v))
+          ^int (clamp255 (.y v))
+          ^int (clamp255 (.z v))))
+
 (defn from-color
   ""
   [^Color c]
@@ -43,6 +50,14 @@
          (.getGreen c)
          (.getBlue c)
          (.getAlpha c)))
+
+(defn from-color3
+  ""
+  [^Color c]
+  (Vec3. (.getRed c)
+         (.getGreen c)
+         (.getBlue c)))
+
 
 ;; blending part
 
