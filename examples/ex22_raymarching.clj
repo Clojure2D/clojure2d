@@ -19,7 +19,7 @@
 
 (def canvas (create-canvas w h))
 
-(def windows (show-window canvas "raymarching" w h 15))
+(def window (show-window canvas "raymarching" w h 15))
 
 (defmethod key-pressed ["raymarching" \space] [_]
   (save-canvas canvas "results/ex22/scene.jpg"))
@@ -35,7 +35,6 @@
 (def ^Vec3 glow-color (v/div (Vec3. 255 153 51) 255.0))
 
 (def ^Vec3 sun-lin (Vec3. 1.2 0.5 1.8)) ;; material color
-
 
 (do
   (def ^Vec3 ro (Vec3. 0.0 5.0 10.0)) ;; ray origin
@@ -81,13 +80,13 @@
           h (max 0.0 (f (.x p) (.z p)))
           newres (min res (/ (* k h) t))]
       (if (or (< h 0.0001)
-              (> i 50))
+              (> i 20))
         (m/constrain newres 0.0 1.0)
         (recur (unchecked-inc i) newres (+ t (m/constrain h 0.02 0.5)))))))
 
 
-(def terrain-f (comp (var/make-variation :sinusoidal 1.0 {})
-                     (var/make-variation :auger 1.0 {})))
+(def terrain-f (comp (var/make-variation :sinusoidal 1.2 {})
+                     (var/make-variation :auger 0.7 {})))
 
 (defn terrain
   ""
@@ -98,7 +97,7 @@
 (defn normal
   ""
   [f ^Vec3 v t]
-  (let [eps (max 0.02 (* 0.001 t))]
+  (let [eps (max 0.002 (* 0.0001 t))]
     (v/normalize (Vec3. (- (f (- (.x v) eps) (.z v))
                            (f (+ (.x v) eps) (.z v)))
                         (+ eps eps)
@@ -159,14 +158,12 @@
             col (if (< t maxt) ;; terrain
                         (let [^Vec3 pos (v/add ro (v/mult rd t))
                               ^Vec3 nor (normal terrain pos t)
-                              ref (reflect rd nor)
                               hh (- 1.0 (smoothstep -2.0 1.0 (.y pos)))
                               sun (m/constrain (v/dot nor sun-light) 0.0 1.0)
                               sha (if (> sun 0.01) (softshadow pos sun-light terrain) 0.0)
                               sky (+ 0.5 (* 0.5 (.y nor)))
 
-                              lin (v/emult (v/mult sun-lin sun) (Vec3. sha (m/pow sha 1.2) (m/pow sha 1.5)))
-                              ]
+                              lin (v/emult (v/mult sun-lin sun) (Vec3. sha (m/pow sha 1.2) (m/pow sha 1.5)))]
                           (calc-fog t lin bcol))
                         bcol)
             col (v/add col (v/mult glow-color (* (* 0.2 s s) (m/constrain (/ (+ (.y rd) 0.4) 0.4) 0.0 1.0)))) ;; sun glow
