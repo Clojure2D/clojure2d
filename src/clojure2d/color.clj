@@ -14,7 +14,7 @@
 (defn clamp255
   ""
   [a]
-  (m/constrain (m/round a) 0 255))
+  (int (m/constrain (m/round a) 0 255)))
 
 (defn mod255
   ""
@@ -24,9 +24,16 @@
 (defn get-luma
   "get luma from color"
   [^Vec4 c]
-  (m/round (+ (* 0.2126 (.x c))
-              (* 0.7152 (.y c))
-              (* 0.0722 (.z c)))))
+  (+ (* 0.2126 (.x c))
+     (* 0.7152 (.y c))
+     (* 0.0722 (.z c))))
+
+(defn get-luma3
+  "get luma from color"
+  [^Vec3 c]
+  (+ (* 0.2126 (.x c))
+     (* 0.7152 (.y c))
+     (* 0.0722 (.z c))))
 
 (defn to-color
   ""

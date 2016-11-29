@@ -1,3 +1,8 @@
+;; https://www.shadertoy.com/view/XsX3RB
+;; http://www.iquilezles.org/www/index.htm
+
+;; low speed cpu version
+
 (ns examples.ex22-raymarching
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
@@ -7,73 +12,170 @@
   (:import [clojure2d.math.vector Vec2 Vec3]
            [java.awt Color]))
 
-(def canvas (create-canvas 800 800))
+(set! *warn-on-reflection* true)
 
-(def windows (show-window canvas "raymarching" 800 800 25))
+(def ^:const w 1000)
+(def ^:const h 1000)
 
-(def ^Vec3 ro (Vec3. 0.0 8.0 10.0))
+(def canvas (create-canvas w h))
 
-(def ^:const mint 0.0)
-(def ^:const maxt 25.0)
+(def windows (show-window canvas "raymarching" w h 15))
+
+(defmethod key-pressed ["raymarching" \space] [_]
+  (save-canvas canvas "results/ex22/scene.jpg"))
+
+(def ^:const mint 0.01) ;; minimum ray distance 
+(def ^:const maxt 30.0) ;; maximum ray distance
+
+(def ^Vec3 sun-light (v/normalize (Vec3. -300.7 0.4 -200.0)))
+
+(def ^Vec3 fog-color (v/div (Vec3. 200 200 200) 255.0))
+(def ^Vec3 sky-color (v/div (Vec3. 135 206 250) 255.0))
+(def ^Vec3 sun-color (v/div (Vec3. 253 184 19) 255.0))
+(def ^Vec3 glow-color (v/div (Vec3. 255 153 51) 255.0))
+
+(def ^Vec3 sun-lin (Vec3. 1.2 0.5 1.8)) ;; material color
+
+
+(do
+  (def ^Vec3 ro (Vec3. 0.0 5.0 10.0)) ;; ray origin
+  (def ^Vec3 ch (Vec3. 0.0 2.5 4.0)) ;; camera heading
+  (def camera-tilt 0.0) ;; tilt camera
+
+  (defn set-camera
+    ""
+    [ta cr]
+    (let [cw (v/normalize (v/sub ta ro))
+          cp (Vec3. (m/sin cr) (m/cos cr) 0.0)
+          cu (v/normalize (v/cross cw cp))
+          cv (v/normalize (v/cross cu cw))]
+      [cu cv cw]))
+
+  (let [[c1 c2 c3] (set-camera ch camera-tilt)]
+    (def ^Vec3 cam1 c1)
+    (def ^Vec3 cam2 c2)
+    (def ^Vec3 cam3 c3)))
 
 (defn cast-ray
   ""
-  [^Vec3 rd f]
+  [rd f]
   (loop [i (int 0)
          t mint]
-    (let [
-          ^Vec3 p (v/add ro (v/mult rd t))
+    (let [^Vec3 p (v/add ro (v/mult rd t))
           diffh (- (.y p) (f (.x p) (.z p)))]
-      (if (or (>= t maxt)
-              (> i 256)
-              (< diffh (* 0.000002 t)))
+      (if (or (> t maxt)
+              (> i 50)
+              (< diffh (* 0.001 t)))
         t
-        (recur (unchecked-inc i) (+ (* 0.5 diffh) t))))))
+        (recur (unchecked-inc i) (+ diffh t))))))
 
-(def terrain (comp (var/make-variation :sinusoidal 1.0 {})
-                   (var/make-variation :auger 1.0 {})
-))
+(def ^:const k 16)
 
-(defn terrain-f
+(defn softshadow
+  ""
+  [pos rd f]
+  (loop [i (int 0)
+         res 1.0
+         t mint]
+    (let [^Vec3 p (v/add pos (v/mult rd t))
+          h (max 0.0 (f (.x p) (.z p)))
+          newres (min res (/ (* k h) t))]
+      (if (or (< h 0.0001)
+              (> i 50))
+        (m/constrain newres 0.0 1.0)
+        (recur (unchecked-inc i) newres (+ t (m/constrain h 0.02 0.5)))))))
+
+
+(def terrain-f (comp (var/make-variation :sinusoidal 1.0 {})
+                     (var/make-variation :auger 1.0 {})))
+
+(defn terrain
   ""
   [x y]
-  (let [^Vec2 v (terrain (Vec2. x y))]
-    (* 8.0 (m/noise (* 0.08 (.x v)) (* 0.08 (.y v))))))
+  (let [^Vec2 v (terrain-f (Vec2. (+ x 0.5) y))]
+    (* 3.5 (m/noise (* 0.08 (.x v)) (* 0.08 (.y v))))))
 
-(def ^:const EPS 0.00001)
-
-(defn normal-v
+(defn normal
   ""
-  [f ^Vec3 v]
-  (v/normalize (Vec3. (- (f (- (.x v) EPS) (.z v))
-                         (f (+ (.x v) EPS) (.z v)))
-                      (+ EPS EPS)
-                      (- (f (.x v) (- (.z v) EPS))
-                         (f (.x v) (+ (.z v) EPS))))))
+  [f ^Vec3 v t]
+  (let [eps (max 0.02 (* 0.001 t))]
+    (v/normalize (Vec3. (- (f (- (.x v) eps) (.z v))
+                           (f (+ (.x v) eps) (.z v)))
+                        (+ eps eps)
+                        (- (f (.x v) (- (.z v) eps))
+                           (f (.x v) (+ (.z v) eps)))))))
 
-(def light (v/normalize (Vec3. -1.0 1.0 0.0)))
-
-(def fog-color (Vec3. 120 120 120))
 (defn calc-fog
   ""
-  [t ^Vec3 col]
-  (let [fo (- 1.0 (m/exp (* -0.001 t t t)))]
-    (v/interpolate col fog-color fo)))
+  [t col bcol]
+  (let [fo (- 1.0 (m/exp (* -0.01 t t)))
+        fbcol (v/interpolate fog-color bcol fo)]
+    (v/interpolate col fbcol fo)))
 
-(dotimes [x 800]
-  (let [xx (m/norm x 0.0 800.0 -2.0 2.0)]
-    (dotimes [y 800]
-      (let [yy (m/norm y 800.0 0.0 -2.0 2.0)
-            ^Vec3 rd (Vec3. xx yy -2.0)
-            t (cast-ray rd terrain-f)
-            c (if (< t maxt)
-                (let [n (normal-v terrain-f (v/add ro (v/mult rd t)))
-                      d (v/dot n light)
-                      cv (int (m/cnorm d 0 1.0 100 255))
-                      cv2 (int (* 0.5 cv))
-                      ^Vec3 col (Vec3. cv2 cv2 cv)]
-                  (c/to-color3 (calc-fog t col)))
-                Color/black)]
+(let [v3 (Vec3. 3.0 3.0 3.0)]
+    (defn contrast
+      ""
+      [col]
+      (let [s (v/mult (v/add v3 (v/mult col 2.0)) 0.1)] 
+        (v/add (v/mult col 0.9)
+               (v/emult col (v/emult s col))))))
+
+(defn gamma
+  ""
+  [col]
+  (v/applyf col #(m/pow (m/constrain % 0.0 1.0) 1.5)))
+
+(defn desaturate
+  ""
+  [col]
+  (let [luma (c/get-luma3 col)]
+   (v/interpolate col (Vec3. luma luma luma) 0.2)))
+
+(defn reflect
+  ""
+  [I N]
+  (v/sub I (v/mult N (* 2.0 (v/dot N I)))))
+
+(defn smoothstep
+  ""
+  [edge0 edge1 x]
+  (let [t (m/norm x edge0 edge1)]
+    (* t t (- 3.0 (* 2.0 t)))))
+
+(dotimes [x w]
+  (let [xx (m/norm x 0.0 w -2.0 2.0)]
+    (dotimes [y h]
+      (let [yy (m/norm y h 0.0 -2.0 2.0)
+            point (v/normalize (Vec3. xx yy 1.0)) ;; screen point
+            ^Vec3 rd (Vec3. (v/dot cam1 point)
+                            (v/dot cam2 point)
+                            (v/dot cam3 point)) ;; view vector
+            t (cast-ray rd terrain) ;; distance to terrain
+            s (m/constrain (v/dot rd sun-light) 0.0 1.0) ;; sun direction
+            bcol (-> sun-color
+                     (v/mult (* 0.2 (m/pow s 6.0)))
+                     (v/add (v/sub sky-color (v/mult (Vec3. (.y rd) (.y rd) (.y rd)) 0.9)))
+                     (v/mult 0.9)) ;; sun color
+            col (if (< t maxt) ;; terrain
+                        (let [^Vec3 pos (v/add ro (v/mult rd t))
+                              ^Vec3 nor (normal terrain pos t)
+                              ref (reflect rd nor)
+                              hh (- 1.0 (smoothstep -2.0 1.0 (.y pos)))
+                              sun (m/constrain (v/dot nor sun-light) 0.0 1.0)
+                              sha (if (> sun 0.01) (softshadow pos sun-light terrain) 0.0)
+                              sky (+ 0.5 (* 0.5 (.y nor)))
+
+                              lin (v/emult (v/mult sun-lin sun) (Vec3. sha (m/pow sha 1.2) (m/pow sha 1.5)))
+                              ]
+                          (calc-fog t lin bcol))
+                        bcol)
+            col (v/add col (v/mult glow-color (* (* 0.2 s s) (m/constrain (/ (+ (.y rd) 0.4) 0.4) 0.0 1.0)))) ;; sun glow
+            c (-> col
+                  gamma
+                  contrast
+                  desaturate
+                  (v/mult 255)
+                  c/to-color3)]
         (with-canvas canvas
           (set-color c)
           (rect x y 1 1))))))
