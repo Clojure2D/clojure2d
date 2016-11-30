@@ -270,9 +270,9 @@
   (mx [_] (max x y z w))
   (mn [_] (min x y z w))
   (emx [_ v]
-    (let [^Vec3 v v] (max (.x v) x) (max (.y v) y) (max (.z v) z) (max (.w v) w)))
+    (let [^Vec4 v v] (max (.x v) x) (max (.y v) y) (max (.z v) z) (max (.w v) w)))
   (emn [_ v]
-    (let [^Vec3 v v] (min (.x v) x) (min (.y v) y) (min (.z v) z) (min (.w v) w)))
+    (let [^Vec4 v v] (min (.x v) x) (min (.y v) y) (min (.z v) z) (min (.w v) w)))
   (sum [_] (+ x y z w)) 
   (interpolate [_ v2 t f]
     (let [^Vec4 v2 v2] (Vec4. (f x (.x v2) t)
