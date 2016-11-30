@@ -26,7 +26,12 @@
   (abs [v1])
   (mx [v1])
   (mn [v1])
-  (sum [v1])
+  (emx [v1 v2])
+  (emn [v1 v2])
+  (maxdim [v])
+  (mindim [v])
+  (base-from [v])
+  (sum [v1])  
   (interpolate [v1 v2 t] [v1 v2 t f])
   (is-zero? [v1])
   (is-near-zero? [v1])
@@ -62,10 +67,21 @@
   (mult [_ v] (Vec2. (* x v) (* y v)))
   (emult [_ v] 
     (let [^Vec2 v v] (Vec2. (* x (.x v)) (* y (.y v)))))
-  (div [_ v] (Vec2. (/ x v) (/ y v)))
+  (div [_ v] 
+    (let [v1 (/ 1.0 v)] (Vec2. (* x v1) (* y v1))))
   (abs [_] (Vec2. (m/abs x) (m/abs y)))
   (mx [_] (max x y))
   (mn [_] (min x y))
+  (emx [_ v]
+    (let [^Vec2 v v] (max (.x v) x) (max (.y v) y)))
+  (emn [_ v]
+    (let [^Vec2 v v] (min (.x v) x) (min (.y v) y)))
+  (maxdim [_]
+    (if (> x y) 0 1))
+  (mindim [_]
+    (if (< x y) 0 1))
+  (base-from [v]
+    [v (perpendicular v)])
   (sum [_] (+ x y)) 
   (interpolate [_ v2 t f]
     (let [^Vec2 v2 v2] (Vec2. (f x (.x v2) t)
@@ -112,10 +128,28 @@
   (mult [_ v] (Vec3. (* x v) (* y v) (* z v)))
   (emult [_ v] 
     (let [^Vec3 v v] (Vec3. (* x (.x v)) (* y (.y v)) (* z (.z v)))))
-  (div [_ v] (Vec3. (/ x v) (/ y v) (/ z v)))
+  (div [_ v] 
+    (let [v1 (/ 1.0 v)] (Vec3. (* x v1) (*  y v1) (* z v1))))
   (abs [_] (Vec3. (m/abs x) (m/abs y) (m/abs z)))
   (mx [_] (max x y z))
   (mn [_] (min x y z))
+  (emx [_ v]
+    (let [^Vec3 v v] (max (.x v) x) (max (.y v) y) (max (.z v) z)))
+  (emn [_ v]
+    (let [^Vec3 v v] (min (.x v) x) (min (.y v) y) (min (.z v) z)))
+  (maxdim [_]
+    (if (> x y)
+      (if (> x z) 0 2)
+      (if (> y z) 1 2)))
+  (mindim [_]
+    (if (< x y)
+      (if (< x z) 0 2)
+      (if (< y z) 1 2)))
+  (base-from [v]
+    (let [v2 (if (> (m/abs x) (m/abs y))
+               (div (Vec3. (- z) 0.0 x) (m/hypot x z))
+               (div (Vec3. 0.0 z (- y)) (m/hypot y z)))]
+      [v v2 (cross v v2)]))
   (sum [_] (+ x y z)) 
   (interpolate [_ v2 t f]
     (let [^Vec3 v2 v2] (Vec3. (f x (.x v2) t)
@@ -230,10 +264,15 @@
   (mult [_ v] (Vec4. (* x v) (* y v) (* z v) (* w v)))
   (emult [_ v]
     (let [^Vec4 v v] (Vec4. (* x (.x v)) (* y (.y v)) (* z (.z v)) (* w (.w v)))))
-  (div [_ v] (Vec4. (/ x v) (/ y v) (/ z v) (/ w v)))
+  (div [_ v]
+    (let [v1 (/ 1.0 v)] (Vec4. (* x v1) (* y v1) (* z v1) (* w v1))))
   (abs [_] (Vec4. (m/abs x) (m/abs y) (m/abs z) (m/abs w)))
   (mx [_] (max x y z w))
   (mn [_] (min x y z w))
+  (emx [_ v]
+    (let [^Vec3 v v] (max (.x v) x) (max (.y v) y) (max (.z v) z) (max (.w v) w)))
+  (emn [_ v]
+    (let [^Vec3 v v] (min (.x v) x) (min (.y v) y) (min (.z v) z) (min (.w v) w)))
   (sum [_] (+ x y z w)) 
   (interpolate [_ v2 t f]
     (let [^Vec4 v2 v2] (Vec4. (f x (.x v2) t)
@@ -259,6 +298,11 @@
   "Euclidean distance between vectors"
   [v1 v2]
   (mag (sub v1 v2)))
+
+(defn dist-sq
+  "Euclidean distance between vectors squared"
+  [v1 v2]
+  (magsq (sub v1 v2)))
 
 (defn dist-abs
   "Manhattan distance between vectors"
@@ -324,6 +368,13 @@
   "Are vectors aligned (have the same direction)?"
   [v1 v2]
   (< (angle-between v1 v2) TOLERANCE))
+
+(defn faceforward
+  "flip normal"
+  [n v]
+  (if (neg? (dot n v))
+    (sub n)
+    n))
 
 ;;(perpendicular (Vec3. 1 2 0) (Vec3. 4 3 0))
 ;;(perpendicular (Vec2. 1 0))
