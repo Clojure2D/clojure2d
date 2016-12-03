@@ -25,18 +25,18 @@ The main reason was that I wanted to learn Clojure making something from the scr
 
 In points:
 
-* Almost decoupled display and canvas - you can have as many windows as you want, you can have as many canvases as you want. Display repaints selected canvas automaticaly in separate thread. This way you can operate on canvas in your way.
+* Almost decoupled display and canvas (decoupled drawing and refreshing) - you can have as many windows as you want, you can have as many canvases as you want. Display repaints selected canvas automaticaly in separate thread. This way you can operate on canvas in your pace.
 * Processing way is still possible (you can attach draw() function to your Display)
 * Easy live coding possible (Emacs/Cider/REPL), 'notebook' way of making (like iPython)
 * FastMath as main math library
 * Main focus on higher level generative/glitch concepts (like sonification support, vector field functions, colorspace operations, things like pixelsorting, slitscan etc. See my Processing sketches, link below)
 
-Check examples and results folders
+Check out examples and results folders
 
 ### What's odd?
 
-It's kind of personal library which supports my (probably not optimal, not convenient for others) way of creating.
-There are still plenty of bugs and not idiomatic code. It's slower than Processing. Eats memory (Pixels code is generally immutable). Still not stable API and architecture.
+It's kind of personal library which supports my (probably not optimal, not convenient for others) way of creating stuff.
+There are still plenty of bugs and not idiomatic code. It's slower than Processing. Eats a lot of memory (Pixels code is generally immutable). Still not stable API and architecture.
 No docs, no tests (yet)
 
 ## Installation
@@ -49,7 +49,7 @@ Add following line as a dependency to your `project.clj`
 
 ## Usage
 
-Since still no docs are available, check out prepared examples. There are available packages described below.
+Since still no docs are available, check out prepared examples. All available packages are described below.
 
 ### clojure2d.core
 
@@ -58,6 +58,7 @@ This is main namespace with functions in three groups:
 * image file oparations (load/save); jpg, png and bmp
 * canvas operations (wrapper for Java2D BufferedImage and Graphics2D)
 * display and event operations (JFrame wrapper)
+* session handling (logger + unique, sequential filename generator)
 
 ### clojure2d.pixels
 
@@ -72,6 +73,7 @@ Defines also:
 
 * colorspace converters
 * collection of blending basic functions (like add, subtract, divide, difference, etc.)
+* palette generation / color reducing filter
 
 ### clojure2d.math
 
@@ -84,20 +86,17 @@ Additionally in following namespaces:
 
 * clojure2d.math.complex - Complex type and operations (code taken from Apache Commons Math)
 * clojure2d.math.vector - Vec2, Vec3 and Vec4 types and operations on vectors
-* clojure2d.math.joise - Joise library bindings (basic, cell and fractal noise)
+* clojure2d.math.joise - Joise library bindings (basic (simplex/perlin/value), cell (voronoi) and fractal noise + combinations)
 
 ### clojure2d.extra
 
 This is namespace for common generative/glitch specific libraries:
 
-* signal - signal processing, wave generators, effects and filters
+* signal - signal processing, wave generators, effects and filters (sonification enabler)
 * overlays - 3 overlays (noise, spots and rgb scanlines) to finish your images
 * segmentation - segment Pixels into rectangles
-* variariations - vector field functions / variations taken from Fractal Flame world
-
-### clojure2d.utils
-
-Couple of helper functions
+* variariations - vector field functions / variations taken from fractal flames world
+* glitch - glitching filters
 
 ## Examples
 
@@ -122,6 +121,9 @@ I've prepared several examples with results where you can check current state of
 * ex17 - generative grids
 * ex18 - wave generator visualizations
 * ex19 - glitch filters: slitscan, channels shift, mirror image
+* ex20 - color reduction examples
+* ex21 - Pickover's popcorns
+* ex22 - ray-marching 3d example
 
 ## TODO
 
@@ -168,12 +170,14 @@ Yes! You can help with this project:
 Discuss about it with me on Slack.
 Or just Pull Request.
 
-## Projects
+## Projects / links
 
 * Processing glitch/generative projects: https://github.com/tsulej/GenerateMe
 * Visual log: http://generateme.tumblr.com/
 * Folds project: http://folds2d.tumblr.com/
 * Articles: https://generateme.wordpress.com/
+* FB: https://www.facebook.com/generateme/ https://www.facebook.com/folds2d/?fref=ts
+* Twitter: https://twitter.com/generateme_blog
 
 ## License
 
