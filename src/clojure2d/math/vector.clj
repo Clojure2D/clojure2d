@@ -73,9 +73,9 @@
   (mx [_] (max x y))
   (mn [_] (min x y))
   (emx [_ v]
-    (let [^Vec2 v v] (max (.x v) x) (max (.y v) y)))
+    (let [^Vec2 v v] (Vec2. (max (.x v) x) (max (.y v) y))))
   (emn [_ v]
-    (let [^Vec2 v v] (min (.x v) x) (min (.y v) y)))
+    (let [^Vec2 v v] (Vec2. (min (.x v) x) (min (.y v) y))))
   (maxdim [_]
     (if (> x y) 0 1))
   (mindim [_]
@@ -134,9 +134,9 @@
   (mx [_] (max x y z))
   (mn [_] (min x y z))
   (emx [_ v]
-    (let [^Vec3 v v] (max (.x v) x) (max (.y v) y) (max (.z v) z)))
+    (let [^Vec3 v v] (Vec3. (max (.x v) x) (max (.y v) y) (max (.z v) z))))
   (emn [_ v]
-    (let [^Vec3 v v] (min (.x v) x) (min (.y v) y) (min (.z v) z)))
+    (let [^Vec3 v v] (Vec3. (min (.x v) x) (min (.y v) y) (min (.z v) z))))
   (maxdim [_]
     (if (> x y)
       (if (> x z) 0 2)
@@ -177,8 +177,8 @@
       (Vec3. (+ (.x o) (* x (.x vx)) (* y (.x vy)) (* z (.x vz)))
              (+ (.y o) (* x (.y vx)) (* y (.y vy)) (* z (.y vz)))
              (+ (.z o) (* x (.z vx)) (* y (.z vy)) (* z (.z vz))))))
-  (axis-rotate [_ angle axis]
-    (let [^Vec3 ax (normalize ^Vec3 axis)
+  (axis-rotate [_ angle ^Vec3 axis]
+    (let [^Vec3 ax (normalize axis)
           axx (.x ax)
           axy (.y ax)
           axz (.z ax)
@@ -270,9 +270,9 @@
   (mx [_] (max x y z w))
   (mn [_] (min x y z w))
   (emx [_ v]
-    (let [^Vec4 v v] (max (.x v) x) (max (.y v) y) (max (.z v) z) (max (.w v) w)))
+    (let [^Vec4 v v] (Vec4. (max (.x v) x) (max (.y v) y) (max (.z v) z) (max (.w v) w))))
   (emn [_ v]
-    (let [^Vec4 v v] (min (.x v) x) (min (.y v) y) (min (.z v) z) (min (.w v) w)))
+    (let [^Vec4 v v] (Vec4. (min (.x v) x) (min (.y v) y) (min (.z v) z) (min (.w v) w))))
   (sum [_] (+ x y z w)) 
   (interpolate [_ v2 t f]
     (let [^Vec4 v2 v2] (Vec4. (f x (.x v2) t)

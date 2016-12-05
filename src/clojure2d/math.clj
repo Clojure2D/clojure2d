@@ -282,6 +282,12 @@
   (let [t1 (* 0.5 (- 1.0 (qcos (* t PI))))]
     (lerp start stop t1)))
 
+(defn smoothstep
+  ""
+  [start stop x]
+  (let [t (norm x start stop)]
+    (* t t (- 3.0 (* 2.0 t)))))
+
 ;;`(wrap 0 -1 1) => 0.0`  
 ;;`(wrap -1.1 -1 1) => 0.8999999999999999`  
 ;;`(wrap 1.1 -1 1) => -0.8999999999999999`
@@ -300,8 +306,6 @@
            (floor)
            (* cycle)
            (- value)))))
-
-
 
 ;;
 ;; ### Statistics
