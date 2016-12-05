@@ -33,7 +33,28 @@
       (let [^Vec3 d (v/sub (v/abs p) b)]
         (Vec2. (+ (v/mag (v/emx d vzero)) (min 0.0 (v/mx d))) matid)))))
 
+(defmethod make-primitive :torus [_ matid conf]
+  (let [small-radius (:small-radius conf)
+        large-radius (:large-radius conf)]
+    (fn [^Vec3 p]
+      (let [l1 (m/hypot (.x p) (.z p))
+            l2 (m/hypot (- l1 large-radius) (.y p))]
+        (Vec2. (- l2 small-radius) matid)))))
+
 ;; operations
+
+(defn op-interpolate
+  ""
+  ([f1 f2 amount lerp]
+   (fn [^Vec3 p]
+     (let [^Vec2 r1 (f1 p)
+           ^Vec2 r2 (f2 p)]
+       (Vec2. (lerp (.x r1) (.x r2) amount)
+              (lerp (.y r1) (.y r2) amount)))))
+  ([f1 f2 amount]
+   (op-interpolate f1 f2 amount m/lerp))
+  ([f1 f2]
+   (op-interpolate f1 f2 0.5)))
 
 (defn op-rotate
   ""
@@ -63,13 +84,13 @@
 
 (defn op-union
   ""
-  [f1 f2]
-  (fn [^Vec3 p]
-    (let [^Vec2 r1 (f1 p)
-          ^Vec2 r2 (f2 p)]
-      (if (< (.x r1) (.x r2))
-        r1
-        r2))))
+  ([f1 f2]
+   (fn [^Vec3 p]
+     (let [^Vec2 r1 (f1 p)
+           ^Vec2 r2 (f2 p)]
+       (if (< (.x r1) (.x r2)) r1 r2))))
+  ([fs]
+   (reduce #(op-union %2 %1) fs)))
 
 (defn op-subtract
   ""

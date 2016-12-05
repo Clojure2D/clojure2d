@@ -124,6 +124,7 @@ I've prepared several examples with results where you can check current state of
 * ex20 - color reduction examples
 * ex21 - Pickover's popcorns
 * ex22 - ray-marching 3d example
+* ex23 - ray-marching 3d example (using SDF ray marching functions from extra/raymarching namespace)
 
 ## TODO
 

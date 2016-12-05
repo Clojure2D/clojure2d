@@ -177,8 +177,9 @@
       (Vec3. (+ (.x o) (* x (.x vx)) (* y (.x vy)) (* z (.x vz)))
              (+ (.y o) (* x (.y vx)) (* y (.y vy)) (* z (.y vz)))
              (+ (.z o) (* x (.z vx)) (* y (.z vy)) (* z (.z vz))))))
-  (axis-rotate [_ angle ^Vec3 axis]
-    (let [^Vec3 ax (normalize axis)
+  (axis-rotate [_ angle axis]
+    (let [^Vec3 axis axis
+          ^Vec3 ax (normalize axis)
           axx (.x ax)
           axy (.y ax)
           axz (.z ax)
