@@ -1,5 +1,16 @@
+;; ## Scope
+;;
+;; This namespace provides basic functions to manipulate with display windows with events, canvas, image files and session.
+;; What's here in brief:
+;;
+;; * Image file read and write, backed by Java ImageIO API. You can read and write BMP, JPG and PNG files. I didn't test WBMP and GIF. Image itself is Java BufferedImage in integer ARGB mode. Each pixel is represented as 32bit unsigned integer and 8 bits per channel. See clojure2d.pixels namespace for pixels operations.
+;; * Canvas with functions to draw on it, represented as atom of BufferedImage and Graphics2D objects.
+;; * Display (JFrame) with events handlers (multimethods), autorefreshing associated canvas and if you prefer Processing style, calling drawing function with context
+;; * Session management to: get unique identifier, save logs (different file per session) and get unique, sequenced filename.
+;; * Some general helper functions
+
 (ns clojure2d.core
-  ""
+  "JFrame, Java2D, file io and simple session management"
   (:require [clojure.java.io :refer :all]
             [clojure2d.math :as m])  
   (:import [java.awt.image BufferedImage]
