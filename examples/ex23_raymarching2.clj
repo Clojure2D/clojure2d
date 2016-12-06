@@ -20,13 +20,13 @@
   (save-canvas canvas "results/ex23/scene.jpg"))
 
 (do
-  (def max-depth 10.0)
+  (def max-depth 20.0)
 
   ;; ray origin
-  (def ro (Vec3. 0.0 3.0 5.0))
+  (def ro (Vec3. 0.0 4.5 4.0))
 
   ;; camera
-  (def camera (r/make-camera ro (Vec3. 0.0 2.0 4.0) 0.0))
+  (def camera (r/make-camera ro (Vec3. 0.0 2.0 2.0) 0.0))
 
   ;; object
   (def sphere (r/make-primitive :sphere 1 {:r 3.0}))
@@ -38,7 +38,7 @@
   (def norm (r/make-normal 0.01))
 
   ;; ray marching fn
-  (def ray-marching (r/make-ray-marching 0.01 max-depth 100))
+  (def ray-marching (r/make-ray-marching 0.001 max-depth 220))
 
   ;; ambient occlusion
   (def ao (r/make-ao 0.3 0.65 5))
@@ -46,12 +46,13 @@
   (def shadow-f (r/make-soft-shadow 8 20))
 
   (def light1 (v/normalize (Vec3. -2.0 1.0 0.0)))
+  (def light2 (v/normalize (Vec3. 0.0 1.0 0.0)))
 
   ;; custom plane
   (defn fn-plane
     ""
     [^Vec3 p]
-    (let [v (m/noise (* 0.1 (.x p)) (* 0.1 (.z p)))]
+    (let [v (- (m/noise (* 0.05 (.x p)) (* 0.05 (.z p))) 1.5)]
       (Vec2. (- (.y p) v) 0.0)))
 
   ;; scene
@@ -63,7 +64,7 @@
   (def background-color (v/div (Vec3. 232 221 203) 255.0))
   
     ;; fog
-  (def fog (r/make-distance-fog background-color -0.02)))
+  (def fog (r/make-distance-fog background-color -0.01)))
 
 
 (dotimes [x w]
@@ -71,16 +72,18 @@
     (dotimes [y h]
       (let [yy (m/norm y 0.0 h 2.0 -2.0)
             ^Vec3 rd (camera (v/normalize (Vec3. xx yy 1.0)))
-            ^Vec2 t (ray-marching scene ro rd)
+            ^Vec3 t (ray-marching scene ro rd)
             col (if (> (.x t) max-depth)
                   background-color
                   (let [^Vec3 pos (r/ray ro rd (.x t))
                         ^Vec3 n (norm scene pos)
                         obj (int (.y t))
                         occ (ao scene pos n)
-                        sha (shadow-f scene pos light1)
-                        dif (* (m/constrain (v/dot n light1) 0.0 1.0) sha)
-                        col (v/mult (scene-colors obj) dif)
+                        sha1 (shadow-f scene pos light1)
+                        dif1 (* (m/constrain (v/dot n light1) 0.0 1.0) sha1)
+                        sha2 (shadow-f scene pos light2)
+                        dif2 (* (m/constrain (v/dot n light2) 0.0 1.0) sha2)
+                        col (v/mult (scene-colors obj) (* 0.5 (+ dif1 dif2)))
                         col (v/mult col occ)]
                     (fog (.x t) col)))]
         (with-canvas canvas

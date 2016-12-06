@@ -138,14 +138,17 @@
   * rot - camera rotation
   returns function which should be used to determine ray direction, based on pixel position"
   [ro ch rot]
-  (let [cw (v/normalize (v/sub ch ro))
+  (let [^Vec3 cw (v/normalize (v/sub ch ro))
         cp (Vec3. (m/sin rot) (m/cos rot) 0.0)
-        cu (v/normalize (v/cross cw cp))
-        cv (v/normalize (v/cross cu cw))]
+        ^Vec3 cu (v/normalize (v/cross cw cp))
+        ^Vec3 cv (v/normalize (v/cross cu cw))
+        row1 (Vec3. (.x cu) (.x cv) (.x cw))
+        row2 (Vec3. (.y cu) (.y cv) (.y cw))
+        row3 (Vec3. (.z cu) (.z cv) (.z cw))]
     (fn [point]
-      (Vec3. (v/dot cu point)
-             (v/dot cv point)
-             (v/dot cw point)))))
+      (Vec3. (v/dot row1 point)
+             (v/dot row2 point)
+             (v/dot row3 point)))))
 
 ;; normal
 
@@ -261,20 +264,25 @@
   tmax - final distance
   steps - how many steps
   stepf - step factor (0.1-1.0)
-  precision - how close is enough (0.0001 - 0.01)"
+  precision - how close is enough (0.0001 - 0.01)
+  return Vec3, where
+  - x - distance
+  - y - material value
+  - z - fake AO based on steps made"
   ([tmin tmax steps stepf precision]
    (fn [f ro rd]
-     (loop [t (min tmin 0.005)
+     (loop [t (min tmin 0.001)
             i (int 0)
             m 0.0]
        (let [r (ray ro rd t)
-             ^Vec2 d (f r)]
+             ^Vec2 d (f r)
+             dist (if (zero? i) (* (.x d) (m/drand 0.3 0.7)) (.x d))]
          (if (or (> i steps)
-                 (< (.x d) precision)
+                 (< dist precision)
                  (> t tmax))
-           (Vec2. t (if (> t tmax) 0.0 m))
-           (recur (+ t (* stepf (.x d)))
+           (Vec3. t (if (> t tmax) -1.0 m) (- 1.0 (/ (double i) steps)))
+           (recur (+ t (* stepf dist))
                   (unchecked-inc i)
                   (.y d)))))))
   ([tmin tmax steps]
-   (make-ray-marching tmin tmax steps 1.0 0.001)))
+   (make-ray-marching tmin tmax steps 1.0 0.0001)))
