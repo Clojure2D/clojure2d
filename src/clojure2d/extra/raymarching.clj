@@ -75,6 +75,12 @@
                   (* (.z p) (+ (* (.z ax) (.z cb)) cosa)))]
         (f (Vec3. nx ny nz))))))
 
+(defn op-scale
+  ""
+  [f s]
+  (fn [^Vec3 p]
+    (let [^Vec2 r (f (v/div p s))]
+      (Vec2. (* (.x r) s) (.y r)))))
 
 (defn op-transform
   ""
@@ -271,4 +277,4 @@
                   (unchecked-inc i)
                   (.y d)))))))
   ([tmin tmax steps]
-   (make-ray-marching tmin tmax steps 0.95 0.001)))
+   (make-ray-marching tmin tmax steps 1.0 0.001)))
