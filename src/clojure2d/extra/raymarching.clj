@@ -229,7 +229,7 @@
 
 (defn make-soft-shadow
   ""
-  [k steps]
+  [k steps max-depth]
   (fn [f ^Vec3 pos ^Vec3 light]
     (loop [i (int 0)
            res 1.0
@@ -239,8 +239,9 @@
             h (max 0.0 (.x sh))
             newres (min res (/ (* k h) t))]
         (if (or (< h 0.001)
+                (> t max-depth)
                 (> i steps))
-          (m/constrain newres 0.0 1.0)
+          (m/constrain (if (< h 0.001) 0.0 newres) 0.0 1.0)
           (recur (unchecked-inc i)
                  newres
                  (+ t (m/constrain h 0.02 0.5))))))))
@@ -255,6 +256,54 @@
        (* 2.0)
        (v/mult N)
        (v/sub I)))
+
+;; lighting
+
+(def specular-exp 8.0)
+(def specular-exp-f (/ (+ 2.0 specular-exp) 8.0))
+
+(defn make-light
+  ""
+  [^Vec3 ldir dstr astr sstr]
+  (fn [^Vec3 color shadow ^Vec3 snormal ^Vec3 rdir]
+    (let [ndotl (max 0.0 (v/dot snormal ldir))
+          half-vec (v/normalize (v/sub ldir rdir))
+          diffuse (* ndotl dstr)
+          ambient (* astr (max 0.0 (v/dot (v/sub snormal) rdir)))
+          hdotn (max 0.0 (v/dot snormal half-vec))
+          fn (* ndotl (+ specular-exp (* (- 1.0 specular-exp) (m/pow (- 1.0 hdotn) 5.0))))
+          specular (* sstr (* specular-exp-f (m/pow hdotn specular-exp) fn))
+
+          diffuse (* diffuse shadow)
+          ambient (* ambient shadow)
+          specular (if (< shadow 1.0) 0.0 specular)]
+      (v/emult color (v/add (Vec3. specular specular specular) (v/add (Vec3. diffuse diffuse diffuse) (Vec3. ambient ambient ambient)))))))
+
+
+(defn make-light2
+  ""
+  [L f0 pows diff-color spec-color astr dstr sstr]
+  (let [f0 (m/sq (/ (- 1.0 pows) (inc pows)))
+        ZERO (Vec3. 0.0 0.0 0.0)
+        diff-f (/ (- 1.0 f0) m/PI)
+        spec-f (+ 0.0856832 (* 0.0397436 pows))]
+    (fn [^Vec3 color shadow ^Vec3 N ^Vec3 E]
+      (let [NL (v/dot N L)
+            H (v/normalize (v/sub L E))
+            NH (v/dot N H)
+            EH (v/dot E H)
+            NE (v/dot N E)
+            m (/ 1.0 (max NL NE))
+            Ff0 (+ f0 (* (- 1.0 f0) (m/pow (- 1.0 EH) 5.0)))
+
+            diffuse (v/mult diff-color (* dstr diff-f))
+            specular (v/mult spec-color (* sstr spec-f (* Ff0 m (m/pow NH pows))))
+            ambient (v/mult color astr)
+
+            diffuse (v/interpolate ZERO diffuse shadow)
+            specular (if (< shadow 1.0) ZERO specular)
+            ambient (v/interpolate ZERO ambient shadow)]
+        (v/emult color (v/add ambient (v/add diffuse specular)))))))
 
 ;; ray marching
 
