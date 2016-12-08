@@ -374,8 +374,8 @@
   "flip normal"
   [n v]
   (if (neg? (dot n v))
-    (sub n)
-    n))
+    n
+    (sub n)))
 
 ;;(perpendicular (Vec3. 1 2 0) (Vec3. 4 3 0))
 ;;(perpendicular (Vec2. 1 0))

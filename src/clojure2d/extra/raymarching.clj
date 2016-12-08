@@ -98,6 +98,21 @@
   ([fs]
    (reduce #(op-union %2 %1) fs)))
 
+(defn op-sunion
+  ""
+  ([f1 f2 k]
+   (let [rk (/ 0.5 k)]
+     (fn [^Vec3 p]
+       (let [^Vec2 r1 (f1 p)
+             ^Vec2 r2 (f2 p)
+             h (m/constrain (+ 0.5 (* rk (- (.x r2) (.x r1)))) 0.0 1.0)
+             fac (* k h (- 1.0 h))
+             v (- (m/lerp (.x r2) (.x r1) h) fac)
+             m (m/lerp (.y r2) (.y r1) h)]
+         (Vec2. v m)))))
+  ([fs k]
+   (reduce #(op-sunion %2 %1 k) fs)))
+
 (defn op-subtract
   ""
   [f1 f2]
@@ -128,6 +143,55 @@
                    (mod (.z p) (.z c)))
           q (v/sub q (v/mult c 0.5))]
       (f q))))
+
+(defn op-rectangles
+  ""
+  [f x y z]
+  (fn [^Vec3 p]
+    (let [xx (- (->> x
+                     (/ (.x p))
+                     m/floor
+                     (* 2.0)
+                     inc
+                     (* x)) (.x p))
+          yy (- (->> y
+                     (/ (.y p))
+                     m/floor
+                     (* 2.0)
+                     inc
+                     (* y)) (.y p))
+          zz (- (->> z
+                     (/ (.z p))
+                     m/floor
+                     (* 2.0)
+                     inc
+                     (* z)) (.z p))
+          pp (v/mult (Vec3. xx yy zz) -0.3)
+          ]
+      (f (v/add p pp)))))
+
+(defn op-sinusoidal
+  ""
+  [f]
+  (fn [^Vec3 p]
+    (let [v (v/mult (v/applyf (v/mult p 3) m/cos) 1.0)]
+      (f (v/add p v)))))
+
+(defn op-splits
+  ""
+  [f x y z]
+  (fn [^Vec3 p]
+    (let [xx (if (pos? (.x p))
+               (+ (.x p) x)
+               (- (.x p) x))
+          yy (if (pos? (.y p))
+               (+ (.y p) y)
+               (- (.y p) y))
+          zz (if (pos? (.z p))
+               (+ (.z p) z)
+               (- (.z p) z))
+          pp (v/mult (Vec3. xx yy zz) 0.5)]
+      (f (v/add p pp)))))
 
 ;; camera
 
@@ -207,8 +271,11 @@
     (loop [i (int 0)
            occ 0.0
            pw 1.0]
-      (let [fac (+ 0.01 (* i k))
-            ^Vec2 d (f (ray p n fac))]
+      (let [ik (* i k)
+            sh (if (odd? i) ik (- ik))
+            yshift (v/mult (Vec3. sh ik (- sh)) 0.2)
+            fac (+ 0.01 ik)
+            ^Vec2 d (f (ray p (v/add n yshift) fac))]
         (if (< i steps)
           (recur (unchecked-inc i)
                  (->> pw
@@ -225,7 +292,7 @@
     (let [ft (- 1.0 (m/exp (* factor t t)))]
       (v/interpolate col fcol ft))))
 
-;; light
+;; shadow
 
 (defn make-soft-shadow
   ""
@@ -238,13 +305,13 @@
             ^Vec2 sh (f r)
             h (max 0.0 (.x sh))
             newres (min res (/ (* k h) t))]
-        (if (or (< h 0.001)
+        (if (or (< h 0.00005)
                 (> t max-depth)
                 (> i steps))
-          (m/constrain (if (< h 0.001) 0.0 newres) 0.0 1.0)
+          (m/constrain newres 0.0 1.0)
           (recur (unchecked-inc i)
                  newres
-                 (+ t (m/constrain h 0.02 0.5))))))))
+                 (+ t (m/constrain h 0.01 0.5))))))))
 
 ;; other functions
 
@@ -257,51 +324,28 @@
        (v/mult N)
        (v/sub I)))
 
-;; lighting
+;; light
 
-(def specular-exp 8.0)
-(def specular-exp-f (/ (+ 2.0 specular-exp) 8.0))
-
+;; ad-hoc Blinn-Phong model
+;; http://renderwonk.com/publications/s2010-shading-course/gotanda/course_note_practical_implementation_at_triace.pdf
 (defn make-light
   ""
-  [^Vec3 ldir dstr astr sstr]
-  (fn [^Vec3 color shadow ^Vec3 snormal ^Vec3 rdir]
-    (let [ndotl (max 0.0 (v/dot snormal ldir))
-          half-vec (v/normalize (v/sub ldir rdir))
-          diffuse (* ndotl dstr)
-          ambient (* astr (max 0.0 (v/dot (v/sub snormal) rdir)))
-          hdotn (max 0.0 (v/dot snormal half-vec))
-          fn (* ndotl (+ specular-exp (* (- 1.0 specular-exp) (m/pow (- 1.0 hdotn) 5.0))))
-          specular (* sstr (* specular-exp-f (m/pow hdotn specular-exp) fn))
-
-          diffuse (* diffuse shadow)
-          ambient (* ambient shadow)
-          specular (if (< shadow 1.0) 0.0 specular)]
-      (v/emult color (v/add (Vec3. specular specular specular) (v/add (Vec3. diffuse diffuse diffuse) (Vec3. ambient ambient ambient)))))))
-
-
-(defn make-light2
-  ""
   [L f0 pows diff-color spec-color astr dstr sstr]
-  (let [f0 (m/sq (/ (- 1.0 pows) (inc pows)))
-        ZERO (Vec3. 0.0 0.0 0.0)
-        diff-f (/ (- 1.0 f0) m/PI)
-        spec-f (+ 0.0856832 (* 0.0397436 pows))]
+  (let [ZERO (Vec3. 0.0 0.0 0.0)]
     (fn [^Vec3 color shadow ^Vec3 N ^Vec3 E]
-      (let [NL (v/dot N L)
+      (let [NL (max 0.0 (v/dot N L))
             H (v/normalize (v/sub L E))
             NH (v/dot N H)
             EH (v/dot E H)
-            NE (v/dot N E)
-            m (/ 1.0 (max NL NE))
+            N-E (max 0.0 (v/dot (v/sub N) E))
             Ff0 (+ f0 (* (- 1.0 f0) (m/pow (- 1.0 EH) 5.0)))
 
-            diffuse (v/mult diff-color (* dstr diff-f))
-            specular (v/mult spec-color (* sstr spec-f (* Ff0 m (m/pow NH pows))))
-            ambient (v/mult color astr)
+            diffuse (v/mult diff-color (* dstr NL))
+            specular (v/mult spec-color (* sstr (* Ff0 NL (m/pow NH pows))))
+            ambient (v/mult color (* astr N-E))
 
             diffuse (v/interpolate ZERO diffuse shadow)
-            specular (if (< shadow 1.0) ZERO specular)
+            specular (v/mult specular (m/pow shadow 8))
             ambient (v/interpolate ZERO ambient shadow)]
         (v/emult color (v/add ambient (v/add diffuse specular)))))))
 
@@ -325,7 +369,7 @@
             m 0.0]
        (let [r (ray ro rd t)
              ^Vec2 d (f r)
-             dist (if (zero? i) (* (.x d) (m/drand 0.3 0.7)) (.x d))]
+             dist (if (zero? i) (* (.x d) 0.3) (.x d))]
          (if (or (> i steps)
                  (< dist precision)
                  (> t tmax))

@@ -43,7 +43,7 @@
   ;; ambient occlusion
   (def ao (r/make-ao 0.3 0.65 5))
 
-  (def shadow-f (r/make-soft-shadow 8 20))
+  (def shadow-f (r/make-soft-shadow 8 20 max-depth))
 
   (def light1 (v/normalize (Vec3. -2.0 1.0 0.0)))
   (def light2 (v/normalize (Vec3. 0.0 1.0 0.0)))
