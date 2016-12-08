@@ -111,7 +111,7 @@
 
 
   ;; scene
-  (def scene (r/op-transform (r/op-scale (r/op-rotate sierp (Vec3. 0.0 1.0 0.0) m/HALF_PI) 3.0) (Vec3. 0.0 5.0 -1.0 )))
+  (def scene (r/op-transform (r/op-scale (r/op-rotate lrp (Vec3. 0.0 1.0 0.0) m/HALF_PI) 3.0) (Vec3. 0.0 5.0 -1.0 )))
 
 (comment conj (map #(r/op-rotate % (Vec3. 0.0 1.0 0.0) 0.0)
                           [sphere box lrp]) plane)
@@ -130,7 +130,7 @@
     (dotimes [y h]
       (let [yy (m/norm y 0.0 h 3.0 -3.0)
             ^Vec3 rd (camera (v/normalize (Vec3. xx yy 1.0)))
-            ^Vec2 t (ray-marching scene ro rd)
+            ^Vec3 t (ray-marching scene ro rd)
             col (if (> (.x t) max-depth)
                   background-color
                   (let [^Vec3 pos (r/ray ro rd (.x t))

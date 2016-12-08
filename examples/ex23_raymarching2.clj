@@ -31,8 +31,6 @@
   ;; object
   (def sphere (r/make-primitive :sphere 1 {:r 3.0}))
   (def box (r/make-primitive :box 1 {:box (Vec3. 2.5 2.5 2.5)}))
-  (def plane (r/make-primitive :plane 0 {:normal (Vec3. 0.0 1.0 0.0)
-                                         :dist-from-origin 0.1}))
 
   ;; normal calculator
   (def norm (r/make-normal 0.01))
@@ -43,16 +41,19 @@
   ;; ambient occlusion
   (def ao (r/make-ao 0.3 0.65 5))
 
-  (def shadow-f (r/make-soft-shadow 8 20 max-depth))
+  (def shadow-f (r/make-soft-shadow 8 80 max-depth))
 
   (def light1 (v/normalize (Vec3. -2.0 1.0 0.0)))
   (def light2 (v/normalize (Vec3. 0.0 1.0 0.0)))
+
+  (def light1-fn (r/make-light light1 shadow-f 0.904 555 (Vec3. 1.0 1.0 1.0) (Vec3. 1.0 1.0 1.0) 1.2 1.0 1.0))
+  (def light2-fn (r/make-light light2 shadow-f 0.904 555 (Vec3. 1.0 1.0 1.0) (Vec3. 1.0 1.0 1.0) 1.2 1.0 1.0))
 
   ;; custom plane
   (defn fn-plane
     ""
     [^Vec3 p]
-    (let [v (- (m/noise (* 0.05 (.x p)) (* 0.05 (.z p))) 1.5)]
+    (let [v (- (m/noise (* 0.03 (.x p)) (* 0.03 (.z p))) 1.5)]
       (Vec2. (- (.y p) v) 0.0)))
 
   ;; scene
@@ -79,11 +80,10 @@
                         ^Vec3 n (norm scene pos)
                         obj (int (.y t))
                         occ (ao scene pos n)
-                        sha1 (shadow-f scene pos light1)
-                        dif1 (* (m/constrain (v/dot n light1) 0.0 1.0) sha1)
-                        sha2 (shadow-f scene pos light2)
-                        dif2 (* (m/constrain (v/dot n light2) 0.0 1.0) sha2)
-                        col (v/mult (scene-colors obj) (* 0.5 (+ dif1 dif2)))
+                        col (scene-colors obj)
+                        col1 (light1-fn col scene n pos)
+                        col2 (light1-fn col scene n pos)
+                        col (v/mult (v/add col1 col2) 0.5)
                         col (v/mult col occ)]
                     (fog (.x t) col)))]
         (with-canvas canvas

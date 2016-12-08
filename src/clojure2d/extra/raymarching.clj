@@ -10,6 +10,8 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
+(def ^Vec3 vzero (Vec3. 0.0 0.0 0.0))
+
 ;; signed distances
 
 (defmulti make-primitive (fn [n matid conf] n))
@@ -20,17 +22,15 @@
       (Vec2. (- (v/mag p) s) matid))))
 
 (defmethod make-primitive :plane [_ matid conf]
-  (let [^Vec3 n (v/normalize (:normal conf))
+  (let [n (v/normalize (:normal conf))
         dist (:dist-from-origin conf)]
     (fn [p]
       (Vec2. (+ dist (v/dot p n)) matid))))
 
-(def ^Vec3 vzero (Vec3. 0.0 0.0 0.0))
-
 (defmethod make-primitive :box [_ matid conf]
-  (let [^Vec3 b (:box conf)]
+  (let [b (:box conf)]
     (fn [p]
-      (let [^Vec3 d (v/sub (v/abs p) b)]
+      (let [d (v/sub (v/abs p) b)]
         (Vec2. (+ (v/mag (v/emx d vzero)) (min 0.0 (v/mx d))) matid)))))
 
 (defmethod make-primitive :torus [_ matid conf]
@@ -46,7 +46,7 @@
 (defn op-interpolate
   ""
   ([f1 f2 amount lerp]
-   (fn [^Vec3 p]
+   (fn [p]
      (let [^Vec2 r1 (f1 p)
            ^Vec2 r2 (f2 p)]
        (Vec2. (lerp (.x r1) (.x r2) amount)
@@ -58,7 +58,7 @@
 
 (defn op-rotate
   ""
-  [f ^Vec3 axis angle]
+  [f axis angle]
   (let [^Vec3 ax (v/normalize axis)
         ^Vec3 sa (v/mult ax (m/sin angle))
         cosa (m/cos angle)
@@ -78,31 +78,31 @@
 (defn op-scale
   ""
   [f s]
-  (fn [^Vec3 p]
+  (fn [p]
     (let [^Vec2 r (f (v/div p s))]
       (Vec2. (* (.x r) s) (.y r)))))
 
 (defn op-transform
   ""
-  [f ^Vec3 t]
-  (fn [^Vec3 p]
+  [f t]
+  (fn [p]
     (f (v/sub p t))))
 
 (defn op-union
   ""
   ([f1 f2]
-   (fn [^Vec3 p]
+   (fn [p]
      (let [^Vec2 r1 (f1 p)
            ^Vec2 r2 (f2 p)]
        (if (< (.x r1) (.x r2)) r1 r2))))
   ([fs]
    (reduce #(op-union %2 %1) fs)))
 
-(defn op-sunion
+(defn op-blend
   ""
   ([f1 f2 k]
    (let [rk (/ 0.5 k)]
-     (fn [^Vec3 p]
+     (fn [p]
        (let [^Vec2 r1 (f1 p)
              ^Vec2 r2 (f2 p)
              h (m/constrain (+ 0.5 (* rk (- (.x r2) (.x r1)))) 0.0 1.0)
@@ -111,12 +111,12 @@
              m (m/lerp (.y r2) (.y r1) h)]
          (Vec2. v m)))))
   ([fs k]
-   (reduce #(op-sunion %2 %1 k) fs)))
+   (reduce #(op-blend %2 %1 k) fs)))
 
 (defn op-subtract
   ""
   [f1 f2]
-  (fn [^Vec3 p]
+  (fn [p]
     (let [^Vec2 r1 (f1 p)
           ^Vec2 r2 (f2 p)
           vr2 (- (.x r2))]
@@ -127,13 +127,14 @@
 (defn op-intersect
   ""
   [f1 f2]
-    (fn [^Vec3 p]
+    (fn [p]
     (let [^Vec2 r1 (f1 p)
           ^Vec2 r2 (f2 p)]
       (if (> (.x r1) (.x r2))
         r1
         r2))))
 
+;; still wrong...
 (defn op-repeat
   ""
   [f ^Vec3 c]
@@ -143,6 +144,8 @@
                    (mod (.z p) (.z c)))
           q (v/sub q (v/mult c 0.5))]
       (f q))))
+
+;; some functional transforming tools
 
 (defn op-rectangles
   ""
@@ -166,15 +169,14 @@
                      (* 2.0)
                      inc
                      (* z)) (.z p))
-          pp (v/mult (Vec3. xx yy zz) -0.3)
-          ]
+          pp (v/mult (Vec3. xx yy zz) -0.1)]
       (f (v/add p pp)))))
 
 (defn op-sinusoidal
   ""
   [f]
   (fn [^Vec3 p]
-    (let [v (v/mult (v/applyf (v/mult p 3) m/cos) 1.0)]
+    (let [v (v/mult (v/applyf (v/mult p 3.0) m/cos) 1.0)]
       (f (v/add p v)))))
 
 (defn op-splits
@@ -273,7 +275,7 @@
            pw 1.0]
       (let [ik (* i k)
             sh (if (odd? i) ik (- ik))
-            yshift (v/mult (Vec3. sh ik (- sh)) 0.2)
+            yshift (v/mult (Vec3. sh ik (- sh)) 0.2) ;; vary a normal a little bit
             fac (+ 0.01 ik)
             ^Vec2 d (f (ray p (v/add n yshift) fac))]
         (if (< i steps)
@@ -297,11 +299,11 @@
 (defn make-soft-shadow
   ""
   [k steps max-depth]
-  (fn [f ^Vec3 pos ^Vec3 light]
+  (fn [f pos light]
     (loop [i (int 0)
            res 1.0
            t 0.01]
-      (let [^Vec3 r (ray pos light t)
+      (let [r (ray pos light t)
             ^Vec2 sh (f r)
             h (max 0.0 (.x sh))
             newres (min res (/ (* k h) t))]
@@ -330,24 +332,24 @@
 ;; http://renderwonk.com/publications/s2010-shading-course/gotanda/course_note_practical_implementation_at_triace.pdf
 (defn make-light
   ""
-  [L f0 pows diff-color spec-color astr dstr sstr]
-  (let [ZERO (Vec3. 0.0 0.0 0.0)]
-    (fn [^Vec3 color shadow ^Vec3 N ^Vec3 E]
-      (let [NL (max 0.0 (v/dot N L))
-            H (v/normalize (v/sub L E))
-            NH (v/dot N H)
-            EH (v/dot E H)
-            N-E (max 0.0 (v/dot (v/sub N) E))
-            Ff0 (+ f0 (* (- 1.0 f0) (m/pow (- 1.0 EH) 5.0)))
+  [L shadow-f f0 pows diff-color spec-color astr dstr sstr]
+  (fn [color scene N E]
+    (let [shadow (shadow-f scene E L)
+          NL (max 0.0 (v/dot N L))
+          H (v/normalize (v/sub L E))
+          NH (v/dot N H)
+          EH (v/dot E H)
+          N-E (max 0.0 (v/dot (v/sub N) E))
+          Ff0 (+ f0 (* (- 1.0 f0) (m/pow (- 1.0 EH) 5.0)))
 
-            diffuse (v/mult diff-color (* dstr NL))
-            specular (v/mult spec-color (* sstr (* Ff0 NL (m/pow NH pows))))
-            ambient (v/mult color (* astr N-E))
+          diffuse (v/mult diff-color (* dstr NL))
+          specular (v/mult spec-color (* sstr (* Ff0 NL (m/pow NH pows))))
+          ambient (v/mult color (* astr N-E))
 
-            diffuse (v/interpolate ZERO diffuse shadow)
-            specular (v/mult specular (m/pow shadow 8))
-            ambient (v/interpolate ZERO ambient shadow)]
-        (v/emult color (v/add ambient (v/add diffuse specular)))))))
+          diffuse (v/interpolate vzero diffuse shadow)
+          specular (v/mult specular (m/pow shadow 8))
+          ambient (v/interpolate vzero ambient shadow)]
+      (v/emult color (v/add ambient (v/add diffuse specular))))))
 
 ;; ray marching
 
