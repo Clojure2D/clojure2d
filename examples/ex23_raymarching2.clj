@@ -36,18 +36,18 @@
   (def norm (r/make-normal 0.01))
 
   ;; ray marching fn
-  (def ray-marching (r/make-ray-marching 0.001 max-depth 220))
+  (def ray-marching (r/make-ray-marching 0.001 max-depth 200))
 
   ;; ambient occlusion
   (def ao (r/make-ao 0.3 0.65 5))
 
-  (def shadow-f (r/make-soft-shadow 8 80 max-depth))
+  (def shadow-f (r/make-soft-shadow 8 40 max-depth))
 
   (def light1 (v/normalize (Vec3. -2.0 1.0 0.0)))
-  (def light2 (v/normalize (Vec3. 0.0 1.0 0.0)))
+  (def light2 (v/normalize (Vec3. 0.0 4.5 4.0)))
 
-  (def light1-fn (r/make-light light1 shadow-f 0.904 555 (Vec3. 1.0 1.0 1.0) (Vec3. 1.0 1.0 1.0) 1.2 1.0 1.0))
-  (def light2-fn (r/make-light light2 shadow-f 0.904 555 (Vec3. 1.0 1.0 1.0) (Vec3. 1.0 1.0 1.0) 1.2 1.0 1.0))
+  (def light1-fn (r/make-light light1 0.904 555 (Vec3. 1.0 1.0 1.0) (Vec3. 1.0 1.0 1.0) 1.0 1.0 1.0))
+  (def light2-fn (r/make-light light2 0.904 555 (Vec3. 1.0 1.0 1.0) (Vec3. 1.0 1.0 1.0) 1.0 1.0 1.0))
 
   ;; custom plane
   (defn fn-plane
@@ -61,31 +61,50 @@
                          (r/op-rotate (r/op-subtract box sphere) (Vec3. 0.0 1.0 0.0) 0.5)))
 
   (def scene-colors [(v/div (Vec3. 3 101 100) 255.0)
-                     (v/div (Vec3. 3 23 52) 255.0)])
+                     (v/div (Vec3. 13 23 52) 255.0)])
   (def background-color (v/div (Vec3. 232 221 203) 255.0))
   
     ;; fog
-  (def fog (r/make-distance-fog background-color -0.01)))
+  (def fog (r/make-distance-fog background-color -0.01))
 
+  (defn do-it
+    ""
+    [canvas]
+    (dotimes [x w]
+      (let [xx (m/norm x 0.0 w -2.0 2.0)]
+        (dotimes [y h]
+          (let [yy (m/norm y 0.0 h 2.0 -2.0)
+                ^Vec3 rd (camera (v/normalize (Vec3. xx yy 1.0)))
+                ^Vec3 t (ray-marching scene ro rd)
+                col (if (> (.x t) max-depth)
+                      background-color
+                      (let [^Vec3 pos (r/ray ro rd (.x t))
+                            ^Vec3 n (norm scene pos)
+                            obj (int (.y t))
+                            occ (ao scene pos n)
+                            col (scene-colors obj)
+                            sha1 (shadow-f scene pos light1)
+                            sha2 (shadow-f scene pos light2)
+                            sha (* 0.5 (+ sha1 sha2))
+                            col1 (light1-fn col sha1 n pos)
+                            col2 (light2-fn col sha2 n pos)
+                            col (v/mult (v/add col1 col2) 0.5)
+                            col (v/mult col occ)
+                            ]
+                        (fog (.x t) col)))]
+            (set-color canvas (c/to-color3 (v/mult col 255)))
+            (rect canvas x y 1 1)))))))
 
-(dotimes [x w]
-  (let [xx (m/norm x 0.0 w -2.0 2.0)]
-    (dotimes [y h]
-      (let [yy (m/norm y 0.0 h 2.0 -2.0)
-            ^Vec3 rd (camera (v/normalize (Vec3. xx yy 1.0)))
-            ^Vec3 t (ray-marching scene ro rd)
-            col (if (> (.x t) max-depth)
-                  background-color
-                  (let [^Vec3 pos (r/ray ro rd (.x t))
-                        ^Vec3 n (norm scene pos)
-                        obj (int (.y t))
-                        occ (ao scene pos n)
-                        col (scene-colors obj)
-                        col1 (light1-fn col scene n pos)
-                        col2 (light1-fn col scene n pos)
-                        col (v/mult (v/add col1 col2) 0.5)
-                        col (v/mult col occ)]
-                    (fog (.x t) col)))]
-        (with-canvas canvas
-          (set-color (c/to-color3 (v/mult col 255)))
-          (rect x y 1 1))))))
+(with-canvas canvas
+  ;(set-background Color/black)
+  (do-it))
+
+(def c (camera (v/normalize (Vec3. 0.1 -0.1 1.0))))
+(def t (ray-marching scene ro c))
+
+(def p (r/ray ro c (.x t)))
+(def n (norm scene p))
+
+(v/dot n light2)
+
+(shadow-f scene p light1)

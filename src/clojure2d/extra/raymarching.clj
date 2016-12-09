@@ -145,55 +145,11 @@
           q (v/sub q (v/mult c 0.5))]
       (f q))))
 
-;; some functional transforming tools
-
-(defn op-rectangles
+(defn op-displace
   ""
-  [f x y z]
-  (fn [^Vec3 p]
-    (let [xx (- (->> x
-                     (/ (.x p))
-                     m/floor
-                     (* 2.0)
-                     inc
-                     (* x)) (.x p))
-          yy (- (->> y
-                     (/ (.y p))
-                     m/floor
-                     (* 2.0)
-                     inc
-                     (* y)) (.y p))
-          zz (- (->> z
-                     (/ (.z p))
-                     m/floor
-                     (* 2.0)
-                     inc
-                     (* z)) (.z p))
-          pp (v/mult (Vec3. xx yy zz) -0.1)]
-      (f (v/add p pp)))))
-
-(defn op-sinusoidal
-  ""
-  [f]
-  (fn [^Vec3 p]
-    (let [v (v/mult (v/applyf (v/mult p 3.0) m/cos) 1.0)]
-      (f (v/add p v)))))
-
-(defn op-splits
-  ""
-  [f x y z]
-  (fn [^Vec3 p]
-    (let [xx (if (pos? (.x p))
-               (+ (.x p) x)
-               (- (.x p) x))
-          yy (if (pos? (.y p))
-               (+ (.y p) y)
-               (- (.y p) y))
-          zz (if (pos? (.z p))
-               (+ (.z p) z)
-               (- (.z p) z))
-          pp (v/mult (Vec3. xx yy zz) 0.5)]
-      (f (v/add p pp)))))
+  [f dispf scalein scaleout]
+  (fn [p]
+    (f (v/add p (v/mult (dispf (v/mult p scalein)) scaleout)))))
 
 ;; camera
 
@@ -305,15 +261,15 @@
            t 0.01]
       (let [r (ray pos light t)
             ^Vec2 sh (f r)
-            h (max 0.0 (.x sh))
+            h (.x sh)
             newres (min res (/ (* k h) t))]
-        (if (or (< h 0.00005)
+        (if (or (< h 0.001)
                 (> t max-depth)
                 (> i steps))
           (m/constrain newres 0.0 1.0)
           (recur (unchecked-inc i)
                  newres
-                 (+ t (m/constrain h 0.01 0.5))))))))
+                 (+ t (m/constrain h 0.02 0.5))))))))
 
 ;; other functions
 
@@ -332,23 +288,22 @@
 ;; http://renderwonk.com/publications/s2010-shading-course/gotanda/course_note_practical_implementation_at_triace.pdf
 (defn make-light
   ""
-  [L shadow-f f0 pows diff-color spec-color astr dstr sstr]
-  (fn [color scene N E]
-    (let [shadow (shadow-f scene E L)
-          NL (max 0.0 (v/dot N L))
+  [L f0 pows diff-color spec-color astr dstr sstr]
+  (fn [color shadow N E]
+    (let [NL (max 0.0 (v/dot N L))
           H (v/normalize (v/sub L E))
           NH (v/dot N H)
           EH (v/dot E H)
-          N-E (max 0.0 (v/dot (v/sub N) E))
+          EN- (max 0.0 (v/dot (v/sub N) E))
           Ff0 (+ f0 (* (- 1.0 f0) (m/pow (- 1.0 EH) 5.0)))
 
           diffuse (v/mult diff-color (* dstr NL))
           specular (v/mult spec-color (* sstr (* Ff0 NL (m/pow NH pows))))
-          ambient (v/mult color (* astr N-E))
+          ambient (v/mult color (* astr EN-))
 
-          diffuse (v/interpolate vzero diffuse shadow)
+          diffuse (v/mult diffuse shadow)
           specular (v/mult specular (m/pow shadow 8))
-          ambient (v/interpolate vzero ambient shadow)]
+          ambient (v/mult ambient shadow)]
       (v/emult color (v/add ambient (v/add diffuse specular))))))
 
 ;; ray marching
