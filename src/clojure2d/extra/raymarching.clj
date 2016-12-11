@@ -12,34 +12,49 @@
 
 (def ^Vec3 vzero (Vec3. 0.0 0.0 0.0))
 
+(deftype Material [^Vec3 color diffusion specular specularf0 specularpow reflection])
+(deftype HitData [d ^Material mat])
+
+(defn interpolate-material
+  ""
+  ([^Material m1 ^Material m2 amt f]
+   (Material. (v/interpolate (.color m1) (.color m2) amt f)
+              (f (.diffusion m1) (.diffusion m2) amt)
+              (f (.specular m1) (.specular m2) amt)
+              (f (.specularf0 m1) (.specularf0 m2) amt)
+              (f (.specularpow m1) (.specularpow m2) amt)
+              (f (.reflection m1) (.reflection m2) amt)))
+  ([m1 m2 amt]
+   (interpolate-material m1 m2 amt m/lerp)))
+
 ;; signed distances
 
-(defmulti make-primitive (fn [n matid conf] n))
+(defmulti make-primitive (fn [n mat conf] n))
 
-(defmethod make-primitive :sphere [_ matid conf]
+(defmethod make-primitive :sphere [_ mat conf]
   (let [s (:r conf)]
     (fn [p]
-      (Vec2. (- (v/mag p) s) matid))))
+      (HitData. (- (v/mag p) s) mat))))
 
-(defmethod make-primitive :plane [_ matid conf]
+(defmethod make-primitive :plane [_ mat conf]
   (let [n (v/normalize (:normal conf))
         dist (:dist-from-origin conf)]
     (fn [p]
-      (Vec2. (+ dist (v/dot p n)) matid))))
+      (HitData. (+ dist (v/dot p n)) mat))))
 
-(defmethod make-primitive :box [_ matid conf]
+(defmethod make-primitive :box [_ mat conf]
   (let [b (:box conf)]
     (fn [p]
       (let [d (v/sub (v/abs p) b)]
-        (Vec2. (+ (v/mag (v/emx d vzero)) (min 0.0 (v/mx d))) matid)))))
+        (HitData. (+ (v/mag (v/emx d vzero)) (min 0.0 (v/mx d))) mat)))))
 
-(defmethod make-primitive :torus [_ matid conf]
+(defmethod make-primitive :torus [_ mat conf]
   (let [small-radius (:small-radius conf)
         large-radius (:large-radius conf)]
     (fn [^Vec3 p]
       (let [l1 (m/hypot (.x p) (.z p))
             l2 (m/hypot (- l1 large-radius) (.y p))]
-        (Vec2. (- l2 small-radius) matid)))))
+        (HitData. (- l2 small-radius) mat)))))
 
 ;; operations
 
@@ -47,14 +62,14 @@
   ""
   ([f1 f2 amount lerp]
    (fn [p]
-     (let [^Vec2 r1 (f1 p)
-           ^Vec2 r2 (f2 p)]
-       (Vec2. (lerp (.x r1) (.x r2) amount)
-              (lerp (.y r1) (.y r2) amount)))))
+     (let [^HitData r1 (f1 p)
+           ^HitData r2 (f2 p)]
+       (HitData. (lerp (.d r1) (.d r2) amount)
+                 (interpolate-material (.mat r1) (.mat r2) amount lerp)))))
   ([f1 f2 amount]
    (op-interpolate f1 f2 amount m/lerp))
   ([f1 f2]
-   (op-interpolate f1 f2 0.5)))
+   (op-interpolate f1 f2 0.5 m/lerp)))
 
 (defn op-rotate
   ""
@@ -79,8 +94,8 @@
   ""
   [f s]
   (fn [p]
-    (let [^Vec2 r (f (v/div p s))]
-      (Vec2. (* (.x r) s) (.y r)))))
+    (let [^HitData r (f (v/div p s))]
+      (HitData. (* (.d r) s) (.mat r)))))
 
 (defn op-transform
   ""
@@ -92,9 +107,9 @@
   ""
   ([f1 f2]
    (fn [p]
-     (let [^Vec2 r1 (f1 p)
-           ^Vec2 r2 (f2 p)]
-       (if (< (.x r1) (.x r2)) r1 r2))))
+     (let [^HitData r1 (f1 p)
+           ^HitData r2 (f2 p)]
+       (if (< (.d r1) (.d r2)) r1 r2))))
   ([fs]
    (reduce #(op-union %2 %1) fs)))
 
@@ -103,13 +118,13 @@
   ([f1 f2 k]
    (let [rk (/ 0.5 k)]
      (fn [p]
-       (let [^Vec2 r1 (f1 p)
-             ^Vec2 r2 (f2 p)
-             h (m/constrain (+ 0.5 (* rk (- (.x r2) (.x r1)))) 0.0 1.0)
+       (let [^HitData r1 (f1 p)
+             ^HitData r2 (f2 p)
+             h (m/constrain (+ 0.5 (* rk (- (.d r2) (.d r1)))) 0.0 1.0)
              fac (* k h (- 1.0 h))
-             v (- (m/lerp (.x r2) (.x r1) h) fac)
-             m (m/lerp (.y r2) (.y r1) h)]
-         (Vec2. v m)))))
+             v (- (m/lerp (.d r2) (.d r1) h) fac)
+             m (interpolate-material (.mat r2) (.mat r1) h m/lerp)]
+         (HitData. v m)))))
   ([fs k]
    (reduce #(op-blend %2 %1 k) fs)))
 
@@ -117,20 +132,20 @@
   ""
   [f1 f2]
   (fn [p]
-    (let [^Vec2 r1 (f1 p)
-          ^Vec2 r2 (f2 p)
-          vr2 (- (.x r2))]
-      (if (> vr2 (.x r1))
-        (Vec2. vr2 (.y r2))
+    (let [^HitData r1 (f1 p)
+          ^HitData r2 (f2 p)
+          vr2 (- (.d r2))]
+      (if (> vr2 (.d r1))
+        (HitData. vr2 (.mat r2))
         r1))))
 
 (defn op-intersect
   ""
   [f1 f2]
     (fn [p]
-    (let [^Vec2 r1 (f1 p)
-          ^Vec2 r2 (f2 p)]
-      (if (> (.x r1) (.x r2))
+    (let [^HitData r1 (f1 p)
+          ^HitData r2 (f2 p)]
+      (if (> (.d r1) (.d r2))
         r1
         r2))))
 
@@ -180,32 +195,32 @@
   (let [epsx (Vec3. eps 0.0 0.0)
         epsy (Vec3. 0.0 eps 0.0)
         epsz (Vec3. 0.0 0.0 eps)
-        ^Vec2 fx- (f (v/sub p epsx))
-        ^Vec2 fx+ (f (v/add p epsx))
-        ^Vec2 fy- (f (v/sub p epsy))
-        ^Vec2 fy+ (f (v/add p epsy))
-        ^Vec2 fz- (f (v/sub p epsz))
-        ^Vec2 fz+ (f (v/add p epsz))]
-    (v/normalize (Vec3. (- (.x fx+) (.x fx-))
-                        (- (.x fy+) (.x fy-))
-                        (- (.x fz+) (.x fz-))))))
+        ^HitData fx- (f (v/sub p epsx))
+        ^HitData fx+ (f (v/add p epsx))
+        ^HitData fy- (f (v/sub p epsy))
+        ^HitData fy+ (f (v/add p epsy))
+        ^HitData fz- (f (v/sub p epsz))
+        ^HitData fz+ (f (v/add p epsz))]
+    (v/normalize (Vec3. (- (.d fx+) (.d fx-))
+                        (- (.d fy+) (.d fy-))
+                        (- (.d fz+) (.d fz-))))))
 
 (defn make-normal
   ""
-  [eps]
+  [f eps]
   (let [epsx (Vec3. eps 0.0 0.0)
         epsy (Vec3. 0.0 eps 0.0)
         epsz (Vec3. 0.0 0.0 eps)]
-    (fn [f p]
-      (let [^Vec2 fx- (f (v/sub p epsx))
-            ^Vec2 fx+ (f (v/add p epsx))
-            ^Vec2 fy- (f (v/sub p epsy))
-            ^Vec2 fy+ (f (v/add p epsy))
-            ^Vec2 fz- (f (v/sub p epsz))
-            ^Vec2 fz+ (f (v/add p epsz))]
-        (v/normalize (Vec3. (- (.x fx+) (.x fx-))
-                            (- (.x fy+) (.x fy-))
-                            (- (.x fz+) (.x fz-))))))))
+    (fn [p]
+      (let [^HitData fx- (f (v/sub p epsx))
+            ^HitData fx+ (f (v/add p epsx))
+            ^HitData fy- (f (v/sub p epsy))
+            ^HitData fy+ (f (v/add p epsy))
+            ^HitData fz- (f (v/sub p epsz))
+            ^HitData fz+ (f (v/add p epsz))]
+        (v/normalize (Vec3. (- (.d fx+) (.d fx-))
+                            (- (.d fy+) (.d fy-))
+                            (- (.d fz+) (.d fz-))))))))
 
 ;; ray
 
@@ -233,11 +248,11 @@
             sh (if (odd? i) ik (- ik))
             yshift (v/mult (Vec3. sh ik (- sh)) 0.2) ;; vary a normal a little bit
             fac (+ 0.01 ik)
-            ^Vec2 d (f (ray p (v/add n yshift) fac))]
+            ^HitData d (f (ray p (v/add n yshift) fac))]
         (if (< i steps)
           (recur (unchecked-inc i)
                  (->> pw
-                      (* (- fac (.x d)))
+                      (* (- fac (.d d)))
                       (+ occ))
                  (* pw falloff))
           (m/constrain (- 1.0 occ) 0.0 1.0))))))
@@ -260,8 +275,8 @@
            res 1.0
            t 0.01]
       (let [r (ray pos light t)
-            ^Vec2 sh (f r)
-            h (.x sh)
+            ^HitData sh (f r)
+            h (.d sh)
             newres (min res (/ (* k h) t))]
         (if (or (< h 0.001)
                 (> t max-depth)
@@ -280,31 +295,8 @@
        (v/dot N)
        (* 2.0)
        (v/mult N)
-       (v/sub I)))
-
-;; light
-
-;; ad-hoc Blinn-Phong model
-;; http://renderwonk.com/publications/s2010-shading-course/gotanda/course_note_practical_implementation_at_triace.pdf
-(defn make-light
-  ""
-  [L f0 pows diff-color spec-color astr dstr sstr]
-  (fn [color shadow N E]
-    (let [NL (max 0.0 (v/dot N L))
-          H (v/normalize (v/sub L E))
-          NH (v/dot N H)
-          EH (v/dot E H)
-          EN- (max 0.0 (v/dot (v/sub N) E))
-          Ff0 (+ f0 (* (- 1.0 f0) (m/pow (- 1.0 EH) 5.0)))
-
-          diffuse (v/mult diff-color (* dstr NL))
-          specular (v/mult spec-color (* sstr (* Ff0 NL (m/pow NH pows))))
-          ambient (v/mult color (* astr EN-))
-
-          diffuse (v/mult diffuse shadow)
-          specular (v/mult specular (m/pow shadow 8))
-          ambient (v/mult ambient shadow)]
-      (v/emult color (v/add ambient (v/add diffuse specular))))))
+       (v/sub I)
+       (v/normalize)))
 
 ;; ray marching
 
@@ -315,24 +307,50 @@
   steps - how many steps
   stepf - step factor (0.1-1.0)
   precision - how close is enough (0.0001 - 0.01)
-  return Vec3, where
-  - x - distance
-  - y - material value
-  - z - fake AO based on steps made"
-  ([tmin tmax steps stepf precision]
-   (fn [f ro rd]
+  background - background material
+  returns vector, where index:
+  - 0 - HitData
+  - 1 - fake AO based on steps made"
+  ([scene background tmin tmax steps stepf precision]
+   (fn [ro rd]
      (loop [t (min tmin 0.001)
             i (int 0)
-            m 0.0]
+            m background]
        (let [r (ray ro rd t)
-             ^Vec2 d (f r)
-             dist (if (zero? i) (* (.x d) 0.3) (.x d))]
+             ^HitData d (scene r)
+             dist (if (zero? i) (* (.d d) 0.3) (.d d))]
          (if (or (> i steps)
                  (< dist precision)
                  (> t tmax))
-           (Vec3. t (if (> t tmax) -1.0 m) (- 1.0 (/ (double i) steps)))
+           [(HitData. t (if (> t tmax) background m)) (- 1.0 (/ (double i) steps))]
            (recur (+ t (* stepf dist))
                   (unchecked-inc i)
-                  (.y d)))))))
-  ([tmin tmax steps]
-   (make-ray-marching tmin tmax steps 1.0 0.0001)))
+                  (.mat d)))))))
+  ([scene background tmin tmax steps]
+   (make-ray-marching scene background tmin tmax steps 1.0 0.00001)))
+
+
+;; light
+;; ad-hoc Blinn-Phong model
+;; http://renderwonk.com/publications/s2010-shading-course/gotanda/course_note_practical_implementation_at_triace.pdf
+(defn make-light
+  ""
+  [L scene diff-color spec-color astr]
+  (fn [^Material mat shadow-f N D pos]
+    (let [shadow (shadow-f scene ^Vec3 pos L)
+          E (v/sub D)
+          NL (max 0.0 (v/dot N L))
+          H (v/normalize (v/add L E))
+          NH (max 0.0 (v/dot N H))
+          EH (max 0.0 (v/dot E H))
+          Ff0 (+ (.specularf0 mat) (* (- 1.0 (.specularf0 mat)) (m/pow (- 1.0 EH) 5.0)))
+
+          diffuse (v/mult diff-color (* (.diffusion mat) NL))
+          specular (v/mult spec-color (* (.specular mat) (* Ff0 NL (m/pow NH (.specularpow mat)))))
+          ambient (v/mult (.color mat) astr)
+
+          diffuse (v/mult diffuse shadow)
+          specular (v/mult specular (m/pow shadow 8))
+          ambient (v/mult ambient shadow)]
+      (v/emult (.color mat) (v/add ambient (v/add diffuse specular))))))
+
