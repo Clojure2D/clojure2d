@@ -15,6 +15,23 @@
 (deftype Material [^Vec3 color diffusion specular specularf0 specularpow reflection])
 (deftype HitData [d ^Material mat])
 
+(defn make-material
+  "Create material information:
+  - color - Vec3 with RGB: 0.0-1.0
+  - diffusion - diffusion ratio: 0.0 - 1.0
+  - specular - specular ratio: 0.0 - 1.0
+  - specularf0 - f0, intensity ratio: 0.0 - 1.0
+  - specularpow - strength of specular: 1.0 - 10k
+  - reflection - reflection ratio: 0.0 - 1.0"
+  [conf]
+  (Material. (:color conf)
+             (:diffusion conf)
+             (:specular conf)
+             (:specularf0 conf)
+             (:specularpow conf)
+             (:reflection conf)))
+
+
 (defn interpolate-material
   ""
   ([^Material m1 ^Material m2 amt f]
