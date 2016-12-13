@@ -7,6 +7,14 @@ Clojure2D is a lightweight library supporting generative coding or glitching. It
 ![ex21](results/small/ex21.jpg)
 ![ex5](results/small/ex5.jpg)
 
+![ex11](results/small/ex11.jpg)
+![ex13](results/small/ex13.jpg)
+![ex16](results/small/ex16.jpg)
+![ex19](results/small/ex19.jpg)
+
+![ex22](results/small/ex22.jpg)
+![ex23](results/small/ex23.jpg)
+
 ## Motivation
 
 This project is the answer to personal needs to optimize my own workflow for generative or glitch creations. I've been producing a lot of Processing code and started to suffer from limitations of working in 'write sketch and run' mode. Too much copy&paste between sketches, zillions of folders, zillions of processed images. And one day I fell in love with FP. This code is the answer.
