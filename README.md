@@ -148,6 +148,7 @@ I've prepared several examples with results where you can check current state of
 * ~~Color namespace cleaning~~
 * ~~Colorspace converters~~
 * More in extra ns:
+  - SDF objects
   - variations
   - glitch filters in extra namespace (moved from Processing)
   - analog filters (for sonification part)

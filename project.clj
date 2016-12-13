@@ -27,9 +27,10 @@
   :repl-options {:timeout 120000}
   :target-path "target/%s"
   :jvm-opts ["-Xmx4096M"
-             "-Dcom.sun.management.jmxremote"
-             "-Dcom.sun.management.jmxremote.ssl=false"
-             "-Dcom.sun.management.jmxremote.authenticate=false"
-             "-Dcom.sun.management.jmxremote.port=43210"]
+          ;   "-Dcom.sun.management.jmxremote"
+          ;   "-Dcom.sun.management.jmxremote.ssl=false"
+          ;   "-Dcom.sun.management.jmxremote.authenticate=false"
+          ;   "-Dcom.sun.management.jmxremote.port=43210"
+             ]
   :marginalia {:javascript ["https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML"]}
   :profiles {:uberjar {:aot :all}})

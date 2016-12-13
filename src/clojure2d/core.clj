@@ -1,11 +1,11 @@
 ;; ## Scope
 ;;
-;; This namespace provides basic functions to manipulate with display windows with events, canvas, image files and session.
+;; This namespace provides basic functions to work with: display windows with events, canvases, image files and session.
 ;; What's here in brief:
 ;;
 ;; * Image file read and write, backed by Java ImageIO API. You can read and write BMP, JPG and PNG files. I didn't test WBMP and GIF. Image itself is Java BufferedImage in integer ARGB mode. Each pixel is represented as 32bit unsigned integer and 8 bits per channel. See clojure2d.pixels namespace for pixels operations.
 ;; * Canvas with functions to draw on it, represented as atom of BufferedImage and Graphics2D objects.
-;; * Display (JFrame) with events handlers (multimethods), autorefreshing associated canvas and if you prefer Processing style, calling drawing function with context
+;; * Display (JFrame) with events handlers (multimethods) + assiciated autorefreshing canvas, and if you prefer Processing style calling `draw` function with context
 ;; * Session management to: get unique identifier, save logs (different file per session) and get unique, sequenced filename.
 ;; * Some general helper functions
 
@@ -30,13 +30,19 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-;; some constants
+;; ### Image
+
+;; Let's start with setting dynamic variable which defines quality of the saved jpeg file. Values are from `0.0` to `1.0`.
+;; You can freely change this setting with `binding` macro.
 (def ^:dynamic *jpeg-image-quality* 0.97)
 
-;; loading image with ImageIcon
+;; #### Load image
 
+;; To load image from the file, just call `(load-image "filename.jpg")`. Idea is stolen from Processing code. Loading is done via `ImageIcon` class and later converted to BufferedImage in ARGB mode.
 (defn load-image 
-  ""
+  "Load image from file.
+  * Input: image filename with absolute or relative path (relative to your project folder)
+  * Returns BufferedImage object"
   [^String filename]
   (try
     (let [^Image img (.getImage (ImageIcon. filename))]
@@ -48,80 +54,103 @@
         bimg))
     (catch Exception e (println "Can't load image: " filename " " (.getMessage e)))))
 
-;; saving canvas with ImageIO
+;; #### Save image
 
+;; Saving image is more tricky. Again, most concepts are taken from Processing.
+
+;; First let's define helper function which extracts extension from filename. Later it will be used to call save function appropriate to file type (recognized from extension) 
 (defn- file-extension-int
-  ""
+  "Extract extension.
+  Input: image filename
+  Returns extension (without dot)"
   [filename]
   (let [[_ ext] (re-find #"\.(\w+)$" filename)]
     ext))
 
+;; Memoize above function (in case you'll be saving file very often).
 (def file-extension (memoize file-extension-int))
 
+;; Another helper which tries to find proper file type writer from `ImageIO` class.
 (defn- ^ImageWriter get-image-writer
-  "return ImageIO ImageWriter based on file extension"
+  "Returns image writer with type taken from extension"
   [filename]
   (let [ext (file-extension filename)
         ^Iterator iter (ImageIO/getImageWritersByFormatName ext)]
     (when (.hasNext iter)
       (.next iter))))
 
-;; necessary to save JPG and BMP
+;; When saving image type which do not have alpha channel (like jpeg or bmp) we should properly flatten image.
 (defn- ^BufferedImage drop-alpha-in-image
-  "drop alpha channel, transforming color properly - from processing code"
+  "Drop alpha from the image.
+  Input: ARGB BufferedImage object
+  Return RGB BufferedImage object"
   [^BufferedImage img]
   (let [w (.getWidth img)
         h (.getHeight img)
         arr (.getRGB img 0 0 w h nil 0 w)
         ^BufferedImage nimg (BufferedImage. w h BufferedImage/TYPE_INT_RGB)]
     (.setRGB nimg 0 0 w h arr 0 w)
-    nimg)
-  )
+    nimg))
 
+;; Physically save image via writer taken from `get-image-writer` function.
 (defn- do-save
-  "physically save image"
-  ([filename ^BufferedImage img ^ImageWriter writer]
+  "Save image to the file via writer with parameters"
+  ([filename img ^ImageWriter writer]
    (do-save filename img writer (.getDefaultWriteParam writer)))
-  ([filename ^BufferedImage img ^ImageWriter writer ^ImageWriteParam param]
+  ([filename ^BufferedImage img ^ImageWriter writer param]
    (with-open [os (output-stream filename)]
      (.setOutput writer (ImageIO/createImageOutputStream os))
      (.write writer nil (IIOImage. img nil nil) param)
      (.dispose writer))))
 
-(defmulti save-to-image (fn [filename ^BufferedImage img ^ImageWriter writer] (keyword (file-extension filename))))
+;; Now I define multimethod which saves image. Multimethod is used here because some image types requires additional actions.
+(defmulti save-to-image (fn [filename img writer] (keyword (file-extension filename))))
 
+;; JPG requires alpha channel removal and we must set the quality in `*jpeg-image-quality*` variable.
 (defmethod save-to-image :jpg
-  [filename ^BufferedImage img ^ImageWriter writer]
-  (let [^BufferedImage nimg (drop-alpha-in-image img)
+  [filename img ^ImageWriter writer]
+  (let [nimg (drop-alpha-in-image img)
         ^ImageWriteParam param (.getDefaultWriteParam writer)]
     (.setCompressionMode param ImageWriteParam/MODE_EXPLICIT)
     (.setCompressionQuality param *jpeg-image-quality*)
     (do-save filename nimg writer param)))
 
+;; BMP also requires alpha channel removal
 (defmethod save-to-image :bmp
-  [filename ^BufferedImage img ^ImageWriter writer]
-  (let [^BufferedImage nimg (drop-alpha-in-image img)]
+  [filename img writer]
+  (let [nimg (drop-alpha-in-image img)]
     (do-save filename nimg writer)))
 
+;; The rest file types are saved with alpha without special treatment.
 (defmethod save-to-image :default
-  [filename ^BufferedImage img ^ImageWriter writer]
+  [filename img writer]
   (do-save filename img writer))
 
+;; Finally main function which makes following steps:
+;; * creates necessary paths
+;; * creates image writer (based on extension)
+;; * calls multimethod to save image
+;; Function prints some messages (subject to change)
 (defn save-image
-  ""
-  [^BufferedImage b filename]
+  "Save image to the file
+  Input: image (`BufferedImage` object) and filename
+  Side effect: saved image and (temporarly printed info about action made)"
+  [b filename]
   (println (str "saving: " filename))
   (make-parents filename)
-  (let [^ImageWriter iwriter (get-image-writer filename)
-        ext (file-extension filename)]
+  (let [iwriter (get-image-writer filename)]
     (if-not (nil? iwriter)
       (save-to-image filename b iwriter)
       (println (str "can't save an image: " filename)))))
 
-;;
+;; #### Addition functions
+
+;; Just an image resizer with bicubic interpolation. Native `Graphics2D` method is called
 (defn resize-image
-  ""
-  [^BufferedImage img width height]
+  "Resize image
+  Input: image and target width and height
+  Returns resized image (newly created)"
+  [img width height]
   (let [^BufferedImage target (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)
         ^Graphics2D g (.createGraphics target)]
     (.setRenderingHint g RenderingHints/KEY_INTERPOLATION RenderingHints/VALUE_INTERPOLATION_BICUBIC)
@@ -130,7 +159,9 @@
     (.dispose g)
     target))
 
-;;;;;;;;;;;;;;;;;;; CANVAS
+;; ### Canvas
+
+
 
 ;; rendering quality options
 (def rendering-hints { :low { RenderingHints/KEY_ANTIALIASING       RenderingHints/VALUE_ANTIALIAS_OFF
