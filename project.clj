@@ -1,6 +1,6 @@
 (defproject clojure2d "0.0.1-SNAPSHOT"
-  :description "Java2D wrapper with creative coding functions (similar to Processing or openFrameworks)"
-  :plugins [[refactor-nrepl "2.2.0"]
+  :description "Creative coding / glitch library backed by Java2D"
+  :plugins [[refactor-nrepl "2.3.0-SNAPSHOT"]
             [cider/cider-nrepl "0.15.0-SNAPSHOT"]
             [lein-ancient "0.6.10"]
             [lein-kibit "0.1.2"]
@@ -25,7 +25,6 @@
                  [com.taoensso/tufte "1.1.0"]]
   :resource-path "resources/"
   :repl-options {:timeout 120000}
-;;  :main ^:skip-aot clojure2d.core
   :target-path "target/%s"
   :jvm-opts ["-Xmx4096M"
              "-Dcom.sun.management.jmxremote"
