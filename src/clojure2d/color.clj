@@ -937,7 +937,7 @@
 ;; http://iquilezles.org/www/articles/palettes/palettes.htm
 (defn create-palette-fn
   ""
-  [^Vec3 a ^Vec3 b ^Vec3 c ^Vec3 d]
+  [a b c d]
   (fn [t]
     (let [^Vec3 cc (-> (->> t
                             (v/mult c)
@@ -958,7 +958,7 @@
         c (v/generate-vec3 (partial m/drand 2))
         d (v/generate-vec3 m/drand)
         f (create-palette-fn a b c d)]
-    (vec (map #(f %) (range 0.0 1.0 (/ 1.0 num))))))
+    (vec (map f (range 0.0 1.0 (/ 1.0 num))))))
 
 ;;
 
