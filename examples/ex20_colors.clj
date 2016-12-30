@@ -2,7 +2,8 @@
   (:require [clojure2d.core :refer :all]
             [clojure2d.pixels :as p]
             [clojure2d.color :as c]
-            [clojure2d.math.vector :as v])
+            [clojure2d.math.vector :as v]
+            [clojure2d.math :as m])
   (:import [clojure2d.math.vector Vec4]))
 
 ;; reduce colors to random palette
@@ -21,3 +22,7 @@
 (p/save-pixels (p/filter-colors (c/make-reduce-color-filter v/dist random-palette-6) img) "results/ex20/euclid.jpg")
 (p/save-pixels (p/filter-colors (c/make-reduce-color-filter v/dist-abs random-palette-6) img) "results/ex20/abs.jpg")
 (p/save-pixels (p/filter-colors (c/make-reduce-color-filter v/dist-cheb random-palette-6) img) "results/ex20/cheb.jpg")
+
+(do
+  (def paletton-palette (c/paletton-palette :triad 0 {:compl true :angle 20 :preset :shiny}))
+  (p/save-pixels (p/filter-colors (c/make-reduce-color-filter paletton-palette) img) "results/ex20/paletton.jpg"))

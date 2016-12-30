@@ -960,16 +960,173 @@
         f (create-palette-fn a b c d)]
     (vec (map f (range 0.0 1.0 (/ 1.0 num))))))
 
+;; paletton palettes
+
+(def paletton-base-data
+  (let [s (fn [e t n] (if (== n -1.0) e
+                          (+ e (/ (- t e) (inc n)))))
+        i (fn [e t n] (if (== n -1.0) t
+                          (+ t (/ (- e t) (inc n)))))
+        paletton-base-values   {:r  [1.0 1.0]
+                                :rg [1.0 1.0]
+                                :g  [1.0 0.8]
+                                :gb [1.0 0.6]
+                                :b  [0.85 0.7]
+                                :br [1.0 0.65]}]
+    {120.0 {:a (:r paletton-base-values)
+            :b (:rg paletton-base-values)
+            :f (fn [e]
+                 (if (== e 0.0) -1.0
+                       (* 0.5 (m/tan (* m/HALF_PI (/ (- 120.0 e) 120.0))))))
+            :g s
+            :rgb (fn [e n r] (Vec4. e n r 255.0))}
+     180.0 {:a (:rg paletton-base-values)
+            :b (:g paletton-base-values)
+            :f (fn [e]
+                 (if (== e 180.0) -1.0
+                     (* 0.5 (m/tan (* m/HALF_PI (/ (- e 120.0) 60.0))))))
+            :g i
+            :rgb (fn [e n r] (Vec4. n e r 255.0))}
+     
+     210.0 {:a (:g paletton-base-values)
+            :b (:gb paletton-base-values)
+            :f (fn [e]
+                 (if (== e 180.0) -1.0
+                     (* 0.75 (m/tan (* m/HALF_PI (/ (- 210.0 e) 30.0))))))
+            :g s
+            :rgb (fn [e n r] (Vec4. r e n 255.0))}
+     255.0 {:a (:gb paletton-base-values)
+            :b (:b paletton-base-values)
+            :f (fn [e]
+                 (if (== e 255.0) -1.0
+                     (* 1.33 (m/tan (* m/HALF_PI (/ (- e 210.0) 45.0))))))
+            :g i
+            :rgb (fn [e n r] (Vec4. r n e 255.0))}
+     
+     315.0 {:a (:b paletton-base-values)
+            :b (:br paletton-base-values)
+            :f (fn [e]
+                 (if (== e 255.0) -1.0
+                     (* 1.33 (m/tan (* m/HALF_PI (/ (- 315.0 e) 60.0))))))
+            :g s
+            :rgb (fn [e n r] (Vec4. n r e 255.0))}
+     360.0 {:a (:br paletton-base-values)
+            :b (:r paletton-base-values)
+            :f (fn [e]
+                 (if (== e 0.0) -1.0
+                     (* 1.33 (m/tan (* m/HALF_PI (/ (- e 315.0) 45.0))))))
+            :g i
+            :rgb (fn [e n r] (Vec4. e r n 255.0))}}))
+
+(defn paletton-hsv-to-rgb
+  ""
+  [hue ks kv]
+  (let [ks (m/constrain ks 0.0 2.0)
+        kv (m/constrain kv 0.0 2.0)
+        h (mod hue 360.0)
+        upd (fn [e t] (if (<= t 1.0)
+                        (* e t)
+                        (+ e (* (- 1.0 e) (dec t)))))
+        {:keys [a b f g rgb]} (second (first (filter #(< h (% 0)) paletton-base-data)))
+        av (second a)
+        bv (second b)
+        as (first a)
+        bs (first b)
+        n (f h)
+        v (upd (g av bv n) kv)
+        s (upd (g as bs n) ks)
+        r (* 255.0 v)
+        b (* r (- 1.0 s))
+        g (if (== n -1.0) b
+              (/ (+ r (* n b)) (inc n)))]
+    (rgb r g b)))
+
+(def paletton-presets
+  {:pale-light [[0.24649 1.78676] [0.09956 1.95603] [0.17209 1.88583] [0.32122 1.65929] [0.39549 1.50186]]
+   :pastels-bright [[0.65667 1.86024] [0.04738 1.99142] [0.39536 1.89478] [0.90297 1.85419] [1.86422 1.8314]]
+   :shiny [[1.00926 2] [0.3587 2] [0.5609 2] [2 0.8502] [2 0.65438]]
+   :pastels-lightest [[0.34088 1.09786] [0.13417 1.62645] [0.23137 1.38072] [0.45993 0.92696] [0.58431 0.81098]]
+   :pastels-very-light [[0.58181 1.32382] [0.27125 1.81913] [0.44103 1.59111] [0.70192 1.02722] [0.84207 0.91425]]
+   :full [[1 1] [0.61056 1.24992] [0.77653 1.05996] [1.06489 0.77234] [1.25783 0.60685]]
+   :pastels-light [[0.37045 0.90707] [0.15557 1.28367] [0.25644 1.00735] [0.49686 0.809] [0.64701 0.69855]]
+   :pastels-med [[0.66333 0.8267] [0.36107 1.30435] [0.52846 0.95991] [0.78722 0.70882] [0.91265 0.5616]]
+   :darker [[0.93741 0.68672] [0.68147 0.88956] [0.86714 0.82989] [1.12072 0.5673] [1.44641 0.42034]]
+   :pastels-mid-pale [[0.38302 0.68001] [0.15521 0.98457] [0.26994 0.81586] [0.46705 0.54194] [0.64065 0.44875]]
+   :pastels [[0.66667 0.66667] [0.33333 1] [0.5 0.83333] [0.83333 0.5] [1 0.33333]]
+   :dark-neon [[0.94645 0.59068] [0.99347 0.91968] [0.93954 0.7292] [1.01481 0.41313] [1.04535 0.24368]]
+   :pastels-dark [[0.36687 0.39819] [0.25044 0.65561] [0.319 0.54623] [0.55984 0.37953] [0.70913 0.3436]]
+   :pastels-very-dark [[0.60117 0.41845] [0.36899 0.59144] [0.42329 0.44436] [0.72826 0.35958] [0.88393 0.27004]]
+   :dark [[1.31883 0.40212] [0.9768 0.25402] [1.27265 0.30941] [1.21289 0.60821] [1.29837 0.82751]]
+   :pastels-mid-dark [[0.26952 0.22044] [0.23405 0.52735] [0.23104 0.37616] [0.42324 0.20502] [0.54424 0.18483]]
+   :pastels-darkest [[0.53019 0.23973] [0.48102 0.50306] [0.50001 0.36755] [0.6643 0.32778] [0.77714 0.3761]]
+   :darkest [[1.46455 0.21042] [0.99797 0.16373] [0.96326 0.274] [1.56924 0.45022] [1.23016 0.66]]
+   :almost-black [[0.12194 0.15399] [0.34224 0.50742] [0.24211 0.34429] [0.31846 0.24986] [0.52251 0.33869]]
+   :almost-gray-dark [[0.10266 0.24053] [0.13577 0.39387] [0.11716 0.30603] [0.14993 0.22462] [0.29809 0.19255]]
+   :almost-gray-darker [[0.07336 0.36815] [0.18061 0.50026] [0.09777 0.314] [0.12238 0.25831] [0.14388 0.1883]]
+   :almost-gray-mid [[0.07291 0.59958] [0.19602 0.74092] [0.10876 0.5366] [0.15632 0.48229] [0.20323 0.42268]]
+   :almost-gray-lighter [[0.06074 0.82834] [0.14546 0.97794] [0.10798 0.76459] [0.15939 0.68697] [0.22171 0.62926]]
+   :almost-gray-light [[0.03501 1.59439] [0.23204 1.10483] [0.14935 1.33784] [0.07371 1.04897] [0.09635 0.91368]]})
+
+(defn make-monochromatic-palette
+  ""
+  [hue preset]
+  (vec (map (fn [[ks kv]] (paletton-hsv-to-rgb hue ks kv)) preset)))
+
+(defmulti paletton-palette (fn [m hue & conf] m))
+
+(defmethod paletton-palette :monochromatic [_ hue & conf]
+  (let [{compl :compl 
+         preset :preset
+         :or {compl false
+              preset :full}} (first conf)
+        ppreset (if (keyword? preset) (paletton-presets preset) preset)
+        p (make-monochromatic-palette hue ppreset)]
+    (if compl (vec (concat p (make-monochromatic-palette (+ hue 180) ppreset))) p)))
+
+(defmethod paletton-palette :triad [_ hue & conf]
+  (let [{compl :compl
+         preset :preset
+         angle :angle
+         adj :adj
+         :or {compl false
+              preset :full
+              angle 30.0
+              adj true}} (first conf)
+        chue (+ 180.0 hue)
+        hue1 (if adj (+ hue angle) (+ chue angle))
+        hue2 (if adj (- hue angle) (- chue angle))
+        ppreset (if (keyword? preset) (paletton-presets preset) preset)
+        p1 (make-monochromatic-palette hue ppreset)
+        p2 (make-monochromatic-palette hue1 ppreset)
+        p3 (make-monochromatic-palette hue2 ppreset)
+        p (vec (concat p1 p2 p3))]
+    (if compl (vec (concat p (make-monochromatic-palette chue ppreset))) p)))
+
+(defmethod paletton-palette :tetrad [_ hue & conf]
+  (let [{preset :preset
+         angle :angle
+         :or {preset :full
+              angle 30.0}} (first conf)
+        p1 (paletton-palette :monochromatic hue {:preset preset :compl true})
+        p2 (paletton-palette :monochromatic (+ angle hue) {:preset preset :compl true})]
+    (vec (concat p1 p2))))
+
 ;;
 
 (defn nearest-color
   ""
-  ([f xf ^Vec4 c]
-   (first (reduce (fn [[currc currdist] ^Vec4 c1]
-                    (let [dist (f c1 c)]
-                      (if (< dist currdist)
-                        [c1 dist]
-                        [currc currdist]))) [c Double/MAX_VALUE] xf)))
+  ([f xf c]
+   (let [s (count xf)]
+     (loop [i (int 0)
+            currc c
+            currdist (double Double/MAX_VALUE)]
+       (if (< i s)
+         (let [c1 (xf i)
+               dist (double (f c c1))]
+           (recur (unchecked-inc i)
+                  (if (< dist currdist) c1 currc)
+                  (if (< dist currdist) dist currdist)))
+         currc))))
   ([xf c]
    (nearest-color v/dist xf c)))
 
