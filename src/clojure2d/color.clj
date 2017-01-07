@@ -351,6 +351,8 @@
              :darkthreshold blend-darkthreshold
              :lightthreshold blend-lightthreshold})
 
+(def blends-names (keys blends))
+
 ;;; Colorspace functions
 
 (defn test-colors
@@ -890,6 +892,8 @@
                   :YCbCr [to-YCbCr from-YCbCr]
                   :YUV   [to-YUV from-YUV]
                   :YIQ   [to-YIQ from-YIQ]})
+
+(def colorspaces-names (keys colorspaces))
 
 (defn to-cs
   "return colorspace converter by keyword (RGB -> ...)"

@@ -19,10 +19,10 @@
                  [net.jafama/jafama "2.1.0"]
                  [org.apache.commons/commons-math3 "3.6.1"]
                  [com.flowpowered/flow-noise "1.0.0"]
-                 [com.sudoplay.joise/joise "1.0.1"]
+                 [com.sudoplay.joise/joise "1.0.4"]
 		 [de.sciss/jwave "1.0.3"]
                  [criterium "0.4.4"]
-                 [com.taoensso/tufte "1.1.0"]]
+                 [com.taoensso/tufte "1.1.1"]]
   :resource-path "resources/"
   :repl-options {:timeout 120000}
   :target-path "target/%s"

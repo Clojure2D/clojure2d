@@ -66,17 +66,15 @@
 (p/save-pixels (p/filter-channels (p/make-tint-filter 10 30 200) img) "results/ex11/tint.jpg")
 
 ;; let's compose some images
-;; list of all composite methods is here
-(def all-blends (keys c/blends))
 
 ;; let's modulo add two images
-(p/save-pixels (p/compose-channels :madd false 
+(p/save-pixels (p/compose-channels :madd false
                                       (p/load-pixels "results/ex11/erode.jpg")
                                       (p/load-pixels "results/ex11/boxblur23.jpg"))
                   "results/ex11/divide.jpg")
 
 ;; let's make random blends
-(p/save-pixels (p/compose-channels (rand-nth all-blends) (rand-nth all-blends) (rand-nth all-blends) nil 
+(p/save-pixels (p/compose-channels (rand-nth c/blends-names) (rand-nth c/blends-names) (rand-nth c/blends-names) nil 
                                       (p/load-pixels "results/ex11/erode.jpg")
                                       (p/load-pixels "results/ex11/boxblur23.jpg"))
                   "results/ex11/random_blend.jpg")

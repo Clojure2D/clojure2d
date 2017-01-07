@@ -3,7 +3,8 @@
             [clojure2d.pixels :as p]
             [clojure2d.core :refer :all]
             [clojure2d.math.vector :as v]
-            [clojure2d.extra.signal :as s])
+            [clojure2d.extra.signal :as s]
+            [clojure2d.color :as c])
   (:import [clojure2d.pixels Pixels]
            [clojure2d.math.vector Vec2]))
 
@@ -66,9 +67,9 @@
 
 (defn- mi-draw-point
   ""
-  ([ch ^Pixels target ^Pixels source oldx oldy newx newy sx sy]
+  ([ch target source oldx oldy newx newy sx sy]
    (p/set-value target ch (+ newx sx) (+ newy sy) (p/get-value source ch (+ oldx sx) (+ oldy sy))))
-  ([ch ^Pixels target ^Pixels source oldx oldy newx newy]
+  ([ch target source oldx oldy newx newy]
    (p/set-value target ch newx newy (p/get-value source ch oldx oldy))))
 
 (defn- mi-do-horizontal
@@ -117,7 +118,7 @@
             1 (mi-draw-point ch target source (- size y 1) (- size x 1) x y tx ty)
             2 (mi-draw-point ch target source x y (- size x 1) (- size y 1) tx ty)
             3 (mi-draw-point ch target source (- size x 1) (- size y 1) x y tx ty))
-          (recur (dec x)))))))
+          (recur (unchecked-dec x)))))))
 
 (defn- mi-do-diag-rect
   ""
@@ -131,7 +132,7 @@
           (mi-draw-point ch target source (- (.w source) x 1) (- (.h source) y 1) x y)
           (mi-draw-point ch target source x y (- (.w source) x 1) (- (.h source) y 1)))))))
 
-(def mirror-ts {:U    (partial mi-do-horizontal true)
+(def mirror-types {:U    (partial mi-do-horizontal true)
                 :D    (partial mi-do-horizontal false)
                 :L    (partial mi-do-vertical true)
                 :R    (partial mi-do-vertical false)
@@ -160,7 +161,7 @@
 (defn make-mirror-filter
   ""
   [t]
-  (t mirror-ts))
+  (t mirror-types))
 
 ;;
 
@@ -169,16 +170,43 @@
    r: value 1.0-3.0"
   ([f r]
    (let [r- (- r)]
-     (fn [ch ^Pixels t ^Pixels p]
+     (fn [ch t ^Pixels p]
        (dotimes [y (.h p)]
          (let [yv (m/norm y 0 (.h p) r- r)]
            (dotimes [x (.w p)]
              (let [xlerp (m/norm x 0 (.w p) 0.0 1.0)
-                   ^Vec2 v1 (f (Vec2. r- yv))
-                   ^Vec2 v2 (f (Vec2. r yv))
+                   v1 (f (Vec2. r- yv))
+                   v2 (f (Vec2. r yv))
                    ^Vec2 vv (v/interpolate v1 v2 xlerp)
                    xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
                    yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
                (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
   ([f]
    (make-slitscan2-filter f 2.0)))
+
+;; blend machine
+
+(defn random-blend-get-cs
+  "Return colorspace or nil"
+  []
+  (if (m/brand 0.85) (rand-nth c/colorspaces-names) nil))
+
+(defn random-blend
+  "Do random blend of two pixels, use random colorspace"
+  [p1 p2]
+  (let [[p1 p2] (if (m/brand 0.5) [p1 p2] [p2 p1]) ; switch images
+        cs1 (random-blend-get-cs) ; let's convert to some colorspace (or leave rgb)
+        cs2 (if (m/brand 0.2) (random-blend-get-cs) cs1) ; maybe different cs on second image?
+        outcs (if (m/brand 0.2) (random-blend-get-cs) cs1) ; maybe some random colorspace on output?
+        bl1 (if (m/brand 0.75) (rand-nth c/blends-names) nil) ; ch1 blend
+        bl2 (if (m/brand 0.75) (rand-nth c/blends-names) nil) ; ch2 blend
+        bl3 (if (m/brand 0.75) (rand-nth c/blends-names) nil) ; ch3 blend
+        result (p/compose-channels bl1 bl2 bl3 nil
+                                   (if cs1 (p/filter-colors ((cs1 c/colorspaces) 0) p1) p1)
+                                   (if cs2 (p/filter-colors ((cs2 c/colorspaces) 0) p2) p2))]
+    (println [cs1 cs2 outcs bl1 bl2 bl3])
+    (if outcs
+      (p/filter-colors ((outcs c/colorspaces) 1) result)
+      result)))
+
+
