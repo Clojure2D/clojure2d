@@ -35,6 +35,19 @@
      (* 0.7152 (.y c))
      (* 0.0722 (.z c))))
 
+(declare to-HSB)
+
+(defn get-hue
+  ""
+  [^Vec4 c]
+  (let [^Vec4 ret (to-HSB c)]
+    (.x ret)))
+
+(defn get-hue360
+  ""
+  [c]
+  (* 1.407843137254902 (get-hue c)))
+
 (defn to-color
   ""
   [^Vec4 v]
