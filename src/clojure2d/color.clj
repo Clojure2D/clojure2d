@@ -1071,6 +1071,8 @@
    :almost-gray-lighter [[0.06074 0.82834] [0.14546 0.97794] [0.10798 0.76459] [0.15939 0.68697] [0.22171 0.62926]]
    :almost-gray-light [[0.03501 1.59439] [0.23204 1.10483] [0.14935 1.33784] [0.07371 1.04897] [0.09635 0.91368]]})
 
+(def paletton-presets-names (keys paletton-presets))
+
 (defn make-monochromatic-palette
   ""
   [hue preset]

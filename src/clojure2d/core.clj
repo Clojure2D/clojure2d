@@ -671,12 +671,14 @@
 
   (defn next-filename
     ""
-    [prefix]
-    (if (nil? @session-name)
-      (do
-        (make-session)
-        (next-filename prefix))
-      (str prefix (second @session-name) "_" (format "%06d" (@session-cnt)))))
+    ([prefix]
+     (if (nil? @session-name)
+       (do
+         (make-session)
+         (next-filename prefix))
+       (str prefix (second @session-name) "_" (format "%06d" (@session-cnt)))))
+    ([prefix suffix]
+     (str (next-filename prefix) suffix)))
 
   (defn get-session-name
     ""
