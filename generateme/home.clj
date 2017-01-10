@@ -6,15 +6,28 @@
             [clojure2d.extra.glitch :as g]))
 
 
-(def p1 (p/load-pixels "generateme/tst/eggs.jpg"))
+(def p1 (p/load-pixels "generateme/tst/krewcres.png"))
 
-(def p2 (p/load-pixels "generateme/tst/eggst.jpg"))
+(def p2 (p/load-pixels "generateme/tst/krew.jpg"))
 
-(p/save-pixels (p/filter-channels p/equalize-filter (p/filter-channels p/normalize-filter (g/random-blend p1 p2))) "generateme/tst/eggsres.jpg")
+(def p3 (p/load-pixels "generateme/tst/res_9F2D998D_krew.jpg"))
 
-(def p3 (p/load-pixels "generateme/tst/mono.jpg"))
+
+(def canvas (core/create-canvas (.w p1) (.h p1)))
+
+(def windows (core/show-window canvas "glitch" (.w p1) (.h p1) 10))
+
+(let [b (g/blend-machine)]
+  (println b)
+  (p/set-canvas-pixels canvas (p/filter-channels p/equalize-filter false 
+                                                 (p/filter-channels p/normalize-filter false 
+                                                                    (g/blend-machine p2 p1 b)))))
+
+(core/save-canvas canvas (core/next-filename "generateme/tst/krew" ".jpg"))
+
+(def p4 (p/get-canvas-pixels canvas))
 
 (do
   (def palette (g/color-reducer-machine))
   (println palette)
-  (p/save-pixels (g/color-reducer-machine p3 palette) "generateme/tst/paletton5.jpg"))
+  (p/set-canvas-pixels canvas (g/color-reducer-machine p4 palette)))
