@@ -21,8 +21,7 @@
                  [com.flowpowered/flow-noise "1.0.0"]
                  [com.sudoplay.joise/joise "1.0.4"]
 		 [de.sciss/jwave "1.0.3"]
-                 [criterium "0.4.4"]
-                 [com.taoensso/tufte "1.1.1"]]
+                 [criterium "0.4.4"]]
   :resource-path "resources/"
   :repl-options {:timeout 120000}
   :target-path "target/%s"

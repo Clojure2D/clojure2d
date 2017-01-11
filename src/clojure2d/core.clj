@@ -1,9 +1,9 @@
-;; ## Scope
+;; # Namespace scope
 ;;
 ;; This namespace provides basic functions to work with: display windows with events, canvases, image files and session.
 ;; What's here in brief:
 ;;
-;; * Image file read and write, backed by Java ImageIO API. You can read and write BMP, JPG and PNG files. I didn't test WBMP and GIF. Image itself is Java BufferedImage in integer ARGB mode. Each pixel is represented as 32bit unsigned integer and 8 bits per channel. See clojure2d.pixels namespace for pixels operations.
+;; * Image file read and write, backed by Java ImageIO API. You can read and write BMP, JPG and PNG files. I didn't test WBMP and GIF. Image itself is Java BufferedImage in integer ARGB mode. Each pixel is represented as 32bit unsigned integer and 8 bits per channel. See `clojure2d.pixels` namespace for pixels operations.
 ;; * Canvas with functions to draw on it, represented as atom of BufferedImage and Graphics2D objects.
 ;; * Display (JFrame) with events handlers (multimethods) + assiciated autorefreshing canvas, and if you prefer Processing style calling `draw` function with context
 ;; * Session management to: get unique identifier, save logs (different file per session) and get unique, sequenced filename.
@@ -30,19 +30,22 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-;; ### Image
+;; ## Image
 
 ;; Let's start with setting dynamic variable which defines quality of the saved jpeg file. Values are from `0.0` to `1.0`.
 ;; You can freely change this setting with `binding` macro.
 (def ^:dynamic *jpeg-image-quality* 0.97)
 
-;; #### Load image
+;; ### Load image
 
 ;; To load image from the file, just call `(load-image "filename.jpg")`. Idea is stolen from Processing code. Loading is done via `ImageIcon` class and later converted to BufferedImage in ARGB mode.
+
 (defn load-image 
   "Load image from file.
+
   * Input: image filename with absolute or relative path (relative to your project folder)
   * Returns BufferedImage object"
+
   [^String filename]
   (try
     (let [^Image img (.getImage (ImageIcon. filename))]
@@ -54,11 +57,18 @@
         bimg))
     (catch Exception e (println "Can't load image: " filename " " (.getMessage e)))))
 
-;; #### Save image
+;; ### Save image
 
 ;; Saving image is more tricky. Again, most concepts are taken from Processing.
+;; 
+;; For provided image object and filename process goes as follows:
+;;
+;; * create all necessary folders
+;; * extract file extension and create image writer object
+;; * call multimethod to prepare data and save chosen format
+;;
+;; We have two factors here. First is whether file format accepts alpha channel (jpgs, bmps don't) and second is quality settings (for jpg only). In first case we have to properly flatten the image with `flatten-image` function. In second case we set quality attributes.
 
-;; First let's define helper function which extracts extension from filename. Later it will be used to call save function appropriate to file type (recognized from extension) 
 (defn- file-extension-int
   "Extract extension.
   Input: image filename
@@ -104,7 +114,7 @@
      (.dispose writer))))
 
 ;; Now I define multimethod which saves image. Multimethod is used here because some image types requires additional actions.
-(defmulti save-to-image (fn [filename img writer] (keyword (file-extension filename))))
+(defmulti save-to-image (fn [filename _ _] (keyword (file-extension filename))))
 
 ;; JPG requires alpha channel removal and we must set the quality in `*jpeg-image-quality*` variable.
 (defmethod save-to-image :jpg
