@@ -12,7 +12,9 @@
 (ns clojure2d.core
   "JFrame, Java2D, file io and simple session management"
   (:require [clojure.java.io :refer :all]
-            [clojure2d.math :as m])  
+            [clojure2d.math :as m]
+            [clojure2d.math.vector :as v]
+            [clojure2d.color :as c])  
   (:import [java.awt.image BufferedImage]
            [javax.swing ImageIcon]
            [javax.imageio ImageIO ImageWriter ImageWriteParam IIOImage]
@@ -25,7 +27,8 @@
             Ellipse2D Ellipse2D$Double]
            [java.awt.event KeyAdapter KeyEvent MouseAdapter MouseMotionAdapter
             MouseEvent WindowAdapter WindowEvent ComponentEvent]
-           [javax.swing JFrame JPanel SwingUtilities]))
+           [javax.swing JFrame JPanel SwingUtilities]
+           [clojure2d.math.vector Vec4]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -45,7 +48,6 @@
 
   * Input: image filename with absolute or relative path (relative to your project folder)
   * Returns BufferedImage object"
-
   [^String filename]
   (try
     (let [^Image img (.getImage (ImageIcon. filename))]
@@ -70,9 +72,10 @@
 ;; We have two factors here. First is whether file format accepts alpha channel (jpgs, bmps don't) and second is quality settings (for jpg only). In first case we have to properly flatten the image with `flatten-image` function. In second case we set quality attributes.
 
 (defn- file-extension-int
-  "Extract extension.
-  Input: image filename
-  Returns extension (without dot)"
+  "Extract extension from filename.
+
+  * Input: image filename
+  * Returns extension (without dot)"
   [filename]
   (let [[_ ext] (re-find #"\.(\w+)$" filename)]
     ext))
@@ -80,20 +83,19 @@
 ;; Memoize above function (in case you'll be saving file very often).
 (def file-extension (memoize file-extension-int))
 
-;; Another helper which tries to find proper file type writer from `ImageIO` class.
 (defn- ^ImageWriter get-image-writer
-  "Returns image writer with type taken from extension"
+  "Returns image writer of type taken from extension"
   [filename]
   (let [ext (file-extension filename)
         ^Iterator iter (ImageIO/getImageWritersByFormatName ext)]
     (when (.hasNext iter)
       (.next iter))))
 
-;; When saving image type which do not have alpha channel (like jpeg or bmp) we should properly flatten image.
-(defn- ^BufferedImage drop-alpha-in-image
-  "Drop alpha from the image.
-  Input: ARGB BufferedImage object
-  Return RGB BufferedImage object"
+(defn- ^BufferedImage flatten-image
+  "Flatten image, properly drop alpha channel
+
+  * Input: ARGB BufferedImage object
+  * Returns RGB BufferedImage object"
   [^BufferedImage img]
   (let [w (.getWidth img)
         h (.getHeight img)
@@ -102,7 +104,6 @@
     (.setRGB nimg 0 0 w h arr 0 w)
     nimg))
 
-;; Physically save image via writer taken from `get-image-writer` function.
 (defn- do-save
   "Save image to the file via writer with parameters"
   ([filename img ^ImageWriter writer]
@@ -113,53 +114,51 @@
      (.write writer nil (IIOImage. img nil nil) param)
      (.dispose writer))))
 
-;; Now I define multimethod which saves image. Multimethod is used here because some image types requires additional actions.
-(defmulti save-to-image (fn [filename _ _] (keyword (file-extension filename))))
+;; Now we define multimethod which saves image. Multimethod is used here because some image types requires additional actions.
+(defmulti save-file-type (fn [filename _ _] (keyword (file-extension filename))))
 
-;; JPG requires alpha channel removal and we must set the quality in `*jpeg-image-quality*` variable.
-(defmethod save-to-image :jpg
+;; JPG requires flatten image and we must set the quality defined in `*jpeg-image-quality*` variable.
+(defmethod save-file-type :jpg
   [filename img ^ImageWriter writer]
-  (let [nimg (drop-alpha-in-image img)
+  (let [nimg (flatten-image img)
         ^ImageWriteParam param (.getDefaultWriteParam writer)]
     (.setCompressionMode param ImageWriteParam/MODE_EXPLICIT)
     (.setCompressionQuality param *jpeg-image-quality*)
     (do-save filename nimg writer param)))
 
-;; BMP also requires alpha channel removal
-(defmethod save-to-image :bmp
+;; BMP also requires image flattening
+(defmethod save-file-type :bmp
   [filename img writer]
-  (let [nimg (drop-alpha-in-image img)]
+  (let [nimg (flatten-image img)]
     (do-save filename nimg writer)))
 
 ;; The rest file types are saved with alpha without special treatment.
-(defmethod save-to-image :default
+(defmethod save-file-type :default
   [filename img writer]
   (do-save filename img writer))
 
-;; Finally main function which makes following steps:
-;; * creates necessary paths
-;; * creates image writer (based on extension)
-;; * calls multimethod to save image
-;; Function prints some messages (subject to change)
 (defn save-image
-  "Save image to the file
-  Input: image (`BufferedImage` object) and filename
-  Side effect: saved image and (temporarly printed info about action made)"
+  "Save image to the file.
+
+  * Input: image (`BufferedImage` object) and filename
+  * Side effect: saved image and (temporarly printed info about action made)"
   [b filename]
   (println (str "saving: " filename))
   (make-parents filename)
   (let [iwriter (get-image-writer filename)]
     (if-not (nil? iwriter)
-      (save-to-image filename b iwriter)
+      (save-file-type filename b iwriter)
       (println (str "can't save an image: " filename)))))
 
-;; #### Addition functions
-
+;; ### Addition functions
+;;
 ;; Just an image resizer with bicubic interpolation. Native `Graphics2D` method is called
+
 (defn resize-image
   "Resize image
-  Input: image and target width and height
-  Returns resized image (newly created)"
+
+  * Input: image and target width and height
+  * Returns newly created resized image"
   [img width height]
   (let [^BufferedImage target (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)
         ^Graphics2D g (.createGraphics target)]
@@ -169,11 +168,13 @@
     (.dispose g)
     target))
 
-;; ### Canvas
+;; ## Canvas
+;;
+;; Canvas is an object you can draw on and which can be displayed in the window. Technically it's an atom consisting image (`BufferedImage` object), `Graphics2D` object which is internally used to draw on the image and rendering quality hints. What is important: to draw on canvas you have to wrap your operations in `with-canvas` macro. `with-canvas` is responsible for creating and releasing `Graphics2D` object. Initially `Graphics2D` is set to `nil`.
+;; Canvas should be accelerated by Java and your video card.
+;; Reminder: Drawing on canvas is single threaded.
 
-
-
-;; rendering quality options
+;; First let's define three rendering quality options: `:low`, `:mid` and `:high`. Where `:low` is fastest but has poor quality and `:high` has best quality but may be slow. Rendering options are used when you create canvas.
 (def rendering-hints { :low { RenderingHints/KEY_ANTIALIASING       RenderingHints/VALUE_ANTIALIAS_OFF
                              RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR
                              RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
@@ -196,17 +197,19 @@
                              RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON
                              RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON}})
 
-;;
+;; Following functions and macro are responsible for creating and releasing `Graphics2D` object for a canvas.
+;; You have to use `with-canvas` macro to draw on canvas. Internally it's a threading macro and accepts only list of methods which first parameter is canvas object.
+;; Please do not use `flush-graphics` and `make-graphics` functions on your own. Use `with-canvas` macro instead. I do not check state of `Graphics2D`.
 
 (defn flush-graphics
-  "dispose current graphics2d"
+  "Dispose current `Graphics2D`"
   [canvas]
   (let [[^Graphics2D g b h] @canvas]
     (.dispose g)
     (swap! canvas (fn [c] [nil b h]))))
 
 (defn make-graphics
-  ""
+  "Create new `Graphics2D` object and set renedering hints"
   [canvas]
   (let [[_ ^BufferedImage b ^RenderingHints h] @canvas
         ^Graphics2D ng (.createGraphics b)]
@@ -216,22 +219,24 @@
     (swap! canvas (fn [c] [ng b h]))))
 
 (defmacro with-canvas
+  "Make sure that your operations have freshly created `Graphics2D` object and object is released at the end."
   [canvas & body]
-  `(let [canvas# ~canvas] (do 
-             (make-graphics canvas#)
-             (-> canvas#
-                 ~@body)
-             (flush-graphics canvas#)
-             canvas#)))
-;;
+  `(let [canvas# ~canvas]
+     (do 
+       (make-graphics canvas#)
+       (-> canvas#
+           ~@body)
+       (flush-graphics canvas#)
+       canvas#)))
+
+;; Next functions are canvas management functions: create, save, resize and set quality.
 
 (declare set-background)
 (declare set-stroke)
 (declare image)
 
-; buffer/canvas is always vector of Graphics2D and BufferedImage
 (defn create-canvas
-  "Create canvas as vector of graphics2d object and BufferedImage"
+  "Create and return canvas with `width`, `height` and hint name (keyword). If hint is not passed use `:high` variant."
   ([width height hints]
    (let
        [^BufferedImage buffer (.. GraphicsEnvironment 
@@ -247,41 +252,44 @@
   ([width height]
    (create-canvas width height :high)))
 
-;; resize
+;; Alias subject to refactor
+(def make-canvas create-canvas)
 
 (defn resize-canvas
-  ""
+  "Resize canvas to new dimensions. Creates and returns new canvas."
   [canvas width height]
   (let [[_ b h] @canvas
         ncanvas (create-canvas width height h)]
     (with-canvas ncanvas
       (image b))))
 
-;; change canvas quality
-
 (defn set-canvas-quality
-  ""
+  "Change canvas quality"
   [canvas hints]
   (let [[g b] @canvas]
     (swap! canvas (fn [c] [g b (rendering-hints hints)]))))
 
 (defn save-canvas
-  "save image buffer"
+  "Save canvas to the file"
   [canvas filename]
   (let [[_ b] @canvas]
     (save-image b filename)))
 
-;; Drawing operations
-;; use with `with-canvas` macro
+;; ### Drawing functions
+;;
+;; Here we have basic drawing functions. What you need to remember:
+;;
+;; * Color is set globally for all figures (exception: `set-background`)
+;; * Filled and stroke figures have separate functions (stroke are not implemented yet)
+;; * Always use with `with-canvas` macro.
 
-;; mutable objects
+;; Since drawing on the canvas is single threaded we can use internal mutable objects to draw things.
 (def ^Line2D line-obj (Line2D$Double.))
 (def ^Rectangle2D rect-obj (Rectangle2D$Double.))
 (def ^Ellipse2D ellipse-obj (Ellipse2D$Double.))
 
-;; drawin objects
 (defn line
-  ""
+  "Draw line from point `(x1,y1)` to `(x2,y2)`"
   [canvas x1 y1 x2 y2]
   (.setLine line-obj x1 y1 x2 y2)
   (let [[^Graphics2D g] @canvas]
@@ -289,13 +297,13 @@
   canvas)
 
 (defn point
-  ""
+  "Draw point at `(x,y)` position"
   [canvas x y]
   (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
   canvas)
 
 (defn rect
-  ""
+  "Draw rectangle with top-left corner at `(x,y)` position with width `w` and height `h`."
   [canvas x1 y1 w h]
   (.setFrame rect-obj x1 y1 w h)
   (let [[^Graphics2D g] @canvas]
@@ -303,7 +311,7 @@
   canvas)
 
 (defn ellipse
-  ""
+  "Draw ellipse with middle at `(x,y)` position with width `w` and height `h`."
   [canvas x1 y1 w h]
   (.setFrame ellipse-obj (- x1 (/ w 2)) (- y1 (/ h 2)) w h)
   (let [[^Graphics2D g _] @canvas]
@@ -311,7 +319,7 @@
   canvas)
 
 (defn triangle
-  ""
+  "Draw triangle with corners at 3 positions."
   [canvas x1 y1 x2 y2 x3 y3]
   (let [p (Path2D$Double.)
         [^Graphics2D g] @canvas]
@@ -324,7 +332,7 @@
   canvas)
 
 (defn quad
-  ""
+  "Draw quad with corners at 4 positions."
   [canvas x1 y1 x2 y2 x3 y3 x4 y4]
   (let [p (Path2D$Double.)
         [^Graphics2D g] @canvas]
@@ -338,7 +346,7 @@
   canvas)
 
 (defn set-stroke
-  ""
+  "Set stroke (line) attributes like `cap`, `join` and size. Default `CAP_ROUND` and `JOIN_MITER` is used. Default size is `1.0`."
   ([canvas size cap join]
    (let [[^Graphics2D g] @canvas]
      (.setStroke g (BasicStroke. size cap join)))
@@ -349,24 +357,38 @@
    (set-stroke canvas 1.0)))
 
 (defn set-color
-  ""
-  [canvas ^Color c]
-  (let [[^Graphics2D g] @canvas]
-    (.setColor g c))
-  canvas)
+  "Set global color. You can pass:
+
+  * java.awt.Color object
+  * clojure2d.math.vector.Vec4 object
+  * individual r, g, b (and optional alpha) as integers from 0-255. They are converted to integer and clamped if necessary."
+  ([canvas c]
+   (let [[^Graphics2D g] @canvas
+         cc (if (instance? Vec4 c)
+              (c/to-color c)
+              c)]
+     (.setColor g c))
+   canvas)
+  ([canvas r g b a]
+   (set-color canvas (Color. ^int (c/clamp255 r)
+                             ^int (c/clamp255 g)
+                             ^int (c/clamp255 b)
+                             ^int (c/clamp255 a))))
+  ([canvas r g b]
+   (set-color canvas r g b 255)))
   
 (defn set-background
-  ""
-  [canvas ^Color c]
+  "Set background to the specified color. Current global color is restored."
+  [canvas c]
   (let [[^Graphics2D g ^BufferedImage b] @canvas
         ^Color currc (.getColor g)] 
-    (.setColor g c)
+    (set-color canvas c)
     (.fillRect g 0 0 (.getWidth b) (.getHeight b))
     (.setColor g currc))
   canvas)
 
 (defn image
-  ""
+  "Draw an image. You can specify position and size of the image. Default it's placed on whole canvas."
   ([canvas ^BufferedImage img x y w h]
    (let [[^Graphics2D g] @canvas]
      (.drawImage g img x y w h nil)

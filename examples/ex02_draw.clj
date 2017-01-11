@@ -18,16 +18,16 @@
                (m/sin)
                (m/abs)
                (+ 0.1))
-        cn (int (m/constrain (m/norm n -1.0 1.0 -20 20) -20 20))
+        cn (int (m/constrain (m/norm n -1.0 1.0 -20 20) -40 40))
         ew (* n 80)
         eh (* (- 1.0 n) 80)]
     (with-canvas canvas
       (set-background (Color. 45 45 41 20)))
     
-    (p/set-canvas-pixels canvas (p/filter-channels p/gaussian-blur-2 (p/get-canvas-pixels canvas)))
+    (p/set-canvas-pixels canvas (p/filter-channels p/gaussian-blur-2 nil (p/get-canvas-pixels canvas)))
 
     (with-canvas canvas
-      (set-color (Color. (- 146 cn) (- 199 cn) (- 163 cn)))
+      (set-color (- 146 ew) (- 199 cn) (- 163 eh))
       (ellipse 50 50 ew eh))))
 
 (defn example-02
