@@ -6,9 +6,9 @@
             [clojure2d.extra.glitch :as g]))
 
 
-(def p1 (p/load-pixels "generateme/amu.jpg"))
+(def p1 (p/load-pixels "generateme/tst/gg1.jpg"))
 
-(def p2 (p/load-pixels "generateme/res_E44A20_amu.jpg"))
+(def p2 (p/load-pixels "generateme/tst/gg3.jpg"))
 
 (def p3 (p/load-pixels "generateme/tst/res_9F2D998D_krew.jpg"))
 
@@ -23,7 +23,7 @@
                                                  (p/filter-channels p/normalize-filter false 
                                                                     (g/blend-machine p2 p1 b)))))
 
-(core/save-canvas canvas (core/next-filename "generateme/amu/res" ".jpg"))
+(core/save-canvas canvas (core/next-filename "generateme/tst/dance/res" ".jpg"))
 
 (def p4 (p/get-canvas-pixels canvas))
 

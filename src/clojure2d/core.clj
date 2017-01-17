@@ -280,7 +280,7 @@
 ;; Here we have basic drawing functions. What you need to remember:
 ;;
 ;; * Color is set globally for all figures (exception: `set-background`)
-;; * Filled and stroke figures have separate functions (stroke are not implemented yet)
+;; * Filled or stroke figures are determined by last parameter `stroke?`. When `true` draw figure outline, filled otherwise.
 ;; * Always use with `with-canvas` macro.
 
 ;; Since drawing on the canvas is single threaded we can use internal mutable objects to draw things.
@@ -302,48 +302,76 @@
   (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
   canvas)
 
+(defn draw-fill-or-stroke
+  "Draw filled or stroked object."
+  [^Graphics2D g obj stroke?]
+  (if stroke?
+    (.draw g obj)
+    (.fill g obj)))
+
 (defn rect
   "Draw rectangle with top-left corner at `(x,y)` position with width `w` and height `h`."
-  [canvas x1 y1 w h]
-  (.setFrame rect-obj x1 y1 w h)
-  (let [[^Graphics2D g] @canvas]
-    (.fill g rect-obj))
-  canvas)
+  ([canvas x1 y1 w h stroke?]
+   (.setFrame rect-obj x1 y1 w h)
+   (draw-fill-or-stroke (@canvas 0) rect-obj stroke?)
+   canvas)
+  ([canvas x1 y1 w h]
+   (rect canvas x1 y1 w h false)))
 
 (defn ellipse
   "Draw ellipse with middle at `(x,y)` position with width `w` and height `h`."
-  [canvas x1 y1 w h]
-  (.setFrame ellipse-obj (- x1 (/ w 2)) (- y1 (/ h 2)) w h)
-  (let [[^Graphics2D g _] @canvas]
-    (.fill g ellipse-obj))
-  canvas)
+  ([canvas x1 y1 w h stroke?]
+   (.setFrame ellipse-obj (- x1 (/ w 2)) (- y1 (/ h 2)) w h)
+   (draw-fill-or-stroke (@canvas 0) ellipse-obj stroke?)
+   canvas)
+  ([canvas x1 y1 w h]
+   (ellipse canvas x1 y1 w h false)))
 
 (defn triangle
   "Draw triangle with corners at 3 positions."
-  [canvas x1 y1 x2 y2 x3 y3]
-  (let [p (Path2D$Double.)
-        [^Graphics2D g] @canvas]
-    (doto p
-      (.moveTo x1 y1)
-      (.lineTo x2 y2)
-      (.lineTo x3 y3)
-      (.closePath))
-    (.fill g p))
-  canvas)
+  ([canvas x1 y1 x2 y2 x3 y3 stroke?]
+   (let [p (Path2D$Double.)]
+     (doto p
+       (.moveTo x1 y1)
+       (.lineTo x2 y2)
+       (.lineTo x3 y3)
+       (.closePath))
+     (draw-fill-or-stroke (@canvas 0) p stroke?))
+   canvas)
+  ([canvas x1 y1 x2 y2 x3 y3]
+   (triangle canvas x1 y2 x2 y2 x3 y3 false)))
+
+(defn triangle-strip
+  "Draw triangle strip.
+
+  Input: list of vertices as vectors [x,y]"
+  ([canvas vs stroke?]
+   (when (> (count vs) 2)
+     (loop [v1 (first vs)
+            v2 (second vs)
+            vss (next (next vs))]
+       (when vss
+         (let [v3 (first vss)]
+           (triangle canvas (v2 0) (v2 1) (v3 0) (v3 1) (v1 0) (v1 1) stroke?)
+           (recur v2 v3 (next vss))))))
+   canvas)
+  ([canvas vs]
+   (triangle-strip canvas vs false)))
 
 (defn quad
   "Draw quad with corners at 4 positions."
-  [canvas x1 y1 x2 y2 x3 y3 x4 y4]
-  (let [p (Path2D$Double.)
-        [^Graphics2D g] @canvas]
-    (doto p
-      (.moveTo x1 y1)
-      (.lineTo x2 y2)
-      (.lineTo x3 y3)
-      (.lineTo x4 y4)
-      (.closePath))
-    (.fill g p))
-  canvas)
+  ([canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
+   (let [p (Path2D$Double.)]
+     (doto p
+       (.moveTo x1 y1)
+       (.lineTo x2 y2)
+       (.lineTo x3 y3)
+       (.lineTo x4 y4)
+       (.closePath))
+     (draw-fill-or-stroke (@canvas 0) p stroke?))
+   canvas)
+  ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
+   (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false)))
 
 (defn set-stroke
   "Set stroke (line) attributes like `cap`, `join` and size. Default `CAP_ROUND` and `JOIN_MITER` is used. Default size is `1.0`."

@@ -159,14 +159,21 @@
 
 (defn  get-image-pixels
   "take pixels from the buffered image"
-  ([^BufferedImage b x y w h]
+  ([^BufferedImage b x y w h planar?]
    (let [size (* 4 w h)
          ^ints p (.. b
                      (getRaster)
-                     (getPixels ^int x ^int y ^int w ^int h ^ints (int-array size)))]
-     (to-planar (make-pixels p w h false))))
-  ([^BufferedImage b]
-   (get-image-pixels b 0 0 (.getWidth b) (.getHeight b))))
+                     (getPixels ^int x ^int y ^int w ^int h ^ints (int-array size)))
+         pixls (make-pixels p w h false)]
+     (if planar?
+       (to-planar pixls)
+       pixls)))
+  ([b x y w h]
+   (get-image-pixels b x y w h true))
+  ([^BufferedImage b planar?]
+   (get-image-pixels b 0 0 (.getWidth b) (.getHeight b) planar?))
+  ([b]
+   (get-image-pixels b true)))
 
 (defn set-image-pixels
   ""
@@ -191,12 +198,14 @@
 
 (defn get-canvas-pixels
   ""
+  ([canvas x y w h planar?]
+   (get-image-pixels (@canvas 1) x y w h planar?))
   ([canvas x y w h]
-   (let [[_ b] @canvas]
-     (get-image-pixels b x y w h)))
+   (get-image-pixels (@canvas 1) x y w h true))
   ([canvas]
-   (let [[_ b] @canvas]
-     (get-image-pixels b))))
+   (get-image-pixels (@canvas 1)))
+  ([canvas planar?]
+   (get-image-pixels (@canvas 1) planar?)))
 
 (defn set-canvas-pixels
   ""
