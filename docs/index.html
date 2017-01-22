@@ -1,1 +1,224 @@
-<html><body>A</body></html>
+<!DOCTYPE html>
+<html>
+<head lang="en">
+<meta charset="UTF-8">
+<title> Game of Life</title>
+
+    <link rel="stylesheet" type="text/css" href="https://viebel.github.io/klipse/css/main.css">
+    <style>
+        pre{
+            margin-top: 10px;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+
+<body class="container">
+
+
+<h1> Game of life</h1>
+
+    <p>Ths page is <strong>live</strong> and <strong>interactive</strong>
+powered by the <a href="https://github.com/viebel/klipse">klipse plugin</a>:</p>
+
+<ol>
+  <li><strong>Live</strong>: The code is executed in your browser</li>
+  <li><strong>Interactive</strong>: You can modify the code and it is evaluated as you type</li>
+</ol>
+
+
+<h2> How to use the framework?</h2>
+
+require the following to load the framework:
+
+<pre ><code class="klipse"
+data-external-libs="https://raw.githubusercontent.com/matlux/game-of-life/self-host-clojurescript/src">
+(require '[zone.lambda.game.board :as b :refer [DEAD ALIVE]])
+</code></pre>
+    
+
+
+<pre class="hidden">
+<code class="klipse" >
+(def canvas (atom nil))
+(def colour (atom "green"))
+
+(defn init []
+  (let [canvas (js/document.getElementById @canvas)
+        ctx (.getContext canvas "2d")
+        w (.-width canvas)
+        h (.-height canvas)]
+    (.clearRect ctx 0 0 w h)
+    (set! (.-fillStyle ctx) "black")
+    (.fillRect ctx 0 0 w h)))
+
+(defn rect [x1 y1 color]
+  (let [canvas (js/document.getElementById @canvas)
+        ctx (.getContext canvas "2d")
+        w (.-width canvas)
+        h (.-height canvas)]
+    (set! (.-fillStyle ctx) color)
+    (.fillRect ctx x1 y1 10  10)))
+
+(defn draw [arena]
+               (doseq [x (range 0 b/size)
+                       y (range 0 b/size)]
+                      (when-let [hue (if (= (get arena (b/c2dto1d b/size [x y])) 'i) (+ 30 (int (rand 75))))]
+                                (rect (* x 10) (* y 10) (if hue @colour "black")))))
+</code></pre>
+
+
+Let's define the rules of the game:
+
+<pre ><code class="klipse" >
+
+
+(defn neighbour-cells [block]
+  (concat (subvec (vec block) 0 4) (subvec (vec  block) 5 9)))
+(defn neighbour-count [block]
+  (count (filter #(= % ALIVE) (neighbour-cells block))))
+(defn is-alive? [board i]
+  (= (get board i) ALIVE))
+(defn coords2state [board coords]
+  (map #(get board %) coords))
+
+(defn parse-block [board block-coords]
+  (let [i (get block-coords 4)
+        ncount (neighbour-count (coords2state board block-coords))]
+    (if (is-alive? board i)
+      (cond
+        (< ncount 2) DEAD
+        (or (= ncount 2) (= ncount 3)) ALIVE
+        (> ncount 3) DEAD)
+      (if (= ncount 3)
+        ALIVE
+        DEAD))))
+
+(defn apply-rules [board]
+  (mapv (fn [i]
+          (let [mov (partial b/move i)] (parse-block board [(mov -1 -1) (mov 0 -1) (mov +1 -1)
+                                                          (mov -1 0) i           (mov +1 0)
+                                                          (mov -1 +1) (mov 0 +1) (mov +1 +1)])))
+        (range (* b/column-nb b/raw-nb))))
+
+(defn game-of-life-step [{:keys [board] :as state}]
+  (reset! b/arena board)
+  (let [new-board (apply-rules board)]
+    {:board new-board}))
+</code></pre>
+
+<canvas id="canvas--regular-n-gon" class="center" width="610" height="610"></canvas>
+
+<pre >
+<code class="klipse" data-eval-idle-msec="1000">
+(reset! colour "green")
+</code></pre>
+
+<p>
+Here is our data:
+</p>
+
+<pre ><code class="klipse" >
+(def test-board
+  '[
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . i . i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . i i . . . . . . i i . . . . . . . . . . . . i i . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . i . . . i . . . . i i . . . . . . . . . . . . i i . . . . . . . . . . . . . . . . . . . . . . .
+    . i i . . . . . . . . i . . . . . i . . . i i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . i i . . . . . . . . i . . . i . i i . . . . i . i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . i . . . . . i . . . . . . . i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . i . . . i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . i i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . i . . i . . i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . i i i i i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . i . i i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . i i i i i i i i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . i . . i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . . i . i i i . . . . . . . . . . i . . . . i . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . . . . . . . . . . i i . . . . . . . . . . . . i . i . . i . i . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . i . . . . . . . . i . i . . . . . . . . . . . . i i . . . i i . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . i . i . . . . . . i . i . . i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . i . i . . . . . i . . . . . i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . . . i . . i . . . . . . . . . i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . i . . . i . i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . i . . . i . i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    . . i . . . . i . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    ])
+
+
+(def seq-of-game (iterate game-of-life-step {:board test-board}))
+
+(def s (atom seq-of-game))
+
+(defn play []
+  (init)
+  (swap! s rest)
+  (draw @b/arena))
+
+</code></pre>
+
+
+
+
+    
+<pre ><code class="klipse" data-preamble="(do (reset! canvas &#34;canvas--regular-n-gon&#34;) (init))" data-loop-msec="200">
+(play)
+</code></pre>
+
+
+<canvas id="canvas--regular-n-gon" class="center" width="610" height="610"></canvas>
+
+
+<link rel="stylesheet" type="text/css" href="https://storage.googleapis.com/app.klipse.tech/css/codemirror.css">
+
+<script>
+    window.klipse_settings = {
+        selector: '.klipse',
+        codemirror_options_in: {
+            lineWrapping: true,
+            autoCloseBrackets: true
+        }
+    }
+</script>
+<script src="https://storage.googleapis.com/app.klipse.tech/plugin/js/klipse_plugin.js"></script>
+  
+</body>
+</html>
