@@ -15,6 +15,12 @@ Clojure2D is a lightweight library supporting generative coding or glitching. It
 ![ex22](results/small/ex22.jpg "Example 22")
 ![ex23](results/small/ex23.jpg "Example 23")
 
+## Documentation
+
+[Github.io](https://clojure2d.github.io/clojure2d/)
+
+[Marginalia - In progress!](https://clojure2d.github.io/clojure2d/docs/marginalia/toc.html)
+
 ## Motivation
 
 This project is the answer to personal needs to optimize my own workflow for generative or glitch creations. I've been producing a lot of Processing code and started to suffer from limitations of working in 'write sketch and run' mode. Too much copy&paste between sketches, zillions of folders, zillions of processed images. And one day I fell in love with FP. This code is the answer.
@@ -137,6 +143,7 @@ I've prepared several examples with results where you can check current state of
 * ex21 - Pickover's popcorns
 * ex22 - ray-marching 3d example
 * ex23 - ray-marching 3d example (using SDF ray marching functions from extra/raymarching namespace)
+* ex24 - triangle stripe
 
 ## TODO
 

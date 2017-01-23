@@ -540,6 +540,7 @@
 (defmethod mouse-event :default [e])
 
 ;; Event adapter objects.
+
 ;; Key
 (def key-processor (proxy [KeyAdapter] []
                      (keyPressed [^KeyEvent e] (key-pressed e))))
@@ -718,6 +719,7 @@
 
 ;; Store date format in variable
 (def ^java.text.SimpleDateFormat simple-date-format (java.text.SimpleDateFormat. "yyyyMMddHHmmss"))
+(def ^java.text.SimpleDateFormat simple-date-format-full (java.text.SimpleDateFormat. "yyyy-MM-dd HH:mm:ss"))
 
 (defn make-session-name
   "Create unique session name based on current time. Result is a vector with date and hash represented as hexadecimary number."
@@ -745,72 +747,71 @@
 ;; * `(get-session-name) => nil`
 ;; * `(make-session) => ["20170123235625" "CD8B7204"]`
 
-(let [session-name (atom nil)
-      session-file (agent nil)
-      session-cnt (atom nil)
-      ^java.text.SimpleDateFormat sdf (java.text.SimpleDateFormat. "yyyy-MM-dd HH:mm:ss")]
+(def session-name (atom nil))
+(def session-file (agent nil))
+(def session-cnt (atom nil))
 
-  (defn close-session
-    "Close current session."
-    []
-    (when-not (nil? @session-file)
-      (send session-file (fn [^java.io.Writer o]
-                           (.flush o)
-                           (.close o)
-                           nil)))
-    (reset! session-name nil)
-    (reset! session-cnt nil))
+(defn close-session
+  "Close current session."
+  []
+  (when-not (nil? @session-file)
+    (send session-file (fn [^java.io.Writer o]
+                         (.flush o)
+                         (.close o)
+                         nil)))
+  (reset! session-name nil)
+  (reset! session-cnt nil))
 
-  (defn make-session
-    "Create new session and log writer (if `log-to-file` set to true)."
-    []
-    (let [nname (make-session-name)]
-      (reset! session-name nname)
+(defn make-session
+  "Create new session and log writer (if `log-to-file` set to true)."
+  []
+  (let [nname (make-session-name)]
+    (reset! session-name nname)
 
-      (when *log-to-file*
-        (let [fname (str "log/" (first nname) ".log")]
-          (make-parents fname)
-          (send session-file (fn [^java.io.Writer o]
-                               (do
-                                 (when-not (nil? o)
-                                   (.flush o)
-                                   (.close o))
-                                 (let [^java.io.Writer no (writer fname :append true)]
-                                   (.write no (str "Session id: " (second nname) "\n"))
-                                   no))))))
-
-      (reset! session-cnt (make-counter 0))
-      nname))
-
-  (defn log
-    "Log message to the session log file."
-    [message]
     (when *log-to-file*
-      (if (nil? @session-file)
-        (do
-          (make-session)
-          (log message))
-        (let [to-log (str (.format sdf (java.util.Date.)) ": " message "\n")]
-          (send session-file (fn [^java.io.Writer o]
-                               (.write o to-log)
-                               (.flush o)
-                               o)))))
-    true)
+      (let [fname (str "log/" (first nname) ".log")]
+        (make-parents fname)
+        (send session-file (fn [^java.io.Writer o]
+                             (do
+                               (when-not (nil? o)
+                                 (.flush o)
+                                 (.close o))
+                               (let [^java.io.Writer no (writer fname :append true)]
+                                 (.write no (str "Session id: " (second nname) "\n"))
+                                 no))))))
 
-  (defn next-filename
-    "Create sequenced filename with prefix (folder name) and optional suffix (eg. file extension)."
-    ([prefix]
-     (if (nil? @session-name)
-       (do
-         (make-session)
-         (next-filename prefix))
-       (str prefix (second @session-name) "_" (format "%06d" (@session-cnt)))))
-    ([prefix suffix]
-     (str (next-filename prefix) suffix)))
+    (reset! session-cnt (make-counter 0))
+    nname))
 
-  (defn get-session-name
-    "Returns current session name (time and hash)"
-    []
-    @session-name)
+(defn log
+  "Log message to the session log file."
+  [message]
+  (when *log-to-file*
+    (if (nil? @session-file)
+      (do
+        (make-session)
+        (log message))
+      (let [to-log (str (.format simple-date-format-full (java.util.Date.)) ": " message "\n")]
+        (send session-file (fn [^java.io.Writer o]
+                             (.write o to-log)
+                             (.flush o)
+                             o)))))
+  true)
 
-)
+(defn next-filename
+  "Create sequenced filename with prefix (folder name) and optional suffix (eg. file extension)."
+  ([prefix]
+   (if (nil? @session-name)
+     (do
+       (make-session)
+       (next-filename prefix))
+     (str prefix (second @session-name) "_" (format "%06d" (@session-cnt)))))
+  ([prefix suffix]
+   (str (next-filename prefix) suffix)))
+
+(defn get-session-name
+  "Returns current session name (time and hash)"
+  []
+  @session-name)
+
+

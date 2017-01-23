@@ -3331,8 +3331,8 @@ As a function parameter you get <code>MouseEvent</code> object <a href="https://
                       MouseEvent/MOUSE_PRESSED  :mouse-pressed
                       MouseEvent/MOUSE_RELEASED :mouse-released})</pre></td></tr><tr><td class="docs"><p>Multimethod used to processed mouse events</p>
 </td><td class="codes"><pre class="brush: clojure">(defmulti mouse-event (fn [^MouseEvent e] [(component-name e) (mouse-event-map (.getID e))]))</pre></td></tr><tr><td class="docs"><p>Do nothing on default</p>
-</td><td class="codes"><pre class="brush: clojure">(defmethod mouse-event :default [e])</pre></td></tr><tr><td class="docs"><p>Event adapter objects.
-Key</p>
+</td><td class="codes"><pre class="brush: clojure">(defmethod mouse-event :default [e])</pre></td></tr><tr><td class="docs"><p>Event adapter objects.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Key</p>
 </td><td class="codes"><pre class="brush: clojure">(def key-processor (proxy [KeyAdapter] []
                      (keyPressed [^KeyEvent e] (key-pressed e))))</pre></td></tr><tr><td class="docs"><p>Mouse</p>
 </td><td class="codes"><pre class="brush: clojure">(def mouse-processor (proxy [MouseAdapter] []
@@ -3483,7 +3483,8 @@ Use cases are:</p>
      #(swap! tick inc)))
   ([]
    (make-counter 0)))</pre></td></tr><tr><td class="docs"><p>Store date format in variable</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^java.text.SimpleDateFormat simple-date-format (java.text.SimpleDateFormat. &quot;yyyyMMddHHmmss&quot;))</pre></td></tr><tr><td class="docs"><p>Create unique session name based on current time. Result is a vector with date and hash represented as hexadecimary number.</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^java.text.SimpleDateFormat simple-date-format (java.text.SimpleDateFormat. &quot;yyyyMMddHHmmss&quot;))
+(def ^java.text.SimpleDateFormat simple-date-format-full (java.text.SimpleDateFormat. &quot;yyyy-MM-dd HH:mm:ss&quot;))</pre></td></tr><tr><td class="docs"><p>Create unique session name based on current time. Result is a vector with date and hash represented as hexadecimary number.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-session-name
   []
   (let [date (java.util.Date.)]
@@ -3508,62 +3509,61 @@ Use cases are:</p>
 <li><code>(get-session-name) =&gt; nil</code></li>
 <li><code>(make-session) =&gt; ["20170123235625" "CD8B7204"]</code></li>
 </ul>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Close current session.Create new session and log writer (if <code>log-to-file</code> set to true).Log message to the session log file.Create sequenced filename with prefix (folder name) and optional suffix (eg. file extension).Returns current session name (time and hash)</p>
-</td><td class="codes"><pre class="brush: clojure">(let [session-name (atom nil)
-      session-file (agent nil)
-      session-cnt (atom nil)
-      ^java.text.SimpleDateFormat sdf (java.text.SimpleDateFormat. &quot;yyyy-MM-dd HH:mm:ss&quot;)]
-  (defn close-session
-    []
-    (when-not (nil? @session-file)
-      (send session-file (fn [^java.io.Writer o]
-                           (.flush o)
-                           (.close o)
-                           nil)))
-    (reset! session-name nil)
-    (reset! session-cnt nil))
-  (defn make-session
-    []
-    (let [nname (make-session-name)]
-      (reset! session-name nname)
-      (when *log-to-file*
-        (let [fname (str &quot;log/&quot; (first nname) &quot;.log&quot;)]
-          (make-parents fname)
-          (send session-file (fn [^java.io.Writer o]
-                               (do
-                                 (when-not (nil? o)
-                                   (.flush o)
-                                   (.close o))
-                                 (let [^java.io.Writer no (writer fname :append true)]
-                                   (.write no (str &quot;Session id: &quot; (second nname) &quot;\n&quot;))
-                                   no))))))
-      (reset! session-cnt (make-counter 0))
-      nname))
-  (defn log
-    [message]
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def session-name (atom nil))
+(def session-file (agent nil))
+(def session-cnt (atom nil))</pre></td></tr><tr><td class="docs"><p>Close current session.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn close-session
+  []
+  (when-not (nil? @session-file)
+    (send session-file (fn [^java.io.Writer o]
+                         (.flush o)
+                         (.close o)
+                         nil)))
+  (reset! session-name nil)
+  (reset! session-cnt nil))</pre></td></tr><tr><td class="docs"><p>Create new session and log writer (if <code>log-to-file</code> set to true).</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-session
+  []
+  (let [nname (make-session-name)]
+    (reset! session-name nname)
     (when *log-to-file*
-      (if (nil? @session-file)
-        (do
-          (make-session)
-          (log message))
-        (let [to-log (str (.format sdf (java.util.Date.)) &quot;: &quot; message &quot;\n&quot;)]
-          (send session-file (fn [^java.io.Writer o]
-                               (.write o to-log)
-                               (.flush o)
-                               o)))))
-    true)
-  (defn next-filename
-    ([prefix]
-     (if (nil? @session-name)
-       (do
-         (make-session)
-         (next-filename prefix))
-       (str prefix (second @session-name) &quot;_&quot; (format &quot;%06d&quot; (@session-cnt)))))
-    ([prefix suffix]
-     (str (next-filename prefix) suffix)))
-  (defn get-session-name
-    []
-    @session-name))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
+      (let [fname (str &quot;log/&quot; (first nname) &quot;.log&quot;)]
+        (make-parents fname)
+        (send session-file (fn [^java.io.Writer o]
+                             (do
+                               (when-not (nil? o)
+                                 (.flush o)
+                                 (.close o))
+                               (let [^java.io.Writer no (writer fname :append true)]
+                                 (.write no (str &quot;Session id: &quot; (second nname) &quot;\n&quot;))
+                                 no))))))
+    (reset! session-cnt (make-counter 0))
+    nname))</pre></td></tr><tr><td class="docs"><p>Log message to the session log file.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn log
+  [message]
+  (when *log-to-file*
+    (if (nil? @session-file)
+      (do
+        (make-session)
+        (log message))
+      (let [to-log (str (.format simple-date-format-full (java.util.Date.)) &quot;: &quot; message &quot;\n&quot;)]
+        (send session-file (fn [^java.io.Writer o]
+                             (.write o to-log)
+                             (.flush o)
+                             o)))))
+  true)</pre></td></tr><tr><td class="docs"><p>Create sequenced filename with prefix (folder name) and optional suffix (eg. file extension).</p>
+</td><td class="codes"><pre class="brush: clojure">(defn next-filename
+  ([prefix]
+   (if (nil? @session-name)
+     (do
+       (make-session)
+       (next-filename prefix))
+     (str prefix (second @session-name) &quot;_&quot; (format &quot;%06d&quot; (@session-cnt)))))
+  ([prefix suffix]
+   (str (next-filename prefix) suffix)))</pre></td></tr><tr><td class="docs"><p>Returns current session name (time and hash)</p>
+</td><td class="codes"><pre class="brush: clojure">(defn get-session-name
+  []
+  @session-name)</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
 SyntaxHighlighter.all();
 
 // hackity hack
