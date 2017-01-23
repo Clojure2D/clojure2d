@@ -2,13 +2,11 @@
 
 Clojure2D is a lightweight library supporting generative coding or glitching. It's based on Java2D directly. It's Clojure only, no ClojureScript version.
 
-![ex4](results/small/ex4.jpg "Example 4")
 ![ex10](results/small/ex10.jpg "Example 10")
 ![ex21](results/small/ex21.jpg "Example 21")
 ![ex5](results/small/ex5.jpg "Example 5")
 
 ![ex11](results/small/ex11.jpg "Example 11")
-![ex13](results/small/ex13.jpg "Example 13")
 ![ex16](results/small/ex16.jpg "Example 16")
 ![ex19](results/small/ex19.jpg "Example 19")
 
