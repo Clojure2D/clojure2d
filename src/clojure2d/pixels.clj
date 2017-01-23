@@ -25,21 +25,21 @@
   (get-channel [pixels ch])
   (set-channel [pixels ch v]))
 
-(deftype Pixels [^ints p w h planar size pos]
+(deftype Pixels [^ints p ^int w ^int h planar ^int size pos]
   PixelsProto
 
   (get-channel [_ ch]
     (let [^ints res (int-array size)
           off (* ch size)]
       (if planar
-        (System/arraycopy p ^int off res 0 ^int size)
+        (System/arraycopy p ^int off res 0 size)
         (core/amap! p idx (aget ^ints p (int (+ ch (bit-shift-left idx 2))))))
       res))
 
   (set-channel [_ ch v]
     (let [off (* ch size)]
       (when planar
-        (System/arraycopy ^ints v 0 p ^int off ^int size)))) 
+        (System/arraycopy ^ints v 0 p ^int off size)))) 
   ;; TODO: implement mutating copy of array into interleaved version of pixels
 
   (get-value [_ ch idx]

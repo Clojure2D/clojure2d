@@ -24,9 +24,9 @@
   ""
   [canvas framecount & res]
   (with-canvas canvas
-    (set-color foreground)
+    (set-awt-color foreground)
     (set-stroke 1.85)
-    (set-background background)
+    (set-awt-background background)
     (draw-lines framecount)))
 
 (defn example-03

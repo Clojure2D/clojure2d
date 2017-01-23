@@ -150,7 +150,7 @@ I've prepared several examples with results where you can check current state of
 ### High priority
 
 * Marginalia docs + github.io page - in progress
-* Cleaning, optimizations - still in progress (more profiling)
+* Cleaning, optimizations - still in progress (more profiling, boxed math)
 * ~~Parallel color operations on Pixels~~
 * ~~Color namespace cleaning~~
 * ~~Colorspace converters~~

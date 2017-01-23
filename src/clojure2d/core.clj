@@ -301,7 +301,7 @@
 (defn point
   "Draw point at `(x,y)` position"
   [canvas x y]
-  (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
+  (line canvas x y (+ (double x) 10.0e-6) (+ (double y) 10.0e-6))
   canvas)
 
 (defn- draw-fill-or-stroke
@@ -386,8 +386,8 @@
   ([canvas]
    (set-stroke canvas 1.0)))
 
-(defn- set-color-java
-  "Internal function to set color with valid java `Color` object."
+(defn set-awt-color
+  "Set color with valid java `Color` object. Use it when you're sure you pass `java.awt.Color`."
   [canvas c]
   (let [[^Graphics2D g] @canvas]
     (.setColor g c)
@@ -400,14 +400,14 @@
   * clojure2d.math.vector.Vec4 or Vec3 object
   * individual r, g, b (and optional alpha) as integers from 0-255. They are converted to integer and clamped if necessary."
   ([canvas c]
-   (set-color-java canvas (c/make-color c)))
+   (set-awt-color canvas (c/make-color c)))
   ([canvas r g b a]
-   (set-color-java canvas (c/make-color r g b a)))
+   (set-awt-color canvas (c/make-color r g b a)))
   ([canvas r g b]
-   (set-color-java canvas (c/make-color r g b))))
+   (set-awt-color canvas (c/make-color r g b))))
   
-(defn- set-background-java
-  "Internal function which sets background color. Expects valid `Color` object."
+(defn set-awt-background
+  "Set background color. Expects valid `Color` object."
   [canvas c]
   (let [[^Graphics2D g ^BufferedImage b] @canvas
         ^Color currc (.getColor g)] 
@@ -423,11 +423,11 @@
   * clojure2d.math.vector.Vec4 or Vec3 object
   * individual r, g, b (and optional alpha) as integers from 0-255. They are converted to integer and clamped if necessary."
   ([canvas c]
-   (set-background-java canvas (c/make-color c)))
+   (set-awt-background canvas (c/make-color c)))
   ([canvas r g b a]
-   (set-background-java canvas (c/make-color r g b a)))
+   (set-awt-background canvas (c/make-color r g b a)))
   ([canvas r g b]
-   (set-background-java canvas (c/make-color r g b))))
+   (set-awt-background canvas (c/make-color r g b))))
 
 (defn image
   "Draw an image. You can specify position and size of the image. Default it's placed on whole canvas."
