@@ -30,8 +30,8 @@
   []
   (let [name1 "first window"
         name2 "second window"
-        frame1 (show-window (create-canvas 1 1) name1 400 400 25)
-        frame2 (show-window (create-canvas 100 100) name2 400 200 10)]
+        frame1 (show-window (make-canvas 1 1) name1 400 400 25)
+        frame2 (show-window (make-canvas 100 100) name2 400 200 10)]
 
     (defmethod key-pressed [name1 \space] [_]
       (println (str "Window: " name1)))
@@ -40,13 +40,13 @@
       (println (str "Window: " name2)))
 
     (defmethod mouse-event [name1 :mouse-released] [^MouseEvent e]
-      (let [canvas (create-canvas 1 1)
+      (let [canvas (make-canvas 1 1)
             x (.getX e)
             y (.getY e)
             cr (int (m/constrain (m/norm x 0 399 0 255) 0 255))
             cg (int (m/constrain (m/norm y 0 399 0 255) 0 255))]
         (with-canvas canvas
-          (set-background (Color. cr cg 128)))
+          (set-background cr cg 128))
         (replace-canvas frame1 canvas)))
     nil))
 

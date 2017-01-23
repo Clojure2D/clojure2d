@@ -282,6 +282,8 @@
 ;; * Color is set globally for all figures (exception: `set-background`)
 ;; * Filled or stroke figures are determined by last parameter `stroke?`. When `true` draw figure outline, filled otherwise (default).
 ;; * Always use with `with-canvas` macro.
+;; 
+;; All functions return canvas object
 
 ;; Since drawing on the canvas is single threaded we can use internal mutable objects to draw things.
 (def ^Line2D line-obj (Line2D$Double.))
@@ -384,29 +386,28 @@
   ([canvas]
    (set-stroke canvas 1.0)))
 
+(defn- set-color-java
+  "Internal function to set color with valid java `Color` object."
+  [canvas c]
+  (let [[^Graphics2D g] @canvas]
+    (.setColor g c)
+    canvas))
+
 (defn set-color
   "Set global color. You can pass:
 
   * java.awt.Color object
-  * clojure2d.math.vector.Vec4 object
+  * clojure2d.math.vector.Vec4 or Vec3 object
   * individual r, g, b (and optional alpha) as integers from 0-255. They are converted to integer and clamped if necessary."
   ([canvas c]
-   (let [[^Graphics2D g] @canvas
-         cc (if (instance? Vec4 c)
-              (c/to-color c)
-              c)]
-     (.setColor g c))
-   canvas)
+   (set-color-java canvas (c/make-color c)))
   ([canvas r g b a]
-   (set-color canvas (Color. ^int (c/clamp255 r)
-                             ^int (c/clamp255 g)
-                             ^int (c/clamp255 b)
-                             ^int (c/clamp255 a))))
+   (set-color-java canvas (c/make-color r g b a)))
   ([canvas r g b]
-   (set-color canvas r g b 255)))
+   (set-color-java canvas (c/make-color r g b))))
   
-(defn set-background
-  "Set background to the specified color. Current global color is restored."
+(defn- set-background-java
+  "Internal function which sets background color. Expects valid `Color` object."
   [canvas c]
   (let [[^Graphics2D g ^BufferedImage b] @canvas
         ^Color currc (.getColor g)] 
@@ -414,6 +415,19 @@
     (.fillRect g 0 0 (.getWidth b) (.getHeight b))
     (.setColor g currc))
   canvas)
+
+(defn set-background
+  "Set background to the specified color. Current global color is restored. You can pass:
+
+  * java.awt.Color object
+  * clojure2d.math.vector.Vec4 or Vec3 object
+  * individual r, g, b (and optional alpha) as integers from 0-255. They are converted to integer and clamped if necessary."
+  ([canvas c]
+   (set-background-java canvas (c/make-color c)))
+  ([canvas r g b a]
+   (set-background-java canvas (c/make-color r g b a)))
+  ([canvas r g b]
+   (set-background-java canvas (c/make-color r g b))))
 
 (defn image
   "Draw an image. You can specify position and size of the image. Default it's placed on whole canvas."
@@ -470,7 +484,8 @@
 ;;
 ;; #### Key event: `key-pressed` multimethod
 ;;
-;; Your dispatch value is window name and 
+;; Your dispatch value is vector with window name and pressed key (as `char`) which you want to handle.
+;; This means you write different method for different key.
 ;; As a function parameter you get `KeyEvent` object [java.awt.KeyEvent](https://docs.oracle.com/javase/7/docs/api/java/awt/event/KeyEvent.html)
 ;;
 ;; See: examples/ex01_events.clj
@@ -487,9 +502,11 @@
 ;; * `:mouse-pressed`
 ;; * `:mouse-released`
 ;;
-;; To get mouse position call `(.getX e)` and `(getY e)` where `e` is MouseEvent object.
+;; To get mouse position call `(.getX e)` and `(.getY e)` where `e` is MouseEvent object.
 ;; 
 ;; See: examples/ex01_events.clj
+
+;; ### Events functions
 
 ;; Function used to close and dispose window. As a side effect `is-display-running?` atom is set to false
 (defn close-window
@@ -498,8 +515,10 @@
   (reset! is-display-running? false)
   (.dispose frame))
 
+;; Next we have private method which extracts the name of your JFrame (set when `show-window` is called).
+
 (defn- component-name
-  "Return name of the component. Used to dispatch events"
+  "Returns name of the component. Used to dispatch events."
   [^ComponentEvent e]
   (let [^Component c (.getComponent e)]
     (.getName c)))
@@ -511,16 +530,16 @@
 
 ;; Map Java mouse event names onto keywords
 (def mouse-event-map {MouseEvent/MOUSE_CLICKED  :mouse-clicked
-                       MouseEvent/MOUSE_DRAGGED  :mouse-dragged
-                       MouseEvent/MOUSE_PRESSED  :mouse-pressed
-                       MouseEvent/MOUSE_RELEASED :mouse-released})
+                      MouseEvent/MOUSE_DRAGGED  :mouse-dragged
+                      MouseEvent/MOUSE_PRESSED  :mouse-pressed
+                      MouseEvent/MOUSE_RELEASED :mouse-released})
 
 ;; Multimethod used to processed mouse events
 (defmulti mouse-event (fn [^MouseEvent e] [(component-name e) (mouse-event-map (.getID e))]))
 ;; Do nothing on default
 (defmethod mouse-event :default [e])
 
-;; Event adapter objects
+;; Event adapter objects.
 ;; Key
 (def key-processor (proxy [KeyAdapter] []
                      (keyPressed [^KeyEvent e] (key-pressed e))))
@@ -534,15 +553,19 @@
 (def mouse-motion-processor (proxy [MouseMotionAdapter] []
                               (mouseDragged [^MouseEvent e] (mouse-event e))))
 
+;; ### Frame machinery functions
+;;
+;; Window is JFrame with JPanel which is used to draw canvas on it. Internally canvas is stored as `atom` with `BufferedImage` extracted from canvas. Main reason for that is option for replacing canvas when windows is running.
+
 (defn- create-panel
-  "Create panel which displays canvas. Attach mouse events, give a name (same as window)."
-  [^BufferedImage buffer windowname width height]
+  "Create panel which displays canvas. Attach paint method, mouse events, give a name (same as window), set size etc."
+  [buffer windowname width height]
   (let [panel (proxy [JPanel] []
                  (paint [^Graphics graphics-context]
                    (let [^JPanel this this
                          ^Graphics2D graphics-context graphics-context] ; avoid reflection hint
                      (.setRenderingHints graphics-context (rendering-hints :high))
-                     (.drawImage graphics-context buffer 0 0 (.getWidth this) (.getHeight this) this))))]
+                     (.drawImage graphics-context (@@buffer 1) 0 0 (.getWidth this) (.getHeight this) this))))]
     (doto panel
       (.setName windowname)
       (.addMouseListener mouse-processor)
@@ -550,7 +573,7 @@
       (.setPreferredSize (Dimension. width height)))))
 
 (defn- build-frame
-  "Create JFrame object, attach JPanel and do what is needed to show desired window. Attach key events."
+  "Create JFrame object, create and attach JPanel and do what is needed to show window. Attach key events and closing event."
   [^JFrame frame is-display-running? buffer windowname width height]
   (let [^JPanel panel (create-panel buffer windowname width height)
         closer (proxy [WindowAdapter] []
@@ -567,12 +590,23 @@
       (.setBackground Color/white)
       (.setVisible true))))
 
+;; Another internal function repaints JPanel with set number of frames per seconds. If `draw` function is passed it is called before rapaint action. Function runs infinitely until window is closed. The cycle goes like this:
+;;
+;; * call `draw` function if available, pass canvas, current frame number and current state (`nil` at start)
+;; * repaint
+;; * wait
+;; * check if window is still displayed and recur incrementing frame number and pass state for another run.
+;;
+;; Keep in mind that first two steps are run as `future` and function waits before run another round.
+
 (defn- refresh-screen-task
-  "Task repainting canvas on window. Repaints with set FPS."
-  [^JFrame frame is-display-running? draw-fun canvas stime]
+  "Task repainting canvas on window with set FPS.
+
+  * Input: frame, is-display-running? atom, function to run before repaint, canvas and sleep time."
+  [^JFrame frame is-display-running? draw-fun buffer stime]
   (loop [cnt 0
          result nil]
-    (let [thr (future (let [curr-res (when draw-fun (draw-fun canvas cnt result))]
+    (let [thr (future (let [curr-res (when draw-fun (draw-fun @buffer cnt result))]
                         (doto frame
                           (.validate)
                           (.repaint))
@@ -580,55 +614,55 @@
       (Thread/sleep stime)
       (when @is-display-running? (recur (inc cnt) @thr)))))
 
-;; You may want to replace canvas to the other one on window. To make it pass `JFrame` object and new canvas.
+;; You may want to replace canvas to the other one on window. To make it pass result of `show-window` function and new canvas.
+;; Internally it just resets buffer atom for another canvas.
 ;; See examples/ex01_events.clj to see how it works.
-;; TODO: when replaceing canvas, you loose refresh-screen-task, try to recover it
+
 (defn replace-canvas
-  "Replace canvas in window"
-  [[^JFrame frame _] canvas]
-  (let [[_ ^BufferedImage b] @canvas
-        ^Container container (.getContentPane frame)
-        ^JPanel panel (create-panel b (.getName frame) (.getWidth container) (.getHeight container))] 
-    (doto container
-      (.removeAll)
-      (.add panel)))
-  (doto frame
-    (.pack)
-    (.invalidate)
-    (.repaint)))
+  "Replace canvas in window.
+
+  * Input: window and new canvas"
+  [[_ _ buffer] canvas]
+  (reset! buffer canvas))
+
+;; Finally function which displays window. Function creates windows visibility status (`is-display-running?` atom), buffer as atomized canvas, creates frame, creates refreshing task (repainter) and shows window.
 
 (defn show-window
-  "Show window with width/height, name and required fps of refresh. Optionally pass callback function"
+  "Show window with width/height, name and required fps of refresh. Optionally pass callback function.
+
+  * Input: canvas, window name, width, height, frames per seconds, (optional) `draw` function.
+  * Returns vector with: `JFrame` object, visibility status atom and buffer atom (canvas packed into the atom)."
   ([canvas wname width height fps draw-fun]
-   (let [[_ ^BufferedImage b] @canvas
-         is-display-running? (atom true)
-         ^JFrame frame (JFrame.)]
-     (SwingUtilities/invokeLater #(build-frame frame is-display-running? b wname width height))
-     (future (refresh-screen-task frame is-display-running? draw-fun canvas (/ 1000.0 fps)))
-     [frame is-display-running?]))
+   (let [is-display-running? (atom true)
+         buffer (atom canvas)
+         frame (JFrame.)]
+     (SwingUtilities/invokeLater #(build-frame frame is-display-running? buffer wname width height))
+     (future (refresh-screen-task frame is-display-running? draw-fun buffer (/ 1000.0 fps)))
+     [frame is-display-running? buffer]))
   ([canvas wname width height fps]
    (show-window canvas wname width height fps nil)))
 
-
-;; various utilities
+;; ## Utility functions
+;;
+;; Now we have a part with some utilities (I had no idea where to put them).
 
 (defn to-hex
-  "return hex value of given number, padded with leading zeroes if given length"
+  "Return hex value of given number, padded with leading zeroes if given length"
   ([n]
    (format "%X" n))
   ([n pad]
    (format (str "%0" pad "X") n)))
 
 (defmacro time-with-name
-  "Evaluates expr and prints the time it took.  Returns the value of
- expr."
-  [ss expr]
+  "Evaluates expr and prints the time it took. Attaches comment at the beginning.
+  Returns the value of expr."
+  [commnt expr]
   `(let [start# (. System (nanoTime))
          ret# ~expr]
-     (prn (str ~ss " Elapsed time: " (/ (double (- (. System (nanoTime)) start#)) 1000000.0) " msecs"))
+     (prn (str "(" ~commnt ")" " Elapsed time: " (/ (double (- (. System (nanoTime)) start#)) 1000000.0) " msecs"))
      ret#))
 
-;; array
+;; Three functions to operate on java arrays. Generally used for operating on `Pixels` with `blur` filter. I hope to remove them soon.
 
 (defn array-mutate!
   "Mutate int array value with function f"
@@ -641,10 +675,10 @@
   {:added "1.0"}
   [a idx expr]
   `(let [a# ~a]
-     (loop  [~idx 0]
+     (loop  [~idx (int 0)]
        (if (< ~idx  (alength a#))
          (do
-           (aset-int a# ~idx ~expr)
+           (aset a# ~idx ~expr)
            (recur (unchecked-inc ~idx)))
          a#))))
 
@@ -666,42 +700,72 @@
       (System/arraycopy array 0 ^ints res 0 len)
       res))
 
+;; ## Session management
 ;;
-(defn make-counter [v] 
-  (let [tick (atom (dec v))]
-    #(swap! tick inc)))
+;; Couple of session management functions. Generally used to generate unique identifier, log or filename for live session.
+;; Use cases are:
+;;
+;; * Log your actions to the file. Simply writes text messages.
+;; * Save your result files under unique and sequenced filenames
+
+(defn make-counter
+  "Create counter function, each call returns next number."
+  ([v]
+   (let [tick (atom (dec v))]
+     #(swap! tick inc)))
+  ([]
+   (make-counter 0)))
+
+;; Store date format in variable
+(def ^java.text.SimpleDateFormat simple-date-format (java.text.SimpleDateFormat. "yyyyMMddHHmmss"))
 
 (defn make-session-name
-  ""
-  ([]
-   (let [^java.text.SimpleDateFormat sdf (java.text.SimpleDateFormat. "yyyyMMddHHmmss")
-         date (java.util.Date.)]
-     [(.format sdf date) (to-hex (hash date))])))
+  "Create unique session name based on current time. Result is a vector with date and hash represented as hexadecimary number."
+  []
+  (let [date (java.util.Date.)]
+    [(.format simple-date-format date) (to-hex (hash date))]))
 
+;; Logging to file is turned off by default.
 (def ^:dynamic *log-to-file* false)
 
-(let [session-name (atom nil) ; store session name as a current date
-      session-file (agent nil) ; logger Writer, created and used when *log-to-file* is true
-      session-cnt (atom nil) ; counter for next filename fn
-      ^java.text.SimpleDateFormat sdf (java.text.SimpleDateFormat. "yyyy-MM-dd HH:mm:ss")
-      nilfn (fn [_] nil)]
+;; Following block defines session related functions. I encapsulates some common variables as atoms or agents. These are:
+;;
+;; * session name which stores current date (formatted)
+;; * file writer as agent used to log your events
+;; * file counter - atom which stores current value of files saved under session
+;;
+;; Example:
+;;
+;; * `(get-session-name) => nil`
+;; * `(make-session) => ["20170123235332" "CD88D0C5"]`
+;; * `(get-session-name) => ["20170123235332" "CD88D0C5"]`
+;; * `(next-filename "folder/" ".txt") => "folder/CD88D0C5_000000.txt"`
+;; * `(next-filename "folder/" ".txt") => "folder/CD88D0C5_000001.txt"`
+;; * `(close-session) => nil`
+;; * `(get-session-name) => nil`
+;; * `(make-session) => ["20170123235625" "CD8B7204"]`
+
+(let [session-name (atom nil)
+      session-file (agent nil)
+      session-cnt (atom nil)
+      ^java.text.SimpleDateFormat sdf (java.text.SimpleDateFormat. "yyyy-MM-dd HH:mm:ss")]
 
   (defn close-session
-    ""
+    "Close current session."
     []
     (when-not (nil? @session-file)
       (send session-file (fn [^java.io.Writer o]
                            (.flush o)
                            (.close o)
                            nil)))
-    (swap! session-name nilfn)
-    (swap! session-cnt nilfn))
+    (reset! session-name nil)
+    (reset! session-cnt nil))
 
   (defn make-session
-    ""
+    "Create new session and log writer (if `log-to-file` set to true)."
     []
     (let [nname (make-session-name)]
-      (swap! session-name (fn [_] nname))
+      (reset! session-name nname)
 
       (when *log-to-file*
         (let [fname (str "log/" (first nname) ".log")]
@@ -715,17 +779,18 @@
                                    (.write no (str "Session id: " (second nname) "\n"))
                                    no))))))
 
-      (swap! session-cnt (fn [_] (make-counter 0)))))
+      (reset! session-cnt (make-counter 0))
+      nname))
 
   (defn log
-    ""
-    [s]
+    "Log message to the session log file."
+    [message]
     (when *log-to-file*
       (if (nil? @session-file)
         (do
           (make-session)
-          (log s))
-        (let [to-log (str (.format sdf (java.util.Date.)) ": " s "\n")]
+          (log message))
+        (let [to-log (str (.format sdf (java.util.Date.)) ": " message "\n")]
           (send session-file (fn [^java.io.Writer o]
                                (.write o to-log)
                                (.flush o)
@@ -733,7 +798,7 @@
     true)
 
   (defn next-filename
-    ""
+    "Create sequenced filename with prefix (folder name) and optional suffix (eg. file extension)."
     ([prefix]
      (if (nil? @session-name)
        (do
@@ -744,9 +809,8 @@
      (str (next-filename prefix) suffix)))
 
   (defn get-session-name
-    ""
+    "Returns current session name (time and hash)"
     []
     @session-name)
-
 
 )

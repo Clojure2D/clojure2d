@@ -79,6 +79,24 @@
          (.getBlue c)))
 
 
+(defn make-color
+  ""
+  ([c]
+   (if (instance? Vec4 c)
+     (to-color c)
+     (if (instance? Vec3 c)
+       (to-color3 c)
+       c)))
+  ([r g b]
+   (Color. ^int (clamp255 r)
+           ^int (clamp255 g)
+           ^int (clamp255 b)))
+  ([r g b a]
+   (Color. ^int (clamp255 r)
+           ^int (clamp255 g)
+           ^int (clamp255 b)
+           ^int (clamp255 a))))
+
 ;; blending part
 
 (defn- umult

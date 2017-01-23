@@ -22,7 +22,7 @@
         ew (* n 80)
         eh (* (- 1.0 n) 80)]
     (with-canvas canvas
-      (set-background (Color. 45 45 41 20)))
+      (set-background 45 45 41 20))
     
     (p/set-canvas-pixels canvas (p/filter-channels p/gaussian-blur-2 nil (p/get-canvas-pixels canvas)))
 
@@ -33,6 +33,6 @@
 (defn example-02
   ""
   []
-  (show-window (create-canvas 100 100) "ellipse" 300 300 25 draw))
+  (show-window (make-canvas 100 100) "ellipse" 300 300 25 draw))
 
-(example-02)
+(def window (example-02))
