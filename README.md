@@ -28,7 +28,7 @@ This project is the answer to personal needs to optimize my own workflow for gen
 * not reusable code - you have to copy your common parts between sketches
 * display and canvas coupling
 * weak or no support for parallelism
-* + more minor
+* more minor...
 
 ### Why not use...
 
@@ -56,6 +56,8 @@ No docs, no tests (yet)
 
 ## Installation
 
+DON'T USE IT! NOT UPDATED! WAIT FOR VERSION 0.1.0
+
 Add following line as a dependency to your `project.clj`
 
 ```clojure
@@ -66,7 +68,7 @@ Add following line as a dependency to your `project.clj`
 
 Since still no docs are available, check out prepared examples. All available packages are described below.
 
-### clojure2d.core
+### clojure2d.core [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.core.html)
 
 This is main namespace with functions in three groups:
 
@@ -171,7 +173,7 @@ I've prepared several examples with results where you can check current state of
 
 ## Community
 
-https://clojurians.slack.com/archives/clojure2d
+[Clojurians](https://clojurians.slack.com/archives/clojure2d)
 
 ### How to support
 
@@ -191,12 +193,13 @@ Or just Pull Request.
 
 ## Projects / links
 
-* Processing glitch/generative projects: https://github.com/tsulej/GenerateMe
-* Visual log: http://generateme.tumblr.com/
-* Folds project: http://folds2d.tumblr.com/
-* Articles: https://generateme.wordpress.com/
-* FB: https://www.facebook.com/generateme/ https://www.facebook.com/folds2d/?fref=ts
-* Twitter: https://twitter.com/generateme_blog
+* [Processing glitch/generative projects](https://github.com/tsulej/GenerateMe)
+* [Visual log](http://generateme.tumblr.com)
+* [Folds project](http://folds2d.tumblr.com)
+* [Articles](https://generateme.wordpress.com)
+* [Facebook 1](https://www.facebook.com/generateme)
+* [Facebook 2](https://www.facebook.com/folds2d)
+* [Twitter](https://twitter.com/generateme_blog)
 
 ## License
 
