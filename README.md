@@ -79,7 +79,7 @@ This is main namespace with functions in three groups:
 
 ### clojure2d.pixels
 
-Definition of Pixels type as a representation of channel values of the image with operations on pixels.
+Pixels type as a representation of channel values of the image plus operations on pixels.
 Defines also:
 
 * pixel filters (blur, erode, dilate, median, threshold, posterize, tint)
@@ -149,7 +149,7 @@ I've prepared several examples with results where you can check current state of
 
 ### High priority
 
-* Marginalia docs + github.io page
+* Marginalia docs + github.io page - in progress
 * Cleaning, optimizations - still in progress (more profiling)
 * ~~Parallel color operations on Pixels~~
 * ~~Color namespace cleaning~~
