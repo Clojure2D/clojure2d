@@ -252,7 +252,7 @@
   ([width height]
    (create-canvas width height :high)))
 
-;; Alias subject to refactor
+;; :TODO: subject to refactor
 (def make-canvas create-canvas)
 
 (defn resize-canvas
@@ -280,7 +280,7 @@
 ;; Here we have basic drawing functions. What you need to remember:
 ;;
 ;; * Color is set globally for all figures (exception: `set-background`)
-;; * Filled or stroke figures are determined by last parameter `stroke?`. When `true` draw figure outline, filled otherwise.
+;; * Filled or stroke figures are determined by last parameter `stroke?`. When `true` draw figure outline, filled otherwise (default).
 ;; * Always use with `with-canvas` macro.
 
 ;; Since drawing on the canvas is single threaded we can use internal mutable objects to draw things.
@@ -302,7 +302,7 @@
   (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
   canvas)
 
-(defn draw-fill-or-stroke
+(defn- draw-fill-or-stroke
   "Draw filled or stroked object."
   [^Graphics2D g obj stroke?]
   (if stroke?
@@ -342,7 +342,7 @@
    (triangle canvas x1 y2 x2 y2 x3 y3 false)))
 
 (defn triangle-strip
-  "Draw triangle strip.
+  "Draw triangle strip. Implementation of `Processing` `STRIP` shape.
 
   Input: list of vertices as vectors [x,y]"
   ([canvas vs stroke?]
@@ -425,9 +425,6 @@
    (let [[_ ^BufferedImage b] @canvas] 
      (image canvas img 0 0 (.getWidth b) (.getHeight b)))))
 
-
-;;;;;;;;;;;;;;;;;;; DISPLAY
-
 ;; ## Display window
 ;;
 ;; You can find here a couple of functions which help to display your canvas and build interaction with user.
@@ -442,19 +439,25 @@
 ;; * window name (used to identify events)
 ;; * width and height
 ;; * canvas refresh rate as frames per second (ex. 25)
-;; * optionally callback function name which is called just before repainting the canvas (like `draw` in Processing)
+;; * optionally callback function which is called just before repainting the canvas (like `draw` in Processing)
 ;;
 ;; `show-window` returns a vector containing `JFrame` object and an atom `is-display-running?`.
 ;;
 ;; `is-display-running?` atom is unique for each window and has value `true` when window is shown and set to `false` when window is closed with default close button.
 ;;
-;; You can use this atom to control (and possibly stop) all activities refering to related window. For example you may want to cancel all updating canvas processing when user closes window.
+;; You can use this atom to control (and possibly stop) all activities which refers to related window. For example you may want to cancel all updating canvas processes when user closes window.
 ;;
 ;; See: examples/ex00_display.clj
 ;;
 ;; ### Callback function (aka `draw`)
 ;;
-;; This is one parameter function which is called just before repainting canvas. You can use it to simulate Processing `draw` behaviour. Function gets current frame count as parameter.
+;; This is three parameters function which is called just before repainting canvas. You can use it to simulate Processing `draw` behaviour. Function should accept following parameters:
+;;
+;; * canvas - canvas to draw on
+;; * frame count - current number of frame / call
+;; * state - any state data you want to pass between calls
+;;
+;; Function should return current state, which is subject to pass to function when called next time.
 ;;
 ;; See: examples/ex02_draw.clj
 ;;
@@ -465,9 +468,9 @@
 ;; * `key-pressed`
 ;; * `mouse-event`
 ;;
-;; #### Key event
+;; #### Key event: `key-pressed` multimethod
 ;;
-;; As a dispatch you get a vector containing `windowname` as a String and pressed key as a char.
+;; Your dispatch value is window name and 
 ;; As a function parameter you get `KeyEvent` object [java.awt.KeyEvent](https://docs.oracle.com/javase/7/docs/api/java/awt/event/KeyEvent.html)
 ;;
 ;; See: examples/ex01_events.clj

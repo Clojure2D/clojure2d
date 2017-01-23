@@ -10,3 +10,8 @@ pom.xml.asc
 .hgignore
 .hg/
 _site
+/generateme/*.jpg
+/generateme/*.png
+*.stackdump
+*.lock
+
