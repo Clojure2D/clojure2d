@@ -67,9 +67,9 @@ And highpass filter (in terms of lowpass filter)
 
 ## Processor
 
-And now time for our signal processor. We need possibility to apply as many filters as we want for one sample, keep the state somewhere and map all samples in the collection. 
+And now time for our signal processor. We need a possibility to apply as many filters as we want for one sample, keep the state somewhere and process whole the collection. 
 
-To make composition I decided to keep filters with current state in a vector as a pair `[filter state]`. Now let's build function which processes given sample through all filters. Function accepts sample and state, returns resulting sample and new state of all filters.
+To make composition of filters I decided to keep them together with current state in a vector as a pair `[filter state]`. Now let's build function which processes given sample through all filters. Function accepts sample and state, returns resulting sample and new state of all filters.
 
 ``` eval-clojure
 (defn make-filters-state
@@ -95,7 +95,8 @@ To make composition I decided to keep filters with current state in a vector as 
 ((process-one-sample -0.432 initial-filters-state) 0)
 ```
 
-And now it's time to add final signal processing function. I used lazy sequence as a result. Filters state is passed between calls.
+And now it's time to add final signal processing function. I create lazy sequence as a result here.
+State of the filters is passed between calls.
 
 <pre><code class="language-eval-clojure" data-loop-msec="2000">(defn process-signal
   "Produce lazy sequence of signal processed with vector of filters"
