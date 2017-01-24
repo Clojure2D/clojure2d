@@ -415,7 +415,7 @@
   (let [lpfilter (make-effect :simple-lowpass conf)]
     (fn
       ([sample state]
-       (let [^StateWithS res (lpfilter state sample)]
+       (let [^StateWithS res (lpfilter sample state)]
          (StateWithS. (- sample (.sample res)) (.state res))))
       ([]
        (lpfilter)))))
