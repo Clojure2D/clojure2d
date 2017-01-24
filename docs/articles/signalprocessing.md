@@ -69,4 +69,72 @@ And highpass filter (in terms of lowpass filter)
 
 And now time for our signal processor. We need possibility to apply as many filters as we want for one sample, keep the state somewhere and map all samples in the collection. 
 
-To make composition I decided to keep filters with current state in the collection as a pair `[filter state]`. Now let's build function which for given collection of filters creates collection with filters and state pairs.
+To make composition I decided to keep filters with current state in a vector as a pair `[filter state]`. Now let's build function which processes given sample through all filters. Function accepts sample and state, returns resulting sample and new state of all filters.
+
+``` eval-clojure
+(defn make-filters-state
+  "Maps filters to filter-state pairs"
+  [fs]
+  (map #(vector % (%)) fs))
+
+(def initial-filters-state (make-filters-state [lowpass-filter highpass-filter]))
+
+(defn process-one-sample
+  "Process one sample"
+  [sample filters-state]
+  (loop [current-sample sample
+         current-state filters-state
+         new-state []]
+    (if current-state
+      (let [[f fstate] (first current-state)
+            [res new-fstate] (f current-sample fstate)]
+        (recur res (next current-state) (conj new-state [f new-fstate])))
+      [current-sample new-state])))
+
+;; let's extract only sample after filtering
+((process-one-sample -0.432 initial-filters-state) 0)
+```
+
+And now it's time to add final signal processing function. I used lazy sequence as a result. Filters state is passed between calls.
+
+<pre><code class="language-eval-clojure" data-loop-msec="2000">(defn process-signal
+  "Produce lazy sequence of signal processed with vector of filters"
+  [signal filters]
+  (let [current-fstate (make-filters-state filters)
+        next-step (fn internal-next-step [sig fstate]
+                    (when sig
+                      (let [[res nfstate] (process-one-sample (first sig) fstate)]
+                        (cons res (lazy-seq (internal-next-step (next sig) nfstate))))))]
+    (next-step signal current-fstate)))
+
+;; round result to 3rd decimal place
+(take 10 (map #(/ (Math/round (* % 1000.0)) 1000.0)
+              (process-signal
+               (repeatedly #(dec (* 2.0 (rand))))
+               [lowpass-filter highpass-filter])))
+</code></pre>
+
+Too see that filters work let's apply lowpass filter for high frequency signal.
+
+``` eval-clojure
+(process-signal
+ [-1.0 0.0 1.0 0.0]
+ [lowpass-filter lowpass-filter lowpass-filter])
+
+```
+
+Signal is almost filtered out). Now check highpass filter on the same signal.
+
+``` eval-clojure
+(process-signal
+ [-1.0 0.0 1.0 0.0]
+ [highpass-filter highpass-filter highpass-filter])
+```
+
+Signal is almost untouched.
+
+## Other approaches
+
+Eric Shull (exupero) proposed on solution based on stateful transducers [-> LINK](http://exupero.org/hazard/post/signal-processing/)
+
+My `Clojure2D` implementation is based on concept described here but based on arrays of doubles and custom types instead of vectors and destructuring.
