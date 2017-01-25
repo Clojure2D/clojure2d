@@ -14,7 +14,8 @@
   (:require [clojure.java.io :refer :all]
             [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
-            [clojure2d.color :as c])  
+            [clojure2d.color :as c]
+            [criterium.core :refer :all])  
   (:import [java.awt.image BufferedImage]
            [javax.swing ImageIcon]
            [javax.imageio ImageIO ImageWriter ImageWriteParam IIOImage]
@@ -323,7 +324,7 @@
 (defn ellipse
   "Draw ellipse with middle at `(x,y)` position with width `w` and height `h`."
   ([canvas x1 y1 w h stroke?]
-   (.setFrame ellipse-obj (- x1 (/ w 2)) (- y1 (/ h 2)) w h)
+   (.setFrame ellipse-obj (- ^double x1 (/ ^double w 2.0)) (- ^double y1 (/ ^double h 2.0)) w h)
    (draw-fill-or-stroke (@canvas 0) ellipse-obj stroke?)
    canvas)
   ([canvas x1 y1 w h]
@@ -813,5 +814,3 @@
   "Returns current session name (time and hash)"
   []
   @session-name)
-
-

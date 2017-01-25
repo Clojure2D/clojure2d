@@ -503,7 +503,7 @@
 (defn make-posterize
   ""
   ([numlev]
-   (let [nl (m/constrain numlev 2 255)
+   (let [nl (int (m/constrain numlev 2 255))
          ^ints levels (posterize-levels nl)]
      (partial filter-channel (partial posterize-pixel levels))))
   ([]

@@ -45,6 +45,8 @@
 
 (ns clojure2d.math
   "FastMath wrappers + helper functions"
+  (:require [criterium.core :refer :all]
+            [clojure2d.math :as m])
   (:import [net.jafama FastMath NumbersUtils]
            [org.apache.commons.math3.random RandomGenerator ISAACRandom JDKRandomGenerator MersenneTwister
             Well512a Well1024a Well19937a Well19937c Well44497a Well44497b]
@@ -54,15 +56,15 @@
 (set! *unchecked-math* true)
 
 ;; Bunch of math constants
-(def ^:const PI Math/PI)
-(def ^:const HALF_PI (/ PI 2.0))
-(def ^:const QUARTER_PI (/ PI 4.0))
-(def ^:const TWO_PI (* PI 2.0))
-(def ^:const TAU TWO_PI)
-(def ^:const E Math/E)
+(def ^:const ^double PI Math/PI)
+(def ^:const ^double HALF_PI (/ PI 2.0))
+(def ^:const ^double QUARTER_PI (/ PI 4.0))
+(def ^:const ^double TWO_PI (* PI 2.0))
+(def ^:const ^double TAU TWO_PI)
+(def ^:const ^double E Math/E)
 
 ;; Very small number \\(\varepsilon\\)
-(def ^:const EPSILON 1.0e-10)
+(def ^:const ^double EPSILON 1.0e-10)
 
 ;; For single argument functions let define clojure functions through macro.
 ;; Macro generates sequence of `def` with respective function name.
@@ -77,7 +79,7 @@
 (bind-math-names [sin cos tan asin acos atan sinh cosh tanh asinh acosh atanh exp log log10 sqrt cbrt])
 
 ;; Additional trigonometry functions
-(def cot #(FastMath/tan (- HALF_PI %)))
+(def cot #(FastMath/tan (- HALF_PI ^double %)))
 (def sec #(/ 1.0 (FastMath/cos %)))
 (def csc #(/ 1.0 (FastMath/sin %)))
 
@@ -87,8 +89,8 @@
 
 ;; Additional cyclometric functions
 (def acot #(- HALF_PI (FastMath/atan %)))
-(def asec #(FastMath/acos (/ 1.0 %)))
-(def acsc #(FastMath/asin (/ 1.0 %)))
+(def asec #(FastMath/acos (/ 1.0 ^double %)))
+(def acsc #(FastMath/asin (/ 1.0 ^double %)))
 (def atan2 #(FastMath/atan2 %1 %2))
 
 ;; Additional hyperbolic functions
@@ -97,9 +99,9 @@
 (def csch #(/ 1.0 (FastMath/sinh %)))
 
 ;; Additional inverse hyperbolic functions
-(def acoth #(FastMath/atanh (/ 1.0 %)))
-(def asech #(FastMath/acosh (/ 1.0 %)))
-(def acsch #(FastMath/asinh (/ 1.0 %)))
+(def acoth #(FastMath/atanh (/ 1.0 ^double %)))
+(def asech #(FastMath/acosh (/ 1.0 ^double %)))
+(def acsch #(FastMath/asinh (/ 1.0 ^double %)))
 
 ;; Quick version of exponential \\(e^x\\)
 (def qexp #(FastMath/expQuick %))
@@ -109,33 +111,34 @@
 
 ;; Few logarithm constants
 ;; \\(\ln 2\\)
-(def ^:const LN2 (log 2.0))
+(def ^:const ^double LN2 (log 2.0))
 
-(def ^:const LN2_2 (* 0.5 LN2))
+(def ^:const ^double LN2_2 (* 0.5 LN2))
 
 ;; \\(\ln 10\\)
-(def ^:const LN10 (log 10.0))
+(def ^:const ^double LN10 (log 10.0))
 
 ;; \\(\frac{1.0}{\ln{0.5}}\\)
-(def ^:const INV_LOG_HALF (/ 1.0 (log 0.5)))
+(def ^:const ^double INV_LOG_HALF (/ 1.0 ^double (log 0.5)))
 
 (defn log2
   "Log with base 2"
-  [x]
-  (/ (log x) LN2))
+  [^double x]
+  (/ (FastMath/log x) LN2))
 
 ;; \\(\log_b x\\)
 (defn logb
   "Logarithm with base"
-  [base x]
-  (/ (log x) (log base)))
+  [^double base ^double x]
+  (/ (FastMath/log x) (FastMath/log base)))
+
 (def qlog #(FastMath/logQuick %))
 
 ;; \\(\log_2 e\\)
-(def ^:const LOG2E (log2 E))
+(def ^:const ^double LOG2E (log2 E))
 
 ;; \\(\log_{10} e\\)
-(def ^:const LOG10E (log10 E))
+(def ^:const ^double LOG10E (log10 E))
 
 ;; Powers (normal, quick and fast)
 (def pow #(FastMath/pow %1 %2))
@@ -151,16 +154,16 @@
 
 (defn safe-sqrt
   "Safe sqrt, for value <= 0 result is 0"
-  [value]
+  [^double value]
   (if (neg? value) 0 (sqrt value)))
 (def qsqrt #(FastMath/sqrtQuick %))
 
 ;; \\(\sqrt{x^2+y^2}\\) and \\(\sqrt{x^2+y^2+z^2}\\)
 (defn hypot
   "Hyponetuse"
-  ([x y]
+  ([^double x ^double y]
    (FastMath/hypot x y))
-  ([x y z]
+  ([^double x ^double y ^double z]
    (FastMath/hypot x y z)))
 
 ;; Rounding functions
@@ -185,56 +188,56 @@
 ;; More constants
 
 ;; \\(\sqrt{2}\\)
-(def ^:const SQRT2 (sqrt 2.0))
-(def ^:const SQRT2_2 (* 0.5 SQRT2))
+(def ^:const ^double SQRT2 (sqrt 2.0))
+(def ^:const ^double SQRT2_2 (* 0.5 SQRT2))
 
 ;; \\(\sqrt{3}\\)
-(def ^:const SQRT3 (sqrt 3.0))
+(def ^:const ^double SQRT3 (sqrt 3.0))
 
 ;; \\(\sqrt{5}\\)
-(def ^:const SQRT5 (sqrt 5.0))
+(def ^:const ^double SQRT5 (sqrt 5.0))
 
 ;; \\(\sqrt{\pi}\\)
-(def ^:const SQRTPI (sqrt PI))
+(def ^:const ^double SQRTPI (sqrt PI))
 
 ;; Golden ratio \\(\varphi\\)
-(def ^:const PHI (* (+ 1.0 SQRT5) 0.5))
+(def ^:const ^double PHI (* (+ 1.0 SQRT5) 0.5))
 
 ;; math.h predefined constants names
-(def ^:const M_E E)
-(def ^:const M_LOG2E LOG2E)
-(def ^:const M_LOG10E LOG10E)
-(def ^:const M_LN2 LN2)
-(def ^:const M_LN10 LN10)
-(def ^:const M_PI PI)
-(def ^:const M_PI_2 HALF_PI)
-(def ^:const M_PI_4 QUARTER_PI)
-(def ^:const M_1_PI (/ 1.0 PI))
-(def ^:const M_2_PI (/ 2.0 PI))
-(def ^:const M_2_SQRTPI (/ 2.0 SQRTPI))
-(def ^:const M_SQRT2 SQRT2)
-(def ^:const M_SQRT1_2 (/ 1.0 SQRT2))
+(def ^:const ^double M_E E)
+(def ^:const ^double M_LOG2E LOG2E)
+(def ^:const ^double M_LOG10E LOG10E)
+(def ^:const ^double M_LN2 LN2)
+(def ^:const ^double M_LN10 LN10)
+(def ^:const ^double M_PI PI)
+(def ^:const ^double M_PI_2 HALF_PI)
+(def ^:const ^double M_PI_4 QUARTER_PI)
+(def ^:const ^double M_1_PI (/ 1.0 PI))
+(def ^:const ^double M_2_PI (/ 2.0 PI))
+(def ^:const ^double M_2_SQRTPI (/ 2.0 SQRTPI))
+(def ^:const ^double M_SQRT2 SQRT2)
+(def ^:const ^double M_SQRT1_2 (/ 1.0 SQRT2))
 
-(def ^:const M_TWOPI TWO_PI)
-(def ^:const M_3PI_4 (* PI 0.75))
-(def ^:const M_SQRT_PI SQRTPI)
-(def ^:const M_LN2LO 1.9082149292705877000E-10)
-(def ^:const M_LN2HI 6.9314718036912381649E-1)
-(def ^:const M_SQRT3 SQRT3)
-(def ^:const M_IVLN10 (/ 1.0 LN10))
-(def ^:const M_LOG2_E LN2)
-(def ^:const M_INVLN2 (/ 1.0 LN2))
+(def ^:const ^double M_TWOPI TWO_PI)
+(def ^:const ^double M_3PI_4 (* PI 0.75))
+(def ^:const ^double M_SQRT_PI SQRTPI)
+(def ^:const ^double M_LN2LO 1.9082149292705877000E-10)
+(def ^:const ^double M_LN2HI 6.9314718036912381649E-1)
+(def ^:const ^double M_SQRT3 SQRT3)
+(def ^:const ^double M_IVLN10 (/ 1.0 LN10))
+(def ^:const ^double M_LOG2_E LN2)
+(def ^:const ^double M_INVLN2 (/ 1.0 LN2))
 
 (defn signum
   "Return 1 if the specified value is > 0, 0 if it is 0, -1 otherwise"
-  [value]
+  [^double value]
   (cond (pos? value) 1
         (neg? value) -1
         :else 0))
 
 (defn sgn
   "Return -1 when value is negative, 1 otherwise"
-  [value]
+  [^double value]
   (if (neg? value) -1 1))
 
 ;;`(constrain 0.5 1 2) => 1`  
@@ -242,7 +245,7 @@
 ;;`(constrain 2.5 1 2) => 2`  
 (defn constrain
   "Clamp value between mn and mx"
-  [value mn mx]
+  [^double value ^double mn ^double mx]
   (if (> value mx) 
     mx
     (if (< value mn) 
@@ -253,8 +256,8 @@
 (defn norm
   "Processing map and norm"
   ([v start1 stop1 start2 stop2] ;; map
-   (+ start2 (* (- stop2 start2) (norm v start1 stop1))))
-  ([v start stop] ;; norm
+   (+ ^double start2 (* (- ^double stop2 ^double start2) ^double (norm v start1 stop1))))
+  ([^double v ^double start ^double stop] ;; norm
    (if (= start stop)
      (if (< v start) 0 1)
      (/ (- v start) (double (- stop start))))))
@@ -271,21 +274,21 @@
 ;; Linear interpolation between `start` and `stop`.
 (defn lerp
   "Processing lerp"
-  [start stop t]
+  [^double start ^double stop ^double t]
   (let [t1 (- 1.0 t)]
     (+ (* t1 start) (* t stop))))
 
 ;; Cosine interpolation between `start` and `stop`
 (defn cos-interpolation
   "oF interpolateCosine"
-  [start stop t]
-  (let [t1 (* 0.5 (- 1.0 (qcos (* t PI))))]
+  [^double start ^double stop ^double t]
+  (let [t1 (* 0.5 (- 1.0 ^double (cos (* t PI))))]
     (lerp start stop t1)))
 
 (defn smoothstep
-  ""
-  [start stop x]
-  (let [t (norm x start stop)]
+  "GL smoothstep"
+  [^double start ^double stop ^double x]
+  (let [t ^double (norm x start stop)]
     (* t t (- 3.0 (* 2.0 t)))))
 
 ;;`(wrap 0 -1 1) => 0.0`  
@@ -293,17 +296,17 @@
 ;;`(wrap 1.1 -1 1) => -0.8999999999999999`
 (defn wrap
   "Wrap overflowed value into the range, ofWrap"
-  [value start stop]
+  [^double value ^double start ^double stop]
   (let [p (> start stop)
         from (if p stop start)
         to (if p start stop)
-        cycle (- to from)]
+        cycle ^double (- to from)]
     (if (zero? cycle)
       to
       (->> cycle
            (double)
            (/ (- value from))
-           (floor)
+           ^double (floor)
            (* cycle)
            (- value)))))
 
@@ -336,7 +339,7 @@
 ;; `(quantile 0.9  '(1 2 3 -1 -1 2 -1 11 111)) => 111`
 (defn quantile
   "Calculate p-quantile of a list"
-  ([p vs]
+  (^double [p vs]
      (let [svs (sort vs)]
        (quantile p (count vs) svs (first svs) (last svs))))
   ([p c svs mn mx]
@@ -360,32 +363,32 @@
 (defn mean
   "Calculate mean of a list"
   ([vs] (mean (reduce + vs) (count vs)))
-  ([sm sz] (/ sm (double sz))))
+  ([^double sm sz] (/ sm (double sz))))
 
 ;; `(standard-deviation '(1 2 3 -1 -1 2 -1 11 111)) => 34.43333154064031`
 (defn standard-deviation
   "Calculate standard deviation of a list"
   ([vs]
-   (standard-deviation vs (count vs) (mean vs)))
-  ([vs sz u]
-   (sqrt (/ (reduce + (map #(pow (- % u) 2) vs)) sz))))
+   (standard-deviation vs (double (count vs)) (mean vs)))
+  ([vs ^double sz ^double u]
+   (sqrt (/ ^double (reduce + (map #(pow (- ^double % u) 2) vs)) sz))))
 
 ;; `(median-absolute-deviation '(1 2 3 -1 -1 2 -1 11 111))  => 3.0`
 (defn median-absolute-deviation
   "Calculate MAD"
   ([vs]
      (median-absolute-deviation vs (median vs)))
-  ([vs m]
-     (median (map #(abs (- % m)) vs))))
+  ([vs ^double m]
+     (median (map #(abs (- ^double % m)) vs))))
 
 ;; `(lower-adjacent-value '(1 2 3 -1 -1 2 -1 11 111)) => -1`
 (defn lower-adjacent-value
   ([vs]
-     (let [q1 (quantile 0.25 vs)
-           m (median vs)
-           q3 (quantile 0.75 vs)]
+   (let [q1 (quantile 0.25 vs)
+         m (median vs)
+         q3 (quantile 0.75 vs)]
        (lower-adjacent-value (sort vs) m (- q3 q1))))
-  ([svs m qd]
+  ([svs ^double m ^double qd]
      (let [l (- m qd)]
        (first (filter (partial < l) svs)))))
 
@@ -396,9 +399,9 @@
            m (median vs)
            q3 (quantile 0.75 vs)]
        (upper-adjacent-value (reverse (sort vs)) m (- q3 q1))))
-  ([rsvs m qd]
+  ([rsvs ^double m ^double qd]
      (let [l (+ m qd)]
-       (first (filter #(< % l) rsvs)))))
+       (first (filter #(< ^double % l) rsvs)))))
 
 ;; `(stats-map '(1 2 3 -1 -1 2 -1 11 111))`
 ;; `=> {:MAD 3.0, :Max 111, :Size 9, :LAV -1, :Mode -1, :Mean 14.11111111111111, :Q1 -1.0, :Q3 7.0, :Min -1, :Total 127, :SD 34.43333154064031, :UAV 3, :Median 2.0}`
@@ -438,12 +441,12 @@
 
 (defn- closest-mean-fn
   [means]
-  (fn [v] (reduce (partial min-key #(sq (- v %))) means)))
+  (fn [^double v] (reduce (partial min-key #(sq (- v ^double %))) means)))
 
 ;; `(k-means 4 '(1 2 3 -1 -1 2 -1 11 111)) => (-1.0 2.0 11.0 111.0)`
 (defn k-means
   "k-means clustering"
-  [k vs]
+  [^long k vs]
   (let [vs (map double vs)
         svs (set vs)]
     (if (> k (count svs))
@@ -479,29 +482,32 @@
 ;; * `:isaac` - ISAAC
 ;; * `:well512a`, `:well1024a`, `:well19937a`, `:well19937c`, `:well44497a`, `:well44497b` - several WELL variants
 
-;; This macro creates function with 1,2 or 3 parameters for every primitive type variant.
-;; Macro accepts two parameters: native class random method and predicate to distinguish between floating point and integers.
-;;
-;; Created function accepts RNG object itself and parameters for range.
-;;
-;; Macro is used internally to extend RandomGenerator interface.
-(defmacro next-random-value-fn
-  "Create function for next random value (long, int, double, float, gaussian) with scale and shift"
-  [func int?]
-  (let [r (vary-meta (gensym "r") assoc :tag 'RandomGenerator)
-        mx2 (gensym "mx2")
-        mn (gensym "mn")
-        mx (gensym "mx")]
-    `(fn self#
-       ([~r] (~func ~r))
-       ([~r ~mx2]
-        ~(if int?
-           `(mod (~func ~r) ~mx2)
-           `(* ~mx2 (~func ~r))))
-       ([~r ~mn ~mx]
-        (let [diff# (- ~mx ~mn)]
-          (if (zero? diff#) ~mn
-            (+ ~mn (self# ~r diff#))))))))
+(defn next-random-value-long
+  ""
+  (^long [^RandomGenerator r] (.nextLong r))
+  (^long [^RandomGenerator r ^long mx] (mod (.nextLong r) mx))
+  (^long [r ^long mn ^long mx]
+   (let [diff (- mx mn)]
+     (if (zero? diff) mn
+         (+ mn (next-random-value-long r diff))))))
+
+(defn next-random-value-double
+  ""
+  (^double [^RandomGenerator r] (.nextDouble r))
+  (^double [^RandomGenerator r ^double mx] (* (.nextDouble r) mx))
+  (^double [r ^double mn ^double mx]
+   (let [diff (- mx mn)]
+     (if (zero? diff) mn
+         (+ mn (next-random-value-double r diff))))))
+
+(defn next-random-value-gaussian
+  ""
+  (^double [^RandomGenerator r] (.nextGaussian r))
+  (^double [^RandomGenerator r ^double mx] (* (.nextGaussian r) mx))
+  (^double [r ^double mn ^double mx]
+   (let [diff (- mx mn)]
+     (if (zero? diff) mn
+         (+ mn (next-random-value-gaussian r diff))))))
 
 ;; Create protocol Randomizer with following functions:
 ;;
@@ -540,30 +546,28 @@
   (grandom [t] [t std] [t avg std] "gaussian random")
   (brandom [t] [t thr] "boolean random, with probability option"))
 
-(def next-gaussian (next-random-value-fn .nextGaussian false))
-
-(defn next-random-with-probability
-  ""
-  [^RandomGenerator r thr]
-  (< (drandom r) thr))
-
 ;; Extend RandomGenerator interface with functions created by macro `next-random-value-fn`. This way all RNG classes are enriched with new, more convenient functions.
 ;;
 ;; Note that `grandom` is under special care due to different [mn mx] range meaning.
 
+(defn int-mask
+  ""
+  [^long v]
+  (int (bit-and v 0xffffffff)))
+
 (extend RandomGenerator
   Randomizer
-  {:irandom (next-random-value-fn .nextInt true)
-   :lrandom (next-random-value-fn .nextLong true)
-   :frandom (next-random-value-fn .nextFloat false)
-   :drandom (next-random-value-fn .nextDouble false)
+  {:irandom (comp int-mask next-random-value-long)
+   :lrandom next-random-value-long
+   :frandom (comp float next-random-value-double)
+   :drandom next-random-value-double
    :grandom (fn
-            ([^RandomGenerator t] (next-gaussian t))
-            ([^RandomGenerator t std] (next-gaussian t std))
-            ([^RandomGenerator t avg std] (next-gaussian t avg (+ avg std))))
+            ([^RandomGenerator t] (next-random-value-gaussian t))
+            ([^RandomGenerator t std] (next-random-value-gaussian t std))
+            ([^RandomGenerator t ^double avg ^double std] (next-random-value-gaussian t avg (+ avg std))))
    :brandom (fn
             ([^RandomGenerator t] (.nextBoolean t))
-            ([^RandomGenerator t thr] (next-random-with-probability t thr)))})
+            ([^RandomGenerator t ^double thr] (< (next-random-value-double t) thr)))})
 
 ;; Helper macro which creates RNG object of given class and/or seed.
 (defmacro create-object-with-seed
@@ -654,7 +658,7 @@
 
 ;;;
 
-(def ^:const AM (/ 1.0 2147483647))
+(def ^:const ^double AM (/ 1.0 2147483647))
 
 (defn discrete-noise
   "Discrete noise"
