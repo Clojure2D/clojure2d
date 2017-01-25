@@ -5,10 +5,11 @@
             [clojure2d.math :as m]
             [clojure2d.extra.glitch :as g]
             [clojure2d.extra.variations :as v]
-            [clojure2d.extra.overlays :as o]))
+            [clojure2d.extra.overlays :as o]
+            [clojure2d.extra.signal :refer :all]))
 
 
-(def p1 (p/load-pixels "generateme/ooo/ooo2.jpg"))
+(def p1 (p/load-pixels "generateme/dance/dancer.jpg"))
 
 (def p2 (p/load-pixels "generateme/ooo/res_07E234_ooo.jpg"))
 
@@ -20,7 +21,7 @@
 
 (def canvas (core/create-canvas (.w p1) (.h p1)))
 
-(def scale 0.6)
+(def scale 0.8)
 
 
 (def windows (core/show-window canvas "glitch" (* scale (.w p1)) (* scale (.h p1)) 10))
@@ -31,9 +32,7 @@
   (println b2)
   (p/set-canvas-pixels canvas (p/filter-channels p/equalize-filter false 
                                                  (p/filter-channels p/normalize-filter false
-                                                                    (g/blend-machine p3
-                                                                                     (g/blend-machine p2 p1 b)
-                                                                                     b2)))))
+                                                                    (g/blend-machine p4 p1 b)))))
 
 (core/with-canvas canvas
   (core/image (o/render-rgb-scanlines (@canvas 1))))
@@ -43,7 +42,7 @@
                    (o/render-noise noise-overlay)
                    (o/render-spots spots-overlay))))
 
-(core/save-canvas canvas (core/next-filename "generateme/ooo/res" ".jpg"))
+(core/save-canvas canvas (core/next-filename "generateme/dance/res" ".jpg"))
 
 (def p4 (p/get-canvas-pixels canvas))
 
@@ -63,3 +62,18 @@
     (p/set-canvas-pixels canvas (p/filter-channels (g/make-slitscan2-filter f 2.0)
                                                    (g/make-slitscan2-filter f 1.9)
                                                    (g/make-slitscan2-filter f 2.1) nil p1))))
+
+;; full process without use of filter-channels
+(time (let [effect (make-effect :dj-eq {:lo (m/drand -20 20) :mid (m/drand -20 20) :hi (m/drand -20 20) :peak_bw 1.3 :shelf_slope 1.5 :rate (m/irand 4000 100000)})
+            in (signal-from-pixels p1 {:layout :planar
+                                      :coding :ulaw
+                                      :signed true
+                                      :channels [2 0 1]
+                                      :bits 8})
+            res (apply-effect effect in)
+            resp (signal-to-pixels (p/clone-pixels p1) res {:layout :planar
+                                                           :coding :alaw-rev
+                                                           :signed true
+                                                           :channels [2 0 1]
+                                                           :bits 8})]
+        (p/set-canvas-pixels canvas (p/filter-channels p/normalize nil resp))))
