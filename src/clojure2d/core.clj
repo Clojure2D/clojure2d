@@ -15,7 +15,8 @@
             [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
             [clojure2d.color :as c]
-            [criterium.core :refer :all])  
+            [criterium.core :refer :all]
+            [primitive-math :as pm])  
   (:import [java.awt.image BufferedImage]
            [javax.swing ImageIcon]
            [javax.imageio ImageIO ImageWriter ImageWriteParam IIOImage]
@@ -176,21 +177,21 @@
 ;; Reminder: Drawing on canvas is single threaded.
 
 ;; First let's define three rendering quality options: `:low`, `:mid` and `:high`. Where `:low` is fastest but has poor quality and `:high` has best quality but may be slow. Rendering options are used when you create canvas.
-(def rendering-hints { :low { RenderingHints/KEY_ANTIALIASING       RenderingHints/VALUE_ANTIALIAS_OFF
+(def rendering-hints { :low {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF
                              RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR
                              RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
                              RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED
                              RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED
                              RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF
                              RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_OFF}
-                      :mid  { RenderingHints/KEY_ANTIALIASING       RenderingHints/VALUE_ANTIALIAS_ON
+                      :mid  {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON
                              RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BILINEAR
                              RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
                              RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED
                              RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED
                              RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF
                              RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON}
-                      :high { RenderingHints/KEY_ANTIALIASING       RenderingHints/VALUE_ANTIALIAS_ON
+                      :high {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON
                              RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC
                              RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY
                              RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY
@@ -301,8 +302,8 @@
 
 (defn point
   "Draw point at `(x,y)` position"
-  [canvas x y]
-  (line canvas x y (+ (double x) 10.0e-6) (+ (double y) 10.0e-6))
+  [canvas ^double x ^double y]
+  (line canvas x y (pm/+ x 10.0e-6) (pm/+ y 10.0e-6))
   canvas)
 
 (defn- draw-fill-or-stroke
@@ -324,7 +325,7 @@
 (defn ellipse
   "Draw ellipse with middle at `(x,y)` position with width `w` and height `h`."
   ([canvas x1 y1 w h stroke?]
-   (.setFrame ellipse-obj (- ^double x1 (/ ^double w 2.0)) (- ^double y1 (/ ^double h 2.0)) w h)
+   (.setFrame ellipse-obj (pm/- x1 (/ ^double w 2.0)) (pm/- ^double y1 (pm/div ^double h 2.0)) w h)
    (draw-fill-or-stroke (@canvas 0) ellipse-obj stroke?)
    canvas)
   ([canvas x1 y1 w h]
@@ -666,15 +667,8 @@
 
 ;; Three functions to operate on java arrays. Generally used for operating on `Pixels` with `blur` filter. I hope to remove them soon.
 
-(defn array-mutate!
-  "Mutate int array value with function f"
-  [f ^ints array idx]
-  (let [v (aget array idx)]
-    (aset array idx ^int (f v))))
-
 (defmacro amap!
   "Mutating version of amap"
-  {:added "1.0"}
   [a idx expr]
   `(let [a# ~a]
      (loop  [~idx (int 0)]

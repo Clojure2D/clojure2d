@@ -46,7 +46,8 @@
 (ns clojure2d.math
   "FastMath wrappers + helper functions"
   (:require [criterium.core :refer :all]
-            [clojure2d.math :as m])
+            [clojure2d.math :as m]
+            [primitive-math :as pm])
   (:import [net.jafama FastMath NumbersUtils]
            [org.apache.commons.math3.random RandomGenerator ISAACRandom JDKRandomGenerator MersenneTwister
             Well512a Well1024a Well19937a Well19937c Well44497a Well44497b]
@@ -79,9 +80,13 @@
 (bind-math-names [sin cos tan asin acos atan sinh cosh tanh asinh acosh atanh exp log log10 sqrt cbrt])
 
 ;; Additional trigonometry functions
-(def cot #(FastMath/tan (- HALF_PI ^double %)))
-(def sec #(/ 1.0 (FastMath/cos %)))
-(def csc #(/ 1.0 (FastMath/sin %)))
+(def cot #(FastMath/tan (pm/- HALF_PI ^double %)))
+(def sec #(pm/div 1.0 (FastMath/cos %)))
+(def csc #(pm/div 1.0 (FastMath/sin %)))
+
+;(def v (vec (repeatedly 1000 #(drand (- TWO_PI) TWO_PI))))
+
+;(quick-bench (mapv #(se)))
 
 ;; Quick and less accurate `sin` and `cos`
 (def qsin #(FastMath/sinQuick %))
