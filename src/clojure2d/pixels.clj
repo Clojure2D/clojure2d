@@ -53,7 +53,7 @@
       (condp = *pixels-edge*
         :zero 0
         :edge (get-value pixels ch (int (m/constrain x 0 (dec w))) (int (m/constrain y 0 (dec h))))
-        :wrap (get-value pixels ch (int (m/wrap x 0 w)) (int (m/wrap y 0 h)))
+        :wrap (get-value pixels ch (int (m/wrap 0 w x)) (int (m/wrap 0 h y)))
         *pixels-edge*)
       (get-value pixels ch (+ x (* y w)))))
 
@@ -71,7 +71,7 @@
       (condp = *pixels-edge*
         :zero (Vec4. 0 0 0 255)
         :edge (get-color pixels (int (m/constrain x 0 (dec w))) (int (m/constrain y 0 (dec h))))
-        :wrap (get-color pixels (int (m/wrap x 0 w)) (int (m/wrap y 0 h)))
+        :wrap (get-color pixels (int (m/wrap 0 w x)) (int (m/wrap 0 h y)))
         (Vec4. *pixels-edge* *pixels-edge* *pixels-edge* 255))
       (get-color pixels (+ x (* y w)))))
 

@@ -45,16 +45,14 @@
 
 (ns clojure2d.math
   "FastMath wrappers + helper functions"
-  (:require [criterium.core :refer :all]
-            [clojure2d.math :as m]
-            [primitive-math :as pm])
-  (:import [net.jafama FastMath NumbersUtils]
+  (:require [clojure2d.math :as m])
+  (:import [net.jafama FastMath]
            [org.apache.commons.math3.random RandomGenerator ISAACRandom JDKRandomGenerator MersenneTwister
             Well512a Well1024a Well19937a Well19937c Well44497a Well44497b]
            [com.flowpowered.noise.module.source Perlin]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 ;; Bunch of math constants
 (def ^:const ^double PI Math/PI)
@@ -80,13 +78,9 @@
 (bind-math-names [sin cos tan asin acos atan sinh cosh tanh asinh acosh atanh exp log log10 sqrt cbrt])
 
 ;; Additional trigonometry functions
-(def cot #(FastMath/tan (pm/- HALF_PI ^double %)))
-(def sec #(pm/div 1.0 (FastMath/cos %)))
-(def csc #(pm/div 1.0 (FastMath/sin %)))
-
-;(def v (vec (repeatedly 1000 #(drand (- TWO_PI) TWO_PI))))
-
-;(quick-bench (mapv #(se)))
+(def cot #(FastMath/tan (- HALF_PI ^double %)))
+(def sec #(/ 1.0 (FastMath/cos %)))
+(def csc #(/ 1.0 (FastMath/sin %)))
 
 ;; Quick and less accurate `sin` and `cos`
 (def qsin #(FastMath/sinQuick %))
@@ -117,7 +111,6 @@
 ;; Few logarithm constants
 ;; \\(\ln 2\\)
 (def ^:const ^double LN2 (log 2.0))
-
 (def ^:const ^double LN2_2 (* 0.5 LN2))
 
 ;; \\(\ln 10\\)
@@ -166,13 +159,13 @@
 ;; \\(\sqrt{x^2+y^2}\\) and \\(\sqrt{x^2+y^2+z^2}\\)
 (defn hypot
   "Hyponetuse"
-  ([^double x ^double y]
+  ([x y]
    (FastMath/hypot x y))
-  ([^double x ^double y ^double z]
+  ([x y z]
    (FastMath/hypot x y z)))
 
 ;; Rounding functions
-(def floor #(FastMath/floor ^double %))
+(def floor ^double #(FastMath/floor ^double %))
 (def ceil #(FastMath/ceil ^double %))
 (def round #(FastMath/round ^double %))
 (def rint #(FastMath/rint ^double %))
@@ -182,8 +175,8 @@
 ;; where n-1 is result of `low-2-exp` and n is result of `high-2-exp`
 ;; `(low-2-exp TWO_PI) => 2` \\(2^2\eq 4\leq 6.28\\)  
 ;; `(high-2-exp TWO_PI) => 3` \\(6.28\leq 2^3\eq 8\\)
-(def low-2-exp (comp int floor (partial logb 2)))
-(def high-2-exp (comp int ceil (partial logb 2)))
+(def low-2-exp (comp long floor log2))
+(def high-2-exp (comp long ceil log2))
 
 ;; Modulo and abs
 (def reminder #(FastMath/remainder %1 %2))
@@ -263,9 +256,9 @@
   ([v start1 stop1 start2 stop2] ;; map
    (+ ^double start2 (* (- ^double stop2 ^double start2) ^double (norm v start1 stop1))))
   ([^double v ^double start ^double stop] ;; norm
-   (if (= start stop)
+   (if (== start stop)
      (if (< v start) 0 1)
-     (/ (- v start) (double (- stop start))))))
+     (/ (- v start) (- stop start)))))
 
 ;; Map and constrain values
 ;; `(cnorm 1.5 0 1 100 200) => 200`
@@ -301,7 +294,7 @@
 ;;`(wrap 1.1 -1 1) => -0.8999999999999999`
 (defn wrap
   "Wrap overflowed value into the range, ofWrap"
-  [^double value ^double start ^double stop]
+  [^double start ^double stop ^double value]
   (let [p (> start stop)
         from (if p stop start)
         to (if p start stop)
@@ -309,7 +302,6 @@
     (if (zero? cycle)
       to
       (->> cycle
-           (double)
            (/ (- value from))
            ^double (floor)
            (* cycle)
@@ -344,14 +336,14 @@
 ;; `(quantile 0.9  '(1 2 3 -1 -1 2 -1 11 111)) => 111`
 (defn quantile
   "Calculate p-quantile of a list"
-  (^double [p vs]
+  (^double [^double p vs]
      (let [svs (sort vs)]
        (quantile p (count vs) svs (first svs) (last svs))))
   ([p c svs mn mx]
-     (let [pic (* p (inc c))
-           k (int pic)
-           d (- pic k)
-           ndk (if (zero? k) mn (nth svs (dec k)))]
+   (let [pic (* p (inc c))
+         k (round pic)
+         d (- pic k)
+         ndk (if (zero? k) mn (nth svs (dec k)))]
        (cond
         (zero? k) mn
         (= c (dec k)) mx
@@ -424,7 +416,7 @@
            q3 (quantile 0.75 sz svs mn mx)
            sd (standard-deviation vs sz u)
            mad (median-absolute-deviation vs mdn)
-           qd (- q3 q1)
+           qd (- ^double q3 ^double q1)
            lav (lower-adjacent-value svs mdn qd)
            uav (upper-adjacent-value rsvs mdn qd)]
        {
@@ -555,14 +547,9 @@
 ;;
 ;; Note that `grandom` is under special care due to different [mn mx] range meaning.
 
-(defn int-mask
-  ""
-  [^long v]
-  (int (bit-and v 0xffffffff)))
-
 (extend RandomGenerator
   Randomizer
-  {:irandom (comp int-mask next-random-value-long)
+  {:irandom (comp unchecked-int next-random-value-long)
    :lrandom next-random-value-long
    :frandom (comp float next-random-value-double)
    :drandom next-random-value-double
