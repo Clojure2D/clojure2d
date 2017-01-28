@@ -9,8 +9,7 @@
 ;; Tolerance for vector comparison used in `is-near-zero?` and `aligned?` functions
 ;; to mitigate approximation errors
 (ns clojure2d.math.vector
-  (:require [clojure2d.math :as m])
-  (:import [net.jafama FastMath]))
+  (:require [clojure2d.math :as m]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -92,12 +91,12 @@
                               (f y (.y v2) t))))
   (interpolate [v1 v2 t] (interpolate v1 v2 t m/lerp))
   (is-zero? [_] (and (zero? x) (zero? y)))
-  (is-near-zero? [_] (and (< (FastMath/abs x) TOLERANCE)
-                          (< (FastMath/abs y) TOLERANCE)))
+  (is-near-zero? [_] (and (< (m/abs x) TOLERANCE)
+                          (< (m/abs y) TOLERANCE)))
   (heading [_] (m/atan2 y x))
   (rotate [_ angle]
-    (let [sa (FastMath/sin angle)
-          ca (FastMath/cos angle)
+    (let [sa (m/sin angle)
+          ca (m/cos angle)
           nx (- (* x ca) (* y sa))
           ny (+ (* x sa) (* y ca))]
       (Vec2. nx ny)))
@@ -111,8 +110,8 @@
   (to-polar [v]
     (Vec2. (mag v) (heading v)))
   (from-polar [_]
-    (Vec2. (* x (FastMath/cos y))
-           (* x (FastMath/sin y)))))
+    (Vec2. (* x (m/cos y))
+           (* x (m/sin y)))))
 
 (deftype Vec3 [^double x ^double y ^double z]
   Object
@@ -150,7 +149,7 @@
       (if (< x z) 0 2)
       (if (< y z) 1 2)))
   (base-from [v]
-    (let [v2 (if (> (FastMath/abs x) (FastMath/abs y))
+    (let [v2 (if (> (m/abs x) (m/abs y))
                (div (Vec3. (- z) 0.0 x) (m/hypot x z))
                (div (Vec3. 0.0 z (- y)) (m/hypot y z)))]
       [v v2 (cross v v2)]))
@@ -161,9 +160,9 @@
                               (f z (.z v2) t))))
   (interpolate [v1 v2 t] (interpolate v1 v2 t m/lerp))
   (is-zero? [_] (and (zero? x) (zero? y) (zero? z)))
-  (is-near-zero? [_] (and (< (FastMath/abs x) TOLERANCE)
-                          (< (FastMath/abs y) TOLERANCE)
-                          (< (FastMath/abs z) TOLERANCE)))
+  (is-near-zero? [_] (and (< (m/abs x) TOLERANCE)
+                          (< (m/abs y) TOLERANCE)
+                          (< (m/abs z) TOLERANCE)))
   (heading [v1] (angle-between v1 (Vec3. 1 0 0)))
   (cross [_ v2]
    (let [^Vec3 v2 v2
@@ -187,8 +186,8 @@
           axx (.x ax)
           axy (.y ax)
           axz (.z ax)
-          cosa (FastMath/cos angle)
-          ^Vec3 sa (mult ax (FastMath/sin angle))
+          cosa (m/cos angle)
+          ^Vec3 sa (mult ax (m/sin angle))
           sax (.x sa)
           say (.y sa)
           saz (.z sa)
@@ -209,12 +208,12 @@
   (axis-rotate [v1 angle axis pivot]
     (add (axis-rotate (sub v1 pivot) angle axis) pivot))
   (rotate [_ anglex angley anglez]
-    (let [a (FastMath/cos anglex)
-          b (FastMath/sin anglex)
-          c (FastMath/cos angley)
-          d (FastMath/sin angley)
-          e (FastMath/cos anglez)
-          f (FastMath/sin anglez)
+    (let [a (m/cos anglex)
+          b (m/sin anglex)
+          c (m/cos angley)
+          d (m/sin angley)
+          e (m/cos anglez)
+          f (m/sin anglez)
           cex (* c x e)
           cf (* c f)
           dz (* d z)
@@ -243,10 +242,10 @@
           phi (m/atan2 y x)]
       (Vec3. r theta phi)))
   (from-polar [_]
-    (let [st (FastMath/sin y)
-          ct (FastMath/cos y)
-          sp (FastMath/sin z)
-          cp (FastMath/cos z)]
+    (let [st (m/sin y)
+          ct (m/cos y)
+          sp (m/sin z)
+          cp (m/cos z)]
       (Vec3. (* x st cp)
              (* x st sp)
              (* x ct)))))
@@ -271,7 +270,7 @@
     (let [^Vec4 v v] (Vec4. (* x (.x v)) (* y (.y v)) (* z (.z v)) (* w (.w v)))))
   (div [_ v]
     (let [v1 (/ 1.0 ^double v)] (Vec4. (* x v1) (* y v1) (* z v1) (* w v1))))
-  (abs [_] (Vec4. (FastMath/abs x) (FastMath/abs y) (FastMath/abs z) (FastMath/abs w)))
+  (abs [_] (Vec4. (m/abs x) (m/abs y) (m/abs z) (m/abs w)))
   (mx [_] (max x y z w))
   (mn [_] (min x y z w))
   (emx [_ v]
@@ -286,10 +285,10 @@
                               (f w (.w v2) t))))
   (interpolate [v1 v2 t] (interpolate v1 v2 t m/lerp))
   (is-zero? [_] (and (zero? x) (zero? y) (zero? z) (zero? w)))
-  (is-near-zero? [_] (and (< (FastMath/abs x) TOLERANCE)
-                          (< (FastMath/abs y) TOLERANCE)
-                          (< (FastMath/abs z) TOLERANCE)
-                          (< (FastMath/abs w) TOLERANCE)))
+  (is-near-zero? [_] (and (< (m/abs x) TOLERANCE)
+                          (< (m/abs y) TOLERANCE)
+                          (< (m/abs z) TOLERANCE)
+                          (< (m/abs w) TOLERANCE)))
   (heading [v1] (angle-between v1 (Vec4. 1 0 0 0))))
 
 ;; common functions

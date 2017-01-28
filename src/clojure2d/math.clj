@@ -45,14 +45,13 @@
 
 (ns clojure2d.math
   "FastMath wrappers + helper functions"
-  (:require [clojure2d.math :as m])
   (:import [net.jafama FastMath]
            [org.apache.commons.math3.random RandomGenerator ISAACRandom JDKRandomGenerator MersenneTwister
             Well512a Well1024a Well19937a Well19937c Well44497a Well44497b]
            [com.flowpowered.noise.module.source Perlin]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* :warn-on-boxed)
+(set! *unchecked-math* true)
 
 ;; Bunch of math constants
 (def ^:const ^double PI Math/PI)
@@ -65,45 +64,53 @@
 ;; Very small number \\(\varepsilon\\)
 (def ^:const ^double EPSILON 1.0e-10)
 
-;; For single argument functions let define clojure functions through macro.
-;; Macro generates sequence of `def` with respective function name.
-(defmacro bind-math-names
-  "Bind namespace name to fastmath function"
-  [names]
-  (cons 'do (for [n names]
-              (let [s (gensym n)]
-                `(def ~n (fn [~s] (. FastMath ~n ~s)))))))
+(defn sin ^double [^double v] (FastMath/sin v))
+(defn cos ^double [^double v] (FastMath/cos v))
+(defn tan ^double [^double v] (FastMath/tan v))
+(defn asin ^double [^double v] (FastMath/asin v))
+(defn acos ^double [^double v] (FastMath/acos v))
+(defn atan ^double [^double v] (FastMath/atan v))
+(defn sinh ^double [^double v] (FastMath/sinh v))
+(defn cosh ^double [^double v] (FastMath/cosh v))
+(defn tanh ^double [^double v] (FastMath/tanh v))
+(defn asinh ^double [^double v] (FastMath/asinh v))
+(defn acosh ^double [^double v] (FastMath/acosh v))
+(defn atanh ^double [^double v] (FastMath/atanh v))
 
-;; Define functions
-(bind-math-names [sin cos tan asin acos atan sinh cosh tanh asinh acosh atanh exp log log10 sqrt cbrt])
+(defn exp ^double [^double v] (FastMath/exp v))
+(defn log ^double [^double v] (FastMath/log v))
+(defn log10 ^double [^double v] (FastMath/log10 v))
+
+(defn sqrt ^double [^double v] (FastMath/sqrt v))
+(defn cbrt ^double [^double v] (FastMath/cbrt v))
 
 ;; Additional trigonometry functions
-(def cot #(FastMath/tan (- HALF_PI ^double %)))
-(def sec #(/ 1.0 (FastMath/cos %)))
-(def csc #(/ 1.0 (FastMath/sin %)))
+(defn cot ^double [^double v] (FastMath/tan (- HALF_PI v)))
+(defn sec ^double [^double v] (/ 1.0 (FastMath/cos v)))
+(defn csc ^double [^double v] (/ 1.0 (FastMath/sin v)))
 
 ;; Quick and less accurate `sin` and `cos`
-(def qsin #(FastMath/sinQuick %))
-(def qcos #(FastMath/cosQuick %))
+(defn qsin ^double [^double v] (FastMath/sinQuick v))
+(defn qcos ^double [^double v] (FastMath/cosQuick v))
 
 ;; Additional cyclometric functions
-(def acot #(- HALF_PI (FastMath/atan %)))
-(def asec #(FastMath/acos (/ 1.0 ^double %)))
-(def acsc #(FastMath/asin (/ 1.0 ^double %)))
-(def atan2 #(FastMath/atan2 %1 %2))
+(defn acot ^double [^double v] (- HALF_PI (FastMath/atan v)))
+(defn asec ^double [^double v] (FastMath/acos (/ 1.0 v)))
+(defn acsc ^double [^double v] (FastMath/asin (/ 1.0 v)))
+(defn atan2 ^double [^double v1 ^double v2] (FastMath/atan2 v1 v2))
 
 ;; Additional hyperbolic functions
-(def coth #(/ 1.0 (FastMath/tanh %)))
-(def sech #(/ 1.0 (FastMath/cosh %)))
-(def csch #(/ 1.0 (FastMath/sinh %)))
+(defn coth ^double [^double v] (/ 1.0 (FastMath/tanh v)))
+(defn sech ^double [^double v] (/ 1.0 (FastMath/cosh v)))
+(defn csch ^double [^double v] (/ 1.0 (FastMath/sinh v)))
 
 ;; Additional inverse hyperbolic functions
-(def acoth #(FastMath/atanh (/ 1.0 ^double %)))
-(def asech #(FastMath/acosh (/ 1.0 ^double %)))
-(def acsch #(FastMath/asinh (/ 1.0 ^double %)))
+(defn acoth ^double [^double v] (FastMath/atanh (/ 1.0 v)))
+(defn asech ^double [^double v] (FastMath/acosh (/ 1.0 v)))
+(defn acsch ^double [^double v] (FastMath/asinh (/ 1.0 v)))
 
 ;; Quick version of exponential \\(e^x\\)
-(def qexp #(FastMath/expQuick %))
+(defn qexp ^double [^double v] (FastMath/expQuick v))
 
 ;; Alias for logarithm
 (def ln log)
@@ -121,16 +128,16 @@
 
 (defn log2
   "Log with base 2"
-  [^double x]
-  (/ (FastMath/log x) LN2))
+  ^double [^double v]
+  (/ (FastMath/log v) LN2))
 
 ;; \\(\log_b x\\)
 (defn logb
   "Logarithm with base"
-  [^double base ^double x]
-  (/ (FastMath/log x) (FastMath/log base)))
+  ^double [^double base ^double v]
+  (/ (FastMath/log v) (FastMath/log base)))
 
-(def qlog #(FastMath/logQuick %))
+(defn qlog ^double [^double v] (FastMath/logQuick v))
 
 ;; \\(\log_2 e\\)
 (def ^:const ^double LOG2E (log2 E))
@@ -139,36 +146,36 @@
 (def ^:const ^double LOG10E (log10 E))
 
 ;; Powers (normal, quick and fast)
-(def pow #(FastMath/pow %1 %2))
-(def qpow #(FastMath/powQuick %1 %2))
+(defn pow ^double [^double v1 ^double v2] (FastMath/pow v1 v2))
+(defn qpow ^double [^double v1 ^double v2] (FastMath/powQuick v1 v2))
 
 ;; Fast version of power, second parameter should be integer
-(def fpow #(FastMath/powFast %1 %2))
+(defn fpow ^double [^double v1 ^double v2] (FastMath/powFast v1 v2))
 
 ;; Square and cubic
-(def sq #(FastMath/pow2 ^double %))
+(defn sq ^double [^double v] (FastMath/pow2 v))
 (def pow2 sq)
-(def pow3 #(FastMath/pow3 ^double %))
+(defn pow3 ^double [^double v] (FastMath/pow3 v))
 
 (defn safe-sqrt
   "Safe sqrt, for value <= 0 result is 0"
-  [^double value]
+  ^double [^double value]
   (if (neg? value) 0 (sqrt value)))
-(def qsqrt #(FastMath/sqrtQuick %))
+(defn qsqrt ^double [^double v] (FastMath/sqrtQuick v))
 
 ;; \\(\sqrt{x^2+y^2}\\) and \\(\sqrt{x^2+y^2+z^2}\\)
 (defn hypot
   "Hyponetuse"
-  ([x y]
+  (^double [^double x ^double y]
    (FastMath/hypot x y))
-  ([x y z]
+  (^double [^double x ^double y ^double z]
    (FastMath/hypot x y z)))
 
 ;; Rounding functions
-(def floor ^double #(FastMath/floor ^double %))
-(def ceil #(FastMath/ceil ^double %))
-(def round #(FastMath/round ^double %))
-(def rint #(FastMath/rint ^double %))
+(defn floor ^double [^double v] (FastMath/floor v))
+(defn ceil ^double [^double v] (FastMath/ceil v))
+(defn round ^long [^double v] (FastMath/round v))
+(defn rint ^double [^double v] (FastMath/rint v))
 
 ;; Find power of 2 exponent for double number where  
 ;; \\(2^(n-1)\leq x\leq 2^n\\)  
@@ -179,9 +186,9 @@
 (def high-2-exp (comp long ceil log2))
 
 ;; Modulo and abs
-(def reminder #(FastMath/remainder %1 %2))
-(def abs #(Math/abs ^double %))
-(def iabs #(Math/abs ^long %))
+(defn reminder ^double [^double v1 ^double v2] #(FastMath/remainder v1 v2))
+(defn abs ^double [^double v] (FastMath/abs v))
+(defn iabs ^long [^long v] (FastMath/abs v))
 
 ;; More constants
 
@@ -228,22 +235,22 @@
 
 (defn signum
   "Return 1 if the specified value is > 0, 0 if it is 0, -1 otherwise"
-  [^double value]
-  (cond (pos? value) 1
-        (neg? value) -1
+  ^double [^double value]
+  (cond (pos? value) 1.0
+        (neg? value) -1.0
         :else 0))
 
 (defn sgn
   "Return -1 when value is negative, 1 otherwise"
-  [^double value]
-  (if (neg? value) -1 1))
+  ^double [^double value]
+  (if (neg? value) -1.0 1.0))
 
 ;;`(constrain 0.5 1 2) => 1`  
 ;;`(constrain 1.5 1 2) => 1.5`  
 ;;`(constrain 2.5 1 2) => 2`  
 (defn constrain
   "Clamp value between mn and mx"
-  [^double value ^double mn ^double mx]
+  ^double [^double value ^double mn ^double mx]
   (if (> value mx) 
     mx
     (if (< value mn) 
@@ -255,9 +262,9 @@
   "Processing map and norm"
   ([v start1 stop1 start2 stop2] ;; map
    (+ ^double start2 (* (- ^double stop2 ^double start2) ^double (norm v start1 stop1))))
-  ([^double v ^double start ^double stop] ;; norm
+  (^double [^double v ^double start ^double stop] ;; norm
    (if (== start stop)
-     (if (< v start) 0 1)
+     (if (< v start) 0.0 1.0)
      (/ (- v start) (- stop start)))))
 
 ;; Map and constrain values
@@ -267,25 +274,25 @@
   ([v start1 stop1 start2 stop2]
    (constrain (norm v start1 stop1 start2 stop2) start2 stop2))
   ([v start stop]
-   (constrain (norm v start stop) 0 1)))
+   (constrain (norm v start stop) 0.0 1.0)))
 
 ;; Linear interpolation between `start` and `stop`.
 (defn lerp
   "Processing lerp"
-  [^double start ^double stop ^double t]
+  ^double [^double start ^double stop ^double t]
   (let [t1 (- 1.0 t)]
     (+ (* t1 start) (* t stop))))
 
 ;; Cosine interpolation between `start` and `stop`
 (defn cos-interpolation
   "oF interpolateCosine"
-  [^double start ^double stop ^double t]
+  ^double [^double start ^double stop ^double t]
   (let [t1 (* 0.5 (- 1.0 ^double (cos (* t PI))))]
     (lerp start stop t1)))
 
 (defn smoothstep
   "GL smoothstep"
-  [^double start ^double stop ^double x]
+  ^double [^double start ^double stop ^double x]
   (let [t ^double (norm x start stop)]
     (* t t (- 3.0 (* 2.0 t)))))
 
@@ -294,16 +301,16 @@
 ;;`(wrap 1.1 -1 1) => -0.8999999999999999`
 (defn wrap
   "Wrap overflowed value into the range, ofWrap"
-  [^double start ^double stop ^double value]
+  ^double [^double start ^double stop ^double value]
   (let [p (> start stop)
         from (if p stop start)
         to (if p start stop)
-        cycle ^double (- to from)]
+        cycle (- to from)]
     (if (zero? cycle)
       to
       (->> cycle
            (/ (- value from))
-           ^double (floor)
+           (floor)
            (* cycle)
            (- value)))))
 

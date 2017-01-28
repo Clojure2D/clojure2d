@@ -15,8 +15,7 @@
             [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
             [clojure2d.color :as c]
-            [criterium.core :refer :all]
-            [primitive-math :as pm])  
+            [criterium.core :refer :all])  
   (:import [java.awt.image BufferedImage]
            [javax.swing ImageIcon]
            [javax.imageio ImageIO ImageWriter ImageWriteParam IIOImage]
@@ -325,7 +324,7 @@
 (defn ellipse
   "Draw ellipse with middle at `(x,y)` position with width `w` and height `h`."
   ([canvas x1 y1 w h stroke?]
-   (.setFrame ellipse-obj (pm/- x1 (/ ^double w 2.0)) (pm/- ^double y1 (pm/div ^double h 2.0)) w h)
+   (.setFrame ellipse-obj (- ^double x1 (/ ^double w 2.0)) (- ^double y1 (/ ^double h 2.0)) w h)
    (draw-fill-or-stroke (@canvas 0) ellipse-obj stroke?)
    canvas)
   ([canvas x1 y1 w h]

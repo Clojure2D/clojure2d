@@ -3,6 +3,9 @@
             [clojure2d.math.vector :as v])
   (:import [clojure2d.math.vector Vec2]))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* :warn-on-boxed)
+
 (deftype Complex [^double real ^double imag]
   Object
   (toString [_] (str "[" real ", " imag "]")))
@@ -25,7 +28,7 @@
 
 (defn abs
   "Absolute value of complex number"
-  [^Complex z]
+  ^double [^Complex z]
   (m/hypot (.real z) (.imag z)))
 
 (defn add
@@ -199,5 +202,5 @@
 
 (defn arg
   "argument"
-  [^Complex z]
+  ^double [^Complex z]
   (m/atan2 (.imag z) (.real z)))
