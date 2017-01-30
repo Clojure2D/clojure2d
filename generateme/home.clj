@@ -36,7 +36,7 @@
                                                  (p/filter-channels p/normalize-filter false
                                                                     (g/blend-machine p4 p1 b)))))
 
-(quick-bench (p/filter-channels p/normalize false p1))
+(quick-bench (p/filter-channels p/dilate-filter false p1))
 
 (core/with-canvas canvas
   (core/image (o/render-rgb-scanlines (@canvas 1))))
