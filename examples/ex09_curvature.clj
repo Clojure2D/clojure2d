@@ -12,14 +12,14 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-(def ^:const width 800)
-(def ^:const height 800)
-(def ^:const border 200)
+(def ^:const ^long width 800)
+(def ^:const ^long height 800)
+(def ^:const ^long border 200)
 
-(def ^:const point-step 1.0)
-(def ^:const point-size 0.7)
-(def ^:const coord-scale 3.0)
-(def ^:const angle-scale 7.0)
+(def ^:const ^double point-step 1.0)
+(def ^:const ^double point-size 0.7)
+(def ^:const ^double coord-scale 3.0)
+(def ^:const ^double angle-scale 7.0)
 
 (defn make-particle
   ""
@@ -35,7 +35,7 @@
         yy (m/norm ny 0 height -1 1)
         ^Vec2 v (fun (v/mult (Vec2. xx yy) coord-scale))
         ^Vec2 vv (v/add v vshift)
-        angle (+ (.z in) (* angle-scale (m/norm (noise (.x vv) (.y vv)) 0 1 -1 1)))]
+        angle (+ (.z in) (* angle-scale ^double (m/norm (noise (.x vv) (.y vv)) 0 1 -1 1)))]
     (with-canvas canvas
       (set-color (Color. 20 20 20 20))
       (set-stroke point-size)
@@ -51,7 +51,7 @@
         variation2 (rand-nth variation-list)
         vshift (Vec2. (m/drand -3 3) (m/drand -3 3))
         mv-fun (partial move-particle canvas vshift (comp (make-variation variation2 1.0 {}) (make-variation variation1 1.0 {})) noise)
-        particles (repeatedly 5000 make-particle)]
+        particles (vec (repeatedly 5000 make-particle))]
     
     (defmethod key-pressed ["curvature" \space] [_]
       (let [r (to-hex (m/irand) 8)]
@@ -64,7 +64,7 @@
 
     (loop [xs particles]
       (when @running
-        (recur (doall (map mv-fun xs)))))
+        (recur (mapv mv-fun xs))))
     
     ))
 

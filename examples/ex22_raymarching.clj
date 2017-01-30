@@ -13,9 +13,10 @@
            [java.awt Color]))
 
 (set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
 
-(def ^:const w 1000)
-(def ^:const h 1000)
+(def ^:const ^long w 1000)
+(def ^:const ^long h 1000)
 
 (def canvas (create-canvas w h))
 
@@ -24,8 +25,8 @@
 (defmethod key-pressed ["raymarching" \space] [_]
   (save-canvas canvas "results/ex22/scene.jpg"))
 
-(def ^:const mint 0.01) ;; minimum ray distance 
-(def ^:const maxt 30.0) ;; maximum ray distance
+(def ^:const ^double mint 0.01) ;; minimum ray distance 
+(def ^:const ^double maxt 30.0) ;; maximum ray distance
 
 (def ^Vec3 sun-light (v/normalize (Vec3. -300.7 0.4 -200.0)))
 
@@ -57,18 +58,18 @@
 
 (defn cast-ray
   ""
-  [rd f]
+  ^double [rd f]
   (loop [i (int 0)
          t mint]
     (let [^Vec3 p (v/add ro (v/mult rd t))
-          diffh (- (.y p) (f (.x p) (.z p)))]
+          diffh (- (.y p) ^double (f (.x p) (.z p)))]
       (if (or (> t maxt)
               (> i 50)
               (< diffh (* 0.001 t)))
         t
         (recur (unchecked-inc i) (+ diffh t))))))
 
-(def ^:const k 16)
+(def ^:const ^long k 16)
 
 (defn softshadow
   ""
@@ -77,7 +78,7 @@
          res 1.0
          t mint]
     (let [^Vec3 p (v/add pos (v/mult rd t))
-          h (max 0.0 (f (.x p) (.z p)))
+          h (max 0.0 ^double (f (.x p) (.z p)))
           newres (min res (/ (* k h) t))]
       (if (or (< h 0.0001)
               (> i 20))
@@ -90,23 +91,23 @@
 
 (defn terrain
   ""
-  [x y]
+  [^double x ^double y]
   (let [^Vec2 v (terrain-f (Vec2. (+ x 0.5) y))]
-    (* 3.5 (m/noise (* 0.08 (.x v)) (* 0.08 (.y v))))))
+    (* 3.5 ^double (m/noise (* 0.08 (.x v)) (* 0.08 (.y v))))))
 
 (defn normal
   ""
-  [f ^Vec3 v t]
+  [f ^Vec3 v ^double t]
   (let [eps (max 0.002 (* 0.0001 t))]
-    (v/normalize (Vec3. (- (f (- (.x v) eps) (.z v))
-                           (f (+ (.x v) eps) (.z v)))
+    (v/normalize (Vec3. (- ^double (f (- (.x v) eps) (.z v))
+                           ^double (f (+ (.x v) eps) (.z v)))
                         (+ eps eps)
-                        (- (f (.x v) (- (.z v) eps))
-                           (f (.x v) (+ (.z v) eps)))))))
+                        (- ^double (f (.x v) (- (.z v) eps))
+                           ^double (f (.x v) (+ (.z v) eps)))))))
 
 (defn calc-fog
   ""
-  [t col bcol]
+  [^double t col bcol]
   (let [fo (- 1.0 (m/exp (* -0.01 t t)))
         fbcol (v/interpolate fog-color bcol fo)]
     (v/interpolate col fbcol fo)))
@@ -133,11 +134,11 @@
 (defn reflect
   ""
   [I N]
-  (v/sub I (v/mult N (* 2.0 (v/dot N I)))))
+  (v/sub I (v/mult N (* 2.0 ^double (v/dot N I)))))
 
 (defn smoothstep
   ""
-  [edge0 edge1 x]
+  ^double [edge0 edge1 ^double x]
   (let [t (m/norm x edge0 edge1)]
     (* t t (- 3.0 (* 2.0 t)))))
 

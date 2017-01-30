@@ -9,9 +9,10 @@
            [java.awt Color]))
 
 (set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
 
-(def ^:const w 1200)
-(def ^:const h 1200)
+(def ^:const ^long w 1200)
+(def ^:const ^long h 1200)
 
 (def canvas (create-canvas w h))
 
@@ -21,7 +22,7 @@
   (save-canvas canvas "results/ex23/scene.jpg"))
 
 (do
-  (def max-depth 20.0)
+  (def ^:const ^double max-depth 20.0)
 
   ;; ray origin
   (def ro (Vec3. 0.0 4.5 4.0))
@@ -44,7 +45,7 @@
   (defn fn-plane
     ""
     [^Vec3 p]
-    (let [v (- (* 1.5 (m/noise (* 0.06 (.x p)) (* 0.06 (.z p)))) 1.5)]
+    (let [v (- (* 1.5 ^double (m/noise (* 0.06 (.x p)) (* 0.06 (.z p)))) 1.5)]
       (HitData. (- (.y p) v) m1)))
 
   ;; scene
@@ -73,7 +74,7 @@
 
   (defn calc-color
     ""
-    [ro rd depth]
+    [ro rd ^double depth]
     (let [rm (ray-marching ro rd)
           ^HitData hit (rm 0)
           ^Material mat (.mat hit)

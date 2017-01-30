@@ -278,7 +278,7 @@
 (defn make-distance-fog
   ""
   [fcol ^double factor]
-  (fn ^double [^double t col]
+  (fn ^Vec3 [^double t col]
     (let [ft (- 1.0 (m/exp (* factor t t)))]
       (v/interpolate col fcol ft))))
 

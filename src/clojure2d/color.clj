@@ -13,8 +13,8 @@
 
 (defn clamp255
   ""
-  ^long [^double a]
-  (long (m/constrain a 0.0 255.0)))
+  [^double a]
+  (int (m/constrain a 0.0 255.0)))
 
 (defn mod255
   ""
@@ -61,17 +61,17 @@
 (defn to-color
   ""
   [^Vec4 v]
-  (Color. (int (clamp255 (.x v)))
-          (int (clamp255 (.y v)))
-          (int (clamp255 (.z v)))
-          (int (clamp255 (.w v)))))
+  (Color. ^int (clamp255 (.x v))
+          ^int (clamp255 (.y v))
+          ^int (clamp255 (.z v))
+          ^int (clamp255 (.w v))))
 
 (defn to-color3
   ""
   [^Vec3 v]
-  (Color. (int (clamp255 (.x v)))
-          (int (clamp255 (.y v)))
-          (int (clamp255 (.z v)))))
+  (Color. ^int (clamp255 (.x v))
+          ^int (clamp255 (.y v))
+          ^int (clamp255 (.z v))))
 
 (defn from-color
   ""
@@ -97,14 +97,14 @@
        (to-color3 c)
        c)))
   ([r g b]
-   (Color. (int (clamp255 r))
-           (int (clamp255 g))
-           (int (clamp255 b))))
+   (Color. ^int (clamp255 r)
+           ^int (clamp255 g)
+           ^int (clamp255 b)))
   ([r g b a]
-   (Color. (int (clamp255 r))
-           (int (clamp255 g))
-           (int (clamp255 b))
-           (int (clamp255 a)))))
+   (Color. ^int (clamp255 r)
+           ^int (clamp255 g)
+           ^int (clamp255 b)
+           ^int (clamp255 a))))
 
 ;; blending part, operate on range 0-1
 

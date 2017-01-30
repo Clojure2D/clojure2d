@@ -234,7 +234,7 @@
                         (pre-layout-planar true p channels)
                         (pre-layout-interleaved true p channels))
          limit (- (alength layout) (dec nb))
-         coding (condp == (:coding config)
+         coding (condp = (:coding config)
                   :none identity
                   :alaw alaw
                   :ulaw ulaw

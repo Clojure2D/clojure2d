@@ -5,6 +5,9 @@
             [clojure2d.math :as m]
             [clojure2d.extra.signal :as s]))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
+
 (def canvas (create-canvas 600 600))
 
 (def display (show-window canvas "waves" 600 600 25))
@@ -14,14 +17,14 @@
     (save-canvas canvas (str "results/ex18/" r ".jpg"))))
 
 ;; frequencies and amplitudes
-(def f (into [] (map #(bit-shift-left 1 %) (range 16))))
-(def a (into [] (map #(/ 1.0 %) f)))
+(def f (into [] (map #(bit-shift-left 1 ^long %) (range 16))))
+(def a (into [] (map #(/ 1.0 ^long %) f)))
 
 (defn draw-fun
   ""
   [canvas f]
   (dotimes [x 600]
-    (rect canvas x (+ 300 (* 300 (f (m/norm x 0 600 0 1)))) 1 1)))
+    (rect canvas x (+ 300.0 (* 300.0 ^double (f (/ x 600.0)))) 1 1)))
 
 ;; run several times
 (let [lst (into [] (map #(s/make-wave (rand-nth s/waves) (f %) (a %) (m/drand 1)) (range 1 5)))]
@@ -49,8 +52,8 @@
       phasemult (repeatedly num #(m/drand -3.0 3.0))
       octaves (repeatedly num #(m/irand num))]
   (dotimes [y 600]
-    (let [yy (m/norm y 0 600 0.0 1.0)
-          lst (map #(s/make-wave (nth wvs %) (f (nth octaves %)) (a (nth octaves %)) (+ (* yy (nth phasemult %)) (nth phases %))) (range num))]
+    (let [yy (/ y 600.0)
+          lst (map #(s/make-wave (nth wvs %) (f (nth octaves %)) (a (nth octaves %)) (+ (* yy ^double (nth phasemult %)) ^double (nth phases %))) (range num))]
       (with-canvas canvas
         (draw-fun2 y (s/make-sum-wave lst))
                                         ;                 (set-background (java.awt.Color/black))
@@ -63,6 +66,6 @@
 ;; open in Audacity as RAW 16 bit signed, mono, big-endian, 44100Hz
 (let [num 10
       amp (* 1.5 (/ 1.0 num))
-      lst (into [] (map #(s/make-wave (rand-nth s/waves) (* 150 %) amp (m/drand 1)) (range 1 (inc num))))
+      lst (into [] (map #(s/make-wave (rand-nth s/waves) (* 150 ^long %) amp (m/drand 1)) (range 1 (inc num))))
       f (s/make-sum-wave lst)]
   (s/save-signal (s/make-signal-from-wave f 44100 10) "results/ex18/wave.raw"))

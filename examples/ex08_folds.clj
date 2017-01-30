@@ -12,14 +12,14 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-(def ^:const w 600)
-(def ^:const h 600)
+(def ^:const ^long w 600)
+(def ^:const ^long h 600)
 
-(def ^:const x1 -3.0)
-(def ^:const y1 -3.0)
-(def ^:const x2 3.0)
-(def ^:const y2 3.0)
-(def ^:const step (/ (- x2 x1) (* 2.321 w)))
+(def ^:const ^double x1 -3.0)
+(def ^:const ^double y1 -3.0)
+(def ^:const ^double x2 3.0)
+(def ^:const ^double y2 3.0)
+(def ^:const ^double step (/ (- x2 x1) (* 2.321 w)))
 
 (def sinusoidal (vr/make-variation :sinusoidal 3.0 {}))
 
@@ -30,7 +30,7 @@
   ""
   []
   (let [one-field? (m/brand 0.25)
-        derivative? (m/brand 0.2)
+        derivative? (m/brand 0.15)
         sinusoidal? (m/brand 0.75)
         field-name1 (rand-nth vr/variation-list)
         field-name2 (rand-nth vr/variation-list)
@@ -57,8 +57,8 @@
       (loop [x x1]
         
         (let [^Vec2 vv (field (Vec2. x y))
-              xx (m/norm (+ (.x vv) (m/grand 0.003)) x1 x2 20 (- w 20))
-              yy (m/norm (+ (.y vv) (m/grand 0.003)) y1 y2 20 (- h 20))]
+              xx (m/norm (+ (.x vv) ^double (m/grand 0.003)) x1 x2 20 (- w 20))
+              yy (m/norm (+ (.y vv) ^double (m/grand 0.003)) y1 y2 20 (- h 20))]
           (point canvas xx yy))
 
         (when (and @disp (< x x2)) (recur (+ x step))))

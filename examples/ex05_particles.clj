@@ -10,14 +10,14 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-(def ^:const width 1200)
-(def ^:const height 1200)
+(def ^:const ^long width 1200)
+(def ^:const ^long height 1200)
 
-(def ^:const point-step 15.0)
-(def ^:const rscale 15.0)
-(def ^:const angle-mult 16.0)
-(def ^:const point-size 0.9)
-(def ^:const alpha 20)
+(def ^:const ^double point-step 15.0)
+(def ^:const ^double rscale 15.0)
+(def ^:const ^double angle-mult 16.0)
+(def ^:const ^double point-size 0.9)
+(def ^:const ^int alpha 20)
 
 (defn make-particle
   ""
@@ -31,7 +31,7 @@
         yy (m/norm (.y in) 0 height -2 2)
         ^Vec2 vr (v/add vrand (Vec2. xx yy))
         ^Vec2 v (v/div (fun vr) rscale)
-        n (noise (.x v) (.y v))
+        ^double n (noise (.x v) (.y v))
         ang (* n m/TWO_PI angle-mult)
         nx (+ (.x in) (* point-step (m/qcos ang)))
         ny (+ (.y in) (* point-step (m/qsin ang)))
@@ -51,12 +51,13 @@
   (let [canvas (create-canvas width height)
         [frame running] (show-window canvas "particles" width height 25)
         noise (n/make-random-fractal)
-        variation1 (rand-nth variation-list)
-        variation2 (rand-nth variation-list)
+        variation1 (rand-nth variation-list-not-random)
+        variation2 (rand-nth variation-list-not-random)
         vrand (Vec2. (m/drand -1 1) (m/drand -1 1))
         compv (make-variation :erf 1.0 {})
         mv-fun (partial move-particle canvas vrand (comp (make-variation variation2 1.0 {}) (make-variation variation1 1.0 {})) noise)
-        particles (repeatedly 25000 make-particle)]
+        
+        particles (vec (repeatedly 25000 make-particle))]
     
     (defmethod key-pressed ["particles" \space] [_]
       (let [r (to-hex (m/irand) 8)]
@@ -66,7 +67,7 @@
 
     (loop [xs particles]
       (when @running
-        (recur (doall (map mv-fun xs)))))
+        (recur (mapv mv-fun xs))))
     
     ))
 

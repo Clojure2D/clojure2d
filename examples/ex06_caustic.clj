@@ -9,18 +9,18 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-(def ^:const min-range -2.0)
-(def ^:const max-range 2.0)
-(def ^:const tilt-scale 4)
-(def ^:const delta-scale 0.5)
-(def ^:const shift-scale 30.0)
+(def ^:const ^double min-range -2.0)
+(def ^:const ^double max-range 2.0)
+(def ^:const ^long tilt-scale 4)
+(def ^:const ^double delta-scale 0.5)
+(def ^:const ^long shift-scale 30)
 
 (defn create-field
   ""
   []
   (let [one-field? (m/brand 0.5)
-        field-name1 (rand-nth vr/variation-list)
-        field-name2 (rand-nth vr/variation-list)
+        field-name1 (rand-nth vr/variation-list-not-random)
+        field-name2 (rand-nth vr/variation-list-not-random)
         field (if one-field?
                 (vr/make-variation field-name1 1.0 {})
                 (comp (vr/make-variation field-name2 1.0 {}) (vr/make-variation field-name1 1.0 {})))]
@@ -31,19 +31,20 @@
 
 (defn draw-caustic
   ""
-  [canvas disp width height]
-  (let [hw (/ width 2)
-        hh (/ height 2)
+  [canvas disp ^long width ^long height]
+  (let [hw (long (/ width 2))
+        hh (long (/ height 2))
         d shift-scale
         d2 (* d 2)
+        d2- (- d2)
         field (create-field)]
-    (loop [x (- d2)]
-      (loop [y (- d2)]
-        (let [hx (m/norm (- x hw) (- hw) hw min-range max-range)
-              hy (m/norm (- y hh) (- hh) hh min-range max-range)
+    (loop [x (double d2-)]
+      (loop [y (double d2-)]
+        (let [^double hx (m/norm (- x hw) (- hw) hw min-range max-range)
+              ^double hy (m/norm (- y hh) (- hh) hh min-range max-range)
               hhx (* tilt-scale hx)
               hhy (* tilt-scale hy)
-              delta (* delta-scale (m/norm (m/noise hx hy) 0 1 -1 1))
+              delta (* delta-scale ^double (m/norm (m/noise hx hy) 0 1 -1 1))
               ^Vec2 v1 (field (Vec2. (- hhx delta) (- hhy delta)))
               ^Vec2 v2 (field (Vec2. (+ hhx delta) (+ hhy delta)))
               dx (* d (- (.x v1) (.x v2)))

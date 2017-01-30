@@ -4,37 +4,38 @@
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
-            [clojure2d.extra.variations :refer :all])
+            [clojure2d.extra.variations :refer :all]
+            [clojure2d.math.joise :as j])
   (:import  [java.awt Color]
             [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-(def ^:const width 900)
-(def ^:const height 900)
+(def ^:const ^long width 900)
+(def ^:const ^long height 900)
 
-(def ^:const point-step 1) ; 0.01 - 2.0
-(def ^:const point-size 1) ; 0.6 - 1.2
-(def ^:const alpha 20)
+(def ^:const ^double point-step 0.05) ; 0.01 - 2.0
+(def ^:const ^double point-size 1.0) ; 0.6 - 1.2
+(def ^:const ^int alpha 20)
 
 (defn make-particle
   ""
   []
-  (let [r (m/drand 0.5 m/TWO_PI)
-        a (m/drand m/TWO_PI)]
+  (let [^double r (m/drand 0.5 m/TWO_PI)
+        ^double a (m/drand m/TWO_PI)]
     (Vec2. (* r (m/qcos a)) (* r (m/qsin a)))))
 
 (def sinusoidal (make-variation :sinusoidal 1.0 {}))
 
 (defn move-particle
   ""
-  [canvas ^Vec2 vrand fun ^Vec2 in]
-  (let [^Vec2 v (v/add in (v/mult (sinusoidal (v/mult (->> in
+  [canvas ^Vec2 vrand noisef fun ^Vec2 in]
+  (let [^Vec2 nf (noisef in)
+        ^Vec2 v (v/add in (v/mult (sinusoidal (v/mult (->> in
                                                            (v/add vrand)
                                                            fun
-                                                           sinusoidal
-                                                           (v/add vrand)) m/TWO_PI)) point-step))
+                                                           (v/add nf)) m/TWO_PI)) point-step))
         nx (.x v)
         ny (.y v)
         screenx (m/norm nx -8.0 8.0 0 width)
@@ -48,15 +49,40 @@
         (Vec2. nx ny))
       (make-particle))))
 
+(defn make-random-noise
+  ""
+  []
+  (let [type (rand-nth (keys j/fractal-type))
+        b [j/make-random-basis-module
+           j/make-random-basis-module
+           j/make-random-cell-module]
+        l (m/drand 1 3)
+        f (m/drand 1 3)
+        params {:type type
+                :lacunarity l
+                :frequency f
+                :octaves [[1 ((rand-nth b))]
+                          [1 ((rand-nth b))]]}]
+    (j/make-noise (j/make-fractal params))))
+
+(defn get-noise
+  ""
+  [f ^Vec2 in]
+  (let [^Vec2 in (v/mult in 0.3)]
+    (Vec2. (- ^double (f (.x in) (.y in)) 0.5)
+           (- ^double (f (.y in) (.x in) 0.3) 0.5))))
+
 (defn example-21
   []
   (let [canvas (create-canvas width height)
         [frame running] (show-window canvas "popcorn" width height 25)
-        variation1 (rand-nth variation-list)
-        variation2 (rand-nth variation-list)
+        variation1 (rand-nth variation-list-not-random)
+        variation2 (rand-nth variation-list-not-random)
         vrand (Vec2. (m/drand -1 1) (m/drand -1 1))
-        mv-fun (partial move-particle canvas vrand (comp (make-variation variation2 1.0 {}) (make-variation variation1 1.0 {})))
-        particles (repeatedly 15000 make-particle)]
+        noisef (if (m/brand 0.2) (partial get-noise (make-random-noise)) (fn [_] (Vec2. 0.0 0.0)))
+        mv-fun (partial move-particle canvas vrand noisef (comp (make-variation variation2 1.0 {}) (make-variation variation1 1.0 {})))
+        
+        particles (vec (repeatedly 15000 make-particle))]
     
     (defmethod key-pressed ["popcorn" \space] [_]
       (binding [*jpeg-image-quality* 0.9]
@@ -69,7 +95,7 @@
 
     (loop [xs particles]
       (when @running
-        (recur (doall (map mv-fun xs)))))
+        (recur (mapv mv-fun xs))))
     
     ))
 

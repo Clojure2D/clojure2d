@@ -6,8 +6,7 @@
   "Process window events"
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m])
-  (:import [java.awt.event MouseEvent]
-           [java.awt Color]))
+  (:import [java.awt.event MouseEvent]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -32,7 +31,7 @@
         name2 "second window"
         frame1 (show-window (make-canvas 1 1) name1 400 400 25)
         frame2 (show-window (make-canvas 100 100) name2 400 200 10)]
-
+    
     (defmethod key-pressed [name1 \space] [_]
       (println (str "Window: " name1)))
 
@@ -43,12 +42,11 @@
       (let [canvas (make-canvas 1 1)
             x (.getX e)
             y (.getY e)
-            cr (int (m/constrain (m/norm x 0 399 0 255) 0 255))
-            cg (int (m/constrain (m/norm y 0 399 0 255) 0 255))]
+            cr (m/cnorm x 0 399 0 255)
+            cg (m/cnorm y 0 399 0 255)]
         (with-canvas canvas
           (set-background cr cg 128))
         (replace-canvas frame1 canvas)))
     nil))
-
 
 (example-01)

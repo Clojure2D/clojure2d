@@ -4,25 +4,35 @@
             [clojure2d.color :as c]
             [clojure2d.math.vector :as v]
             [clojure2d.math :as m])
-  (:import [clojure2d.math.vector Vec4]))
+  (:import [clojure2d.math.vector Vec4]
+           [clojure2d.pixels Pixels]))
 
 ;; reduce colors to random palette
 
-(def img (p/load-pixels "results/test.jpg"))
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
+
+(def ^Pixels img (p/load-pixels "results/test.jpg"))
+
+(def canvas (make-canvas (.w img) (.h img)))
+(def window (show-window canvas "Colors" (.w img) (.h img) 15))
+
+(defmethod key-pressed ["Colors" \space] [_]
+  (save-canvas canvas (next-filename "results/ex20/" ".jpg")))
 
 ;; colourlovers
-(p/save-pixels (p/filter-colors (c/make-reduce-color-filter) img) "results/ex20/colourlovers.jpg")
+(p/set-canvas-pixels canvas (p/filter-colors (c/make-reduce-color-filter) img))
 
 ;; generated palette with 8 colors
 (def random-palette-8 (c/make-random-palette 8))
-(p/save-pixels (p/filter-colors (c/make-reduce-color-filter random-palette-8) img) "results/ex20/generated.jpg")
+(p/set-canvas-pixels canvas (p/filter-colors (c/make-reduce-color-filter random-palette-8) img))
 
 ;; different distance function
 (def random-palette-6 (conj (c/make-random-palette 4) (Vec4. 0 0 0 255.0) (Vec4. 255 255 255 255)))
-(p/save-pixels (p/filter-colors (c/make-reduce-color-filter v/dist random-palette-6) img) "results/ex20/euclid.jpg")
-(p/save-pixels (p/filter-colors (c/make-reduce-color-filter v/dist-abs random-palette-6) img) "results/ex20/abs.jpg")
-(p/save-pixels (p/filter-colors (c/make-reduce-color-filter v/dist-cheb random-palette-6) img) "results/ex20/cheb.jpg")
+(p/set-canvas-pixels canvas (p/filter-colors (c/make-reduce-color-filter v/dist random-palette-6) img))
+(p/set-canvas-pixels canvas  (p/filter-colors (c/make-reduce-color-filter v/dist-abs random-palette-6) img))
+(p/set-canvas-pixels canvas  (p/filter-colors (c/make-reduce-color-filter v/dist-cheb random-palette-6) img))
 
 (do
-  (def paletton-palette (c/paletton-palette :triad 0 {:compl true :angle 20 :preset :shiny}))
-  (p/save-pixels (p/filter-colors (c/make-reduce-color-filter paletton-palette) img) "results/ex20/paletton.jpg"))
+  (def paletton-palette (c/paletton-palette :triad 0 {:compl true :angle 20 :preset (rand-nth c/paletton-presets-names)}))
+  (p/set-canvas-pixels canvas  (p/filter-colors (c/make-reduce-color-filter paletton-palette) img)))

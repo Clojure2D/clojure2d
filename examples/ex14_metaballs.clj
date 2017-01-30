@@ -3,29 +3,31 @@
 (ns examples.ex14-metaballs
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
-            [clojure2d.color :as c])
-  (:import [java.awt Color]))
+            [clojure2d.color :as c]
+            [clojure2d.math.vector :as v])
+  (:import [java.awt Color]
+           [clojure2d.math.vector Vec3]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-(def ^:const SIZE 400)
+(def ^:const ^long SIZE 600)
 
-(deftype Ball [x y vx vy radius color])
+(deftype Ball [^double x ^double y ^double vx ^double vy ^double radius ^Vec3 color])
 
 (defn make-ball
   ""
-  []
+  ^Ball []
   (Ball. (m/irand SIZE)
          (m/irand SIZE)
-         (double (m/irand 1 7))
-         (double (m/irand 1 7))
+         (m/irand 1 7)
+         (m/irand 1 7)
          (m/irand 40 55)
-         (take 3 (repeatedly #(m/irand 256)))))
+         (Vec3. (m/drand 255) (m/drand 255) (m/drand 255))))
 
 (defn direction
   ""
-  [p v]
+  ^double [^double p ^double v]
   (if (or (> p SIZE) (neg? p))
     (- v)
     v))
@@ -37,41 +39,34 @@
         vy (direction (.y ball) (.vy ball))]
     (Ball. (+ (.x ball) vx) (+ (.y ball) vy) vx vy (.radius ball) (.color ball))))
 
-(defn color
-  ""
-  [r g b]
-  (Color. ^int (c/clamp255 r)
-          ^int (c/clamp255 g)
-          ^int (c/clamp255 b)))
-
 (defn influence 
   ""
-  [^Ball ball px py]
+  ^double [^Ball ball ^double px ^double py]
   (let [dx (- (.x ball) px)
         dy (- (.y ball) py)]
     (/ (.radius ball) (+ m/EPSILON (m/hypot dx dy)))))
 
 (defn compute-color
   ""
-  [x y [red-cur green-cur blue-cur] ^Ball ball]
+  ^Vec3 [x y ^Vec3 cur ^Ball ball]
   (let [infl (influence ball x y)
-        [r g b] (.color ball)]
-    [(+ red-cur (* infl r))
-     (+ green-cur (* infl g))
-     (+ blue-cur (* infl b))]))
+        ^Vec3 rgb (.color ball)]
+    (Vec3. (+ (.x cur) (* infl (.x rgb)))
+           (+ (.y cur) (* infl (.y rgb)))
+           (+ (.z cur) (* infl (.z rgb))))))
 
 (defn draw
   ""
   [canvas balls]
-  (loop [y 0]
-   (loop [x 0]
+  (loop [y (int 0)]
+    (loop [x (int 0)]
     
-    (let [[r g b] (reduce (partial compute-color x y) [0 0 0] balls)]
-      (set-color canvas ^Color (color r g b))
-      (rect canvas x y 2 2))
+      (let [^Vec3 c (reduce (partial compute-color x y) (Vec3. 0.0 0.0 0.0) balls)]
+        (set-color canvas c)
+        (rect canvas x y 2 2))
     
-    (when (< x (- SIZE 2)) (recur (+ 2 x))))
-   (when (< y (- SIZE 2)) (recur (+ 2 y)))))
+      (when (< x (- SIZE 2)) (recur (+ 2 x))))
+    (when (< y (- SIZE 2)) (recur (+ 2 y)))))
 
 (defn draw-balls
   ""
@@ -90,4 +85,4 @@
     (show-window canvas "metaballs" SIZE SIZE 25 (partial draw-balls n)))
   :done)
 
-(example-14 (m/irand 2 4))
+(example-14 (m/irand 2 6))

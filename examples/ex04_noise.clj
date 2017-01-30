@@ -1,7 +1,8 @@
 (ns examples.ex04-noise
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
-            [clojure2d.math.joise :as j])
+            [clojure2d.math.joise :as j]
+            [clojure2d.color :as c])
   (:import  [java.awt Color]))
 
 (set! *warn-on-reflection* true)
@@ -16,8 +17,8 @@
     (dotimes [x 180]
       (let [xx (/ x 50.0)
             yy (/ y 50.0)
-            n (int (m/cnorm (n xx yy) 0 1 0 255))]
-        (set-color canvas (Color. n n n))
+            nn (* 255.0 ^double (n xx yy))]
+        (set-color canvas (c/make-color nn nn nn))
         (rect canvas (+ x 10) (+ y 10) 1 1))))
   canvas)
 
@@ -25,11 +26,11 @@
   ""
   [n]
   (with-canvas canvas
-    (set-background (Color. 0 0 0))
+    (set-background Color/black)
     (loop-noise n))
   nil)
 
-(show-window canvas "noise" 600 600 1)
+(show-window canvas "noise" 600 600 10)
 
 (defmethod key-pressed ["noise" \space] [_]
   (let [r (to-hex (m/irand) 8)]
@@ -61,7 +62,7 @@
 ;saving: results/ex04/D9164162.jpg
 ;saving: results/ex04/A72AC802.jpg
 ;saving: results/ex04/B14C2C21.jpg
-(let [coeffs [(m/drand -5 5) (m/drand -5 5) (m/drand -5 5) (m/drand -5 5)]]
+(let [coeffs [(m/drand -5.0 5.0) (m/drand -5.0 5.0) (m/drand -5.0 5.0) (m/drand -5.0 5.0)]]
   (draw-noise (j/make-noise (j/auto-correct (j/make-cell {:coeffs coeffs}) 500)))
   coeffs)
 

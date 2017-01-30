@@ -606,7 +606,7 @@
 
   * Input: frame, is-display-running? atom, function to run before repaint, canvas and sleep time."
   [^JFrame frame is-display-running? draw-fun buffer stime]
-  (loop [cnt 0
+  (loop [cnt (long 0)
          result nil]
     (let [thr (future (let [curr-res (when draw-fun (draw-fun @buffer cnt result))]
                         (doto frame

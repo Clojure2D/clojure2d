@@ -645,9 +645,9 @@
 
 (defn noise-with
   ""
-  ([^Perlin n x] (* 0.5 (+ 1.0 (.getValue n x 0.5 0.5))))
-  ([^Perlin n x y] (* 0.5 (+ 1.0 (.getValue n x y 0.5))))
-  ([^Perlin n x y z] (* 0.5 (+ 1.0 (.getValue n x y z)))))
+  (^double [^Perlin n x] (* 0.5 (+ 1.0 (.getValue n x 0.5 0.5))))
+  (^double [^Perlin n x y] (* 0.5 (+ 1.0 (.getValue n x y 0.5))))
+  (^double [^Perlin n x y z] (* 0.5 (+ 1.0 (.getValue n x y z)))))
 
 (defn make-perlin-noise
   ""

@@ -1,23 +1,45 @@
 (ns examples.ex15-colorspace
   (:require [clojure2d.core :refer :all]
             [clojure2d.pixels :as p]
-            [clojure2d.color :as c]))
+            [clojure2d.color :as c])
+  (:import [clojure2d.pixels Pixels]))
+
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
 
 ;; convert image into some colorspaces
 
-(def img (p/load-pixels "results/test.jpg"))
+(def ^Pixels img (p/load-pixels "results/test.jpg"))
 
-(p/save-pixels (p/filter-colors c/to-OHTA img) "results/ex15/ohta.jpg")
-(p/save-pixels (p/filter-colors c/to-CMY img) "results/ex15/cmy.jpg")
-(p/save-pixels (p/filter-colors c/to-YPbPr img) "results/ex15/ypbpr.jpg")
-(p/save-pixels (p/filter-colors c/from-OHTA img) "results/ex15/revohta.jpg")
-(p/save-pixels (p/filter-colors c/from-YPbPr img) "results/ex15/revypbpr.jpg")
+(def canvas (make-canvas (.w img) (.h img)))
+(def window (show-window canvas "Colorspace" (.w img) (.h img) 15))
 
-(p/save-pixels (p/filter-colors (comp c/to-YPbPr c/from-OHTA c/from-YPbPr) img) "results/ex15/mess.jpg")
+(defmethod key-pressed ["Colorspace" \space] [_]
+  (save-canvas canvas (next-filename "results/ex15/" ".jpg")))
+
+
+(p/set-canvas-pixels canvas (p/filter-colors c/to-OHTA img))
+(p/set-canvas-pixels canvas (p/filter-colors c/to-CMY img))
+(p/set-canvas-pixels canvas (p/filter-colors c/to-YPbPr img))
+(p/set-canvas-pixels canvas (p/filter-colors c/from-OHTA img))
+(p/set-canvas-pixels canvas (p/filter-colors c/from-YPbPr img))
+
+(p/set-canvas-pixels canvas (p/filter-colors (comp c/to-YPbPr c/from-OHTA c/from-YPbPr) img))
 
 ;; equalize histogram in YPbPr colorspace
-(p/save-pixels (->> img
-                    (p/filter-colors c/to-YPbPr)
-                    (p/filter-channels p/equalize-filter false)
-                    (p/filter-colors c/from-YPbPr))
-             "results/ex15/equalize.jpg")
+(p/set-canvas-pixels canvas (->> img
+                                 (p/filter-colors c/to-YPbPr)
+                                 (p/filter-channels p/equalize-filter false)
+                                 (p/filter-colors c/from-YPbPr)))
+
+
+;; random conversion
+(let [cs1 (rand-nth c/colorspaces-names)
+      cs2 (rand-nth c/colorspaces-names)]
+  (println (str ":RGB -> " cs1 " -> " cs2 " -> :RGB"))
+  (p/set-canvas-pixels canvas (->> img
+                                   (p/filter-colors (first (c/colorspaces cs1)))
+                                   (p/filter-channels p/normalize-filter false)
+                                   (p/filter-colors (second (c/colorspaces cs2)))
+                                   (p/filter-channels p/normalize-filter false))))
+

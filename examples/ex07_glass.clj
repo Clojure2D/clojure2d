@@ -2,9 +2,9 @@
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
-            [clojure2d.extra.variations :as vr])
-  (:import [clojure2d.math.vector Vec2]
-           [java.awt Color]))
+            [clojure2d.extra.variations :as vr]
+            [clojure2d.color :as c])
+  (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -13,8 +13,8 @@
   ""
   []
   (let [one-field? (m/brand 0.5)
-        field-name1 (rand-nth vr/variation-list)
-        field-name2 (rand-nth vr/variation-list)
+        field-name1 (rand-nth vr/variation-list-not-random)
+        field-name2 (rand-nth vr/variation-list-not-random)
         field (if one-field?
                 (vr/make-variation field-name1 1.0 {})
                 (comp (vr/make-variation field-name2 1.0 {}) (vr/make-variation field-name1 1.0 {})))]
@@ -25,24 +25,24 @@
 
 (defn draw-glass
   ""
-  [canvas disp width height]
-  (let [hw (/ height 2)
-        ww (/ width 2)
+  [canvas disp ^long width ^long height]
+  (let [hw (long (/ height 2))
+        ww (long (/ width 2))
         field (create-field)]
-      (loop [x 0]
-        (loop [y 0]
-          (let [xt (/ (- x ww) 120)
-                yt (/ (- y hw) 120)
-                ^Vec2 n (field (Vec2. xt yt))
-                n1 (m/noise (.x n) (.y n))
-                n2 (m/noise (.y n) (.x n) 0.3)
-                v1 (float (m/constrain n1 0 1))
-                v2 (float (m/constrain n2 0 1))]
-            (set-color canvas (Color. (* v1 v1) (* v1 v2) v2))
-            (rect canvas x y 1 1))
+    (loop [x (int 0)]
+      (loop [y (int 0)]
+        (let [xt (/ (- x ww) 120.0)
+              yt (/ (- y hw) 120.0)
+              ^Vec2 n (field (Vec2. xt yt))
+              n1 (m/noise (.x n) (.y n))
+              n2 (m/noise (.y n) (.x n) 0.3)
+              v1 (m/constrain n1 0 1)
+              v2 (m/constrain n2 0 1)]
+          (set-color canvas (c/make-color (* 255.0 v1 v1) (* 255.0 v1 v2) (* 255.0 v2)))
+          (rect canvas x y 1 1))
 
-          (when (and @disp (< y height)) (recur (inc y))))
-        (when (and @disp (< x width)) (recur (inc x))))))
+        (when (and @disp (< y height)) (recur (inc y))))
+      (when (and @disp (< x width)) (recur (inc x))))))
 
 (defn example-07
   ""

@@ -81,7 +81,7 @@
 ;; Locally used random function for some configuration parameters. Mostly used to avoid `0` value.
 (defn- srandom
   "Symetric random from [-mx -mn] and [mn mx]"
-  [mn mx]
+  ^double  [^double mn ^double mx]
   (let [^double rand (m/drand mn mx)]
   (if (m/brand)
     rand
@@ -89,6 +89,19 @@
 
 (def ^Vec2 unitx (Vec2. 1.0 0.0))
 (def ^Vec2 zerov (Vec2. 0.0 0.0))
+
+;; Two atoms to register names. One for non-random functions and second for random
+
+(def random-var (atom []))
+(def regular-var (atom [:default]))
+
+(defn- register-var
+  "Add `name` to the atom `what`"
+  [what name]
+  (swap! what conj name))
+
+(def register-random-var (partial register-var random-var))
+(def register-regular-var (partial register-var regular-var))
 
 ;; ## A
 ;;
@@ -117,6 +130,7 @@
           yy (* amount dy)]
       (Vec2. xx yy))))
 (make-var-method auger)
+(register-regular-var :auger)
 
 ;; ### Arch
 
@@ -131,6 +145,7 @@
           (Vec2. (* amount sinr)
                  (* amount (/ (m/sq sinr) cosr)))))))
 (make-var-method arch)
+(register-random-var :arch)
 
 ;; ## B
 
@@ -172,6 +187,7 @@
           yy (* amount sins temp)]
       (Vec2. xx yy))))
 (make-var-method bcollide)
+(register-regular-var :bcollide)
 
 ;; ### bCollide
 (defn config-bswirl
@@ -202,6 +218,7 @@
         (Vec2. (* amount (/ sinht temp))
                (* amount (/ sins temp)))))))
 (make-var-method bswirl)
+(register-regular-var :bswirl)
 
 ;; ### BesselJ
 (defn make-besselj
@@ -211,6 +228,7 @@
     (Vec2. (* amount ^double (v/mag v) (BesselJ/value (m/abs (.x v)) (m/abs (.y v))))
            (* amount ^double (v/heading v)))))
 (make-var-method besselj)
+(register-regular-var :besselj)
 
 ;; ### Beta
 (defn make-beta
@@ -220,6 +238,7 @@
     (Vec2. (* amount (Beta/logBeta (+ m/EPSILON (m/abs (.x v))) (+ m/EPSILON (m/abs (.y v)))))
            (* amount ^double (v/heading v)))))
 (make-var-method beta)
+(register-regular-var :beta)
 
 ;; ## Bent
 
@@ -232,6 +251,7 @@
       (Vec2. (* amount nx)
              (* amount ny)))))
 (make-var-method bent)
+(register-regular-var :bent)
 
 ;; ## Blade
 
@@ -245,6 +265,7 @@
       (Vec2. (* amount (.x v) (+ cosr sinr))
              (* amount (.x v) (- cosr sinr))))))
 (make-var-method blade)
+(register-random-var :blade)
 
 (defn make-blade2
   ""
@@ -256,6 +277,7 @@
       (Vec2. (* amount (.x v) (+ cosr sinr))
              (* amount (.y v) (- cosr sinr))))))
 (make-var-method blade2)
+(register-random-var :blade2)
 
 ;; ## Boarders
 
@@ -286,6 +308,7 @@
             (Vec2. (* amount (- (+ hoffsetx roundx) (/ (* 0.25 offsetx) offsety)))
                    (* amount (- (+ hoffsety roundy) 0.25)))))))))
 (make-var-method boarders)
+(register-random-var :boarders)
 
 ;; ## Butterfly
 
@@ -301,6 +324,7 @@
              (* r y2)))))
 
 (make-var-method butterfly)
+(register-regular-var :butterfly)
 
 ;; ## C
 
@@ -380,6 +404,7 @@
                   (+ YY)
                   (* amount))))))
 (make-var-method circlelinear)
+(register-regular-var :circlelinear)
 
 ;; ### csin
 
@@ -393,13 +418,32 @@
 
 (defn make-csin
   "CSin by zephyrtronium, http://fractal-resources.deviantart.com/art/CSin-Apophysis-Plugin-158332287"
-  [amount {:keys [stretch ^Complex s-cx]}]
+  [^double amount {:keys [stretch ^Complex s-cx]}]
   (fn [^Vec2 v]
     (v/mult (->> (c/from-vec2 v)
                  (c/mult s-cx)
                  (c/sin)
                  (c/to-vec2)) amount)))
 (make-var-method csin)
+(register-regular-var :csin)
+
+;; ## D
+
+;; ### Diamond
+
+(defn make-diamond
+  "Diamond"
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [^double length (v/mag v)
+          sina (/ (.x v) length)
+          cosa (/ (.y v) length)
+          sinr (m/sin length)
+          cosr (m/cos length)]
+      (Vec2. (* amount sina cosr)
+             (* amount cosa sinr)))))
+(make-var-method diamond)
+(register-regular-var :diamond)
 
 ;; ## E
 
@@ -436,6 +480,7 @@
           yy (* amount (m/sinh mu) (m/sin nu))]
       (Vec2. xx yy))))
 (make-var-method emod)
+(register-regular-var :emod)
 
 ;; ### Erf
 (defn make-erf
@@ -445,6 +490,7 @@
     (Vec2. (* amount (Erf/erf (.x v) (.y v)))
            (* amount ^double (v/heading v)))))
 (make-var-method erf)
+(register-regular-var :erf)
 
 ;; ### Exp
 (defn make-exp
@@ -455,6 +501,7 @@
       (Vec2. (* amount e (m/cos (.y v)))
              (* amount e (m/sin (.y v)))))))
 (make-var-method exp)
+(register-regular-var :exp)
 
 ;; ## F
 (defn config-fan2
@@ -481,6 +528,7 @@
       (Vec2. (* amount r (m/sin a))
              (* amount r (m/cos a))))))
 (make-var-method fan2)
+(register-regular-var :fan2)
 
 ;; ## G
 
@@ -492,6 +540,7 @@
     (Vec2. (* amount (Gamma/logGamma (v/mag v)))
            (* amount ^double (v/heading v)))))
 (make-var-method gamma)
+(register-regular-var :gamma)
 
 ;; ## H
 ;;
@@ -505,6 +554,7 @@
       (Vec2. (* r (.x v))
              (* r (.y v))))))
 (make-var-method hemisphere)
+(register-regular-var :hemisphere)
 
 ;; ## J
 ;;
@@ -519,6 +569,7 @@
                  (* amount))]
       (Vec2. (* r (m/cos a)) (* r (m/sin a))))))
 (make-var-method julia)
+(register-random-var :julia)
 
 ;; ### JuliaN
 (defn config-julian
@@ -540,6 +591,7 @@
           r (* amount (m/pow (v/magsq v) cpower))]
       (Vec2. (* r (m/cos a)) (* r (m/sin a))))))
 (make-var-method julian)
+(register-random-var :julian)
 
 ;; ### JuliaQ
 (defn config-juliaq
@@ -566,11 +618,40 @@
           r (* amount (m/pow (v/magsq v) half-inv-power))]
       (Vec2. (* r (m/cos a)) (* r (m/sin a))))))
 (make-var-method juliaq)
+(register-random-var :juliaq)
 
 ;; ## N
 
 
 ;; ## P
+
+;; ### Pie
+(defn config-pie
+  "Pie configuration
+  params: `:slices` `:rotation` `:thickness`"
+  [p]
+  (merge {:slices (srandom 0.01 7.0)
+          :rotation (m/drand m/TWO_PI)
+          :thickness (m/drand -2.0 2.0)} p))
+(make-config-method pie)
+
+(defn make-pie
+  "pie from jwildfire"
+  [^double amount {:keys [^double slices ^double rotation ^double thickness]}]
+  (fn [^Vec2 v]
+    (let [sl (m/round (+ 0.5 (* slices ^double (m/drand))))
+          a (-> thickness
+                (* ^double (m/drand))
+                (+ sl)
+                (* m/TWO_PI)
+                (/ slices)
+                (+ rotation))
+          r (* amount ^double (m/drand))]
+      (Vec2. (* r (m/cos a))
+             (* r (m/sin a))))))
+(make-var-method pie)
+(register-random-var :pie)
+
 
 ;; ### Popcorn2
 (defn config-popcorn2
@@ -602,8 +683,26 @@
                   (* amount))]
       (Vec2. xx yy))))
 (make-var-method popcorn2)
+(register-regular-var :popcorn2)
 
 ;; ## S
+
+;; ### Scry
+
+(defn make-scry
+  ""
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [^double t (v/magsq v)
+          d (-> 1.0
+                (/ amount)
+                (+ t)
+                (* (m/sqrt t))
+                (+ m/EPSILON))
+          r (/ 1.0 d)]
+      (v/mult v r))))
+(make-var-method scry)
+(register-regular-var :scry)
 
 ;; ### Sinusoidal
 (defn make-sinusoidal
@@ -612,6 +711,7 @@
   (fn [^Vec2 v]
     (Vec2. (* amount (m/sin (.x v))) (* amount (m/sin (.y v))))))
 (make-var-method sinusoidal)
+(register-regular-var :sinusoidal)
 
 ;; ### STwin
 (defn config-stwin
@@ -637,6 +737,7 @@
       (Vec2. (+ (* amount (.x v)) result)
              (+ (* amount (.y v)) result)))))
 (make-var-method stwin)
+(register-regular-var :stwin)
 
 ;; ## T
 
@@ -669,6 +770,7 @@
         (v/mult res amount)
         (v/mult v amount)))))
 (make-var-method trade)
+(register-regular-var :trade)
 
 ;;;;; https://github.com/d3/d3-geo-projection/tree/master/src
 
@@ -685,6 +787,7 @@
                         (* 1.25))) amount)))
 
 (make-var-method miller)
+(register-regular-var :miller)
 
 (defn make-millerrev
   ""
@@ -697,8 +800,8 @@
                        (m/atan)
                        (* 2.5)
                        (- (* 0.625 m/PI)))) amount)))
-
 (make-var-method millerrev)
+(register-regular-var :millerrev)
 
 (defn make-foucaut
   ""
@@ -714,32 +817,16 @@
                   (* amount))
           yy (* amount m/SQRTPI (m/tan k))]
       (Vec2. xx yy))))
-
 (make-var-method foucaut)
+(register-regular-var :foucaout)
 
 ;;;;
 
-(def variation-list-random [:arch
-                            :blade :blade2 :boarders
-                            :julia :julian :juliaq])
-
-(def variation-list-not-random [:default
-                                :auger 
-                                :bcollide :besselj :beta :bswirl :bent :butterfly
-                                :circlelinear :csin 
-                                :emod :erf :exp
-                                :foucaut :fan2
-                                :gamma 
-                                :hemisphere
-                                :miller :millerrev
-                                :popcorn2 
-                                :sinusoidal :stwin
-                                :trade])
-
+(def variation-list-random @random-var)
+(def variation-list-not-random @regular-var)
 
 ;; list of all variations defined in the file
 (def variation-list (concat variation-list-random variation-list-not-random))
-
 
 ;;; combinator & randomizer
 
@@ -747,7 +834,7 @@
 
 (defn derivative
   ""
-  ([f amount a]
+  ([f ^double amount ^double a]
    (let [^Vec2 d (Vec2. a a)]
      (fn [^Vec2 v]
        (let [v1 (f v)
@@ -762,7 +849,7 @@
 
 (defn- binary-op
   ""
-  [op f1 f2 amount]
+  [op f1 f2 ^double amount]
   (fn [^Vec2 v]
     (v/mult (op (f1 v) (f2 v)) amount)))
 
@@ -773,7 +860,7 @@
 
 (defn divf
   ""
-  [f1 f2 amount]
+  [f1 f2 ^double amount]
   (fn [^Vec2 v]
     (let [^Vec2 v1 (f1 v)
           ^Vec2 v2 (f2 v)
