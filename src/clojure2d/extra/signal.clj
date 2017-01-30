@@ -41,14 +41,14 @@
   (toString [_] (str "size=" (alength signal))))
 
 ;; helper functions
-(def ^:const alaw-A 87.6)
-(def ^:const alaw-rA (/ 1.0 alaw-A))
-(def ^:const alaw-lA (inc (m/log alaw-A)))
-(def ^:const alaw-rlA (/ 1.0 alaw-lA))
+(def ^:const ^double alaw-A 87.6)
+(def ^:const ^double alaw-rA (/ 1.0 alaw-A))
+(def ^:const ^double alaw-lA (inc (m/log alaw-A)))
+(def ^:const ^double alaw-rlA (/ 1.0 alaw-lA))
 
 (defn alaw
   ""
-  [x]
+  ^double [^double x]
   (let [absx (m/abs x)
         f (* alaw-rlA (m/sgn x))]
     (* f (if (< absx alaw-rA)
@@ -57,7 +57,7 @@
 
 (defn alaw-rev
   ""
-  [y]
+  ^double [^double y]
   (let [absy (m/abs y)
         f (* alaw-rA (m/sgn y))
         v (* absy alaw-lA)]
@@ -65,82 +65,82 @@
            v
            (m/exp (dec v))))))
 
-(def ^:const ulaw-U 255.0)
-(def ^:const ulaw-rU (/ 1.0 255.0))
-(def ^:const ulaw-U1 (inc ulaw-U))
-(def ^:const ulaw-rlnU1 (/ 1.0 (m/log ulaw-U1)))
+(def ^:const ^double ulaw-U 255.0)
+(def ^:const ^double ulaw-rU (/ 1.0 255.0))
+(def ^:const ^double ulaw-U1 (inc ulaw-U))
+(def ^:const ^double ulaw-rlnU1 (/ 1.0 (m/log ulaw-U1)))
 
 (defn ulaw
   ""
-  [x]
+  ^double [^double x]
   (* (m/sgn x)
      ulaw-rlnU1
      (m/log (inc (* ulaw-U (m/abs x))))))
 
 (defn ulaw-rev
   ""
-  [y]
+  ^double [^double y]
   (* (m/sgn y)
      ulaw-rU
      (dec (m/pow ulaw-U1 (m/abs y)))))
 
 (defn- apply-sign
   ""
-  [in bits]
+  ^long [^long in ^long bits]
   (let [sh (- 64 bits)]
     (-> in
-         (bit-shift-left sh)
-         (bit-shift-right sh))))
+        (bit-shift-left sh)
+        (bit-shift-right sh))))
 
 ;; TODO: move me to bit operations!!!
 (defn- pack-with-endianess-and-sign
   ""
-  ([x little-endian signed]
+  (^long [^long x little-endian signed]
    (if signed (apply-sign x 8) x))
-  ([x y little-endian signed]
-   (let [[a b] (if little-endian [y x] [x y])
+  (^long [x y little-endian signed]
+   (let [[^long a ^long b] (if little-endian [y x] [x y])
          val (bit-or (bit-shift-left (bit-and a 0xff) 8)
                      (bit-and b 0xff))]
      (if signed (apply-sign val 16) val))
    )
   ([x y z little-endian signed]
-   (let [[a b c] (if little-endian [z y x] [x y z])
+   (let [[^long a ^long b ^long c] (if little-endian [z y x] [x y z])
          val (bit-or (bit-shift-left (bit-and a 0xff) 16)
                      (bit-shift-left (bit-and b 0xff) 8)
                      (bit-and c 0xff))]
      (if signed (apply-sign val 24) val))))
 
 
-(def s8-min (apply-sign 0x80 8))
-(def s8-max (apply-sign 0x7f 8))
-(def s16-min (apply-sign 0x8000 16))
-(def s16-max (apply-sign 0x7fff 16))
-(def s24-min (apply-sign 0x800000 24))
-(def s24-max (apply-sign 0x7fffff 24))
+(def ^:const ^long s8-min (apply-sign 0x80 8))
+(def ^:const ^long s8-max (apply-sign 0x7f 8))
+(def ^:const ^long s16-min (apply-sign 0x8000 16))
+(def ^:const ^long s16-max (apply-sign 0x7fff 16))
+(def ^:const ^long s24-min (apply-sign 0x800000 24))
+(def ^:const ^long s24-max (apply-sign 0x7fffff 24))
 
 (defn- int-to-float
   ""
-  ([x endianess sign]
+  (^double [x endianess sign]
    (let [v (pack-with-endianess-and-sign x endianess sign)]
      (if sign
        (m/norm v s8-min s8-max -1.0 1.0)
        (m/norm v 0 0xff -1.0 1.0))))
-  ([x y endianess sign]
+  (^double [x y endianess sign]
    (let [v (pack-with-endianess-and-sign x y endianess sign)]
      (if sign
        (m/norm v s16-min s16-max -1.0 1.0)
        (m/norm v 0 0xffff -1.0 1.0))))
   ([x y z endianess sign]
-   (let [v (pack-with-endianess-and-sign x y z endianess sign)]
+   (let [^long v (pack-with-endianess-and-sign x y z endianess sign)]
      (if sign
        (m/norm v s24-min s24-max -1.0 1.0)
        (m/norm v 0 0xffffff -1.0 1.0)))))
 
 (defn- float-to-int
   ""
-  [bits v little-endian sign]
+  [^long bits ^double v little-endian sign]
   (let [vv (m/constrain v -1.0 1.0)
-        restored (long (condp = bits
+        restored (long (condp == bits
                          8 (if sign
                                (m/norm vv -1.0 1.0 s8-min s8-max)
                                (m/norm vv -1.0 1.0 0 0xff))
@@ -150,7 +150,7 @@
                          24 (if sign
                                 (m/norm vv -1.0 1.0 s24-min s24-max)
                                 (m/norm vv -1.0 1.0 0 0xffffff))))]
-    (condp = bits
+    (condp == bits
       8 (bit-and restored 0xff)
       16 (let [a (bit-and restored 0xff)
                b (bit-and (bit-shift-right restored 8) 0xff)]
@@ -224,7 +224,7 @@
   ([^Pixels p conf]
    (let [config (merge pixels-default-configuration conf)
          channels (if (= :all (:channels config)) [0 1 2 3] (:channels config))
-         b (:bits config)
+         ^long b (:bits config)
          e (:little-endian config)
          s (:signed config)
          nb (bit-shift-right b 3)
@@ -234,7 +234,7 @@
                         (pre-layout-planar true p channels)
                         (pre-layout-interleaved true p channels))
          limit (- (alength layout) (dec nb))
-         coding (condp = (:coding config)
+         coding (condp == (:coding config)
                   :none identity
                   :alaw alaw
                   :ulaw ulaw
@@ -244,7 +244,7 @@
      (loop [idx (int 0)
             bidx (int 0)]
        (when (< idx limit)
-         (condp = nb
+         (condp == nb
            1 (aset ^doubles buff bidx (double (coding (int-to-float (aget ^ints layout idx) e s))))
            2 (aset ^doubles buff bidx (double (coding (int-to-float (aget ^ints layout idx) (aget ^ints layout (inc idx)) e s))))
            3 (aset ^doubles buff bidx (double (coding (int-to-float (aget ^ints layout idx) (aget ^ints layout (inc idx)) (aget ^ints layout (+ 2 idx)) e s)))))
@@ -259,7 +259,7 @@
   [^Pixels target ^Signal sig conf]
   (let [config (merge pixels-default-configuration conf)
         channels (if (= :all (:channels config)) [0 1 2 3] (:channels config))
-        b (:bits config)
+        ^long b (:bits config)
         e (:little-endian config)
         s (:signed config)
         nb (bit-shift-right b 3)
@@ -327,7 +327,7 @@
 
 (defn apply-effects
   "Apply effects on signal"
-  ([effects ^Signal s rst]
+  ([effects ^Signal s ^long rst]
    (let [len (alength ^doubles (.signal s))
          ^doubles in (.signal s)
          ^doubles out (double-array len)]
@@ -339,7 +339,7 @@
                nidx (inc idx)]
            (aset ^doubles out idx (double (.sample res)))
            (recur nidx 
-                  (if (and (pos? rst) (zero? (mod nidx rst)))
+                  (if (and (pos? rst) (zero? ^long (mod nidx rst)))
                     (create-state effects)
                     (.state res))))))
      (Signal. out)))
@@ -348,7 +348,7 @@
 
 (defn apply-effect
   ""
-  ([effect ^Signal s rst]
+  ([effect ^Signal s ^long rst]
    (let [len (alength ^doubles (.signal s))
          ^doubles in (.signal s)
          ^doubles out (double-array len)]
@@ -360,7 +360,7 @@
                nidx (inc idx)]
            (aset ^doubles out idx (double (.sample state)))
            (recur nidx 
-                  (if (and (pos? rst) (zero? (mod nidx rst)))
+                  (if (and (pos? rst) (zero? ^long (mod nidx rst)))
                     (effect)
                     (.state state))))))
      (Signal. out)))
@@ -396,7 +396,7 @@
 
 (defn- calc-filter-alpha
   ""
-  [rate cutoff]
+  ^double [^double rate ^double cutoff]
   (let [tinterval (/ 1.0 rate)
         tau (/ 1.0 (* cutoff m/TWO_PI))]
     (/ tinterval (+ tau tinterval))))
@@ -404,7 +404,7 @@
 (defmethod make-effect :simple-lowpass [_ conf]
   (let [alpha (calc-filter-alpha (:rate conf) (:cutoff conf))]
     (fn
-      ([sample prev]
+      ([^double sample ^double prev]
        (let [s1 (* sample alpha)
              s2 (- prev (* prev alpha))
              nprev (+ s1 s2)]
@@ -414,7 +414,7 @@
 (defmethod make-effect :simple-highpass [_ conf]
   (let [lpfilter (make-effect :simple-lowpass conf)]
     (fn
-      ([sample state]
+      ([^double sample state]
        (let [^StateWithS res (lpfilter sample state)]
          (StateWithS. (- sample (.sample res)) (.state res))))
       ([]
@@ -429,7 +429,7 @@
    gain
    bw - bandwidth
    fs - sample rate"
-  [fc gain bw fs]
+  [^double fc ^double gain ^double bw ^double fs]
   (let [w (/ (* m/TWO_PI (m/constrain fc 1.0 (* 0.5 fs))) fs)
         cw (m/cos w)
         sw (m/sin w)
@@ -454,7 +454,7 @@
    gain
    slope - shelf slope
    fs - sample rate"
-  [fc gain slope fs]
+  [^double fc ^double gain ^double slope ^double fs]
   (let [w (/ (* m/TWO_PI (m/constrain fc 1.0 (* 0.5 fs))) fs)
         cw (m/cos w)
         sw (m/sin w)
@@ -482,7 +482,7 @@
    gain
    slope - shelf slope
    fs - sample rate"
-  [fc gain slope fs]
+  [^double fc ^double gain ^double slope ^double fs]
   (let [w (/ (* m/TWO_PI (m/constrain fc 1.0 (* 0.5 fs))) fs)
         cw (m/cos w)
         sw (m/sin w)
@@ -507,7 +507,7 @@
 
 (defn biquad-lp-params
   ""
-  [fc bw fs]
+  [^double fc ^double bw ^double fs]
   (let [omega (* m/TWO_PI (/ fc fs))
         sn (m/sin omega)
         cs (m/cos omega)
@@ -524,7 +524,7 @@
 
 (defn biquad-hp-params
   ""
-  [fc bw fs]
+  [^double fc ^double bw ^double fs]
   (let [omega (* m/TWO_PI (/ fc fs))
         sn (m/sin omega)
         cs (m/cos omega)
@@ -541,7 +541,7 @@
 
 (defn biquad-bp-params
   ""
-  [fc bw fs]
+  [^double fc ^double bw ^double fs]
   (let [omega (* m/TWO_PI (/ fc fs))
         sn (m/sin omega)
         cs (m/cos omega)
@@ -559,7 +559,7 @@
 
 (defn biquad-filter
   ""
-  ([^BiquadConf c sample ^StateBiquad state]
+  ([^BiquadConf c ^double sample ^StateBiquad state]
    (let [y (-> (* (.b0 c) sample)
                (+ (* (.b1 c) (.x1 state)))
                (+ (* (.b2 c) (.x2 state)))
@@ -603,10 +603,10 @@
        (StateDjEq. (b1) (b2) (b3))))))
 
 (defmethod make-effect :phaser-allpass [_ conf]
-  (let [d (:delay conf)
+  (let [^double d (:delay conf)
         a1 (/ (- 1.0 d) (inc d))]
     (fn
-      ([sample zm1]
+      ([^double sample ^double zm1]
        (let [y (+ zm1 (* sample (- a1)))
              new-zm1 (+ sample (* y a1))]
          (StateWithS. y new-zm1)))
@@ -616,9 +616,9 @@
 (deftype StateDivider [^double out ^double amp ^double count ^double lamp ^double last ^int zeroxs])
 
 (defmethod make-effect :divider [_ conf]
-  (let [denom (:denominator conf)]
+  (let [^long denom (:denominator conf)]
     (fn
-      ([sample ^StateDivider state]
+      ([^double sample ^StateDivider state]
        (let [count (inc (.count state))
              ^StateDivider s1 (if (or (and (> sample 0.0) (<= (.last state) 0.0))
                                       (and (neg? sample) (>= (.last state) 0.0)))
@@ -628,7 +628,7 @@
                                 (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (.zeroxs state)))
              amp (+ (.amp s1) (m/abs sample))
              ^StateDivider s2 (if (and (> denom 1)
-                                       (== (mod (.zeroxs s1) denom) (dec denom)))
+                                       (== ^long (rem (.zeroxs s1) denom) (dec denom)))
                                 (StateDivider. (if (pos? (.out s1)) -1.0 1.0) 0.0 0 (/ amp (.count s1)) (.last s1) 0)
                                 (StateDivider. (.out s1) amp (.count s1) (.lamp s1) (.last s1) (.zeroxs s1)))]
          (StateWithS. (* (.out s2) (.lamp s2)) (StateDivider. (.out s2) (.amp s2) (.count s2) (.lamp s2) sample (.zeroxs s2)))))
@@ -642,17 +642,17 @@
   (let [lp-chain [(make-effect :simple-lowpass {:rate 100000 :cutoff 25000})
                   (make-effect :simple-lowpass {:rate 100000 :cutoff 10000})
                   (make-effect :simple-lowpass {:rate 100000 :cutoff 1000})]
-        quant (:quant conf)
-        omega (:omega conf)
-        phase (:phase conf)]
+        ^double quant (:quant conf)
+        ^double omega (:omega conf)
+        ^double phase (:phase conf)]
     (fn
-      ([sample ^StateFm state]
+      ([^double sample ^StateFm state]
        (let [sig (* sample phase)
              new-integral (+ (.integral state) sig)
              m (m/cos (+ new-integral (* omega (.t state))))
-             m (if (pos? quant)
-                 (m/norm (int (m/norm m -1.0 1.0 0.0 quant)) 0.0 quant -1.0 1.0)
-                 m)
+             ^double m (if (pos? quant)
+                         (m/norm (int (m/norm m -1.0 1.0 0.0 quant)) 0.0 quant -1.0 1.0)
+                         m)
              dem (m/abs (- m (.pre state)))
              ^StateWithS res (process-effects-one-pass dem (.lp state))
              demf (/ (* 2.0 (- (.sample res) omega)) phase)]
@@ -663,10 +663,10 @@
 ;; foverdrive
 
 (defmethod make-effect :foverdrive [_ conf]
-  (let [drive (:drive conf)
-        drivem1 (dec (:drive conf))]
+  (let [^double drive (:drive conf)
+        drivem1 (dec drive)]
     (fn
-      ([sample state]
+      ([^double sample state]
        (let [fx (m/abs sample)
              res (/ (* sample (+ fx drive)) (inc (+ (* sample sample) (* fx drivem1))))]
          (StateWithS. res state)))
@@ -677,18 +677,18 @@
 (deftype StateDecimator [^double count ^double last])
 
 (defmethod make-effect :decimator [_ conf]
-  (let [step (m/pow 0.5 (- (:bits conf) 0.9999))
+  (let [step (m/pow 0.5 (- ^double (:bits conf) 0.9999))
         stepr (/ 1.0 step)
-        ratio (/ (:fs conf) (:rate conf))]
+        ratio (/ ^double (:fs conf) ^double (:rate conf))]
     (fn
-      ([sample ^StateDecimator state]
+      ([^double sample ^StateDecimator state]
        (let [ncount (+ (.count state) ratio)]
          (if (>= ncount 1.0)
-           (let [delta (* step (mod (->> sample
-                                         m/sgn
-                                         (* step 0.5)
-                                         (+ sample)
-                                         (* stepr)) 1.0))
+           (let [delta (* step ^double (rem (->> sample
+                                                 m/sgn
+                                                 (* step 0.5)
+                                                 (+ sample)
+                                                 (* stepr)) 1.0))
                  last (- sample delta)]
              (StateWithS. last (StateDecimator. (dec ncount) last)))
            (StateWithS. (.last state) (StateDecimator. ncount (.last state))))))
@@ -730,36 +730,36 @@
 
 (defmulti make-wave (fn [f _ _ _] f))
 
-(defmethod make-wave :sin [_ f a p]
-  (fn [x]
+(defmethod make-wave :sin [_ ^double f ^double a ^double p]
+  (fn ^double [^double x]
     (* a
      (m/sin (+ (* p m/TWO_PI) (* x m/TWO_PI f))))))
 
-(defmethod make-wave :noise [_ f a p]
-  (fn [x]
+(defmethod make-wave :noise [_ ^double f ^double a ^double p]
+  (fn ^double [^double x]
     (* a
-       (snoise (* (+ p x) f)))))
+       ^double (snoise (* (+ p x) f)))))
 
-(defmethod make-wave :saw [_ f a p] 
-  (fn [x]
+(defmethod make-wave :saw [_ ^double f ^double a ^double p] 
+  (fn ^double [^double x]
     (let [rp (* 2.0 a)
-          p2 (* f (mod (+ (* a p) a x) 1.0))]
+          p2 (* f ^double (mod (+ (* a p) a x) 1.0))]
       (* rp (- p2 (m/floor p2) 0.5)))))
 
-(defmethod make-wave :square [_ f a p]
-  (fn [x]
-    (if (< (mod (+ p (* x f)) 1.0) 0.5)
+(defmethod make-wave :square [_ ^double f ^double a ^double p]
+  (fn ^double [^double x]
+    (if (< ^double (mod (+ p (* x f)) 1.0) 0.5)
       a
       (- a))))
 
-(defmethod make-wave :triangle [_ f a p]
+(defmethod make-wave :triangle [_ ^double f ^double a ^double p]
   (let [saw (make-wave :saw f a p)]
-    (fn [x]
+    (fn ^double [^double x]
       (- (* 2.0 (m/abs (saw x))) a))))
 
-(defmethod make-wave :cut-triangle [_ f a p]
+(defmethod make-wave :cut-triangle [_ ^double f ^double a ^double p]
   (let [tri (make-wave :triangle f a p)]
-    (fn [x]
+    (fn ^double [^double x]
       (let [namp (* 0.5 a)]
         (* 2.0 (m/constrain (tri x) (- namp) namp))))))
 
@@ -767,8 +767,8 @@
 
 (defn sum-waves
   ""
-  [fs x]
-  (reduce #(+ %1 (%2 x)) 0 fs))
+  ^double [fs ^double x]
+  (reduce #(+ ^double %1 ^double (%2 x)) 0.0 fs))
 
 (defn make-sum-wave
   ""
@@ -777,7 +777,7 @@
 
 (defn make-signal-from-wave
   ""
-  [f samplerate seconds]
+  [f ^double samplerate ^double seconds]
   (let [len (* samplerate seconds)
         ^doubles buffer (double-array len)
         limit (dec seconds)]

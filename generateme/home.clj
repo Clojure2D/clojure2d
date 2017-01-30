@@ -6,12 +6,14 @@
             [clojure2d.extra.glitch :as g]
             [clojure2d.extra.variations :as v]
             [clojure2d.extra.overlays :as o]
-            [clojure2d.extra.signal :refer :all]))
+            [clojure2d.extra.signal :refer :all]
+            [criterium.core :refer :all])
+  (:import [net.jafama FastMath]))
 
 
-(def p1 (p/load-pixels "generateme/dance/dancer.jpg"))
+(def p1 (p/load-pixels "generateme/sold/sold.jpg"))
 
-(def p2 (p/load-pixels "generateme/ooo/res_07E234_ooo.jpg"))
+(def p2 (p/load-pixels "generateme/sold/soldr.jpg"))
 
 (def p3 (p/load-pixels "generateme/ooo/ooo.jpg"))
 
@@ -21,7 +23,7 @@
 
 (def canvas (core/create-canvas (.w p1) (.h p1)))
 
-(def scale 0.8)
+(def scale 0.5)
 
 
 (def windows (core/show-window canvas "glitch" (* scale (.w p1)) (* scale (.h p1)) 10))
@@ -34,6 +36,8 @@
                                                  (p/filter-channels p/normalize-filter false
                                                                     (g/blend-machine p4 p1 b)))))
 
+(quick-bench (p/filter-channels p/normalize false p1))
+
 (core/with-canvas canvas
   (core/image (o/render-rgb-scanlines (@canvas 1))))
 
@@ -42,7 +46,9 @@
                    (o/render-noise noise-overlay)
                    (o/render-spots spots-overlay))))
 
-(core/save-canvas canvas (core/next-filename "generateme/dance/res" ".jpg"))
+(core/save-canvas canvas (core/next-filename "generateme/sold/res" ".jpg"))
+
+(p/set-canvas-pixels canvas p4)
 
 (def p4 (p/get-canvas-pixels canvas))
 
@@ -77,3 +83,18 @@
                                                            :channels [2 0 1]
                                                            :bits 8})]
         (p/set-canvas-pixels canvas (p/filter-channels p/normalize nil resp))))
+
+
+;;; some speed tests
+
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* :warn-on-boxed)
+
+(def arr (vec (repeatedly 1000 #(m/drand))))
+
+(defn lsin
+  ""
+  ^double [^double v]
+  (FastMath/sin v))
+
+(quick-bench (mapv #(+ (lsin %) (lsin %)) arr))

@@ -12,8 +12,8 @@
 
 (def ^Vec3 vzero (Vec3. 0.0 0.0 0.0))
 
-(deftype Material [^Vec3 color diffusion specular specularf0 specularpow reflection])
-(deftype HitData [d ^Material mat])
+(deftype Material [^Vec3 color ^double diffusion ^double specular ^double specularf0 ^double specularpow ^double reflection])
+(deftype HitData [^double d ^Material mat])
 
 (defn make-material
   "Create material information:
@@ -49,25 +49,25 @@
 (defmulti make-primitive (fn [n mat conf] n))
 
 (defmethod make-primitive :sphere [_ mat conf]
-  (let [s (:r conf)]
+  (let [^double s (:r conf)]
     (fn [p]
-      (HitData. (- (v/mag p) s) mat))))
+      (HitData. (- ^double (v/mag p) s) mat))))
 
 (defmethod make-primitive :plane [_ mat conf]
   (let [n (v/normalize (:normal conf))
-        dist (:dist-from-origin conf)]
+        ^double dist (:dist-from-origin conf)]
     (fn [p]
-      (HitData. (+ dist (v/dot p n)) mat))))
+      (HitData. (+ dist ^double (v/dot p n)) mat))))
 
 (defmethod make-primitive :box [_ mat conf]
   (let [b (:box conf)]
     (fn [p]
       (let [d (v/sub (v/abs p) b)]
-        (HitData. (+ (v/mag (v/emx d vzero)) (min 0.0 (v/mx d))) mat)))))
+        (HitData. (+ ^double (v/mag (v/emx d vzero)) (min 0.0 ^double (v/mx d))) mat)))))
 
 (defmethod make-primitive :torus [_ mat conf]
-  (let [small-radius (:small-radius conf)
-        large-radius (:large-radius conf)]
+  (let [^double small-radius (:small-radius conf)
+        ^double large-radius (:large-radius conf)]
     (fn [^Vec3 p]
       (let [l1 (m/hypot (.x p) (.z p))
             l2 (m/hypot (- l1 large-radius) (.y p))]
@@ -109,7 +109,7 @@
 
 (defn op-scale
   ""
-  [f s]
+  [f ^double s]
   (fn [p]
     (let [^HitData r (f (v/div p s))]
       (HitData. (* (.d r) s) (.mat r)))))
@@ -132,7 +132,7 @@
 
 (defn op-blend
   ""
-  ([f1 f2 k]
+  ([f1 f2 ^double k]
    (let [rk (/ 0.5 k)]
      (fn [p]
        (let [^HitData r1 (f1 p)
@@ -256,8 +256,8 @@
    k - scaling factor (0.01-1.0)
    falloff - 0.5-0.95
    steps - how many steps (2-10)"
-  [k falloff steps]
-  (fn [f p n]
+  [^double k ^double falloff ^long steps]
+  (fn ^double [f p n]
     (loop [i (int 0)
            occ 0.0
            pw 1.0]
@@ -277,8 +277,8 @@
 ;; fog
 (defn make-distance-fog
   ""
-  [fcol factor]
-  (fn [t col]
+  [fcol ^double factor]
+  (fn ^double [^double t col]
     (let [ft (- 1.0 (m/exp (* factor t t)))]
       (v/interpolate col fcol ft))))
 
@@ -286,7 +286,7 @@
 
 (defn make-soft-shadow
   ""
-  [k steps max-depth]
+  [^double k ^long steps ^double max-depth]
   (fn [f pos light]
     (loop [i (int 0)
            res 1.0
@@ -309,7 +309,7 @@
   ""
   [I N]
   (->> I
-       (v/dot N)
+       ^double (v/dot N)
        (* 2.0)
        (v/mult N)
        (v/sub I)
@@ -329,20 +329,25 @@
   - 0 - HitData
   - 1 - fake AO based on steps made"
   ([scene background tmin tmax steps stepf precision]
-   (fn [ro rd]
-     (loop [t (min tmin 0.001)
-            i (int 0)
-            m background]
-       (let [r (ray ro rd t)
-             ^HitData d (scene r)
-             dist (if (zero? i) (* (.d d) 0.3) (.d d))]
-         (if (or (> i steps)
-                 (< dist precision)
-                 (> t tmax))
-           [(HitData. t (if (> t tmax) background m)) (- 1.0 (/ (double i) steps))]
-           (recur (+ t (* stepf dist))
-                  (unchecked-inc i)
-                  (.mat d)))))))
+   (let [^double tmin tmin
+         ^double tmax tmax
+         ^long steps steps
+         ^double stepf stepf
+         ^double precision precision]
+     (fn [ro rd]
+       (loop [t (min tmin 0.001)
+              i (int 0)
+              m background]
+         (let [r (ray ro rd t)
+               ^HitData d (scene r)
+               dist (if (zero? i) (* (.d d) 0.3) (.d d))]
+           (if (or (> i steps)
+                   (< dist precision)
+                   (> t tmax))
+             [(HitData. t (if (> t tmax) background m)) (- 1.0 (/ (double i) steps))]
+             (recur (+ t (* stepf dist))
+                    (unchecked-inc i)
+                    (.mat d))))))))
   ([scene background tmin tmax steps]
    (make-ray-marching scene background tmin tmax steps 1.0 0.00001)))
 
@@ -356,10 +361,10 @@
   (fn [^Material mat shadow-f N D pos]
     (let [shadow (shadow-f scene ^Vec3 pos L)
           E (v/sub D)
-          NL (max 0.0 (v/dot N L))
+          NL (max 0.0 ^double (v/dot N L))
           H (v/normalize (v/add L E))
-          NH (max 0.0 (v/dot N H))
-          EH (max 0.0 (v/dot E H))
+          NH (max 0.0 ^double (v/dot N H))
+          EH (max 0.0 ^double (v/dot E H))
           Ff0 (+ (.specularf0 mat) (* (- 1.0 (.specularf0 mat)) (m/pow (- 1.0 EH) 5.0)))
 
           diffuse (v/mult diff-color (* (.diffusion mat) NL))

@@ -14,7 +14,7 @@
 (def ^:dynamic *pixels-edge* :edge)
 
 ;; how many cores we have?
-(def ^:const cores (.availableProcessors (Runtime/getRuntime)))
+(def ^:const ^long cores (.availableProcessors (Runtime/getRuntime)))
 
 (defprotocol PixelsProto
   (get-value [pixels ch idx] [pixels ch x y])
@@ -25,77 +25,78 @@
   (get-channel [pixels ch])
   (set-channel [pixels ch v]))
 
-(deftype Pixels [^ints p ^int w ^int h planar ^int size pos]
+(deftype Pixels [^ints p ^long w ^long h planar ^long size pos]
   PixelsProto
 
   (get-channel [_ ch]
     (let [^ints res (int-array size)
-          off (* ch size)]
+          off (* ^long ch size)]
       (if planar
-        (System/arraycopy p ^int off res 0 size)
-        (core/amap! p idx (aget ^ints p (int (+ ch (bit-shift-left idx 2))))))
+        (System/arraycopy p off res 0 size)
+        (dotimes [idx size]
+          (aset res idx (aget p (+ ^long ch (bit-shift-left idx 2))))))
       res))
 
   (set-channel [_ ch v]
-    (let [off (* ch size)]
+    (let [off (* ^long ch size)]
       (when planar
-        (System/arraycopy ^ints v 0 p ^int off size)))) 
+        (System/arraycopy ^ints v 0 p off size)))) 
   ;; TODO: implement mutating copy of array into interleaved version of pixels
 
   (get-value [_ ch idx]
-    (aget ^ints p (int (pos ch idx))))
+    (aget ^ints p (pos ch idx)))
 
   (get-value [pixels ch x y]
-    (if (or (neg? x)
-            (neg? y)
-            (>= x w)
-            (>= y h))
+    (if (or (neg? ^long x)
+            (neg? ^long y)
+            (>= ^long x w)
+            (>= ^long y h))
       (condp = *pixels-edge*
         :zero 0
-        :edge (get-value pixels ch (int (m/constrain x 0 (dec w))) (int (m/constrain y 0 (dec h))))
+        :edge (get-value pixels ch (m/iconstrain x 0 (dec w)) (m/iconstrain y 0 (dec h)))
         :wrap (get-value pixels ch (int (m/wrap 0 w x)) (int (m/wrap 0 h y)))
         *pixels-edge*)
-      (get-value pixels ch (+ x (* y w)))))
+      (get-value pixels ch (+ ^long x (* ^long y w)))))
 
   (get-color [_ idx]
-    (Vec4. (aget ^ints p (int (pos 0 idx)))
-           (aget ^ints p (int (pos 1 idx)))
-           (aget ^ints p (int (pos 2 idx)))
-           (aget ^ints p (int (pos 3 idx)))))
+    (Vec4. (aget ^ints p ^long (pos 0 idx))
+           (aget ^ints p ^long (pos 1 idx))
+           (aget ^ints p ^long (pos 2 idx))
+           (aget ^ints p ^long (pos 3 idx))))
 
   (get-color [pixels x y]
-    (if (or (neg? x)
-            (neg? y)
-            (>= x w)
-            (>= y h))
+    (if (or (neg? ^long x)
+            (neg? ^long y)
+            (>= ^long x w)
+            (>= ^long y h))
       (condp = *pixels-edge*
         :zero (Vec4. 0 0 0 255)
-        :edge (get-color pixels (int (m/constrain x 0 (dec w))) (int (m/constrain y 0 (dec h))))
+        :edge (get-color pixels (m/iconstrain x 0 (dec w)) ((m/iconstrain y 0 (dec h))))
         :wrap (get-color pixels (int (m/wrap 0 w x)) (int (m/wrap 0 h y)))
         (Vec4. *pixels-edge* *pixels-edge* *pixels-edge* 255))
-      (get-color pixels (+ x (* y w)))))
+      (get-color pixels (+ ^long x (* ^long y w)))))
 
   (set-value [_ ch idx v]
     (aset ^ints p (int (pos ch idx)) (int v))
     p)
 
   (set-value [pixels ch x y v]
-    (set-value pixels ch (+ x (* y w)) v))
+    (set-value pixels ch (+ ^long x (* ^long y w)) v))
 
   (set-color [_ idx v]
     (let [^Vec4 v v]
-      (aset ^ints p (int (pos 0 idx)) (int (.x v)))
-      (aset ^ints p (int (pos 1 idx)) (int (.y v)))
-      (aset ^ints p (int (pos 2 idx)) (int (.z v)))
-      (aset ^ints p (int (pos 3 idx)) (int (.w v))))
+      (aset ^ints p ^long (pos 0 idx) (int (.x v)))
+      (aset ^ints p ^long (pos 1 idx) (int (.y v)))
+      (aset ^ints p ^long (pos 2 idx) (int (.z v)))
+      (aset ^ints p ^long (pos 3 idx) (int (.w v))))
     p)
 
   (set-color [pixels x y v]
-    (set-color pixels (+ x (* y w)) v))
+    (set-color pixels (+ ^long x (* ^long y w)) v))
 
   (idx->pos [_ idx]
-    (let [y (quot idx w)
-          x (rem idx w)]
+    (let [y (quot ^long idx w)
+          x (rem ^long idx w)]
       (Vec2. x y)))
   
   Object
@@ -105,22 +106,22 @@
 
 (defn make-value-selector
   ""
-  [planar size]
+  [planar ^long size]
   (if planar
-    (fn [ch idx]
+    (fn ^long [^long ch ^long idx]
       (+ idx (* ch size)))
-    (fn [ch idx]
+    (fn ^long [^long ch ^long idx]
       (+ ch (bit-shift-left idx 2)))))
 
 (defn make-pixels
   "Pixels constructors, sets valid channel value selector (pos) depending on layout"
-  ([^ints a w h planar]
+  ([^ints a ^long w ^long h planar]
    (let [size (* w h)
          pos (make-value-selector planar size)]
      (Pixels. a w h planar size pos)))
   ([w h]
    (make-pixels w h true))
-  ([w h planar]
+  ([^long w ^long h planar]
    (make-pixels (int-array (* 4 w h)) w h planar)))
 
 (defn replace-pixels
@@ -133,14 +134,18 @@
 (defn clone-pixels
   "Clone Pixels"
   [^Pixels p]
-  (replace-pixels p (core/array-clone (.p p))))
+  (let [len (alength ^ints (.p p))
+        res (int-array len)]
+    (do
+      (System/arraycopy (.p p) 0 ^ints res 0 len)
+      (replace-pixels p res))))
 
 ;; interleaved/planar
 
 (defn to-planar
   "Convert interleaved (native) layout of pixels to planar"
   [^Pixels p]
-  (let [f (fn [x]
+  (let [f (fn ^long [^long x]
             (let [q (quot x (.size p))
                   r (rem x (.size p))]
               (+ q (bit-shift-left r 2))))]
@@ -149,7 +154,7 @@
 (defn from-planar
   "Convert planar pixel layout to interleaved"
   [^Pixels p]
-  (let [f (fn [x]
+  (let [f (fn ^long [^long x]
             (let [q (bit-shift-right x 0x2)
                   r (bit-and x 0x3)]
               (+ q (* (.size p) r))))]
@@ -160,7 +165,7 @@
 (defn  get-image-pixels
   "take pixels from the buffered image"
   ([^BufferedImage b x y w h planar?]
-   (let [size (* 4 w h)
+   (let [size (* 4 ^long w ^long h)
          ^ints p (.. b
                      (getRaster)
                      (getPixels ^int x ^int y ^int w ^int h ^ints (int-array size)))
@@ -181,7 +186,7 @@
    (let [^Pixels p (if (.planar pin) (from-planar pin) pin)] 
      (.. b
          (getRaster)
-         (setPixels ^int x ^int y ^int (.w p) ^int (.h p) ^ints (.p p))))
+         (setPixels ^int x ^int y (int (.w p)) (int (.h p)) ^ints (.p p))))
    b)
   ([^BufferedImage b ^Pixels p]
    (set-image-pixels b 0 0 p)))
@@ -236,12 +241,12 @@
   ""
   [f ^Pixels p]
   (let [^Pixels target (clone-pixels p)
-        pre-step (max 40000 (/ (.size p) cores))
+        pre-step (max 40000 ^long (/ (.size p) cores))
         step (int (m/ceil pre-step))
         parts (range 0 (.size p) step)
         ftrs (doall
               (map
-               #(future (let [end (min (+ % step) (.size p))]
+               #(future (let [end (min (+ ^long % step) (.size p))]
                           (loop [idx (int %)]
                             (when (< idx end)
                               (set-color target idx (f (get-color p idx)))
@@ -252,11 +257,11 @@
 
 (defn filter-channel
   "Filter one channel, write result into target. Works only on planar"
-  [f ch ^Pixels target ^Pixels p]
+  [f ^long ch ^Pixels target ^Pixels p]
   (let [size (.size target)
-        start (int (* ch size))
-        stop (int (* (inc ch) size))]
-    (loop [idx start]
+        start (* ch size)
+        stop (* (inc ch) size)]
+    (loop [idx (int start)]
       (when (< idx stop)
         (aset ^ints (.p target) idx (int (f (aget ^ints (.p p) idx))))
         (recur (unchecked-inc idx))))
@@ -291,11 +296,11 @@
   "Blend one channel, write result into target. Works only on planar"
   [f ch ^Pixels target ^Pixels p1 ^Pixels p2]
   (let [size (.size target)
-        start (int (* ch size))
-        stop (int (* (inc ch) size))]
+        start (int (* ^long ch size))
+        stop (int (* (inc ^long ch) size))]
     (loop [idx start]
       (when (< idx stop)
-        (aset ^ints (.p target) idx (int (f (aget ^ints (.p p1) idx) (aget ^ints (.p p2) idx))))
+        (aset ^ints (.p target) idx (int (c/convert-and-blend f (aget ^ints (.p p1) idx) (aget ^ints (.p p2) idx))))
         (recur (unchecked-inc idx))))
     true))
 
@@ -351,7 +356,7 @@
 
 (defn get-3x3
   ""
-  [ch ^Pixels p x y]
+  [ch ^Pixels p ^long x ^long y]
   [(get-value p ch (dec x) (dec y))
    (get-value p ch x  (dec y))
    (get-value p ch (inc x) (dec y))
@@ -365,11 +370,11 @@
 (defn get-cross-f
   ""
   [f ch ^Pixels p x y]
-  (f (get-value p ch x (dec y))
-     (f (get-value p ch (dec x) y)
-        (f (get-value p ch x y)
-           (f (get-value p ch (inc x) y)
-              (get-value p ch x (inc y)))))))
+  (f ^int (get-value p ch x (dec ^long y))
+     (f ^int (get-value p ch (dec ^long x) y)
+        (f ^int (get-value p ch x y)
+           (f ^int (get-value p ch (inc ^long x) y)
+              ^int (get-value p ch x (inc ^long y)))))))
 
 (def dilate-filter (partial filter-channel-xy (partial get-cross-f max)))
 (def erode-filter (partial filter-channel-xy (partial get-cross-f min)))
@@ -377,44 +382,57 @@
 ;; gaussian blur done
 ;; http://blog.ivank.net/fastest-gaussian-blur.html
 
+(defn make-aget-2d
+  ""
+  [^ints array ^long w ^long h]
+  (fn local-aget-2d ^long [^long x ^long y]
+    (if (or (neg? x)
+            (neg? y)
+            (>= x w)
+            (>= y h))
+      (local-aget-2d (m/iconstrain x 0 (dec w)) (m/iconstrain y 0 (dec h)))
+      (aget array (+ x (* y w))))))
+
 (defn box-blur-v
   ""
-  [r w h ^ints in]
+  [^long r ^long w ^long h ^ints in]
   (if (zero? r) in
-      (let [size (* w h)
+      (let [aget-2d (make-aget-2d in w h)
+            size (* w h)
             ^ints target (int-array size)
             iarr (/ 1.0 (inc (+ r r)))
             r+ (inc r)
             rang (range (- r+) r)]
         (dotimes [x w]
-          (let [val (reduce #(+ %1 (core/aget-2d in w h x %2)) 0 rang)]
+          (let [val (reduce #(+ ^long %1 ^long (aget-2d x %2)) 0 rang)]
             (loop [y (int 0)
                    v (int val)]
               (when (< y h)
-                (let [nv (int (- (+ v (core/aget-2d in w h x (+ y r)))
-                                 (core/aget-2d in w h x (- y r+))))]
-                  (aset ^ints target (int (+ x (* w y))) (int (* nv iarr)))
+                (let [nv (- (+ v ^long (aget-2d x (+ y r)))
+                            ^long (aget-2d x (- y r+)))]
+                  (aset ^ints target (+ x (* w y)) (int (* nv iarr)))
                   (recur (unchecked-inc y) nv))))))
         target)))
 
 (defn box-blur-h
   ""
-  [r w h ^ints in]
+  [^long r ^long w ^long h ^ints in]
   (if (zero? r) in
-      (let [size (* w h)
+      (let [aget-2d (make-aget-2d in w h)
+            size (* w h)
             ^ints target (int-array size)
             iarr (/ 1.0 (inc (+ r r)))
             r+ (inc r)
             rang (range (- r+) r)]
         (dotimes [y h]
-          (let [val (reduce #(+ %1 (core/aget-2d in w h %2 y)) 0 rang)
+          (let [val (reduce #(+ ^long %1 ^long (aget-2d %2 y)) 0 rang)
                 off (* w y)]
             (loop [x (int 0)
                    v (int val)]
               (when (< x w)
-                (let [nv (int (- (+ v (core/aget-2d in w h (+ x r) y))
-                                 (core/aget-2d in w h (- x r+) y)))]
-                  (aset ^ints target (int (+ x off)) (int (* nv iarr)))
+                (let [nv (- (+ v ^long (aget-2d (+ x r) y))
+                            ^long (aget-2d (- x r+) y))]
+                  (aset ^ints target (+ x off) (int (* nv iarr)))
                   (recur (unchecked-inc x) nv))))))
         target)))
 
@@ -442,7 +460,7 @@
 
 (defn radius-for-gauss
   ""
-  [sigma n]
+  [^double sigma ^long n]
   (let [sigma* (* 12 sigma sigma)
         w-ideal (-> sigma*
                     (/ n)
@@ -454,7 +472,7 @@
         m-ideal (/ (- sigma* (* n (m/sq wl)) (* 4 n wl) (* 3 n))
                    (- (* -4 wl) 4))
         m (m/round m-ideal)]
-    (vec (map #(int (/ (dec (if (< % m) wl wu)) 2)) (range n)))))
+    (vec (map #(int (/ (dec (if (< ^int % m) wl wu)) 2)) (range n)))))
 
 (def radius-for-gauss-memo (memoize radius-for-gauss))
 
@@ -484,14 +502,14 @@
 
 (defn posterize-levels-fun
   ""
-  [numlev]
-  (let [f (fn [idx] (-> idx
-                        (* numlev)
-                        (bit-shift-right 8)
-                        (* 255.0)
-                        (/ (dec numlev))))
+  [^long numlev]
+  (let [f (fn ^long [^long idx] (-> idx
+                                    (* numlev)
+                                    (bit-shift-right 8)
+                                    (* 255)
+                                    (/ (dec numlev))))
         ^ints tmp (int-array 256)]
-    (amap tmp idx ret ^int (f idx))))
+    (amap tmp idx ret ^long (f idx))))
 
 (def posterize-levels (memoize posterize-levels-fun))
 
@@ -502,8 +520,8 @@
 
 (defn make-posterize
   ""
-  ([numlev]
-   (let [nl (int (m/constrain numlev 2 255))
+  ([^long numlev]
+   (let [nl (m/iconstrain numlev 2 255)
          ^ints levels (posterize-levels nl)]
      (partial filter-channel (partial posterize-pixel levels))))
   ([]
@@ -517,13 +535,13 @@
 
 (defn threshold-pixel
   ""
-  [thr v]
+  ^long [^long thr ^long v]
   (if (< v thr) 255 0))
 
 (defn make-threshold
   ""
-  ([thr]
-   (let [t (int (* 256 thr))]
+  ([^double thr]
+   (let [t (long (* 256 thr))]
      (partial filter-channel (partial threshold-pixel t))))
   ([]
    (make-threshold 0.5)))
@@ -542,8 +560,8 @@
 
 (defn make-quantile-filter
   ""
-  [v]
-  (let [q (int (m/constrain v 0 8))]
+  [^long v]
+  (let [q (m/iconstrain v 0 8)]
     (partial filter-channel-xy (comp (partial quantile q) get-3x3))))
 
 (def median-filter (make-quantile-filter 4))
@@ -552,13 +570,13 @@
 
 (defn calc-tint
   ""
-  [a b]
-  (bit-shift-right (bit-and 0xff00 (unchecked-int (* a b))) 8))
+  ^long [^long a ^long b]
+  (bit-shift-right (bit-and 0xff00 (* a b)) 8))
 
 (defn make-tint-map
   ""
   [r g b a]
-  (vec (map #(amap ^ints (int-array 256) idx ret ^int (calc-tint idx %)) [r g b a])))
+  (vec (map #(amap ^ints (int-array 256) idx ret ^long (calc-tint idx %)) [r g b a])))
 
 (defn make-tinter
   ""
@@ -578,16 +596,19 @@
 (defn normalize
   "Normalize channel values to whole (0-255) range"
   [ch target ^Pixels p]
-  (let [[mn mx] (loop [idx (int 0)
-                       currmn (int Integer/MAX_VALUE)
-                       currmx (int Integer/MIN_VALUE)]
-                  (if (< idx (.size p))
-                    (let [v (get-value p ch idx)]
+  (let [sz (.size p)
+        [mn mx] (loop [idx (int 0)
+                       currmn (long 1000)
+                       currmx (long -1000)]
+                  (if (< idx sz)
+                    (let [^long v (get-value p ch idx)]
                       (recur (unchecked-inc idx)
-                             (int (if (< v currmn) v currmn))
-                             (int (if (> v currmx) v currmx))))
-                    [currmn currmx]))]
-    (filter-channel #(m/norm % mn mx 0 255) ch target p)))
+                             (min v currmn)
+                             (max v currmx)))
+                    [currmn currmx]))
+        mnd (double mn)
+        mxd (double mx)]
+    (filter-channel #(* 255.0 (m/norm % mnd mxd)) ch target p)))
 
 (def normalize-filter normalize)
 
@@ -595,12 +616,12 @@
   ""
   [ch ^Pixels p]
   (let [^doubles hist (double-array 256 0.0)
-        sz (int (.size p))
-        d (/ 1.0 (.size p))]
+        sz (.size p)
+        d (double (/ 1.0 (.size p)))]
     (loop [idx (int 0)]
       (if (< idx sz)
         (let [c (get-value p ch idx)]
-          (aset ^doubles hist (int c) (double (+ d (aget ^doubles hist (int c)))))
+          (aset ^doubles hist c (+ d (aget ^doubles hist c)))
           (recur (unchecked-inc idx)))
         hist))))
 
@@ -608,17 +629,17 @@
   ""
   [^doubles hist]
   (let [^ints lookup (int-array 256 0)]
-    (loop [currmn (int Integer/MAX_VALUE)
-           currmx (int Integer/MIN_VALUE)
+    (loop [currmn Integer/MAX_VALUE
+           currmx Integer/MIN_VALUE
            sum (double 0.0)
            idx (int 0)]
       (if (< idx 256)
-        (let [currsum (+ sum (aget ^doubles hist idx))
-              val (int (m/constrain (m/round (* sum 255.0)) 0 255))]
+        (let [currsum (+ sum ^double (aget ^doubles hist idx))
+              val (m/round (m/constrain (* sum 255.0) 0.0 255.0))]
           (aset ^ints lookup idx val)
-          (recur (int (if (< val currmn) val currmn))
-                 (int (if (> val currmx) val currmx))
-                 (double currsum)
+          (recur (min val currmn)
+                 (max val currmx)
+                 currsum
                  (unchecked-inc idx)))
         lookup))))
 
@@ -626,9 +647,9 @@
   "Equalize histogram"
   [ch target p]
   (let [^ints lookup (equalize-make-lookup (equalize-make-histogram ch p))]
-    (filter-channel #(aget ^ints lookup (int %)) ch target p)))
+    (filter-channel #(aget ^ints lookup ^int %) ch target p)))
 
 (defn negate-filter
   ""
   [ch target p]
-  (filter-channel #(- 255 %) ch target p))
+  (filter-channel #(- 255 ^int %) ch target p))

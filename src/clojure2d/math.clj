@@ -186,7 +186,7 @@
 (def high-2-exp (comp long ceil log2))
 
 ;; Modulo and abs
-(defn reminder ^double [^double v1 ^double v2] #(FastMath/remainder v1 v2))
+(defn remainder ^double [^double v1 ^double v2] (FastMath/remainder v1 v2))
 (defn abs ^double [^double v] (FastMath/abs v))
 (defn iabs ^long [^long v] (FastMath/abs v))
 
@@ -251,6 +251,15 @@
 (defn constrain
   "Clamp value between mn and mx"
   ^double [^double value ^double mn ^double mx]
+  (if (> value mx) 
+    mx
+    (if (< value mn) 
+      mn 
+      value)))
+
+(defn iconstrain
+  "Clamp value between mn and mx"
+  ^long [^long value ^long mn ^long mx]
   (if (> value mx) 
     mx
     (if (< value mn) 
@@ -661,7 +670,7 @@
 
 (defn discrete-noise
   "Discrete noise"
-  [X Y]
+  ^double [^long X ^long Y]
   (let [n (unchecked-add-int X (unchecked-multiply-int Y 57))
         nn (unchecked-int (bit-xor n (bit-shift-left n 13)))
         nnn (unchecked-add-int 1376312589 (unchecked-multiply-int nn (unchecked-add-int 789221 (unchecked-multiply-int nn (unchecked-multiply-int nn 15731)))))]

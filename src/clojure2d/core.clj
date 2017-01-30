@@ -302,7 +302,7 @@
 (defn point
   "Draw point at `(x,y)` position"
   [canvas ^double x ^double y]
-  (line canvas x y (pm/+ x 10.0e-6) (pm/+ y 10.0e-6))
+  (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
   canvas)
 
 (defn- draw-fill-or-stroke
@@ -663,37 +663,6 @@
          ret# ~expr]
      (prn (str "(" ~commnt ")" " Elapsed time: " (/ (double (- (. System (nanoTime)) start#)) 1000000.0) " msecs"))
      ret#))
-
-;; Three functions to operate on java arrays. Generally used for operating on `Pixels` with `blur` filter. I hope to remove them soon.
-
-(defmacro amap!
-  "Mutating version of amap"
-  [a idx expr]
-  `(let [a# ~a]
-     (loop  [~idx (int 0)]
-       (if (< ~idx  (alength a#))
-         (do
-           (aset a# ~idx ~expr)
-           (recur (unchecked-inc ~idx)))
-         a#))))
-
-(defn aget-2d
-  "Get value from int array, treat as 2d"
-  [^ints array w h x y]
-  (if (or (neg? x)
-          (neg? y)
-          (>= x w)
-          (>= y h))
-    (aget-2d array w h (m/constrain x 0 (dec w)) (m/constrain y 0 (dec h)))
-    (aget array (int (+ x (* y w))))))
-
-(defn array-clone
-  "Clone array using System/arraycopy"
-  [^ints array]
-  (let [len (int (alength array))
-        res (int-array len)]
-      (System/arraycopy array 0 ^ints res 0 len)
-      res))
 
 ;; ## Session management
 ;;

@@ -13,8 +13,8 @@
 
 ;; Simple 2d SLITSCAN
 
-(def freqs (vec (map #(bit-shift-left 1 %) (range 16))))
-(def amps (vec (map #(/ 1.0 %) freqs)))
+(def freqs (vec (map #(bit-shift-left 1 ^long %) (range 16))))
+(def amps (mapv #(/ 1.0 ^long %) freqs))
 
 (defn slitscan-random-setup
   ""
@@ -41,10 +41,10 @@
   [fx fy ch ^Pixels p x y]
   (let [sx (/ 1.0 (.w p))
         sy (/ 1.0 (.h p))
-        shiftx (* 0.5 (.w p) (fx (* x sx)))
-        shifty (* 0.5 (.h p) (fy (* y sy)))
-        xx (mod (int (+ x (.w p) shiftx)) (.w p))
-        yy (mod (int (+ y (.h p) shifty)) (.h p))]
+        shiftx (* 0.5 (.w p) ^double (fx (* ^long x sx)))
+        shifty (* 0.5 (.h p) ^double (fy (* ^long y sy)))
+        xx (rem (int (+ ^long x (.w p) shiftx)) (.w p))
+        yy (rem (int (+ ^long y (.h p) shifty)) (.h p))]
       (p/get-value p ch xx yy)))
 
 (defn make-slitscan-filter
@@ -68,7 +68,8 @@
 (defn- mi-draw-point
   ""
   ([ch target source oldx oldy newx newy sx sy]
-   (p/set-value target ch (+ newx sx) (+ newy sy) (p/get-value source ch (+ oldx sx) (+ oldy sy))))
+   (p/set-value target ch (+ ^long newx ^long sx) (+ ^long newy ^long sy)
+                (p/get-value source ch (+ ^long oldx ^long sx) (+ ^long oldy ^long sy))))
   ([ch target source oldx oldy newx newy]
    (p/set-value target ch newx newy (p/get-value source ch oldx oldy))))
 
@@ -93,12 +94,13 @@
 (defn- mi-do-diag-ul
   ""
   [t shift? ch target ^Pixels source]
-  (let [size (min (.w source) (.h source))
+  (let [^int t t
+        size (min (.w source) (.h source))
         tx (if shift? (- (.w source) size) 0)
         ty (if shift? (- (.h source) size) 0)]
     (dotimes [y size]
       (dotimes [x (inc y)]
-        (condp = (int t)
+        (condp == t
           0 (mi-draw-point ch target source x y y x tx ty)
           1 (mi-draw-point ch target source y x x y tx ty)
           2 (mi-draw-point ch target source x y (- size x 1) (- size y 1) tx ty)
@@ -107,13 +109,14 @@
 (defn- mi-do-diag-ur
   ""
   [t shift? ch target ^Pixels source]
-  (let [size (min (.w source) (.h source))
+  (let [^int t t
+        size (min (.w source) (.h source))
         tx (if shift? (- (.w source) size) 0)
         ty (if shift? (- (.h source) size) 0)]
     (dotimes [y size]
       (loop [x (int (dec size))]
         (when (>= x (- size y 1))
-          (condp = (int t)
+          (condp == t
             0 (mi-draw-point ch target source x y (- size y 1) (- size x 1) tx ty)
             1 (mi-draw-point ch target source (- size y 1) (- size x 1) x y tx ty)
             2 (mi-draw-point ch target source x y (- size x 1) (- size y 1) tx ty)
@@ -124,9 +127,9 @@
   ""
   [t l ch target ^Pixels source]
   (dotimes [y (.h source)]
-    (let [d (if t
-              (m/norm y 0 (.h source) 0 (.w source))
-              (m/norm y 0 (.h source) (.w source) 0))]
+    (let [d (int (if t
+                   (m/norm y 0 (.h source) 0 (.w source))
+                   (m/norm y 0 (.h source) (.w source) 0)))]
       (dotimes [x d]
         (if l
           (mi-draw-point ch target source (- (.w source) x 1) (- (.h source) y 1) x y)
@@ -167,7 +170,7 @@
 (defn make-slitscan2-filter
   "f: Vec2 -> Vec2 (use variation)
    r: value 1.0-3.0"
-  ([f r]
+  ([f ^double r]
    (let [r- (- r)]
      (fn [ch t ^Pixels p]
        (dotimes [y (.h p)]
