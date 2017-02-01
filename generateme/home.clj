@@ -11,9 +11,10 @@
   (:import [net.jafama FastMath]))
 
 
-(def p1 (p/load-pixels "generateme/nino/nino.jpg"))
 
-(def p2 (p/load-pixels "generateme/nino/ninores.jpg"))
+(def p1 (p/load-pixels "generateme/lucas/lucas.jpg"))
+
+(def p2 (p/load-pixels "generateme/lucas/lucas1.jpg"))
 
 (def p3 (p/load-pixels "generateme/ooo/ooo.jpg"))
 
@@ -46,16 +47,18 @@
                    (o/render-noise noise-overlay)
                    (o/render-spots spots-overlay))))
 
-(core/save-canvas canvas (core/next-filename "generateme/nino/res" ".jpg"))
+(core/save-canvas canvas (core/next-filename "generateme/lukas/res" ".jpg"))
 
 (p/set-canvas-pixels canvas p4)
 
 (def p4 (p/get-canvas-pixels canvas))
 
+(def p5 (p/get-canvas-pixels canvas))
+
 (do
   (def palette (g/color-reducer-machine))
   (println palette)
-  (p/set-canvas-pixels canvas (g/color-reducer-machine p4 palette)))
+  (p/set-canvas-pixels canvas (g/color-reducer-machine p5 palette)))
 
 
 ;; slitscan
@@ -66,13 +69,13 @@
 
   (binding [p/*pixels-edge* :wrap]
     (p/set-canvas-pixels canvas (p/filter-channels (g/make-slitscan2-filter f 1.0)
-                                                   (g/make-slitscan2-filter f 0.9)
-                                                   (g/make-slitscan2-filter f 1.1) nil p4))))
+                                                   (g/make-slitscan2-filter f 0.95)
+                                                   (g/make-slitscan2-filter f 1.05) nil p4))))
 
 ;; full process without use of filter-channels
 (time (let [effect (make-effect :dj-eq {:lo (m/drand -20 20) :mid (m/drand -20 20) :hi (m/drand -20 20) :peak_bw 1.3 :shelf_slope 1.5 :rate (m/irand 4000 100000)})
-            in (signal-from-pixels p1 {:layout :planar
-                                      :coding :ulaw
+            in (signal-from-pixels p4 {:layout :planar
+                                      :coding :alaw
                                       :signed true
                                       :channels [2 0 1]
                                       :bits 8})
