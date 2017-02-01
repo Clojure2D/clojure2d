@@ -11,10 +11,9 @@
   (:import [net.jafama FastMath]))
 
 
+(def p1 (p/load-pixels "generateme/ghost/res.jpg"))
 
-(def p1 (p/load-pixels "generateme/lucas/lucas.jpg"))
-
-(def p2 (p/load-pixels "generateme/lucas/lucas1.jpg"))
+(def p2 (p/load-pixels "generateme/ghost/ghostr2.jpg"))
 
 (def p3 (p/load-pixels "generateme/ooo/ooo.jpg"))
 
@@ -35,7 +34,7 @@
   (println b2)
   (p/set-canvas-pixels canvas (p/filter-channels p/equalize-filter false 
                                                  (p/filter-channels p/normalize-filter false
-                                                                    (g/blend-machine p1 p4 b)))))
+                                                                    (g/blend-machine p1 p5 b)))))
 
 (quick-bench (p/filter-channels p/dilate-filter false p1))
 
@@ -47,9 +46,11 @@
                    (o/render-noise noise-overlay)
                    (o/render-spots spots-overlay))))
 
-(core/save-canvas canvas (core/next-filename "generateme/lukas/res" ".jpg"))
+(core/close-session)
 
-(p/set-canvas-pixels canvas p4)
+(core/save-canvas canvas (core/next-filename "generateme/ghost/res" ".jpg"))
+
+(p/set-canvas-pixels canvas p5)
 
 (def p4 (p/get-canvas-pixels canvas))
 
@@ -58,7 +59,7 @@
 (do
   (def palette (g/color-reducer-machine))
   (println palette)
-  (p/set-canvas-pixels canvas (g/color-reducer-machine p5 palette)))
+  (p/set-canvas-pixels canvas (g/color-reducer-machine p1 palette)))
 
 
 ;; slitscan
@@ -69,8 +70,8 @@
 
   (binding [p/*pixels-edge* :wrap]
     (p/set-canvas-pixels canvas (p/filter-channels (g/make-slitscan2-filter f 1.0)
-                                                   (g/make-slitscan2-filter f 0.95)
-                                                   (g/make-slitscan2-filter f 1.05) nil p4))))
+                                                   (g/make-slitscan2-filter f 0.98)
+                                                   (g/make-slitscan2-filter f 1.02) nil p4))))
 
 ;; full process without use of filter-channels
 (time (let [effect (make-effect :dj-eq {:lo (m/drand -20 20) :mid (m/drand -20 20) :hi (m/drand -20 20) :peak_bw 1.3 :shelf_slope 1.5 :rate (m/irand 4000 100000)})
