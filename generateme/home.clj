@@ -11,9 +11,9 @@
   (:import [net.jafama FastMath]))
 
 
-(def p1 (p/load-pixels "generateme/sold/sold.jpg"))
+(def p1 (p/load-pixels "generateme/nino/nino.jpg"))
 
-(def p2 (p/load-pixels "generateme/sold/soldr.jpg"))
+(def p2 (p/load-pixels "generateme/nino/ninores.jpg"))
 
 (def p3 (p/load-pixels "generateme/ooo/ooo.jpg"))
 
@@ -34,7 +34,7 @@
   (println b2)
   (p/set-canvas-pixels canvas (p/filter-channels p/equalize-filter false 
                                                  (p/filter-channels p/normalize-filter false
-                                                                    (g/blend-machine p4 p1 b)))))
+                                                                    (g/blend-machine p1 p4 b)))))
 
 (quick-bench (p/filter-channels p/dilate-filter false p1))
 
@@ -46,7 +46,7 @@
                    (o/render-noise noise-overlay)
                    (o/render-spots spots-overlay))))
 
-(core/save-canvas canvas (core/next-filename "generateme/sold/res" ".jpg"))
+(core/save-canvas canvas (core/next-filename "generateme/nino/res" ".jpg"))
 
 (p/set-canvas-pixels canvas p4)
 
@@ -65,9 +65,9 @@
       f (comp v1 v2)]
 
   (binding [p/*pixels-edge* :wrap]
-    (p/set-canvas-pixels canvas (p/filter-channels (g/make-slitscan2-filter f 2.0)
-                                                   (g/make-slitscan2-filter f 1.9)
-                                                   (g/make-slitscan2-filter f 2.1) nil p1))))
+    (p/set-canvas-pixels canvas (p/filter-channels (g/make-slitscan2-filter f 1.0)
+                                                   (g/make-slitscan2-filter f 0.9)
+                                                   (g/make-slitscan2-filter f 1.1) nil p4))))
 
 ;; full process without use of filter-channels
 (time (let [effect (make-effect :dj-eq {:lo (m/drand -20 20) :mid (m/drand -20 20) :hi (m/drand -20 20) :peak_bw 1.3 :shelf_slope 1.5 :rate (m/irand 4000 100000)})
