@@ -21,7 +21,7 @@
            [org.apache.commons.math3.special Gamma Beta Erf BesselJ]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 ;; Every variation consist of variation configuration and function itself.
 ;;
@@ -772,6 +772,63 @@
 (make-var-method trade)
 (register-regular-var :trade)
 
+;; ## V
+
+;; ### Voron
+
+(defn config-voron
+  "Voron configuration"
+  [p]
+  (merge {:k (srandom 0.6 1.3)
+          :step (srandom 0.1 1.2)
+          :num (m/drand 0.1 25.0)
+          :xseed (m/irand)
+          :yseed (m/irand)} p))
+(make-config-method voron)
+
+(deftype VoronResType [^double R ^double X0 ^double Y0])
+(deftype VoronCalcType [^long M1 ^long N1 ^long k])
+
+(defn make-voron
+  "Voron by eralex61, http://eralex61.deviantart.com/art/Voronoi-Diagram-plugin-153126702"
+  [^double amount {:keys [^double k ^double step ^double num ^int xseed ^int yseed]}]
+  (fn [^Vec2 v]
+    (let [fk (fn ^VoronCalcType [^long M1 ^long N1]
+               (VoronCalcType. M1 N1
+                               (long (inc (m/floor (* (m/discrete-noise (+ (+ (* M1 19) (* N1 257)) xseed) 0) num))))))
+          m (long (m/floor (/ (.x v) step)))
+          n (long (m/floor (/ (.y v) step)))
+          m- (dec m)
+          m+ (inc m)
+          n- (dec n)
+          n+ (inc n)
+          Ks (mapv fk [m- m- m- m m m m+ m+ m+] [n- n n+ n- n n+ n- n n+])
+          ^VoronResType res (reduce (fn [^VoronResType curr ^VoronCalcType calc]
+                                      (loop [i (long 0)
+                                             ^VoronResType currl curr]
+                                        (if (< i (.k calc))
+                                          (let [X (* step (+ (.M1 calc) (m/discrete-noise (+
+                                                                                           (+ i (* 64 (.M1 calc)))
+                                                                                           (+ xseed (* 15 (.N1 calc)))) 0)))
+                                                Y (* step (+ (.N1 calc) (m/discrete-noise (+
+                                                                                           (+ i (* 21 (.M1 calc)))
+                                                                                           (+ yseed (* 33 (.N1 calc)))) 0)))
+                                                R (m/hypot (- (.x v) X) (- (.y v) Y))]
+                                            (recur (unchecked-inc i)
+                                                   (if (< R (.R currl))
+                                                     (VoronResType. R X Y)
+                                                     currl)))
+                                          currl))) (VoronResType. 20.0 0.0 0.0) Ks)]
+      (Vec2. (* amount (+ (.X0 res) (* k (- (.x v) (.X0 res)))))
+             (* amount (+ (.Y0 res) (* k (- (.y v) (.Y0 res)))))))))
+(make-var-method voron)
+(register-regular-var :voron)
+
+(def vv (make-variation :voron 1.0 {}))
+
+(vv (Vec2. 0.9 0.2))
+;; => #object[clojure2d.math.vector.Vec2 0x34f5877c "[-0.6144291130318851, -0.03556826075794334]"]
+
 ;;;;; https://github.com/d3/d3-geo-projection/tree/master/src
 
 (defn make-miller
@@ -818,7 +875,7 @@
           yy (* amount m/SQRTPI (m/tan k))]
       (Vec2. xx yy))))
 (make-var-method foucaut)
-(register-regular-var :foucaout)
+(register-regular-var :foucaut)
 
 ;;;;
 

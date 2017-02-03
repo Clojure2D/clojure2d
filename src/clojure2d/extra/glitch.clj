@@ -9,7 +9,7 @@
            [clojure2d.math.vector Vec2 Vec4]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 ;; Simple 2d SLITSCAN
 
@@ -174,9 +174,9 @@
    (let [r- (- r)]
      (fn [ch t ^Pixels p]
        (dotimes [y (.h p)]
-         (let [yv (m/norm y 0 (.h p) r- r)]
+         (let [^double yv (m/norm y 0.0 (.h p) r- r)]
            (dotimes [x (.w p)]
-             (let [xlerp (m/norm x 0 (.w p) 0.0 1.0)
+             (let [xlerp (m/norm x 0.0 (.w p))
                    v1 (f (Vec2. r- yv))
                    v2 (f (Vec2. r yv))
                    ^Vec2 vv (v/interpolate v1 v2 xlerp)
@@ -185,6 +185,25 @@
                (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
   ([f]
    (make-slitscan2-filter f 2.0)))
+
+;;
+(defn make-fold-filter
+  "f: Vec2 -> Vec2 (use variation)
+   r: value 1.0-3.0"
+  ([f ^double r]
+   (let [r- (- r)]
+     (fn [ch t ^Pixels p]
+       (dotimes [y (.h p)]
+         (let [^double yv (m/norm y 0.0 (.h p) r- r)]
+           (dotimes [x (.w p)]
+             (let [^double xv (m/norm x 0.0 (.w p) r- r)
+                   ^Vec2 vv (f (Vec2. xv yv))
+                   xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
+                   yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
+               (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
+  ([f]
+   (make-fold-filter f 2.0)))
+
 
 ;; blend machine
 

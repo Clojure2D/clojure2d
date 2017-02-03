@@ -11,7 +11,7 @@
   (:import [net.jafama FastMath]))
 
 
-(def p1 (p/load-pixels "generateme/ghost/res.jpg"))
+(def p1 (p/load-pixels "generateme/humming/humming.jpg"))
 
 (def p2 (p/load-pixels "generateme/ghost/ghostr2.jpg"))
 
@@ -23,7 +23,7 @@
 
 (def canvas (core/create-canvas (.w p1) (.h p1)))
 
-(def scale 0.5)
+(def scale 0.9)
 
 
 (def windows (core/show-window canvas "glitch" (* scale (.w p1)) (* scale (.h p1)) 10))
@@ -48,7 +48,7 @@
 
 (core/close-session)
 
-(core/save-canvas canvas (core/next-filename "generateme/ghost/res" ".jpg"))
+(core/save-canvas canvas (core/next-filename "generateme/humming/res" ".jpg"))
 
 (p/set-canvas-pixels canvas p5)
 
@@ -59,7 +59,7 @@
 (do
   (def palette (g/color-reducer-machine))
   (println palette)
-  (p/set-canvas-pixels canvas (g/color-reducer-machine p1 palette)))
+  (p/set-canvas-pixels canvas (g/color-reducer-machine p5 palette)))
 
 
 ;; slitscan
@@ -69,24 +69,33 @@
       f (comp v1 v2)]
 
   (binding [p/*pixels-edge* :wrap]
-    (p/set-canvas-pixels canvas (p/filter-channels (g/make-slitscan2-filter f 1.0)
-                                                   (g/make-slitscan2-filter f 0.98)
-                                                   (g/make-slitscan2-filter f 1.02) nil p4))))
+    (p/set-canvas-pixels canvas (p/filter-channels (g/make-slitscan2-filter f 3.0)
+                                                   (g/make-slitscan2-filter f 2.98)
+                                                   (g/make-slitscan2-filter f 3.02) nil p5))))
 
 ;; full process without use of filter-channels
 (time (let [effect (make-effect :dj-eq {:lo (m/drand -20 20) :mid (m/drand -20 20) :hi (m/drand -20 20) :peak_bw 1.3 :shelf_slope 1.5 :rate (m/irand 4000 100000)})
-            in (signal-from-pixels p4 {:layout :planar
-                                      :coding :alaw
-                                      :signed true
-                                      :channels [2 0 1]
+            in (signal-from-pixels p5 {:channels [2 0 1]
                                       :bits 8})
             res (apply-effect effect in)
-            resp (signal-to-pixels (p/clone-pixels p1) res {:layout :planar
-                                                           :coding :alaw-rev
-                                                           :signed true
-                                                           :channels [2 0 1]
+            resp (signal-to-pixels (p/clone-pixels p1) res {:channels [2 0 1]
                                                            :bits 8})]
         (p/set-canvas-pixels canvas (p/filter-channels p/normalize nil resp))))
+
+
+;; fold
+
+(let [v1name (rand-nth v/variation-list-not-random)
+      v2name (rand-nth v/variation-list-not-random)
+      v1 (v/make-variation v1name 1.0 {})
+      v2 (v/make-variation v2name 1.0 {})
+      f (comp v1 v2)]
+
+  (binding [p/*pixels-edge* :wrap]
+    (println (str v2name " o " v1name))
+    (p/set-canvas-pixels canvas (p/filter-channels (g/make-fold-filter f 2.05)
+                                                   (g/make-fold-filter f 2.0)
+                                                   (g/make-fold-filter f 1.95) nil p5))))
 
 
 ;;; some speed tests

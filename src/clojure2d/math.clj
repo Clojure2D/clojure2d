@@ -666,12 +666,14 @@
 
 ;;;
 
-(def ^:const ^double AM (/ 1.0 2147483647))
+(def ^:const ^double AM (/ 1.0 2147483647.0))
 
 (defn discrete-noise
   "Discrete noise"
   ^double [^long X ^long Y]
-  (let [n (unchecked-add-int X (unchecked-multiply-int Y 57))
+  (let [X (unchecked-int X)
+        Y (unchecked-int Y)
+        n (unchecked-add-int X (unchecked-multiply-int Y 57))
         nn (unchecked-int (bit-xor n (bit-shift-left n 13)))
         nnn (unchecked-add-int 1376312589 (unchecked-multiply-int nn (unchecked-add-int 789221 (unchecked-multiply-int nn (unchecked-multiply-int nn 15731)))))]
     (* AM (unchecked-int (bit-and 0x7fffffff nnn)))))

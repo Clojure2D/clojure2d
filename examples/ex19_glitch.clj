@@ -59,11 +59,29 @@
 
 ;; slitscan 2
 
-(let [v1 (v/make-variation (rand-nth v/variation-list-not-random) 1.0 {})
-      v2 (v/make-variation (rand-nth v/variation-list-not-random) 1.0 {})
+(let [v1name (rand-nth v/variation-list-not-random)
+      v2name (rand-nth v/variation-list-not-random)
+      v1 (v/make-variation v1name 1.0 {})
+      v2 (v/make-variation v2name 1.0 {})
       f (comp v1 v2)]
 
   (binding [p/*pixels-edge* :wrap]
-    (p/set-canvas-pixels canvas (p/filter-channels (g/make-slitscan2-filter f 2.0)
-                                                   (g/make-slitscan2-filter f 1.9)
-                                                   (g/make-slitscan2-filter f 2.1) nil img))))
+    (println (str v1name " o " v2name))
+    (p/set-canvas-pixels canvas (p/filter-channels (g/make-slitscan2-filter f 2.03)
+                                                   (g/make-slitscan2-filter f 2.0)
+                                                   (g/make-slitscan2-filter f 1.97) nil img))))
+
+
+;; fold
+
+(let [v1name (rand-nth v/variation-list-not-random)
+      v2name (rand-nth v/variation-list-not-random)
+      v1 (v/make-variation v1name 1.0 {})
+      v2 (v/make-variation v2name 1.0 {})
+      f (comp v1 v2)]
+
+  (binding [p/*pixels-edge* :wrap]
+    (println (str v2name " o " v1name))
+    (p/set-canvas-pixels canvas (p/filter-channels (g/make-fold-filter f 2.03)
+                                                   (g/make-fold-filter f 2.0)
+                                                   (g/make-fold-filter f 1.97) nil img))))
