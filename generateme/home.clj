@@ -11,9 +11,9 @@
   (:import [net.jafama FastMath]))
 
 
-(def p1 (p/load-pixels "generateme/humming/humming.jpg"))
+(def p1 (p/load-pixels "generateme/graj/graj.jpg"))
 
-(def p2 (p/load-pixels "generateme/ghost/ghostr2.jpg"))
+(def p2 (p/load-pixels "generateme/graj/res_23B5869B_graj.jpg"))
 
 (def p3 (p/load-pixels "generateme/ooo/ooo.jpg"))
 
@@ -23,7 +23,7 @@
 
 (def canvas (core/create-canvas (.w p1) (.h p1)))
 
-(def scale 0.9)
+(def scale 0.6)
 
 
 (def windows (core/show-window canvas "glitch" (* scale (.w p1)) (* scale (.h p1)) 10))
@@ -34,7 +34,7 @@
   (println b2)
   (p/set-canvas-pixels canvas (p/filter-channels p/equalize-filter false 
                                                  (p/filter-channels p/normalize-filter false
-                                                                    (g/blend-machine p1 p5 b)))))
+                                                                    (g/blend-machine p1 p2 b)))))
 
 (quick-bench (p/filter-channels p/dilate-filter false p1))
 
@@ -48,7 +48,7 @@
 
 (core/close-session)
 
-(core/save-canvas canvas (core/next-filename "generateme/humming/res" ".jpg"))
+(core/save-canvas canvas (core/next-filename "generateme/graj/res" ".jpg"))
 
 (p/set-canvas-pixels canvas p5)
 
