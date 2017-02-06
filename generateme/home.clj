@@ -11,7 +11,7 @@
   (:import [net.jafama FastMath]))
 
 
-(def p1 (p/load-pixels "generateme/graj/graj.jpg"))
+(def p1 (p/load-pixels "generateme/dance/dancer.jpg"))
 
 (def p2 (p/load-pixels "generateme/graj/res_23B5869B_graj.jpg"))
 
@@ -23,7 +23,7 @@
 
 (def canvas (core/create-canvas (.w p1) (.h p1)))
 
-(def scale 0.6)
+(def scale 0.9)
 
 
 (def windows (core/show-window canvas "glitch" (* scale (.w p1)) (* scale (.h p1)) 10))
@@ -75,11 +75,18 @@
 
 ;; full process without use of filter-channels
 (time (let [effect (make-effect :dj-eq {:lo (m/drand -20 20) :mid (m/drand -20 20) :hi (m/drand -20 20) :peak_bw 1.3 :shelf_slope 1.5 :rate (m/irand 4000 100000)})
-            in (signal-from-pixels p5 {:channels [2 0 1]
-                                      :bits 8})
-            res (apply-effect effect in)
-            resp (signal-to-pixels (p/clone-pixels p1) res {:channels [2 0 1]
-                                                           :bits 8})]
+            effect2 (make-effect :phaser-allpass {:delay (m/drand 2.0)})
+            in (signal-from-pixels p1 {:layout :interleaved
+                                          :channels [0 1 2]
+                                          :bits 8
+                                          :coding :none
+                                          :signed true})
+            res (apply-effect effect2 in)
+            resp (signal-to-pixels (p/clone-pixels p1) res {:channels [0 1 2]
+                                                            :layout :interleaved
+                                                            :bits 8
+                                                            :coding :none
+                                                            :signed true})]
         (p/set-canvas-pixels canvas (p/filter-channels p/normalize nil resp))))
 
 

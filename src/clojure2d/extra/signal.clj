@@ -118,7 +118,7 @@
 (def ^:const ^long s24-min (apply-sign 0x800000 24))
 (def ^:const ^long s24-max (apply-sign 0x7fffff 24))
 
-(defn- int-to-float
+(defn int-to-float
   ""
   (^double [x endianess sign]
    (let [v (pack-with-endianess-and-sign x endianess sign)]
@@ -136,7 +136,7 @@
        (m/norm v s24-min s24-max -1.0 1.0)
        (m/norm v 0 0xffffff -1.0 1.0)))))
 
-(defn- float-to-int
+(defn float-to-int
   ""
   [^long bits ^double v little-endian sign]
   (let [vv (m/constrain v -1.0 1.0)
@@ -240,14 +240,13 @@
                   :ulaw ulaw
                   :alaw-rev alaw-rev
                   :ulaw-rev ulaw-rev)]
-
      (loop [idx (int 0)
             bidx (int 0)]
        (when (< idx limit)
          (condp == nb
-           1 (aset ^doubles buff bidx (double (coding (int-to-float (aget ^ints layout idx) e s))))
-           2 (aset ^doubles buff bidx (double (coding (int-to-float (aget ^ints layout idx) (aget ^ints layout (inc idx)) e s))))
-           3 (aset ^doubles buff bidx (double (coding (int-to-float (aget ^ints layout idx) (aget ^ints layout (inc idx)) (aget ^ints layout (+ 2 idx)) e s)))))
+           1 (aset ^doubles buff bidx ^double (coding (int-to-float (aget ^ints layout idx) e s)))
+           2 (aset ^doubles buff bidx ^double (coding (int-to-float (aget ^ints layout idx) (aget ^ints layout (inc idx)) e s)))
+           3 (aset ^doubles buff bidx ^double (coding (int-to-float (aget ^ints layout idx) (aget ^ints layout (inc idx)) (aget ^ints layout (+ 2 idx)) e s))))
          (recur (+ idx nb) (inc bidx))))
 
      (Signal. buff)))
