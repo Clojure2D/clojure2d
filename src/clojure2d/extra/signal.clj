@@ -97,7 +97,7 @@
   ""
   (^long [^long x little-endian signed]
    (if signed (apply-sign x 8) x))
-  (^long [x y little-endian signed]
+  (^long [^long x ^long y little-endian signed]
    (let [[^long a ^long b] (if little-endian [y x] [x y])
          val (bit-or (bit-shift-left (bit-and a 0xff) 8)
                      (bit-and b 0xff))]
@@ -109,7 +109,6 @@
                      (bit-shift-left (bit-and b 0xff) 8)
                      (bit-and c 0xff))]
      (if signed (apply-sign val 24) val))))
-
 
 (def ^:const ^long s8-min (apply-sign 0x80 8))
 (def ^:const ^long s8-max (apply-sign 0x7f 8))
@@ -658,6 +657,30 @@
          (StateWithS. (m/constrain demf -1.0 1.0) (StateFm. m new-integral (inc (.t state)) (.state res)))))
       ([]
        (StateFm. 0.0 0.0 0 (create-state lp-chain))))))
+
+;; bandwidth limit
+;; https://searchcode.com/file/18573523/cmt/src/lofi.cpp#
+
+(defmethod make-effect :bandwidth-limit [_ conf]
+  (let [dx (double (/ (:freq conf) (:rate conf)))]
+    (fn
+      ([^double sample ^double state]
+       (let [res (if (>= sample state)
+                   (min (+ state dx) sample)
+                   (max (- state dx) sample))]
+         (StateWithS. res res)))
+      ([] 0.0))))
+
+(defmethod make-effect :distort [_ conf]
+  (let [fact (double (:factor conf))
+        nfact (inc fact)]
+    (fn 
+      ([^double sample state]
+       (let [div (+ fact (m/abs sample))
+             res (* nfact (/ sample div))]
+         (StateWithS. res state)))
+      ([] nil))))
+
 
 ;; foverdrive
 

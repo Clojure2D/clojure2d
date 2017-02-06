@@ -11,7 +11,7 @@
   (:import [net.jafama FastMath]))
 
 
-(def p1 (p/load-pixels "generateme/dance/dancer.jpg"))
+(def p1 (p/load-pixels "generateme/aa/aa.jpg"))
 
 (def p2 (p/load-pixels "generateme/graj/res_23B5869B_graj.jpg"))
 
@@ -25,7 +25,6 @@
 
 (def scale 0.9)
 
-
 (def windows (core/show-window canvas "glitch" (* scale (.w p1)) (* scale (.h p1)) 10))
 
 (let [b (g/blend-machine)
@@ -34,7 +33,7 @@
   (println b2)
   (p/set-canvas-pixels canvas (p/filter-channels p/equalize-filter false 
                                                  (p/filter-channels p/normalize-filter false
-                                                                    (g/blend-machine p1 p2 b)))))
+                                                                    (g/blend-machine p1 p4 b)))))
 
 (quick-bench (p/filter-channels p/dilate-filter false p1))
 
@@ -48,7 +47,7 @@
 
 (core/close-session)
 
-(core/save-canvas canvas (core/next-filename "generateme/graj/res" ".jpg"))
+(core/save-canvas canvas (core/next-filename "generateme/aa/res" ".jpg"))
 
 (p/set-canvas-pixels canvas p5)
 
@@ -75,18 +74,18 @@
 
 ;; full process without use of filter-channels
 (time (let [effect (make-effect :dj-eq {:lo (m/drand -20 20) :mid (m/drand -20 20) :hi (m/drand -20 20) :peak_bw 1.3 :shelf_slope 1.5 :rate (m/irand 4000 100000)})
-            effect2 (make-effect :phaser-allpass {:delay (m/drand 2.0)})
+            effect2 (make-effect :distort {:factor 1.0})
             in (signal-from-pixels p1 {:layout :interleaved
                                           :channels [0 1 2]
-                                          :bits 8
+                                          :bits 24
                                           :coding :none
-                                          :signed true})
+                                          :signed false})
             res (apply-effect effect2 in)
             resp (signal-to-pixels (p/clone-pixels p1) res {:channels [0 1 2]
                                                             :layout :interleaved
-                                                            :bits 8
+                                                            :bits 24
                                                             :coding :none
-                                                            :signed true})]
+                                                            :signed false})]
         (p/set-canvas-pixels canvas (p/filter-channels p/normalize nil resp))))
 
 

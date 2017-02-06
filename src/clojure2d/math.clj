@@ -276,6 +276,19 @@
      (if (< v start) 0.0 1.0)
      (/ (- v start) (- stop start)))))
 
+(defn make-norm
+  "Make map/norm function"
+  ([^double start ^double stop]
+   (let [r (- stop start)]
+       (fn ^double [^double v ^double dstart ^double dstop]
+          (let [vn (/ (- v start) r)]
+            (+ dstart (* (- dstop dstart) vn))))))
+  ([^double start ^double stop ^double dstart ^double dstop]
+   (let [r (- stop start)]
+       (fn ^double [^double v]
+          (let [vn (/ (- v start) r)]
+            (+ dstart (* (- dstop dstart) vn)))))))
+
 ;; Map and constrain values
 ;; `(cnorm 1.5 0 1 100 200) => 200`
 (defn cnorm
