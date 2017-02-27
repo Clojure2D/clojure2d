@@ -474,6 +474,8 @@
 ;;
 ;; Function should return current state, which is subject to pass to function when called next time.
 ;;
+;; You can replace drawing function anytime, see `show-window` function for a reference.
+;;
 ;; See: examples/ex02_draw.clj
 ;;
 ;; ### Events
@@ -598,8 +600,6 @@
 ;; * repaint
 ;; * wait
 ;; * check if window is still displayed and recur incrementing frame number and pass state for another run.
-;;
-;; Keep in mind that first two steps are run as `future` and function waits before run another round.
 
 (defn- refresh-screen-task
   "Task repainting canvas on window with set FPS.
@@ -608,7 +608,7 @@
   [^JFrame frame is-display-running? draw-fun buffer stime]
   (loop [cnt (long 0)
          result nil]
-    (let [thr (let [curr-res (when draw-fun (draw-fun @buffer cnt result))]
+    (let [thr (let [curr-res (when @draw-fun (@draw-fun @buffer cnt result))]
                 (doto frame
                   (.validate)
                   (.repaint))
@@ -627,20 +627,37 @@
   [[_ _ buffer] canvas]
   (reset! buffer canvas))
 
+;; Similarly you may want to replace `draw-fun` to other one on window. To make it pass result of `show-window` function and new `draw-fun`
+;; Internally it just resets atom.
+
+(defn replace-draw-fun
+  "Replace drawing function attached to the window
+
+  * Input: window and new draw"
+  [[_ _ _ draw-fun-atom] new-draw]
+  (reset! draw-fun-atom new-draw))
+
 ;; Finally function which displays window. Function creates windows visibility status (`is-display-running?` atom), buffer as atomized canvas, creates frame, creates refreshing task (repainter) and shows window.
+;;
+;; `draw-fun` and `canvas` are packed in atom and returned, you can access them and replace during live coding sessions.
 
 (defn show-window
   "Show window with width/height, name and required fps of refresh. Optionally pass callback function.
 
   * Input: canvas, window name, width, height, frames per seconds, (optional) `draw` function.
-  * Returns vector with: `JFrame` object, visibility status atom and buffer atom (canvas packed into the atom)."
+  * Returns vector with: `JFrame` object, visibility status atom, buffer atom (canvas packed into the atom) and drawing function packed in atom (to enable live coding). For convenience last element of the vector is a map with same values."
   ([canvas wname width height fps draw-fun]
    (let [is-display-running? (atom true)
+         draw-fun-atom (atom draw-fun)
          buffer (atom canvas)
          frame (JFrame.)]
      (SwingUtilities/invokeLater #(build-frame frame is-display-running? buffer wname width height))
-     (future (refresh-screen-task frame is-display-running? draw-fun buffer (/ 1000.0 fps)))
-     [frame is-display-running? buffer]))
+     (future (refresh-screen-task frame is-display-running? draw-fun-atom buffer (/ 1000.0 fps)))
+     [frame is-display-running? buffer draw-fun-atom
+      {:frame frame
+       :is-display-running? is-display-running?
+       :buffer buffer
+       :draw-fun draw-fun-atom}]))
   ([canvas wname width height fps]
    (show-window canvas wname width height fps nil)))
 

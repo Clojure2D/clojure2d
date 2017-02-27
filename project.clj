@@ -11,7 +11,7 @@
             [lein-deps-tree "0.1.2"]
             [lein-marginalia "0.9.0"]
             [com.jakemccrary/lein-test-refresh "0.18.1"]
-            [lein-codox "0.10.2"]]
+            [lein-codox "0.10.3"]]
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
