@@ -11,15 +11,15 @@
   (:import [net.jafama FastMath]))
 
 
-(def p1 (p/load-pixels "generateme/adrian/ares6.png"))
+
+(def p1 (p/load-pixels "generateme/adrian/adrian.jpg"))
 
 (def p2 (p/load-pixels "generateme/adrian/ares3.png"))
 
 (def p3 (p/load-pixels "generateme/ooo/ooo.jpg"))
 
-(def noise-overlay (o/make-noise 30 (.w p1) (.h p1)))
-(def spots-overlay (o/make-spots 80 [20 30 60 120 180 200] (.w p1) (.h p1)))
-
+(def noise-overlay (o/make-noise 40 (.w p1) (.h p1)))
+(def spots-overlay (o/make-spots 80 [30 60 120 180] (.w p1) (.h p1)))
 
 (def canvas (core/create-canvas (.w p1) (.h p1)))
 
@@ -31,9 +31,9 @@
       b2 (g/blend-machine)]
   (println b)
   (println b2)
-  (p/set-canvas-pixels canvas (p/filter-channels p/equalize-filter false 
+  (p/set-canvas-pixels canvas (p/filter-channels p/normalize-filter false 
                                                  (p/filter-channels p/normalize-filter false
-                                                                    (g/blend-machine p4 p5 b)))))
+                                                                    (g/blend-machine p4 p2 b)))))
 
 (quick-bench (p/filter-channels p/dilate-filter false p1))
 
@@ -49,7 +49,7 @@
 
 (core/save-canvas canvas (core/next-filename "generateme/adrian/res" ".png"))
 
-(p/set-canvas-pixels canvas p5)
+(p/set-canvas-pixels canvas p4)
 
 (def p4 (p/get-canvas-pixels canvas))
 
@@ -73,7 +73,7 @@
     (println (str v2name " o " v1name))
     (p/set-canvas-pixels canvas (p/filter-channels (g/make-slitscan2-filter f 3.0)
                                                    (g/make-slitscan2-filter f 2.98)
-                                                   (g/make-slitscan2-filter f 3.02) nil p5))))
+                                                   (g/make-slitscan2-filter f 3.02) nil p1))))
 
 ;; full process without use of filter-channels
 (time (let [effect (make-effect :dj-eq {:lo (m/drand -20 20) :mid (m/drand -20 20) :hi (m/drand -20 20) :peak_bw 1.3 :shelf_slope 1.5 :rate (m/irand 4000 100000)})
@@ -92,7 +92,6 @@
                                                             :signed true})]
         (p/set-canvas-pixels canvas (p/filter-channels p/normalize nil (p/filter-colors c/from-HWB resp)))))
 
-
 ;; fold
 
 (let [v1name (rand-nth v/variation-list-not-random)
@@ -103,9 +102,9 @@
 
   (binding [p/*pixels-edge* :wrap]
     (println (str v2name " o " v1name))
-    (p/set-canvas-pixels canvas (p/filter-channels (g/make-fold-filter f 2.05)
+    (p/set-canvas-pixels canvas (p/filter-channels (g/make-fold-filter f 2.01)
                                                    (g/make-fold-filter f 2.0)
-                                                   (g/make-fold-filter f 1.95) nil p5))))
+                                                   (g/make-fold-filter f 1.99) nil p1))))
 
 
 ;;; some speed tests

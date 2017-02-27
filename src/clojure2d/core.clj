@@ -608,13 +608,13 @@
   [^JFrame frame is-display-running? draw-fun buffer stime]
   (loop [cnt (long 0)
          result nil]
-    (let [thr (future (let [curr-res (when draw-fun (draw-fun @buffer cnt result))]
-                        (doto frame
-                          (.validate)
-                          (.repaint))
-                        curr-res))]
+    (let [thr (let [curr-res (when draw-fun (draw-fun @buffer cnt result))]
+                (doto frame
+                  (.validate)
+                  (.repaint))
+                curr-res)]
       (Thread/sleep stime)
-      (when @is-display-running? (recur (inc cnt) @thr)))))
+      (when @is-display-running? (recur (inc cnt) thr)))))
 
 ;; You may want to replace canvas to the other one on window. To make it pass result of `show-window` function and new canvas.
 ;; Internally it just resets buffer atom for another canvas.
