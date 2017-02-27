@@ -11,19 +11,19 @@
   (:import [net.jafama FastMath]))
 
 
-(def p1 (p/load-pixels "generateme/aa/aa.jpg"))
+(def p1 (p/load-pixels "generateme/adrian/ares6.png"))
 
-(def p2 (p/load-pixels "generateme/graj/res_23B5869B_graj.jpg"))
+(def p2 (p/load-pixels "generateme/adrian/ares3.png"))
 
 (def p3 (p/load-pixels "generateme/ooo/ooo.jpg"))
 
-(def noise-overlay (o/make-noise 80 (.w p1) (.h p1)))
-(def spots-overlay (o/make-spots 80 [30 60 120 180] (.w p1) (.h p1)))
+(def noise-overlay (o/make-noise 30 (.w p1) (.h p1)))
+(def spots-overlay (o/make-spots 80 [20 30 60 120 180 200] (.w p1) (.h p1)))
 
 
 (def canvas (core/create-canvas (.w p1) (.h p1)))
 
-(def scale 0.9)
+(def scale 0.4)
 
 (def windows (core/show-window canvas "glitch" (* scale (.w p1)) (* scale (.h p1)) 10))
 
@@ -33,7 +33,7 @@
   (println b2)
   (p/set-canvas-pixels canvas (p/filter-channels p/equalize-filter false 
                                                  (p/filter-channels p/normalize-filter false
-                                                                    (g/blend-machine p1 p4 b)))))
+                                                                    (g/blend-machine p4 p5 b)))))
 
 (quick-bench (p/filter-channels p/dilate-filter false p1))
 
@@ -47,7 +47,7 @@
 
 (core/close-session)
 
-(core/save-canvas canvas (core/next-filename "generateme/aa/res" ".jpg"))
+(core/save-canvas canvas (core/next-filename "generateme/adrian/res" ".png"))
 
 (p/set-canvas-pixels canvas p5)
 
@@ -63,11 +63,14 @@
 
 ;; slitscan
 
-(let [v1 (v/make-variation (rand-nth v/variation-list-not-random) 1.0 {})
-      v2 (v/make-variation (rand-nth v/variation-list-not-random) 1.0 {})
+(let [v1name (rand-nth v/variation-list-not-random)
+      v2name (rand-nth v/variation-list-not-random)
+      v1 (v/make-variation v1name 1.0 {})
+      v2 (v/make-variation v2name 1.0 {})
       f (comp v1 v2)]
 
   (binding [p/*pixels-edge* :wrap]
+    (println (str v2name " o " v1name))
     (p/set-canvas-pixels canvas (p/filter-channels (g/make-slitscan2-filter f 3.0)
                                                    (g/make-slitscan2-filter f 2.98)
                                                    (g/make-slitscan2-filter f 3.02) nil p5))))
@@ -75,18 +78,19 @@
 ;; full process without use of filter-channels
 (time (let [effect (make-effect :dj-eq {:lo (m/drand -20 20) :mid (m/drand -20 20) :hi (m/drand -20 20) :peak_bw 1.3 :shelf_slope 1.5 :rate (m/irand 4000 100000)})
             effect2 (make-effect :distort {:factor 1.0})
-            in (signal-from-pixels p1 {:layout :interleaved
-                                          :channels [0 1 2]
-                                          :bits 24
+            inluv (p/filter-colors c/to-HWB p5)
+            in (signal-from-pixels inluv {:layout :interleaved
+                                          :channels [0]
+                                          :bits 8
                                           :coding :none
-                                          :signed false})
-            res (apply-effect effect2 in)
-            resp (signal-to-pixels (p/clone-pixels p1) res {:channels [0 1 2]
+                                          :signed true})
+            res (apply-effect effect in)
+            resp (signal-to-pixels (p/clone-pixels p1) res {:channels [0]
                                                             :layout :interleaved
-                                                            :bits 24
+                                                            :bits 8
                                                             :coding :none
-                                                            :signed false})]
-        (p/set-canvas-pixels canvas (p/filter-channels p/normalize nil resp))))
+                                                            :signed true})]
+        (p/set-canvas-pixels canvas (p/filter-channels p/normalize nil (p/filter-colors c/from-HWB resp)))))
 
 
 ;; fold
