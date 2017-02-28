@@ -16,11 +16,11 @@
             [clojure2d.math.vector :as v]
             [clojure2d.color :as c]
             [criterium.core :refer :all])  
-  (:import [java.awt.image BufferedImage]
+  (:import [java.awt.image BufferedImage BufferStrategy]
            [javax.swing ImageIcon]
            [javax.imageio ImageIO ImageWriter ImageWriteParam IIOImage]
            [java.awt Graphics Graphics2D Image RenderingHints GraphicsEnvironment 
-            Transparency BasicStroke Color Container Dimension Component]
+            Transparency BasicStroke Color Container Dimension Component Toolkit Canvas]
            [java.util Iterator]
            [java.awt.geom Line2D Line2D$Double
             Rectangle2D Rectangle2D$Double
@@ -564,25 +564,20 @@
 (defn- create-panel
   "Create panel which displays canvas. Attach paint method, mouse events, give a name (same as window), set size etc."
   [buffer windowname width height]
-  (let [panel (proxy [JPanel] []
-                 (paint [^Graphics graphics-context]
-                   (let [^JPanel this this
-                         ^Graphics2D graphics-context graphics-context] ; avoid reflection hint
-                     (.setRenderingHints graphics-context (rendering-hints :high))
-                     (.drawImage graphics-context (@@buffer 1) 0 0 (.getWidth this) (.getHeight this) this))))]
+  (let [panel (Canvas.)]
     (doto panel
       (.setName windowname)
       (.addMouseListener mouse-processor)
       (.addMouseMotionListener mouse-motion-processor)
+      (.setIgnoreRepaint true)
       (.setPreferredSize (Dimension. width height)))))
 
 (defn- build-frame
   "Create JFrame object, create and attach JPanel and do what is needed to show window. Attach key events and closing event."
-  [^JFrame frame is-display-running? buffer windowname width height]
-  (let [^JPanel panel (create-panel buffer windowname width height)
-        closer (proxy [WindowAdapter] []
+  [^JFrame frame ^Canvas panel is-display-running? buffer windowname width height]
+  (let [closer (proxy [WindowAdapter] []
                  (windowClosing [^WindowEvent e] (close-window frame is-display-running?)))]
-    (.add (.getContentPane frame) panel)
+    (.add frame panel)
     (doto frame
       (.addKeyListener key-processor)
       (.setResizable false)
@@ -592,7 +587,9 @@
       (.setName windowname)
       (.setTitle windowname)
       (.setBackground Color/white)
-      (.setVisible true))))
+      (.setVisible true))
+    (doto panel
+      (.createBufferStrategy 2))))
 
 ;; Another internal function repaints JPanel with set number of frames per seconds. If `draw` function is passed it is called before rapaint action. Function runs infinitely until window is closed. The cycle goes like this:
 ;;
@@ -601,20 +598,31 @@
 ;; * wait
 ;; * check if window is still displayed and recur incrementing frame number and pass state for another run.
 
+(defn repaint
+  ""
+  [^Canvas panel buffer]
+  (let [^BufferStrategy strategy (.getBufferStrategy panel)]
+    (loop []
+      (loop []
+        (let [^Graphics2D graphics-context (.getDrawGraphics strategy)]
+          (.drawImage graphics-context (@buffer 1) 0 0 (.getWidth panel) (.getHeight panel) nil)
+          (.dispose graphics-context))
+        (when (.contentsRestored strategy) (recur)))
+      (.show strategy)
+      (when (.contentsLost strategy) (recur)))
+    (.sync (Toolkit/getDefaultToolkit))))
+
 (defn- refresh-screen-task
   "Task repainting canvas on window with set FPS.
 
   * Input: frame, is-display-running? atom, function to run before repaint, canvas and sleep time."
-  [^JFrame frame is-display-running? draw-fun buffer stime]
+  [^Canvas panel is-display-running? draw-fun buffer stime]
   (loop [cnt (long 0)
          result nil]
-    (let [thr (let [curr-res (when @draw-fun (@draw-fun @buffer cnt result))]
-                (doto frame
-                  (.validate)
-                  (.repaint))
-                curr-res)]
+    (let [new-result (when @draw-fun (@draw-fun @buffer cnt result))]
       (Thread/sleep stime)
-      (when @is-display-running? (recur (inc cnt) thr)))))
+      (repaint panel @buffer)
+      (when @is-display-running? (recur (inc cnt) new-result)))))
 
 ;; You may want to replace canvas to the other one on window. To make it pass result of `show-window` function and new canvas.
 ;; Internally it just resets buffer atom for another canvas.
@@ -650,14 +658,16 @@
    (let [is-display-running? (atom true)
          draw-fun-atom (atom draw-fun)
          buffer (atom canvas)
-         frame (JFrame.)]
-     (SwingUtilities/invokeLater #(build-frame frame is-display-running? buffer wname width height))
-     (future (refresh-screen-task frame is-display-running? draw-fun-atom buffer (/ 1000.0 fps)))
+         frame (JFrame.)
+         panel (create-panel buffer wname width height)]
+     (SwingUtilities/invokeLater #(build-frame frame panel is-display-running? buffer wname width height))
+     (future (refresh-screen-task panel is-display-running? draw-fun-atom buffer (/ 1000.0 fps)))
      [frame is-display-running? buffer draw-fun-atom
       {:frame frame
        :is-display-running? is-display-running?
        :buffer buffer
-       :draw-fun draw-fun-atom}]))
+       :draw-fun draw-fun-atom
+       :panel panel}]))
   ([canvas wname width height fps]
    (show-window canvas wname width height fps nil)))
 

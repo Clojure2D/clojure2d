@@ -39,13 +39,11 @@
         vy2 (m/lerp (get-in gff [ix iy+]) (get-in gff [ix+ iy+]) rx)]
     (m/lerp vy1 vy2 ry)))
 
-(defn draw
+(defn my-draw
   ""
-  [canvas frame _]
-  (let [kappa (* (double frame) 0.0041)
-        hf (/ (m/sqrt (* 8.0 (/ kappa m/PI))) 
-              (- 4.0 kappa))]
-    (with-canvas canvas (set-background 21 20 19))
+  [canvas hf]
+  (do
+    (set-background canvas 21 20 19)
     (dotimes [t rays]
       (let [theta (* t rsteps)]
         (loop [x (double (* 0.5 width))
@@ -55,11 +53,19 @@
             (let [v (* hf (get-field-value x y))
                   sx (m/sin (+ v theta))
                   sy (m/cos (+ v theta))]
-              (with-canvas canvas
-                (rect x y 0.8 0.8))
+              (rect canvas x y 0.8 0.8)
               (recur (+ x sx)
                      (+ y sy)
                      (unchecked-inc-int iter)))))))))
+
+(defn draw
+  ""
+  [canvas frame _]
+  (let [kappa (* (double frame) 0.0041)
+        hf (/ (m/sqrt (* 8.0 (/ kappa m/PI))) 
+              (- 4.0 kappa))]
+    (with-canvas canvas
+      (my-draw hf))))
 
 (do
 
