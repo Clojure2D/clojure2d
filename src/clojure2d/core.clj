@@ -474,8 +474,6 @@
 ;;
 ;; Function should return current state, which is subject to pass to function when called next time.
 ;;
-;; You can replace drawing function anytime, see `show-window` function for a reference.
-;;
 ;; See: examples/ex02_draw.clj
 ;;
 ;; ### Events
@@ -559,10 +557,10 @@
 
 ;; ### Frame machinery functions
 ;;
-;; Window is JFrame with JPanel which is used to draw canvas on it. Internally canvas is stored as `atom` with `BufferedImage` extracted from canvas. Main reason for that is option for replacing canvas when windows is running.
+;; Window is JFrame with Panel (as java.awt.Canvas) which is used to draw canvas on it. Internally canvas is stored as `atom` with `BufferedImage` extracted from canvas. Main reason for that is option for replacing canvas when windows is running.
 
 (defn- create-panel
-  "Create panel which displays canvas. Attach paint method, mouse events, give a name (same as window), set size etc."
+  "Create panel which displays canvas. Attach mouse events, give a name (same as window), set size etc."
   [buffer windowname width height]
   (let [panel (Canvas.)]
     (doto panel
@@ -573,7 +571,7 @@
       (.setPreferredSize (Dimension. width height)))))
 
 (defn- build-frame
-  "Create JFrame object, create and attach JPanel and do what is needed to show window. Attach key events and closing event."
+  "Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event."
   [^JFrame frame ^Canvas panel is-display-running? buffer windowname width height]
   (let [closer (proxy [WindowAdapter] []
                  (windowClosing [^WindowEvent e] (close-window frame is-display-running?)))]
@@ -591,15 +589,15 @@
     (doto panel
       (.createBufferStrategy 2))))
 
-;; Another internal function repaints JPanel with set number of frames per seconds. If `draw` function is passed it is called before rapaint action. Function runs infinitely until window is closed. The cycle goes like this:
+;; Another internal function repaints panel with set number of frames per seconds. If `draw` function is passed it is called before rapaint action. Function runs infinitely until window is closed. The cycle goes like this:
 ;;
 ;; * call `draw` function if available, pass canvas, current frame number and current state (`nil` at start)
 ;; * repaint
 ;; * wait
 ;; * check if window is still displayed and recur incrementing frame number and pass state for another run.
 
-(defn repaint
-  ""
+(defn- repaint
+  "Draw buffer on panel."
   [^Canvas panel buffer]
   (let [^BufferStrategy strategy (.getBufferStrategy panel)]
     (loop []
@@ -619,7 +617,7 @@
   [^Canvas panel is-display-running? draw-fun buffer stime]
   (loop [cnt (long 0)
          result nil]
-    (let [new-result (when @draw-fun (@draw-fun @buffer cnt result))]
+    (let [new-result (when draw-fun (draw-fun @buffer cnt result))]
       (Thread/sleep stime)
       (repaint panel @buffer)
       (when @is-display-running? (recur (inc cnt) new-result)))))
@@ -635,16 +633,6 @@
   [[_ _ buffer] canvas]
   (reset! buffer canvas))
 
-;; Similarly you may want to replace `draw-fun` to other one on window. To make it pass result of `show-window` function and new `draw-fun`
-;; Internally it just resets atom.
-
-(defn replace-draw-fun
-  "Replace drawing function attached to the window
-
-  * Input: window and new draw"
-  [[_ _ _ draw-fun-atom] new-draw]
-  (reset! draw-fun-atom new-draw))
-
 ;; Finally function which displays window. Function creates windows visibility status (`is-display-running?` atom), buffer as atomized canvas, creates frame, creates refreshing task (repainter) and shows window.
 ;;
 ;; `draw-fun` and `canvas` are packed in atom and returned, you can access them and replace during live coding sessions.
@@ -656,17 +644,15 @@
   * Returns vector with: `JFrame` object, visibility status atom, buffer atom (canvas packed into the atom) and drawing function packed in atom (to enable live coding). For convenience last element of the vector is a map with same values."
   ([canvas wname width height fps draw-fun]
    (let [is-display-running? (atom true)
-         draw-fun-atom (atom draw-fun)
          buffer (atom canvas)
          frame (JFrame.)
          panel (create-panel buffer wname width height)]
      (SwingUtilities/invokeLater #(build-frame frame panel is-display-running? buffer wname width height))
-     (future (refresh-screen-task panel is-display-running? draw-fun-atom buffer (/ 1000.0 fps)))
-     [frame is-display-running? buffer draw-fun-atom
+     (future (refresh-screen-task panel is-display-running? draw-fun buffer (/ 1000.0 fps)))
+     [frame is-display-running? buffer
       {:frame frame
        :is-display-running? is-display-running?
        :buffer buffer
-       :draw-fun draw-fun-atom
        :panel panel}]))
   ([canvas wname width height fps]
    (show-window canvas wname width height fps nil)))

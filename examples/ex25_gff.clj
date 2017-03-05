@@ -74,4 +74,4 @@
   (with-canvas canvas
     (set-color 220 220 210 200))
 
-  (def window (show-window canvas "GFF" width height 25 draw)))
+  (def window (show-window canvas "GFF" width height 25 #(draw %1 %2 %3))))
