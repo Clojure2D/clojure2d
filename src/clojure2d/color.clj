@@ -425,6 +425,7 @@
              :msubtract blend-msubtract
              :linearburn blend-linearburn
              :mlinearburn blend-mlinearburn
+             :multiply blend-multiply
              :darken blend-darken
              :lighten blend-lighten
              :screen blend-screen

@@ -58,7 +58,7 @@
 (do
   (def palette (g/color-reducer-machine))
   (println palette)
-  (p/set-canvas-pixels canvas (g/color-reducer-machine p5 palette)))
+  (p/set-canvas-pixels canvas (g/color-reducer-machine palette p5)))
 
 
 ;; slitscan

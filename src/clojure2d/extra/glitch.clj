@@ -273,7 +273,7 @@
                bpal)
          pal (merge pal {:distf (rand-nth [v/dist v/dist-abs v/dist-cheb v/dist-sq])})]
      pal))
-  ([p conf]
+  ([conf p]
    (p/filter-colors (c/make-reduce-color-filter (:distf conf) (:palette conf)) p))
   ([p]
    (color-reducer-machine p (color-reducer-machine))))
