@@ -440,6 +440,7 @@
              :mpegtoplight blend-mpegtoplight
              :difference blend-difference
              :divide blend-divide
+             :mdivide blend-mdivide
              :or blend-or
              :and blend-and
              :xor blend-xor
