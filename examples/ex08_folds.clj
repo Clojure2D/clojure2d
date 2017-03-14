@@ -46,8 +46,7 @@
     (if one-field?
       (println field-name1)
       (println (str field-name1 " " field-name2)))
-    field)
-  )
+    field))
 
 (defn make-me
   ""

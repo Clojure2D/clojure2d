@@ -427,6 +427,20 @@
 (make-var-method csin)
 (register-regular-var :csin)
 
+;; ### Cayley transform
+
+(defn make-cayley
+  "Cayley transform"
+  [^double amount _]
+  (fn [^Vec2 v]
+    (if (== (.y v) -1.0)
+      zerov
+      (let [^Complex c (c/from-vec2 v)]
+        (c/to-vec2 (c/div (c/add c c/I-)
+                          (c/add c c/I)))))))
+(make-var-method cayley)
+(register-regular-var :cayley)
+
 ;; ## D
 
 ;; ### Diamond
@@ -928,7 +942,8 @@
 (defn compf
   ""
   [f1 f2 amount]
-  (v/mult (comp f1 f2) amount))
+  (fn [^Vec2 v]
+    (v/mult (f1 (f2 v)) amount)))
 
 (defn make-random-configuration
   ""
