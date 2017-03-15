@@ -2902,85 +2902,85 @@ to restore state you have to use destructuring [result &amp; state] to use on an
 </td><td class="codes"><pre class="brush: clojure">(deftype Signal [^doubles signal]
   Object
   (toString [_] (str &quot;size=&quot; (alength signal))))</pre></td></tr><tr><td class="docs"><p>helper functions</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const alaw-A 87.6)
-(def ^:const alaw-rA (/ 1.0 alaw-A))
-(def ^:const alaw-lA (inc (m/log alaw-A)))
-(def ^:const alaw-rlA (/ 1.0 alaw-lA))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double alaw-A 87.6)
+(def ^:const ^double alaw-rA (/ 1.0 alaw-A))
+(def ^:const ^double alaw-lA (inc (m/log alaw-A)))
+(def ^:const ^double alaw-rlA (/ 1.0 alaw-lA))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn alaw
-  [x]
+  ^double [^double x]
   (let [absx (m/abs x)
         f (* alaw-rlA (m/sgn x))]
     (* f (if (&lt; absx alaw-rA)
            (* alaw-A absx)
            (+ alaw-lA (m/log absx))))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn alaw-rev
-  [y]
+  ^double [^double y]
   (let [absy (m/abs y)
         f (* alaw-rA (m/sgn y))
         v (* absy alaw-lA)]
     (* f (if (&lt; absy alaw-rlA)
            v
            (m/exp (dec v))))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def ^:const ulaw-U 255.0)
-(def ^:const ulaw-rU (/ 1.0 255.0))
-(def ^:const ulaw-U1 (inc ulaw-U))
-(def ^:const ulaw-rlnU1 (/ 1.0 (m/log ulaw-U1)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double ulaw-U 255.0)
+(def ^:const ^double ulaw-rU (/ 1.0 255.0))
+(def ^:const ^double ulaw-U1 (inc ulaw-U))
+(def ^:const ^double ulaw-rlnU1 (/ 1.0 (m/log ulaw-U1)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn ulaw
-  [x]
+  ^double [^double x]
   (* (m/sgn x)
      ulaw-rlnU1
      (m/log (inc (* ulaw-U (m/abs x))))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn ulaw-rev
-  [y]
+  ^double [^double y]
   (* (m/sgn y)
      ulaw-rU
      (dec (m/pow ulaw-U1 (m/abs y)))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- apply-sign
-  [in bits]
+  ^long [^long in ^long bits]
   (let [sh (- 64 bits)]
     (-&gt; in
-         (bit-shift-left sh)
-         (bit-shift-right sh))))</pre></td></tr><tr><td class="docs"><p>TODO: move me to bit operations!!!</p>
+        (bit-shift-left sh)
+        (bit-shift-right sh))))</pre></td></tr><tr><td class="docs"><p>TODO: move me to bit operations!!!</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- pack-with-endianess-and-sign
-  ([x little-endian signed]
+  (^long [^long x little-endian signed]
    (if signed (apply-sign x 8) x))
-  ([x y little-endian signed]
-   (let [[a b] (if little-endian [y x] [x y])
+  (^long [^long x ^long y little-endian signed]
+   (let [[^long a ^long b] (if little-endian [y x] [x y])
          val (bit-or (bit-shift-left (bit-and a 0xff) 8)
                      (bit-and b 0xff))]
      (if signed (apply-sign val 16) val)))
   ([x y z little-endian signed]
-   (let [[a b c] (if little-endian [z y x] [x y z])
+   (let [[^long a ^long b ^long c] (if little-endian [z y x] [x y z])
          val (bit-or (bit-shift-left (bit-and a 0xff) 16)
                      (bit-shift-left (bit-and b 0xff) 8)
                      (bit-and c 0xff))]
      (if signed (apply-sign val 24) val))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def s8-min (apply-sign 0x80 8))
-(def s8-max (apply-sign 0x7f 8))
-(def s16-min (apply-sign 0x8000 16))
-(def s16-max (apply-sign 0x7fff 16))
-(def s24-min (apply-sign 0x800000 24))
-(def s24-max (apply-sign 0x7fffff 24))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn- int-to-float
-  ([x endianess sign]
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^long s8-min (apply-sign 0x80 8))
+(def ^:const ^long s8-max (apply-sign 0x7f 8))
+(def ^:const ^long s16-min (apply-sign 0x8000 16))
+(def ^:const ^long s16-max (apply-sign 0x7fff 16))
+(def ^:const ^long s24-min (apply-sign 0x800000 24))
+(def ^:const ^long s24-max (apply-sign 0x7fffff 24))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn int-to-float
+  (^double [x endianess sign]
    (let [v (pack-with-endianess-and-sign x endianess sign)]
      (if sign
        (m/norm v s8-min s8-max -1.0 1.0)
        (m/norm v 0 0xff -1.0 1.0))))
-  ([x y endianess sign]
+  (^double [x y endianess sign]
    (let [v (pack-with-endianess-and-sign x y endianess sign)]
      (if sign
        (m/norm v s16-min s16-max -1.0 1.0)
        (m/norm v 0 0xffff -1.0 1.0))))
   ([x y z endianess sign]
-   (let [v (pack-with-endianess-and-sign x y z endianess sign)]
+   (let [^long v (pack-with-endianess-and-sign x y z endianess sign)]
      (if sign
        (m/norm v s24-min s24-max -1.0 1.0)
        (m/norm v 0 0xffffff -1.0 1.0)))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn- float-to-int
-  [bits v little-endian sign]
+</td><td class="codes"><pre class="brush: clojure">(defn float-to-int
+  [^long bits ^double v little-endian sign]
   (let [vv (m/constrain v -1.0 1.0)
-        restored (long (condp = bits
+        restored (long (condp == bits
                          8 (if sign
                                (m/norm vv -1.0 1.0 s8-min s8-max)
                                (m/norm vv -1.0 1.0 0 0xff))
@@ -2990,7 +2990,7 @@ to restore state you have to use destructuring [result &amp; state] to use on an
                          24 (if sign
                                 (m/norm vv -1.0 1.0 s24-min s24-max)
                                 (m/norm vv -1.0 1.0 0 0xffffff))))]
-    (condp = bits
+    (condp == bits
       8 (bit-and restored 0xff)
       16 (let [a (bit-and restored 0xff)
                b (bit-and (bit-shift-right restored 8) 0xff)]
@@ -3056,7 +3056,7 @@ to restore state you have to use destructuring [result &amp; state] to use on an
   ([^Pixels p conf]
    (let [config (merge pixels-default-configuration conf)
          channels (if (= :all (:channels config)) [0 1 2 3] (:channels config))
-         b (:bits config)
+         ^long b (:bits config)
          e (:little-endian config)
          s (:signed config)
          nb (bit-shift-right b 3)
@@ -3075,10 +3075,10 @@ to restore state you have to use destructuring [result &amp; state] to use on an
      (loop [idx (int 0)
             bidx (int 0)]
        (when (&lt; idx limit)
-         (condp = nb
-           1 (aset ^doubles buff bidx (double (coding (int-to-float (aget ^ints layout idx) e s))))
-           2 (aset ^doubles buff bidx (double (coding (int-to-float (aget ^ints layout idx) (aget ^ints layout (inc idx)) e s))))
-           3 (aset ^doubles buff bidx (double (coding (int-to-float (aget ^ints layout idx) (aget ^ints layout (inc idx)) (aget ^ints layout (+ 2 idx)) e s)))))
+         (condp == nb
+           1 (aset ^doubles buff bidx ^double (coding (int-to-float (aget ^ints layout idx) e s)))
+           2 (aset ^doubles buff bidx ^double (coding (int-to-float (aget ^ints layout idx) (aget ^ints layout (inc idx)) e s)))
+           3 (aset ^doubles buff bidx ^double (coding (int-to-float (aget ^ints layout idx) (aget ^ints layout (inc idx)) (aget ^ints layout (+ 2 idx)) e s))))
          (recur (+ idx nb) (inc bidx))))
      (Signal. buff)))
   ([p]
@@ -3087,7 +3087,7 @@ to restore state you have to use destructuring [result &amp; state] to use on an
   [^Pixels target ^Signal sig conf]
   (let [config (merge pixels-default-configuration conf)
         channels (if (= :all (:channels config)) [0 1 2 3] (:channels config))
-        b (:bits config)
+        ^long b (:bits config)
         e (:little-endian config)
         s (:signed config)
         nb (bit-shift-right b 3)
@@ -3142,7 +3142,7 @@ minimizing destructuring as much as possible...</p>
   ([effects initial-state]
    (vec (map #(StateWithF. %1 %2) effects initial-state))))</pre></td></tr><tr><td class="docs"><p>Apply effects on signal</p>
 </td><td class="codes"><pre class="brush: clojure">(defn apply-effects
-  ([effects ^Signal s rst]
+  ([effects ^Signal s ^long rst]
    (let [len (alength ^doubles (.signal s))
          ^doubles in (.signal s)
          ^doubles out (double-array len)]
@@ -3154,14 +3154,14 @@ minimizing destructuring as much as possible...</p>
                nidx (inc idx)]
            (aset ^doubles out idx (double (.sample res)))
            (recur nidx 
-                  (if (and (pos? rst) (zero? (mod nidx rst)))
+                  (if (and (pos? rst) (zero? ^long (mod nidx rst)))
                     (create-state effects)
                     (.state res))))))
      (Signal. out)))
   ([effects s]
    (apply-effects effects s 0)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn apply-effect
-  ([effect ^Signal s rst]
+  ([effect ^Signal s ^long rst]
    (let [len (alength ^doubles (.signal s))
          ^doubles in (.signal s)
          ^doubles out (double-array len)]
@@ -3173,7 +3173,7 @@ minimizing destructuring as much as possible...</p>
                nidx (inc idx)]
            (aset ^doubles out idx (double (.sample state)))
            (recur nidx 
-                  (if (and (pos? rst) (zero? (mod nidx rst)))
+                  (if (and (pos? rst) (zero? ^long (mod nidx rst)))
                     (effect)
                     (.state state))))))
      (Signal. out)))
@@ -3199,14 +3199,14 @@ minimizing destructuring as much as possible...</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>SIMPLE LOWPASS/HIGHPASS</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- calc-filter-alpha
-  [rate cutoff]
+  ^double [^double rate ^double cutoff]
   (let [tinterval (/ 1.0 rate)
         tau (/ 1.0 (* cutoff m/TWO_PI))]
     (/ tinterval (+ tau tinterval))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmethod make-effect :simple-lowpass [_ conf]
   (let [alpha (calc-filter-alpha (:rate conf) (:cutoff conf))]
     (fn
-      ([sample prev]
+      ([^double sample ^double prev]
        (let [s1 (* sample alpha)
              s2 (- prev (* prev alpha))
              nprev (+ s1 s2)]
@@ -3215,8 +3215,8 @@ minimizing destructuring as much as possible...</p>
 </td><td class="codes"><pre class="brush: clojure">(defmethod make-effect :simple-highpass [_ conf]
   (let [lpfilter (make-effect :simple-lowpass conf)]
     (fn
-      ([sample state]
-       (let [^StateWithS res (lpfilter state sample)]
+      ([^double sample state]
+       (let [^StateWithS res (lpfilter sample state)]
          (StateWithS. (- sample (.sample res)) (.state res))))
       ([]
        (lpfilter)))))</pre></td></tr><tr><td class="docs"><p>BIQUAD FILTERS</p>
@@ -3226,7 +3226,7 @@ minimizing destructuring as much as possible...</p>
    bw - bandwidth
    fs - sample rate</p>
 </td><td class="codes"><pre class="brush: clojure">(defn biquad-eq-params
-  [fc gain bw fs]
+  [^double fc ^double gain ^double bw ^double fs]
   (let [w (/ (* m/TWO_PI (m/constrain fc 1.0 (* 0.5 fs))) fs)
         cw (m/cos w)
         sw (m/sin w)
@@ -3248,7 +3248,7 @@ minimizing destructuring as much as possible...</p>
    slope - shelf slope
    fs - sample rate</p>
 </td><td class="codes"><pre class="brush: clojure">(defn biquad-hs-params
-  [fc gain slope fs]
+  [^double fc ^double gain ^double slope ^double fs]
   (let [w (/ (* m/TWO_PI (m/constrain fc 1.0 (* 0.5 fs))) fs)
         cw (m/cos w)
         sw (m/sin w)
@@ -3273,7 +3273,7 @@ minimizing destructuring as much as possible...</p>
    slope - shelf slope
    fs - sample rate</p>
 </td><td class="codes"><pre class="brush: clojure">(defn biquad-ls-params
-  [fc gain slope fs]
+  [^double fc ^double gain ^double slope ^double fs]
   (let [w (/ (* m/TWO_PI (m/constrain fc 1.0 (* 0.5 fs))) fs)
         cw (m/cos w)
         sw (m/sin w)
@@ -3295,7 +3295,7 @@ minimizing destructuring as much as possible...</p>
         a2 (* a0r (+ bs (- (dec (- A)) amc)))]
     (BiquadConf. b0 b1 b2 a1 a2)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn biquad-lp-params
-  [fc bw fs]
+  [^double fc ^double bw ^double fs]
   (let [omega (* m/TWO_PI (/ fc fs))
         sn (m/sin omega)
         cs (m/cos omega)
@@ -3309,7 +3309,7 @@ minimizing destructuring as much as possible...</p>
         a2 (* a0r (dec alpha))]
     (BiquadConf. b0 b1 b2 a1 a2)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn biquad-hp-params
-  [fc bw fs]
+  [^double fc ^double bw ^double fs]
   (let [omega (* m/TWO_PI (/ fc fs))
         sn (m/sin omega)
         cs (m/cos omega)
@@ -3323,7 +3323,7 @@ minimizing destructuring as much as possible...</p>
         a2 (* a0r (dec alpha))]
     (BiquadConf. b0 b1 b2 a1 a2)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn biquad-bp-params
-  [fc bw fs]
+  [^double fc ^double bw ^double fs]
   (let [omega (* m/TWO_PI (/ fc fs))
         sn (m/sin omega)
         cs (m/cos omega)
@@ -3337,7 +3337,7 @@ minimizing destructuring as much as possible...</p>
     (BiquadConf. b0 b1 b2 a1 a2)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(deftype StateBiquad [^double x2 ^double x1 ^double y2 ^double y1])</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn biquad-filter
-  ([^BiquadConf c sample ^StateBiquad state]
+  ([^BiquadConf c ^double sample ^StateBiquad state]
    (let [y (-&gt; (* (.b0 c) sample)
                (+ (* (.b1 c) (.x1 state)))
                (+ (* (.b2 c) (.x2 state)))
@@ -3372,10 +3372,10 @@ minimizing destructuring as much as possible...</p>
       ([]
        (StateDjEq. (b1) (b2) (b3))))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmethod make-effect :phaser-allpass [_ conf]
-  (let [d (:delay conf)
+  (let [^double d (:delay conf)
         a1 (/ (- 1.0 d) (inc d))]
     (fn
-      ([sample zm1]
+      ([^double sample ^double zm1]
        (let [y (+ zm1 (* sample (- a1)))
              new-zm1 (+ sample (* y a1))]
          (StateWithS. y new-zm1)))
@@ -3383,9 +3383,9 @@ minimizing destructuring as much as possible...</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(deftype StateDivider [^double out ^double amp ^double count ^double lamp ^double last ^int zeroxs])</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmethod make-effect :divider [_ conf]
-  (let [denom (:denominator conf)]
+  (let [^long denom (:denominator conf)]
     (fn
-      ([sample ^StateDivider state]
+      ([^double sample ^StateDivider state]
        (let [count (inc (.count state))
              ^StateDivider s1 (if (or (and (&gt; sample 0.0) (&lt;= (.last state) 0.0))
                                       (and (neg? sample) (&gt;= (.last state) 0.0)))
@@ -3395,7 +3395,7 @@ minimizing destructuring as much as possible...</p>
                                 (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (.zeroxs state)))
              amp (+ (.amp s1) (m/abs sample))
              ^StateDivider s2 (if (and (&gt; denom 1)
-                                       (== (mod (.zeroxs s1) denom) (dec denom)))
+                                       (== ^long (rem (.zeroxs s1) denom) (dec denom)))
                                 (StateDivider. (if (pos? (.out s1)) -1.0 1.0) 0.0 0 (/ amp (.count s1)) (.last s1) 0)
                                 (StateDivider. (.out s1) amp (.count s1) (.lamp s1) (.last s1) (.zeroxs s1)))]
          (StateWithS. (* (.out s2) (.lamp s2)) (StateDivider. (.out s2) (.amp s2) (.count s2) (.lamp s2) sample (.zeroxs s2)))))
@@ -3406,29 +3406,49 @@ minimizing destructuring as much as possible...</p>
   (let [lp-chain [(make-effect :simple-lowpass {:rate 100000 :cutoff 25000})
                   (make-effect :simple-lowpass {:rate 100000 :cutoff 10000})
                   (make-effect :simple-lowpass {:rate 100000 :cutoff 1000})]
-        quant (:quant conf)
-        omega (:omega conf)
-        phase (:phase conf)]
+        ^double quant (:quant conf)
+        ^double omega (:omega conf)
+        ^double phase (:phase conf)]
     (fn
-      ([sample ^StateFm state]
+      ([^double sample ^StateFm state]
        (let [sig (* sample phase)
              new-integral (+ (.integral state) sig)
              m (m/cos (+ new-integral (* omega (.t state))))
-             m (if (pos? quant)
-                 (m/norm (int (m/norm m -1.0 1.0 0.0 quant)) 0.0 quant -1.0 1.0)
-                 m)
+             ^double m (if (pos? quant)
+                         (m/norm (int (m/norm m -1.0 1.0 0.0 quant)) 0.0 quant -1.0 1.0)
+                         m)
              dem (m/abs (- m (.pre state)))
              ^StateWithS res (process-effects-one-pass dem (.lp state))
              demf (/ (* 2.0 (- (.sample res) omega)) phase)]
          (StateWithS. (m/constrain demf -1.0 1.0) (StateFm. m new-integral (inc (.t state)) (.state res)))))
       ([]
-       (StateFm. 0.0 0.0 0 (create-state lp-chain))))))</pre></td></tr><tr><td class="docs"><p>foverdrive</p>
+       (StateFm. 0.0 0.0 0 (create-state lp-chain))))))</pre></td></tr><tr><td class="docs"><p>bandwidth limit
+https://searchcode.com/file/18573523/cmt/src/lofi.cpp#</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod make-effect :bandwidth-limit [_ conf]
+  (let [dx (double (/ (:freq conf) (:rate conf)))]
+    (fn
+      ([^double sample ^double state]
+       (let [res (if (&gt;= sample state)
+                   (min (+ state dx) sample)
+                   (max (- state dx) sample))]
+         (StateWithS. res res)))
+      ([] 0.0))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod make-effect :distort [_ conf]
+  (let [fact (double (:factor conf))
+        nfact (inc fact)]
+    (fn 
+      ([^double sample state]
+       (let [div (+ fact (m/abs sample))
+             res (* nfact (/ sample div))]
+         (StateWithS. res state)))
+      ([] nil))))</pre></td></tr><tr><td class="docs"><p>foverdrive</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmethod make-effect :foverdrive [_ conf]
-  (let [drive (:drive conf)
-        drivem1 (dec (:drive conf))]
+  (let [^double drive (:drive conf)
+        drivem1 (dec drive)]
     (fn
-      ([sample state]
+      ([^double sample state]
        (let [fx (m/abs sample)
              res (/ (* sample (+ fx drive)) (inc (+ (* sample sample) (* fx drivem1))))]
          (StateWithS. res state)))
@@ -3436,18 +3456,18 @@ minimizing destructuring as much as possible...</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(deftype StateDecimator [^double count ^double last])</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmethod make-effect :decimator [_ conf]
-  (let [step (m/pow 0.5 (- (:bits conf) 0.9999))
+  (let [step (m/pow 0.5 (- ^double (:bits conf) 0.9999))
         stepr (/ 1.0 step)
-        ratio (/ (:fs conf) (:rate conf))]
+        ratio (/ ^double (:fs conf) ^double (:rate conf))]
     (fn
-      ([sample ^StateDecimator state]
+      ([^double sample ^StateDecimator state]
        (let [ncount (+ (.count state) ratio)]
          (if (&gt;= ncount 1.0)
-           (let [delta (* step (mod (-&gt;&gt; sample
-                                         m/sgn
-                                         (* step 0.5)
-                                         (+ sample)
-                                         (* stepr)) 1.0))
+           (let [delta (* step ^double (rem (-&gt;&gt; sample
+                                                 m/sgn
+                                                 (* step 0.5)
+                                                 (+ sample)
+                                                 (* stepr)) 1.0))
                  last (- sample delta)]
              (StateWithS. last (StateDecimator. (dec ncount) last)))
            (StateWithS. (.last state) (StateDecimator. ncount (.last state))))))
@@ -3478,42 +3498,42 @@ please use Audacity/SOX utilities to convert files</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def snoise (j/make-noise (j/auto-correct (j/make-basis) 10000 -1.0 1.0)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmulti make-wave (fn [f _ _ _] f))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod make-wave :sin [_ f a p]
-  (fn [x]
+</td><td class="codes"><pre class="brush: clojure">(defmethod make-wave :sin [_ ^double f ^double a ^double p]
+  (fn ^double [^double x]
     (* a
      (m/sin (+ (* p m/TWO_PI) (* x m/TWO_PI f))))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod make-wave :noise [_ f a p]
-  (fn [x]
+</td><td class="codes"><pre class="brush: clojure">(defmethod make-wave :noise [_ ^double f ^double a ^double p]
+  (fn ^double [^double x]
     (* a
-       (snoise (* (+ p x) f)))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod make-wave :saw [_ f a p] 
-  (fn [x]
+       ^double (snoise (* (+ p x) f)))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod make-wave :saw [_ ^double f ^double a ^double p] 
+  (fn ^double [^double x]
     (let [rp (* 2.0 a)
-          p2 (* f (mod (+ (* a p) a x) 1.0))]
+          p2 (* f ^double (mod (+ (* a p) a x) 1.0))]
       (* rp (- p2 (m/floor p2) 0.5)))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod make-wave :square [_ f a p]
-  (fn [x]
-    (if (&lt; (mod (+ p (* x f)) 1.0) 0.5)
+</td><td class="codes"><pre class="brush: clojure">(defmethod make-wave :square [_ ^double f ^double a ^double p]
+  (fn ^double [^double x]
+    (if (&lt; ^double (mod (+ p (* x f)) 1.0) 0.5)
       a
       (- a))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod make-wave :triangle [_ f a p]
+</td><td class="codes"><pre class="brush: clojure">(defmethod make-wave :triangle [_ ^double f ^double a ^double p]
   (let [saw (make-wave :saw f a p)]
-    (fn [x]
+    (fn ^double [^double x]
       (- (* 2.0 (m/abs (saw x))) a))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmethod make-wave :cut-triangle [_ f a p]
+</td><td class="codes"><pre class="brush: clojure">(defmethod make-wave :cut-triangle [_ ^double f ^double a ^double p]
   (let [tri (make-wave :triangle f a p)]
-    (fn [x]
+    (fn ^double [^double x]
       (let [namp (* 0.5 a)]
         (* 2.0 (m/constrain (tri x) (- namp) namp))))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def waves [:sin :noise :saw :square :triangle :cut-triangle])</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn sum-waves
-  [fs x]
-  (reduce #(+ %1 (%2 x)) 0 fs))</pre></td></tr><tr><td class="docs">
+  ^double [fs ^double x]
+  (reduce #(+ ^double %1 ^double (%2 x)) 0.0 fs))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-sum-wave
   [fs]
   (partial sum-waves fs))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-signal-from-wave
-  [f samplerate seconds]
+  [f ^double samplerate ^double seconds]
   (let [len (* samplerate seconds)
         ^doubles buffer (double-array len)
         limit (dec seconds)]

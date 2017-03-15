@@ -2876,10 +2876,10 @@ net.brehaut.ClojureTools = (function (SH) {
   (:import [clojure2d.pixels Pixels]
            [clojure2d.math.vector Vec2 Vec4]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* true)</pre></td></tr><tr><td class="docs"><p>Simple 2d SLITSCAN</p>
+(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><p>Simple 2d SLITSCAN</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def freqs (vec (map #(bit-shift-left 1 %) (range 16))))
-(def amps (vec (map #(/ 1.0 %) freqs)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def freqs (vec (map #(bit-shift-left 1 ^long %) (range 16))))
+(def amps (mapv #(/ 1.0 ^long %) freqs))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn slitscan-random-setup
   ([n]
    (let [f (fn []
@@ -2900,10 +2900,10 @@ net.brehaut.ClojureTools = (function (SH) {
   [fx fy ch ^Pixels p x y]
   (let [sx (/ 1.0 (.w p))
         sy (/ 1.0 (.h p))
-        shiftx (* 0.5 (.w p) (fx (* x sx)))
-        shifty (* 0.5 (.h p) (fy (* y sy)))
-        xx (mod (int (+ x (.w p) shiftx)) (.w p))
-        yy (mod (int (+ y (.h p) shifty)) (.h p))]
+        shiftx (* 0.5 (.w p) ^double (fx (* ^long x sx)))
+        shifty (* 0.5 (.h p) ^double (fy (* ^long y sy)))
+        xx (rem (int (+ ^long x (.w p) shiftx)) (.w p))
+        yy (rem (int (+ ^long y (.h p) shifty)) (.h p))]
       (p/get-value p ch xx yy)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-slitscan-filter
   ([]
@@ -2919,7 +2919,8 @@ net.brehaut.ClojureTools = (function (SH) {
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- mi-draw-point
   ([ch target source oldx oldy newx newy sx sy]
-   (p/set-value target ch (+ newx sx) (+ newy sy) (p/get-value source ch (+ oldx sx) (+ oldy sy))))
+   (p/set-value target ch (+ ^long newx ^long sx) (+ ^long newy ^long sy)
+                (p/get-value source ch (+ ^long oldx ^long sx) (+ ^long oldy ^long sy))))
   ([ch target source oldx oldy newx newy]
    (p/set-value target ch newx newy (p/get-value source ch oldx oldy))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- mi-do-horizontal
@@ -2938,25 +2939,27 @@ net.brehaut.ClojureTools = (function (SH) {
         (mi-draw-point ch target source (- (.w source) x 1) y x y)))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- mi-do-diag-ul
   [t shift? ch target ^Pixels source]
-  (let [size (min (.w source) (.h source))
+  (let [^int t t
+        size (min (.w source) (.h source))
         tx (if shift? (- (.w source) size) 0)
         ty (if shift? (- (.h source) size) 0)]
     (dotimes [y size]
       (dotimes [x (inc y)]
-        (condp = (int t)
+        (condp == t
           0 (mi-draw-point ch target source x y y x tx ty)
           1 (mi-draw-point ch target source y x x y tx ty)
           2 (mi-draw-point ch target source x y (- size x 1) (- size y 1) tx ty)
           3 (mi-draw-point ch target source y x (- size y 1) (- size x 1) tx ty))))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- mi-do-diag-ur
   [t shift? ch target ^Pixels source]
-  (let [size (min (.w source) (.h source))
+  (let [^int t t
+        size (min (.w source) (.h source))
         tx (if shift? (- (.w source) size) 0)
         ty (if shift? (- (.h source) size) 0)]
     (dotimes [y size]
       (loop [x (int (dec size))]
         (when (&gt;= x (- size y 1))
-          (condp = (int t)
+          (condp == t
             0 (mi-draw-point ch target source x y (- size y 1) (- size x 1) tx ty)
             1 (mi-draw-point ch target source (- size y 1) (- size x 1) x y tx ty)
             2 (mi-draw-point ch target source x y (- size x 1) (- size y 1) tx ty)
@@ -2965,9 +2968,9 @@ net.brehaut.ClojureTools = (function (SH) {
 </td><td class="codes"><pre class="brush: clojure">(defn- mi-do-diag-rect
   [t l ch target ^Pixels source]
   (dotimes [y (.h source)]
-    (let [d (if t
-              (m/norm y 0 (.h source) 0 (.w source))
-              (m/norm y 0 (.h source) (.w source) 0))]
+    (let [d (int (if t
+                   (m/norm y 0 (.h source) 0 (.w source))
+                   (m/norm y 0 (.h source) (.w source) 0)))]
       (dotimes [x d]
         (if l
           (mi-draw-point ch target source (- (.w source) x 1) (- (.h source) y 1) x y)
@@ -3002,13 +3005,13 @@ net.brehaut.ClojureTools = (function (SH) {
 </td><td class="codes"></td></tr><tr><td class="docs"><p>f: Vec2 -> Vec2 (use variation)
    r: value 1.0-3.0</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-slitscan2-filter
-  ([f r]
+  ([f ^double r]
    (let [r- (- r)]
      (fn [ch t ^Pixels p]
        (dotimes [y (.h p)]
-         (let [yv (m/norm y 0 (.h p) r- r)]
+         (let [^double yv (m/norm y 0.0 (.h p) r- r)]
            (dotimes [x (.w p)]
-             (let [xlerp (m/norm x 0 (.w p) 0.0 1.0)
+             (let [xlerp (m/norm x 0.0 (.w p))
                    v1 (f (Vec2. r- yv))
                    v2 (f (Vec2. r yv))
                    ^Vec2 vv (v/interpolate v1 v2 xlerp)
@@ -3016,7 +3019,22 @@ net.brehaut.ClojureTools = (function (SH) {
                    yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
                (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
   ([f]
-   (make-slitscan2-filter f 2.0)))</pre></td></tr><tr><td class="docs"><p>blend machine</p>
+   (make-slitscan2-filter f 2.0)))</pre></td></tr><tr><td class="docs"><p>f: Vec2 -> Vec2 (use variation)
+   r: value 1.0-3.0</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-fold-filter
+  ([f ^double r]
+   (let [r- (- r)]
+     (fn [ch t ^Pixels p]
+       (dotimes [y (.h p)]
+         (let [^double yv (m/norm y 0.0 (.h p) r- r)]
+           (dotimes [x (.w p)]
+             (let [^double xv (m/norm x 0.0 (.w p) r- r)
+                   ^Vec2 vv (f (Vec2. xv yv))
+                   xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
+                   yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
+               (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
+  ([f]
+   (make-fold-filter f 2.0)))</pre></td></tr><tr><td class="docs"><p>blend machine</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Return colorspace or nil</p>
 </td><td class="codes"><pre class="brush: clojure">(defn random-blend-get-cs
   []
@@ -3078,7 +3096,7 @@ net.brehaut.ClojureTools = (function (SH) {
                bpal)
          pal (merge pal {:distf (rand-nth [v/dist v/dist-abs v/dist-cheb v/dist-sq])})]
      pal))
-  ([p conf]
+  ([conf p]
    (p/filter-colors (c/make-reduce-color-filter (:distf conf) (:palette conf)) p))
   ([p]
    (color-reducer-machine p (color-reducer-machine))))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;

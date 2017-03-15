@@ -2876,13 +2876,17 @@ net.brehaut.ClojureTools = (function (SH) {
 (set! *unchecked-math* true)</pre></td></tr><tr><td class="docs"><p>Calculate standard deviation of selection 10% of random channel values</p>
 </td><td class="codes"><pre class="brush: clojure">(defn calc-stdev
   ([^Pixels pixels ch sx sy w h]
-   (let [limit (max (int (* 0.1 w h)) 4)]
+   (let [^int sx sx
+         ^int sy sy
+         ^int w w
+         ^int h h
+         limit (max (int (* 0.1 w h)) 4)]
      (loop [A 0.0
             Q 0.0
             k 1]
-       (let [posx (m/irand w)
-             posy (m/irand h)
-             xk (p/get-value pixels ch (+ sx posx) (+ sy posy))
+       (let [^int posx (m/irand w)
+             ^int posy (m/irand h)
+             xk (double (p/get-value pixels ch (+ sx posx) (+ sy posy)))
              newA (+ A (/ (- xk A) k))
              newQ (+ Q (* (- xk A) (- xk newA)) )]
          (if (&lt; k limit)
@@ -2890,19 +2894,21 @@ net.brehaut.ClojureTools = (function (SH) {
            (m/sqrt (/ Q (dec limit)))))))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn segment-pixels-divide
   [^Pixels p ch mins maxs thr]
-  (let [ww (bit-shift-left 1 (m/high-2-exp (.w p)))
-        hh (bit-shift-left 1 (m/high-2-exp (.h p)))
-        mins (max 2 mins)
+  (let [ww (bit-shift-left 1 ^long (m/high-2-exp (.w p)))
+        hh (bit-shift-left 1 ^long (m/high-2-exp (.h p)))
+        mins (max 2 ^long mins)
+        ^long maxs maxs
+        ^double thr thr
         segmf (fn local-segmentation
-                [x y size res]
+                [^long x ^long y ^long size res]
                 (if (or (&gt;= x (.w p)) (&gt;= y (.h p)))
                   res
                   (lazy-seq
-                   (let [stdev (calc-stdev p ch x y size size)]
+                   (let [^double stdev (calc-stdev p ch x y size size)]
                      (if (or (&gt; size maxs)
                              (and (&gt; size mins)
                                   (&gt; stdev thr)))
-                       (let [mid (/ size 2)]
+                       (let [mid (long (/ size 2))]
                          (-&gt;&gt; res
                               (local-segmentation (+ x mid) (+ y mid) mid)
                               (local-segmentation x (+ y mid) mid)

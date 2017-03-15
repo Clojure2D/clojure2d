@@ -2889,7 +2889,7 @@ Code is taken from <a href="https://github.com/tsulej/JWildfire/tree/master/src/
            [clojure2d.math.complex Complex]
            [org.apache.commons.math3.special Gamma Beta Erf BesselJ]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* true)</pre></td></tr><tr><td class="docs"><p>Every variation consist of variation configuration and function itself.</p>
+(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><p>Every variation consist of variation configuration and function itself.</p>
 
 <p>Configuration is a map with named values passed later when creating variation
 Map can be empty or nil if you want random parametrization or function don't have parametrization.</p>
@@ -2943,13 +2943,21 @@ Function returns map with full and precalculated configuration necessary to crea
 
 <p>Locally used random function for some configuration parameters. Mostly used to avoid <code>0</code> value.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- srandom
-  [mn mx]
-  (let [rand (m/drand mn mx)]
+  ^double  [^double mn ^double mx]
+  (let [^double rand (m/drand mn mx)]
   (if (m/brand)
     rand
     (* -1 rand))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def ^Vec2 unitx (Vec2. 1.0 0.0))
-(def ^Vec2 zerov (Vec2. 0.0 0.0))</pre></td></tr><tr><td class="docs"><p>Auger configuration
+(def ^Vec2 zerov (Vec2. 0.0 0.0))</pre></td></tr><tr><td class="docs"><p>Two atoms to register names. One for non-random functions and second for random</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def random-var (atom []))
+(def regular-var (atom [:default]))</pre></td></tr><tr><td class="docs"><p>Add <code>name</code> to the atom <code>what</code></p>
+</td><td class="codes"><pre class="brush: clojure">(defn- register-var
+  [what name]
+  (swap! what conj name))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def register-random-var (partial register-var random-var))
+(def register-regular-var (partial register-var regular-var))</pre></td></tr><tr><td class="docs"><p>Auger configuration
   params: <code>:freq</code> <code>:weight</code> <code>:sym</code> <code>:scale</code></p>
 
 <h2>A</h2>
@@ -2963,7 +2971,7 @@ Function returns map with full and precalculated configuration necessary to crea
           :scale (srandom 0.5 2)} p))
 (make-config-method auger)</pre></td></tr><tr><td class="docs"><p>Auger by Xyrus02</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-auger
-  [amount {:keys [freq weight sym scale]}]
+  [^double amount {:keys [^double freq ^double weight ^double sym ^double scale]}]
   (fn [^Vec2 v]
     (let [x (.x v)
           y (.y v)
@@ -2974,18 +2982,20 @@ Function returns map with full and precalculated configuration necessary to crea
           xx (* amount (+ x (* sym (- dx x))))
           yy (* amount dy)]
       (Vec2. xx yy))))
-(make-var-method auger)</pre></td></tr><tr><td class="docs"><h3>Arch</h3>
+(make-var-method auger)
+(register-regular-var :auger)</pre></td></tr><tr><td class="docs"><h3>Arch</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-arch
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
-    (let [ang (* amount (m/drand m/PI))
+    (let [ang (* amount ^double (m/drand m/PI))
           sinr (m/sin ang)
           cosr (m/cos ang)]
       (if (zero? cosr) zerov
           (Vec2. (* amount sinr)
                  (* amount (/ (m/sq sinr) cosr)))))))
-(make-var-method arch)</pre></td></tr><tr><td class="docs"><h2>B</h2>
+(make-var-method arch)
+(register-random-var :arch)</pre></td></tr><tr><td class="docs"><h2>B</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>bCollide configuration
   params: <code>:num</code> <code>:a</code></p>
 
@@ -2994,22 +3004,22 @@ Function returns map with full and precalculated configuration necessary to crea
   [p]
   (let [m (merge {:num (srandom 1 30)
                   :a (m/drand 2)} p)
-        bcn-pi (* (:num m) m/M_1_PI)
-        pi-bcn (/ m/PI (:num m))
-        bca-bcn (/ (* m/PI (:a m)) (:num m))]
+        bcn-pi (* ^double (:num m) m/M_1_PI)
+        pi-bcn (/ m/PI ^double (:num m))
+        bca-bcn (/ (* m/PI ^double (:a m)) ^double (:num m))]
     (assoc m
            :bcn-pi bcn-pi
            :pi-bcn pi-bcn
            :bca-bcn bca-bcn)))
 (make-config-method bcollide)</pre></td></tr><tr><td class="docs"><p>bCollide by Michael Faber, http://michaelfaber.deviantart.com/art/bSeries-320574477</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-bcollide
-  [amount {:keys [bcn-pi pi-bcn bca-bcn]}]
+  [^double amount {:keys [^double bcn-pi ^double pi-bcn ^double bca-bcn]}]
   (fn [^Vec2 v]
     (let [v+ (v/add v unitx)
           v- (Vec2. (- 1.0 (.x v)) (.y v))
           tau (* 0.5 (- (m/log (v/magsq v+))
                         (m/log (v/magsq v-))))
-          pre-sigma (- m/PI (v/heading v+) (v/heading v-))
+          pre-sigma (- m/PI ^double (v/heading v+) ^double (v/heading v-))
           alt (int (* pre-sigma bcn-pi))
           sigma (if (even? alt)
                   (+ (* alt pi-bcn) (rem (+ pre-sigma bca-bcn) pi-bcn))
@@ -3022,7 +3032,8 @@ Function returns map with full and precalculated configuration necessary to crea
           xx (* amount sinht temp)
           yy (* amount sins temp)]
       (Vec2. xx yy))))
-(make-var-method bcollide)</pre></td></tr><tr><td class="docs"><p>bSwirl configuration
+(make-var-method bcollide)
+(register-regular-var :bcollide)</pre></td></tr><tr><td class="docs"><p>bSwirl configuration
   params: <code>:in</code> <code>:out</code></p>
 
 <h3>bCollide</h3>
@@ -3032,13 +3043,13 @@ Function returns map with full and precalculated configuration necessary to crea
           :out (m/drand -2.0 2.0)} p))
 (make-config-method bswirl)</pre></td></tr><tr><td class="docs"><p>bSwirl by Michael Faber, http://michaelfaber.deviantart.com/art/bSeries-320574477</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-bswirl
-  [amount {:keys [in out]}]
+  [^double amount {:keys [^double in ^double out]}]
   (fn [^Vec2 v]
     (let [v+ (v/add v unitx)
           v- (Vec2. (- 1.0 (.x v)) (.y v))
           tau (* 0.5 (- (m/log (v/magsq v+))
                         (m/log (v/magsq v-))))
-          pre-sigma (- m/PI (v/heading v+) (v/heading v-))
+          pre-sigma (- m/PI ^double (v/heading v+) ^double (v/heading v-))
           sigma (+ pre-sigma (* tau out) (/ in tau))
           sinht (m/sinh tau)
           cosht (m/cosh tau)
@@ -3049,50 +3060,56 @@ Function returns map with full and precalculated configuration necessary to crea
         (Vec2. 0.0 0.0)
         (Vec2. (* amount (/ sinht temp))
                (* amount (/ sins temp)))))))
-(make-var-method bswirl)</pre></td></tr><tr><td class="docs"><h3>BesselJ</h3>
+(make-var-method bswirl)
+(register-regular-var :bswirl)</pre></td></tr><tr><td class="docs"><h3>BesselJ</h3>
 </td><td class="codes"><pre class="brush: clojure">(defn make-besselj
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
-    (Vec2. (* amount (v/mag v) (BesselJ/value (m/abs (.x v)) (m/abs (.y v))))
-           (* amount (v/heading v)))))
-(make-var-method besselj)</pre></td></tr><tr><td class="docs"><h3>Beta</h3>
+    (Vec2. (* amount ^double (v/mag v) (BesselJ/value (m/abs (.x v)) (m/abs (.y v))))
+           (* amount ^double (v/heading v)))))
+(make-var-method besselj)
+(register-regular-var :besselj)</pre></td></tr><tr><td class="docs"><h3>Beta</h3>
 </td><td class="codes"><pre class="brush: clojure">(defn make-beta
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
     (Vec2. (* amount (Beta/logBeta (+ m/EPSILON (m/abs (.x v))) (+ m/EPSILON (m/abs (.y v)))))
-           (* amount (v/heading v)))))
-(make-var-method beta)</pre></td></tr><tr><td class="docs"><h2>Bent</h2>
+           (* amount ^double (v/heading v)))))
+(make-var-method beta)
+(register-regular-var :beta)</pre></td></tr><tr><td class="docs"><h2>Bent</h2>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-bent
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
     (let [nx (if (neg? (.x v)) (+ (.x v) (.x v)) (.x v))
           ny (if (neg? (.y v)) (* (.y v) 0.5) (.y v))]
       (Vec2. (* amount nx)
              (* amount ny)))))
-(make-var-method bent)</pre></td></tr><tr><td class="docs"><h2>Blade</h2>
+(make-var-method bent)
+(register-regular-var :bent)</pre></td></tr><tr><td class="docs"><h2>Blade</h2>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-blade
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
-    (let [r (* (m/drand amount) (v/mag v))
+    (let [r (* ^double (m/drand amount) ^double (v/mag v))
           sinr (m/sin r)
           cosr (m/cos r)]
       (Vec2. (* amount (.x v) (+ cosr sinr))
              (* amount (.x v) (- cosr sinr))))))
-(make-var-method blade)</pre></td></tr><tr><td class="docs">
+(make-var-method blade)
+(register-random-var :blade)</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-blade2
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
-    (let [r (* (m/drand amount) (v/mag v))
+    (let [r (* ^double (m/drand amount) ^double (v/mag v))
           sinr (m/sin r)
           cosr (m/cos r)]
       (Vec2. (* amount (.x v) (+ cosr sinr))
              (* amount (.y v) (- cosr sinr))))))
-(make-var-method blade2)</pre></td></tr><tr><td class="docs"><h2>Boarders</h2>
+(make-var-method blade2)
+(register-random-var :blade2)</pre></td></tr><tr><td class="docs"><h2>Boarders</h2>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-boarders
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
     (let [roundx (m/rint (.x v))
           roundy (m/rint (.y v))
@@ -3114,10 +3131,11 @@ Function returns map with full and precalculated configuration necessary to crea
                    (* amount (+ hoffsety roundy 0.25)))
             (Vec2. (* amount (- (+ hoffsetx roundx) (/ (* 0.25 offsetx) offsety)))
                    (* amount (- (+ hoffsety roundy) 0.25)))))))))
-(make-var-method boarders)</pre></td></tr><tr><td class="docs"><h2>Butterfly</h2>
+(make-var-method boarders)
+(register-random-var :boarders)</pre></td></tr><tr><td class="docs"><h2>Butterfly</h2>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-butterfly
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
     (let [wx (* amount 1.3029400317411197908970256609023)
           y2 (* 2.0 (.y v))
@@ -3125,7 +3143,8 @@ Function returns map with full and precalculated configuration necessary to crea
                              (+ m/EPSILON (m/sq (.x v)) (m/sq y2)))))]
       (Vec2. (* r (.x v))
              (* r y2)))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(make-var-method butterfly)</pre></td></tr><tr><td class="docs"><h2>C</h2>
+</td><td class="codes"><pre class="brush: clojure">(make-var-method butterfly)
+(register-regular-var :butterfly)</pre></td></tr><tr><td class="docs"><h2>C</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>CircleLinear configuration
   params: <code>:Sc</code> <code>:K</code> <code>:Dens1</code> <code>:Dens2</code> <code>:Reverse</code> <code>:X</code> <code>:Y</code> <code>:Seed</code></p>
 
@@ -3140,21 +3159,21 @@ Function returns map with full and precalculated configuration necessary to crea
                   :X (m/drand 20)
                   :Y (m/drand 20)
                   :Seed (m/irand Integer/MAX_VALUE)} p)]
-    (assoc m :dd (* (:Dens1 m) (:Dens2 m)))))
+    (assoc m :dd (* ^double (:Dens1 m) ^double (:Dens2 m)))))
 (make-config-method circlelinear)</pre></td></tr><tr><td class="docs"><p>CircleLinear by eralex, http://eralex61.deviantart.com/art/Circles-Plugins-126273412</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-circlelinear
-  [amount {:keys [Sc K Dens1 Dens2 Reverse X Y Seed dd]}]
+  [^double amount {:keys [^double Sc ^double K ^double Dens1 ^double Dens2 ^double Reverse ^double X ^double Y ^double Seed ^double dd]}]
   (fn [^Vec2 v]
     (let [M (-&gt;&gt; Sc
                  (/ (.x v))
                  (* 0.5)
                  (m/floor)
-                 (int))
+                 (long))
           N (-&gt;&gt; Sc
                  (/ (.y v))
                  (* 0.5)
                  (m/floor)
-                 (int))
+                 (long))
           X (- (.x v) (-&gt;&gt; M
                            (* 2.0)
                            (inc)
@@ -3169,25 +3188,25 @@ Function returns map with full and precalculated configuration necessary to crea
                  (+ 0.3)
                  (* Sc))
           Z1 (m/discrete-noise (+ M Seed) N)
-          [XX YY] (if (and (&lt; Z1 Dens1) (&lt; U V)) 
-                    (if (pos? Reverse)
-                           (if (&lt; Z1 dd)
-                             [(* K X) (* K Y)]
-                             (let [Z (-&gt;&gt; K
-                                          (- 1.0)
-                                          (* U)
-                                          (/ V)
-                                          (+ K))]
-                               [(* Z X) (* Z Y)]))
-                           (if (&gt; Z1 dd)
-                             [(* K X) (* K Y)]
-                             (let [Z (-&gt;&gt; K
-                                          (- 1.0)
-                                          (* U)
-                                          (/ V)
-                                          (+ K))]
-                               [(* Z X) (* Z Y)])))
-                    [X Y])]
+          [^double XX ^double YY] (if (and (&lt; Z1 Dens1) (&lt; U V)) 
+                                    (if (pos? Reverse)
+                                      (if (&lt; Z1 dd)
+                                        [(* K X) (* K Y)]
+                                        (let [Z (-&gt;&gt; K
+                                                     (- 1.0)
+                                                     (* U)
+                                                     (/ V)
+                                                     (+ K))]
+                                          [(* Z X) (* Z Y)]))
+                                      (if (&gt; Z1 dd)
+                                        [(* K X) (* K Y)]
+                                        (let [Z (-&gt;&gt; K
+                                                     (- 1.0)
+                                                     (* U)
+                                                     (/ V)
+                                                     (+ K))]
+                                          [(* Z X) (* Z Y)])))
+                                    [X Y])]
       (Vec2. (-&gt;&gt; 2.0
                   (* M)
                   (inc)
@@ -3200,7 +3219,8 @@ Function returns map with full and precalculated configuration necessary to crea
                   (* Sc)
                   (+ YY)
                   (* amount))))))
-(make-var-method circlelinear)</pre></td></tr><tr><td class="docs"><h3>csin</h3>
+(make-var-method circlelinear)
+(register-regular-var :circlelinear)</pre></td></tr><tr><td class="docs"><h3>csin</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>CSin configuraion
   params <code>:stretch</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn config-csin
@@ -3209,13 +3229,39 @@ Function returns map with full and precalculated configuration necessary to crea
     (assoc m :s-cx (Complex. (:stretch m) 0.0))))
 (make-config-method csin)</pre></td></tr><tr><td class="docs"><p>CSin by zephyrtronium, http://fractal-resources.deviantart.com/art/CSin-Apophysis-Plugin-158332287</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-csin
-  [amount {:keys [stretch ^Complex s-cx]}]
+  [^double amount {:keys [stretch ^Complex s-cx]}]
   (fn [^Vec2 v]
     (v/mult (-&gt;&gt; (c/from-vec2 v)
                  (c/mult s-cx)
                  (c/sin)
                  (c/to-vec2)) amount)))
-(make-var-method csin)</pre></td></tr><tr><td class="docs"><h2>E</h2>
+(make-var-method csin)
+(register-regular-var :csin)</pre></td></tr><tr><td class="docs"><h3>Cayley transform</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Cayley transform</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-cayley
+  [^double amount _]
+  (fn [^Vec2 v]
+    (if (== (.y v) -1.0)
+      zerov
+      (let [^Complex c (c/from-vec2 v)]
+        (c/to-vec2 (c/div (c/add c c/I-)
+                          (c/add c c/I)))))))
+(make-var-method cayley)
+(register-regular-var :cayley)</pre></td></tr><tr><td class="docs"><h2>D</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><h3>Diamond</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Diamond</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-diamond
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [^double length (v/mag v)
+          sina (/ (.x v) length)
+          cosa (/ (.y v) length)
+          sinr (m/sin length)
+          cosr (m/cos length)]
+      (Vec2. (* amount sina cosr)
+             (* amount cosa sinr)))))
+(make-var-method diamond)
+(register-regular-var :diamond)</pre></td></tr><tr><td class="docs"><h2>E</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>eMod configuration
   params: <code>:radius</code> <code>:distance</code></p>
 
@@ -3224,13 +3270,13 @@ Function returns map with full and precalculated configuration necessary to crea
   [p]
   (let [m (merge {:radius (m/drand 0.1 4)
                   :distance (m/drand 2)} p)]
-    (assoc m :radius2 (* 2.0 (:radius m))
-           :rdr (+ (:radius m) (* (:distance m) (:radius m))))))
+    (assoc m :radius2 (* 2.0 ^double (:radius m))
+           :rdr (+ ^double (:radius m) (* ^double (:distance m) ^double (:radius m))))))
 (make-config-method emod)</pre></td></tr><tr><td class="docs"><p>eMod by Michael Faber, http://michaelfaber.deviantart.com/art/eSeries-306044892</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-emod
-  [amount {:keys [radius distance radius2 rdr]}]
+  [^double amount {:keys [^double radius ^double distance ^double radius2 ^double rdr]}]
   (fn [^Vec2 v]
-    (let [tmp (+ 1.0 (v/magsq v))
+    (let [tmp (inc ^double (v/magsq v))
           tmp2 (* 2.0 (.x v))
           xmax-pre (* 0.5 (+ (m/safe-sqrt (+ tmp tmp2))
                              (m/safe-sqrt (- tmp tmp2))))
@@ -3247,20 +3293,23 @@ Function returns map with full and precalculated configuration necessary to crea
           xx (* amount (m/cosh mu) (m/cos nu))
           yy (* amount (m/sinh mu) (m/sin nu))]
       (Vec2. xx yy))))
-(make-var-method emod)</pre></td></tr><tr><td class="docs"><h3>Erf</h3>
+(make-var-method emod)
+(register-regular-var :emod)</pre></td></tr><tr><td class="docs"><h3>Erf</h3>
 </td><td class="codes"><pre class="brush: clojure">(defn make-erf
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
     (Vec2. (* amount (Erf/erf (.x v) (.y v)))
-           (* amount (v/heading v)))))
-(make-var-method erf)</pre></td></tr><tr><td class="docs"><h3>Exp</h3>
+           (* amount ^double (v/heading v)))))
+(make-var-method erf)
+(register-regular-var :erf)</pre></td></tr><tr><td class="docs"><h3>Exp</h3>
 </td><td class="codes"><pre class="brush: clojure">(defn make-exp
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
     (let [e (m/exp (.x v))]
       (Vec2. (* amount e (m/cos (.y v)))
              (* amount e (m/sin (.y v)))))))
-(make-var-method exp)</pre></td></tr><tr><td class="docs"><p>fan2 configuration
+(make-var-method exp)
+(register-regular-var :exp)</pre></td></tr><tr><td class="docs"><p>fan2 configuration
   params: <code>:x</code> <code>:y</code></p>
 
 <h2>F</h2>
@@ -3270,10 +3319,10 @@ Function returns map with full and precalculated configuration necessary to crea
           :y (m/drand -1 1)} p))
 (make-config-method fan2)</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-fan2
-  [amount {:keys [x y]}]
+  [^double amount {:keys [^double x ^double y]}]
   (fn [^Vec2 v]
-    (let [r (v/mag v)
-          angle (v/heading v)
+    (let [^double r (v/mag v)
+          ^double angle (v/heading v)
           dy y
           dx (+ 1.0e-6 (* m/PI x x))
           dx2 (* 0.5 dx)
@@ -3283,39 +3332,43 @@ Function returns map with full and precalculated configuration necessary to crea
               (+ angle dx2))]
       (Vec2. (* amount r (m/sin a))
              (* amount r (m/cos a))))))
-(make-var-method fan2)</pre></td></tr><tr><td class="docs"><h2>G</h2>
+(make-var-method fan2)
+(register-regular-var :fan2)</pre></td></tr><tr><td class="docs"><h2>G</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>gamma by zephyrtronium, http://fractal-resources.deviantart.com/art/Gamma-Apophysis-Plugin-154808483</p>
 
 <h3>Gamma</h3>
 </td><td class="codes"><pre class="brush: clojure">(defn make-gamma
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
     (Vec2. (* amount (Gamma/logGamma (v/mag v)))
-           (* amount (v/heading v)))))
-(make-var-method gamma)</pre></td></tr><tr><td class="docs"><h2>H</h2>
+           (* amount ^double (v/heading v)))))
+(make-var-method gamma)
+(register-regular-var :gamma)</pre></td></tr><tr><td class="docs"><h2>H</h2>
 
 <h3>Hemisphere</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-hemisphere
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
-    (let [r (/ amount (m/sqrt (inc (v/magsq v))))]
+    (let [r (/ amount (m/sqrt (inc ^double (v/magsq v))))]
       (Vec2. (* r (.x v))
              (* r (.y v))))))
-(make-var-method hemisphere)</pre></td></tr><tr><td class="docs"><p>Julia</p>
+(make-var-method hemisphere)
+(register-regular-var :hemisphere)</pre></td></tr><tr><td class="docs"><p>Julia</p>
 
 <h2>J</h2>
 
 <h3>Julia</h3>
 </td><td class="codes"><pre class="brush: clojure">(defn make-julia
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
-    (let [a (+ (* 0.5 (v/heading v)) (* m/PI (m/irand 2)))
+    (let [a (+ (* 0.5 ^double (v/heading v)) (* m/PI ^double (m/irand 2)))
           r (-&gt;&gt; (v/mag v)
                  (m/sqrt)
                  (* amount))]
       (Vec2. (* r (m/cos a)) (* r (m/sin a))))))
-(make-var-method julia)</pre></td></tr><tr><td class="docs"><p>JuliaN configuration
+(make-var-method julia)
+(register-random-var :julia)</pre></td></tr><tr><td class="docs"><p>JuliaN configuration
   params: <code>:power</code> <code>:dist</code></p>
 
 <h3>JuliaN</h3>
@@ -3325,15 +3378,16 @@ Function returns map with full and precalculated configuration necessary to crea
                   :dist (m/drand -4 4)} p)]
     (assoc m
            :abspower (m/abs (:power m))
-           :cpower (* 0.5 (/ (:dist m) (:power m))))))
+           :cpower (* 0.5 (/ ^double (:dist m) ^double (:power m))))))
 (make-config-method julian)</pre></td></tr><tr><td class="docs"><p>JuliaN</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-julian
-  [amount {:keys [power abspower cpower]}]
+  [^double amount {:keys [^double power ^double abspower ^double cpower]}]
   (fn [^Vec2 v]
-    (let [a (/ (+ (v/heading v) (* m/TWO_PI (m/drand abspower))) power)
+    (let [a (/ (+ ^double (v/heading v) (* m/TWO_PI ^double (m/drand abspower))) power)
           r (* amount (m/pow (v/magsq v) cpower))]
       (Vec2. (* r (m/cos a)) (* r (m/sin a))))))
-(make-var-method julian)</pre></td></tr><tr><td class="docs"><p>Juliaq configuration
+(make-var-method julian)
+(register-random-var :julian)</pre></td></tr><tr><td class="docs"><p>Juliaq configuration
   params: <code>:power</code> <code>:divisor</code></p>
 
 <h3>JuliaQ</h3>
@@ -3341,24 +3395,49 @@ Function returns map with full and precalculated configuration necessary to crea
   [p]
   (let [m (merge {:power (srandom 1 10)
                   :divisor (m/drand -8 8)} p)
-        inv-power (/ (:divisor m) (:power m))
+        inv-power (/ ^double (:divisor m) ^double (:power m))
         half-inv-power (* 0.5 inv-power)
-        inv-power-2pi (/ m/TWO_PI (:power m))]
+        inv-power-2pi (/ m/TWO_PI ^double (:power m))]
     (assoc m
            :inv-power inv-power
            :half-inv-power half-inv-power
            :inv-power-2pi inv-power-2pi)))
 (make-config-method juliaq)</pre></td></tr><tr><td class="docs"><p>juliaq by Zueuk, http://zueuk.deviantart.com/art/juliaq-Apophysis-plugins-340813357</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-juliaq
-  [amount {:keys [inv-power inv-power-2pi half-inv-power] :as all}]
+  [^double amount {:keys [^double inv-power ^double inv-power-2pi ^double half-inv-power] :as all}]
   (fn [^Vec2 v]
-    (let [a (+ (* inv-power (v/heading v))
-               (* inv-power-2pi (m/drand (Integer/MAX_VALUE))))
+    (let [a (+ (* inv-power ^double (v/heading v))
+               (* inv-power-2pi ^double (m/drand (Integer/MAX_VALUE))))
           r (* amount (m/pow (v/magsq v) half-inv-power))]
       (Vec2. (* r (m/cos a)) (* r (m/sin a))))))
-(make-var-method juliaq)</pre></td></tr><tr><td class="docs"><h2>N</h2>
+(make-var-method juliaq)
+(register-random-var :juliaq)</pre></td></tr><tr><td class="docs"><h2>N</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><h2>P</h2>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Popcorn2 configuration
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Pie configuration
+  params: <code>:slices</code> <code>:rotation</code> <code>:thickness</code></p>
+
+<h3>Pie</h3>
+</td><td class="codes"><pre class="brush: clojure">(defn config-pie
+  [p]
+  (merge {:slices (srandom 0.01 7.0)
+          :rotation (m/drand m/TWO_PI)
+          :thickness (m/drand -2.0 2.0)} p))
+(make-config-method pie)</pre></td></tr><tr><td class="docs"><p>pie from jwildfire</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-pie
+  [^double amount {:keys [^double slices ^double rotation ^double thickness]}]
+  (fn [^Vec2 v]
+    (let [sl (m/round (+ 0.5 (* slices ^double (m/drand))))
+          a (-&gt; thickness
+                (* ^double (m/drand))
+                (+ sl)
+                (* m/TWO_PI)
+                (/ slices)
+                (+ rotation))
+          r (* amount ^double (m/drand))]
+      (Vec2. (* r (m/cos a))
+             (* r (m/sin a))))))
+(make-var-method pie)
+(register-random-var :pie)</pre></td></tr><tr><td class="docs"><p>Popcorn2 configuration
   params: <code>:x</code> <code>:y</code> <code>:c</code></p>
 
 <h3>Popcorn2</h3>
@@ -3369,7 +3448,7 @@ Function returns map with full and precalculated configuration necessary to crea
           :c (m/drand -5.0 5.0)} p))
 (make-config-method popcorn2)</pre></td></tr><tr><td class="docs"><p>popcorn2 from apophysis</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-popcorn2
-  [amount {:keys [x y c]}]
+  [^double amount {:keys [^double x ^double y ^double c]}]
   (fn [^Vec2 v]
     (let [xx (-&gt;&gt; (.y v)
                   (* c)
@@ -3386,15 +3465,31 @@ Function returns map with full and precalculated configuration necessary to crea
                   (+ (.y v))
                   (* amount))]
       (Vec2. xx yy))))
-(make-var-method popcorn2)</pre></td></tr><tr><td class="docs"><h2>S</h2>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Sinusoidal</p>
+(make-var-method popcorn2)
+(register-regular-var :popcorn2)</pre></td></tr><tr><td class="docs"><h2>S</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><h3>Scry</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn make-scry
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [^double t (v/magsq v)
+          d (-&gt; 1.0
+                (/ amount)
+                (+ t)
+                (* (m/sqrt t))
+                (+ m/EPSILON))
+          r (/ 1.0 d)]
+      (v/mult v r))))
+(make-var-method scry)
+(register-regular-var :scry)</pre></td></tr><tr><td class="docs"><p>Sinusoidal</p>
 
 <h3>Sinusoidal</h3>
 </td><td class="codes"><pre class="brush: clojure">(defn make-sinusoidal
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
     (Vec2. (* amount (m/sin (.x v))) (* amount (m/sin (.y v))))))
-(make-var-method sinusoidal)</pre></td></tr><tr><td class="docs"><p>STwin configuration
+(make-var-method sinusoidal)
+(register-regular-var :sinusoidal)</pre></td></tr><tr><td class="docs"><p>STwin configuration
   params: <code>:distort</code> <code>:multiplier</code></p>
 
 <h3>STwin</h3>
@@ -3404,7 +3499,7 @@ Function returns map with full and precalculated configuration necessary to crea
           :multiplier (srandom 0.001 3.0)} p))
 (make-config-method stwin)</pre></td></tr><tr><td class="docs"><p>STwin by Xyrus-02, http://timothy-vincent.deviantart.com/art/STwin-Plugin-136504836</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-stwin
-  [amount {:keys [distort multiplier]}]
+  [^double amount {:keys [^double distort ^double multiplier]}]
   (fn [^Vec2 v]
     (let [x (* (.x v) amount multiplier)
           y (* (.y v) amount multiplier)
@@ -3416,7 +3511,8 @@ Function returns map with full and precalculated configuration necessary to crea
           result (/ (* x2-y2 (m/sin (* m/TWO_PI distort (+ x y)))) div)]
       (Vec2. (+ (* amount (.x v)) result)
              (+ (* amount (.y v)) result)))))
-(make-var-method stwin)</pre></td></tr><tr><td class="docs"><h2>T</h2>
+(make-var-method stwin)
+(register-regular-var :stwin)</pre></td></tr><tr><td class="docs"><h2>T</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Trade configuration</p>
 
 <h3>Trade</h3>
@@ -3426,17 +3522,17 @@ Function returns map with full and precalculated configuration necessary to crea
                   :r2 (m/drand 0.1 3.0)
                   :d1 (m/drand -2.0 2.0)
                   :d2 (m/drand -2.0 2.0)} p)]
-    (assoc m :c1 (+ (:r1 m) (:d1 m))
-           :c2 (+ (:r2 m) (:d2 m)))))
+    (assoc m :c1 (+ ^double (:r1 m) ^double (:d1 m))
+           :c2 (+ ^double (:r2 m) ^double (:d2 m)))))
 (make-config-method trade)</pre></td></tr><tr><td class="docs"><p>trade by Michael Faber,  http://michaelfaber.deviantart.com/art/The-Lost-Variations-258913970</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-trade
-  [amount {:keys [r1 r2 c1 c2]}]
+  [^double amount {:keys [^double r1 ^double r2 ^double c1 ^double c2]}]
   (fn [^Vec2 v]
-    (let [[cc1 cc2 fr rr] (if (pos? (.x v))
-                            [c1 (- c2) (/ r2 r1) r1]
-                            [(- c2) c1 (/ r1 r2) r2])
+    (let [[^double cc1 ^double cc2 ^double fr ^double rr] (if (pos? (.x v))
+                                                            [c1 (- c2) (/ r2 r1) r1]
+                                                            [(- c2) c1 (/ r1 r2) r2])
           nv (Vec2. (- cc1 (.x v)) (.y v))
-          rm (v/mag nv)
+          ^double rm (v/mag nv)
           r (* rm fr)
           a (v/heading nv)
           res (Vec2. (+ cc2 (* r (m/cos a)))
@@ -3444,10 +3540,59 @@ Function returns map with full and precalculated configuration necessary to crea
       (if (&lt;= rm rr)
         (v/mult res amount)
         (v/mult v amount)))))
-(make-var-method trade)</pre></td></tr><tr><td class="docs"><p>https://github.com/d3/d3-geo-projection/tree/master/src</p>
+(make-var-method trade)
+(register-regular-var :trade)</pre></td></tr><tr><td class="docs"><h2>V</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><h3>Voron</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Voron configuration</p>
+</td><td class="codes"><pre class="brush: clojure">(defn config-voron
+  [p]
+  (merge {:k (srandom 0.6 1.3)
+          :step (srandom 0.1 1.2)
+          :num (m/drand 0.1 25.0)
+          :xseed (m/irand)
+          :yseed (m/irand)} p))
+(make-config-method voron)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(deftype VoronResType [^double R ^double X0 ^double Y0])
+(deftype VoronCalcType [^long M1 ^long N1 ^long k])</pre></td></tr><tr><td class="docs"><p>Voron by eralex61, http://eralex61.deviantart.com/art/Voronoi-Diagram-plugin-153126702</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-voron
+  [^double amount {:keys [^double k ^double step ^double num ^int xseed ^int yseed]}]
+  (fn [^Vec2 v]
+    (let [fk (fn ^VoronCalcType [^long M1 ^long N1]
+               (VoronCalcType. M1 N1
+                               (long (inc (m/floor (* (m/discrete-noise (+ (+ (* M1 19) (* N1 257)) xseed) 0) num))))))
+          m (long (m/floor (/ (.x v) step)))
+          n (long (m/floor (/ (.y v) step)))
+          m- (dec m)
+          m+ (inc m)
+          n- (dec n)
+          n+ (inc n)
+          Ks (mapv fk [m- m- m- m m m m+ m+ m+] [n- n n+ n- n n+ n- n n+])
+          ^VoronResType res (reduce (fn [^VoronResType curr ^VoronCalcType calc]
+                                      (loop [i (long 0)
+                                             ^VoronResType currl curr]
+                                        (if (&lt; i (.k calc))
+                                          (let [X (* step (+ (.M1 calc) (m/discrete-noise (+
+                                                                                           (+ i (* 64 (.M1 calc)))
+                                                                                           (+ xseed (* 15 (.N1 calc)))) 0)))
+                                                Y (* step (+ (.N1 calc) (m/discrete-noise (+
+                                                                                           (+ i (* 21 (.M1 calc)))
+                                                                                           (+ yseed (* 33 (.N1 calc)))) 0)))
+                                                R (m/hypot (- (.x v) X) (- (.y v) Y))]
+                                            (recur (unchecked-inc i)
+                                                   (if (&lt; R (.R currl))
+                                                     (VoronResType. R X Y)
+                                                     currl)))
+                                          currl))) (VoronResType. 20.0 0.0 0.0) Ks)]
+      (Vec2. (* amount (+ (.X0 res) (* k (- (.x v) (.X0 res)))))
+             (* amount (+ (.Y0 res) (* k (- (.y v) (.Y0 res)))))))))
+(make-var-method voron)
+(register-regular-var :voron)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def vv (make-variation :voron 1.0 {}))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(vv (Vec2. 0.9 0.2))</pre></td></tr><tr><td class="docs"><p>=> #object[clojure2d.math.vector.Vec2 0x34f5877c "[-0.6144291130318851, -0.03556826075794334]"]</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>https://github.com/d3/d3-geo-projection/tree/master/src</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-miller
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
     (v/mult (Vec2. (.x v)
                    (-&gt;&gt; (m/constrain (.y v) -1.9634 1.9634)
@@ -3456,9 +3601,10 @@ Function returns map with full and precalculated configuration necessary to crea
                         (m/tan)
                         (m/log)
                         (* 1.25))) amount)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(make-var-method miller)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-var-method miller)
+(register-regular-var :miller)</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-millerrev
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
     (v/mult (Vec2. (.x v)
                    (-&gt; (.y v)
@@ -3466,10 +3612,11 @@ Function returns map with full and precalculated configuration necessary to crea
                        (m/exp)
                        (m/atan)
                        (* 2.5)
-                       (- (* 0.625 m/PI)))) amount)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(make-var-method millerrev)</pre></td></tr><tr><td class="docs">
+                       (- (* 0.625 m/PI)))) amount)))
+(make-var-method millerrev)
+(register-regular-var :millerrev)</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-foucaut
-  [amount _]
+  [^double amount _]
   (fn [^Vec2 v]
     (let [k (* 0.5 (.y v))
           cosk (m/cos k)
@@ -3480,29 +3627,17 @@ Function returns map with full and precalculated configuration necessary to crea
                   (* 2)
                   (* amount))
           yy (* amount m/SQRTPI (m/tan k))]
-      (Vec2. xx yy))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(make-var-method foucaut)</pre></td></tr><tr><td class="docs">
+      (Vec2. xx yy))))
+(make-var-method foucaut)
+(register-regular-var :foucaut)</pre></td></tr><tr><td class="docs">
 </td><td class="codes"></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def variation-list-random [:arch
-                            :blade :blade2 :boarders
-                            :julia :julian :juliaq])</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def variation-list-not-random [:default
-                                :auger 
-                                :bcollide :besselj :beta :bswirl :bent :butterfly
-                                :circlelinear :csin 
-                                :emod :erf :exp
-                                :foucaut :fan2
-                                :gamma 
-                                :hemisphere
-                                :miller :millerrev
-                                :popcorn2 
-                                :sinusoidal :stwin
-                                :trade])</pre></td></tr><tr><td class="docs"><p>list of all variations defined in the file</p>
+</td><td class="codes"><pre class="brush: clojure">(def variation-list-random @random-var)
+(def variation-list-not-random @regular-var)</pre></td></tr><tr><td class="docs"><p>list of all variations defined in the file</p>
 </td><td class="codes"><pre class="brush: clojure">(def variation-list (concat variation-list-random variation-list-not-random))</pre></td></tr><tr><td class="docs"><p>combinator &amp; randomizer</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn derivative
-  ([f amount a]
+  ([f ^double amount ^double a]
    (let [^Vec2 d (Vec2. a a)]
      (fn [^Vec2 v]
        (let [v1 (f v)
@@ -3514,14 +3649,14 @@ Function returns map with full and precalculated configuration necessary to crea
    (derivative f 1.0)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- binary-op
-  [op f1 f2 amount]
+  [op f1 f2 ^double amount]
   (fn [^Vec2 v]
     (v/mult (op (f1 v) (f2 v)) amount)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def addf (partial binary-op v/add))
 (def subf (partial binary-op v/sub))
 (def mulf (partial binary-op v/emult))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn divf
-  [f1 f2 amount]
+  [f1 f2 ^double amount]
   (fn [^Vec2 v]
     (let [^Vec2 v1 (f1 v)
           ^Vec2 v2 (f2 v)
@@ -3530,7 +3665,8 @@ Function returns map with full and precalculated configuration necessary to crea
       (v/mult (Vec2. (/ (.x v1) x) (/ (.y v1) y)) amount))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn compf
   [f1 f2 amount]
-  (v/mult (comp f1 f2) amount))</pre></td></tr><tr><td class="docs">
+  (fn [^Vec2 v]
+    (v/mult (f1 (f2 v)) amount)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-random-configuration
   []
   ())</pre></td></tr><tr><td class="docs">

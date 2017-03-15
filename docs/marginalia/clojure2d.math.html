@@ -2921,134 +2921,149 @@ Wrappers are made to provide Clojure functions.</p>
 </ul>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>FastMath wrappers + helper functions</p>
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.math
-  (:import [net.jafama FastMath NumbersUtils]
+  (:import [net.jafama FastMath]
            [org.apache.commons.math3.random RandomGenerator ISAACRandom JDKRandomGenerator MersenneTwister
             Well512a Well1024a Well19937a Well19937c Well44497a Well44497b]
            [com.flowpowered.noise.module.source Perlin]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
 (set! *unchecked-math* true)</pre></td></tr><tr><td class="docs"><p>Bunch of math constants</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const PI Math/PI)
-(def ^:const HALF_PI (/ PI 2.0))
-(def ^:const QUARTER_PI (/ PI 4.0))
-(def ^:const TWO_PI (* PI 2.0))
-(def ^:const TAU TWO_PI)
-(def ^:const E Math/E)</pre></td></tr><tr><td class="docs"><p>Very small number \(\varepsilon\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const EPSILON 1.0e-10)</pre></td></tr><tr><td class="docs"><p>Bind namespace name to fastmath function</p>
-
-<p>For single argument functions let define clojure functions through macro.
-Macro generates sequence of <code>def</code> with respective function name.</p>
-</td><td class="codes"><pre class="brush: clojure">(defmacro bind-math-names
-  [names]
-  (cons 'do (for [n names]
-              (let [s (gensym n)]
-                `(def ~n (fn [~s] (. FastMath ~n ~s)))))))</pre></td></tr><tr><td class="docs"><p>Define functions</p>
-</td><td class="codes"><pre class="brush: clojure">(bind-math-names [sin cos tan asin acos atan sinh cosh tanh asinh acosh atanh exp log log10 sqrt cbrt])</pre></td></tr><tr><td class="docs"><p>Additional trigonometry functions</p>
-</td><td class="codes"><pre class="brush: clojure">(def cot #(FastMath/tan (- HALF_PI %)))
-(def sec #(/ 1.0 (FastMath/cos %)))
-(def csc #(/ 1.0 (FastMath/sin %)))</pre></td></tr><tr><td class="docs"><p>Quick and less accurate <code>sin</code> and <code>cos</code></p>
-</td><td class="codes"><pre class="brush: clojure">(def qsin #(FastMath/sinQuick %))
-(def qcos #(FastMath/cosQuick %))</pre></td></tr><tr><td class="docs"><p>Additional cyclometric functions</p>
-</td><td class="codes"><pre class="brush: clojure">(def acot #(- HALF_PI (FastMath/atan %)))
-(def asec #(FastMath/acos (/ 1.0 %)))
-(def acsc #(FastMath/asin (/ 1.0 %)))
-(def atan2 #(FastMath/atan2 %1 %2))</pre></td></tr><tr><td class="docs"><p>Additional hyperbolic functions</p>
-</td><td class="codes"><pre class="brush: clojure">(def coth #(/ 1.0 (FastMath/tanh %)))
-(def sech #(/ 1.0 (FastMath/cosh %)))
-(def csch #(/ 1.0 (FastMath/sinh %)))</pre></td></tr><tr><td class="docs"><p>Additional inverse hyperbolic functions</p>
-</td><td class="codes"><pre class="brush: clojure">(def acoth #(FastMath/atanh (/ 1.0 %)))
-(def asech #(FastMath/acosh (/ 1.0 %)))
-(def acsch #(FastMath/asinh (/ 1.0 %)))</pre></td></tr><tr><td class="docs"><p>Quick version of exponential \(e^x\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def qexp #(FastMath/expQuick %))</pre></td></tr><tr><td class="docs"><p>Alias for logarithm</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double PI Math/PI)
+(def ^:const ^double HALF_PI (/ PI 2.0))
+(def ^:const ^double QUARTER_PI (/ PI 4.0))
+(def ^:const ^double TWO_PI (* PI 2.0))
+(def ^:const ^double TAU TWO_PI)
+(def ^:const ^double E Math/E)</pre></td></tr><tr><td class="docs"><p>Very small number \(\varepsilon\)</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double EPSILON 1.0e-10)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn sin ^double [^double v] (FastMath/sin v))
+(defn cos ^double [^double v] (FastMath/cos v))
+(defn tan ^double [^double v] (FastMath/tan v))
+(defn asin ^double [^double v] (FastMath/asin v))
+(defn acos ^double [^double v] (FastMath/acos v))
+(defn atan ^double [^double v] (FastMath/atan v))
+(defn sinh ^double [^double v] (FastMath/sinh v))
+(defn cosh ^double [^double v] (FastMath/cosh v))
+(defn tanh ^double [^double v] (FastMath/tanh v))
+(defn asinh ^double [^double v] (FastMath/asinh v))
+(defn acosh ^double [^double v] (FastMath/acosh v))
+(defn atanh ^double [^double v] (FastMath/atanh v))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn exp ^double [^double v] (FastMath/exp v))
+(defn log ^double [^double v] (FastMath/log v))
+(defn log10 ^double [^double v] (FastMath/log10 v))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn sqrt ^double [^double v] (FastMath/sqrt v))
+(defn cbrt ^double [^double v] (FastMath/cbrt v))</pre></td></tr><tr><td class="docs"><p>Additional trigonometry functions</p>
+</td><td class="codes"><pre class="brush: clojure">(defn cot ^double [^double v] (FastMath/tan (- HALF_PI v)))
+(defn sec ^double [^double v] (/ 1.0 (FastMath/cos v)))
+(defn csc ^double [^double v] (/ 1.0 (FastMath/sin v)))</pre></td></tr><tr><td class="docs"><p>Quick and less accurate <code>sin</code> and <code>cos</code></p>
+</td><td class="codes"><pre class="brush: clojure">(defn qsin ^double [^double v] (FastMath/sinQuick v))
+(defn qcos ^double [^double v] (FastMath/cosQuick v))</pre></td></tr><tr><td class="docs"><p>Additional cyclometric functions</p>
+</td><td class="codes"><pre class="brush: clojure">(defn acot ^double [^double v] (- HALF_PI (FastMath/atan v)))
+(defn asec ^double [^double v] (FastMath/acos (/ 1.0 v)))
+(defn acsc ^double [^double v] (FastMath/asin (/ 1.0 v)))
+(defn atan2 ^double [^double v1 ^double v2] (FastMath/atan2 v1 v2))</pre></td></tr><tr><td class="docs"><p>Additional hyperbolic functions</p>
+</td><td class="codes"><pre class="brush: clojure">(defn coth ^double [^double v] (/ 1.0 (FastMath/tanh v)))
+(defn sech ^double [^double v] (/ 1.0 (FastMath/cosh v)))
+(defn csch ^double [^double v] (/ 1.0 (FastMath/sinh v)))</pre></td></tr><tr><td class="docs"><p>Additional inverse hyperbolic functions</p>
+</td><td class="codes"><pre class="brush: clojure">(defn acoth ^double [^double v] (FastMath/atanh (/ 1.0 v)))
+(defn asech ^double [^double v] (FastMath/acosh (/ 1.0 v)))
+(defn acsch ^double [^double v] (FastMath/asinh (/ 1.0 v)))</pre></td></tr><tr><td class="docs"><p>Quick version of exponential \(e^x\)</p>
+</td><td class="codes"><pre class="brush: clojure">(defn qexp ^double [^double v] (FastMath/expQuick v))</pre></td></tr><tr><td class="docs"><p>Alias for logarithm</p>
 </td><td class="codes"><pre class="brush: clojure">(def ln log)</pre></td></tr><tr><td class="docs"><p>Few logarithm constants
 \(\ln 2\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const LN2 (log 2.0))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def ^:const LN2_2 (* 0.5 LN2))</pre></td></tr><tr><td class="docs"><p>\(\ln 10\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const LN10 (log 10.0))</pre></td></tr><tr><td class="docs"><p>\(\frac{1.0}{\ln{0.5}}\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const INV_LOG_HALF (/ 1.0 (log 0.5)))</pre></td></tr><tr><td class="docs"><p>Log with base 2</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double LN2 (log 2.0))
+(def ^:const ^double LN2_2 (* 0.5 LN2))</pre></td></tr><tr><td class="docs"><p>\(\ln 10\)</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double LN10 (log 10.0))</pre></td></tr><tr><td class="docs"><p>\(\frac{1.0}{\ln{0.5}}\)</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double INV_LOG_HALF (/ 1.0 ^double (log 0.5)))</pre></td></tr><tr><td class="docs"><p>Log with base 2</p>
 </td><td class="codes"><pre class="brush: clojure">(defn log2
-  [x]
-  (/ (log x) LN2))</pre></td></tr><tr><td class="docs"><p>Logarithm with base</p>
+  ^double [^double v]
+  (/ (FastMath/log v) LN2))</pre></td></tr><tr><td class="docs"><p>Logarithm with base</p>
 
 <p>\(\log_b x\)</p>
 </td><td class="codes"><pre class="brush: clojure">(defn logb
-  [base x]
-  (/ (log x) (log base)))
-(def qlog #(FastMath/logQuick %))</pre></td></tr><tr><td class="docs"><p>\(\log_2 e\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const LOG2E (log2 E))</pre></td></tr><tr><td class="docs"><p>\(\log_{10} e\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const LOG10E (log10 E))</pre></td></tr><tr><td class="docs"><p>Powers (normal, quick and fast)</p>
-</td><td class="codes"><pre class="brush: clojure">(def pow #(FastMath/pow %1 %2))
-(def qpow #(FastMath/powQuick %1 %2))</pre></td></tr><tr><td class="docs"><p>Fast version of power, second parameter should be integer</p>
-</td><td class="codes"><pre class="brush: clojure">(def fpow #(FastMath/powFast %1 %2))</pre></td></tr><tr><td class="docs"><p>Square and cubic</p>
-</td><td class="codes"><pre class="brush: clojure">(def sq #(FastMath/pow2 ^double %))
+  ^double [^double base ^double v]
+  (/ (FastMath/log v) (FastMath/log base)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn qlog ^double [^double v] (FastMath/logQuick v))</pre></td></tr><tr><td class="docs"><p>\(\log_2 e\)</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double LOG2E (log2 E))</pre></td></tr><tr><td class="docs"><p>\(\log_{10} e\)</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double LOG10E (log10 E))</pre></td></tr><tr><td class="docs"><p>Powers (normal, quick and fast)</p>
+</td><td class="codes"><pre class="brush: clojure">(defn pow ^double [^double v1 ^double v2] (FastMath/pow v1 v2))
+(defn qpow ^double [^double v1 ^double v2] (FastMath/powQuick v1 v2))</pre></td></tr><tr><td class="docs"><p>Fast version of power, second parameter should be integer</p>
+</td><td class="codes"><pre class="brush: clojure">(defn fpow ^double [^double v1 ^double v2] (FastMath/powFast v1 v2))</pre></td></tr><tr><td class="docs"><p>Square and cubic</p>
+</td><td class="codes"><pre class="brush: clojure">(defn sq ^double [^double v] (FastMath/pow2 v))
 (def pow2 sq)
-(def pow3 #(FastMath/pow3 ^double %))</pre></td></tr><tr><td class="docs"><p>Safe sqrt, for value &lt;= 0 result is 0</p>
+(defn pow3 ^double [^double v] (FastMath/pow3 v))</pre></td></tr><tr><td class="docs"><p>Safe sqrt, for value &lt;= 0 result is 0</p>
 </td><td class="codes"><pre class="brush: clojure">(defn safe-sqrt
-  [value]
+  ^double [^double value]
   (if (neg? value) 0 (sqrt value)))
-(def qsqrt #(FastMath/sqrtQuick %))</pre></td></tr><tr><td class="docs"><p>Hyponetuse</p>
+(defn qsqrt ^double [^double v] (FastMath/sqrtQuick v))</pre></td></tr><tr><td class="docs"><p>Hyponetuse</p>
 
 <p>\(\sqrt{x^2+y^2}\) and \(\sqrt{x^2+y^2+z^2}\)</p>
 </td><td class="codes"><pre class="brush: clojure">(defn hypot
-  ([x y]
+  (^double [^double x ^double y]
    (FastMath/hypot x y))
-  ([x y z]
+  (^double [^double x ^double y ^double z]
    (FastMath/hypot x y z)))</pre></td></tr><tr><td class="docs"><p>Rounding functions</p>
-</td><td class="codes"><pre class="brush: clojure">(def floor #(FastMath/floor ^double %))
-(def ceil #(FastMath/ceil ^double %))
-(def round #(FastMath/round ^double %))
-(def rint #(FastMath/rint ^double %))</pre></td></tr><tr><td class="docs"><p>Find power of 2 exponent for double number where <br />
+</td><td class="codes"><pre class="brush: clojure">(defn floor ^double [^double v] (FastMath/floor v))
+(defn ceil ^double [^double v] (FastMath/ceil v))
+(defn round ^long [^double v] (FastMath/round v))
+(defn rint ^double [^double v] (FastMath/rint v))</pre></td></tr><tr><td class="docs"><p>Find power of 2 exponent for double number where <br />
 \(2^(n-1)\leq x\leq 2^n\) <br />
 where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-exp</code>
 <code>(low-2-exp TWO_PI) =&gt; 2</code> \(2^2\eq 4\leq 6.28\) <br />
 <code>(high-2-exp TWO_PI) =&gt; 3</code> \(6.28\leq 2^3\eq 8\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def low-2-exp (comp int floor (partial logb 2)))
-(def high-2-exp (comp int ceil (partial logb 2)))</pre></td></tr><tr><td class="docs"><p>Modulo and abs</p>
-</td><td class="codes"><pre class="brush: clojure">(def reminder #(FastMath/remainder %1 %2))
-(def abs #(Math/abs ^double %))
-(def iabs #(Math/abs ^long %))</pre></td></tr><tr><td class="docs"><p>More constants</p>
+</td><td class="codes"><pre class="brush: clojure">(def low-2-exp (comp long floor log2))
+(def high-2-exp (comp long ceil log2))</pre></td></tr><tr><td class="docs"><p>Modulo and abs</p>
+</td><td class="codes"><pre class="brush: clojure">(defn remainder ^double [^double v1 ^double v2] (FastMath/remainder v1 v2))
+(defn abs ^double [^double v] (FastMath/abs v))
+(defn iabs ^long [^long v] (FastMath/abs v))</pre></td></tr><tr><td class="docs"><p>More constants</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>\(\sqrt{2}\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const SQRT2 (sqrt 2.0))
-(def ^:const SQRT2_2 (* 0.5 SQRT2))</pre></td></tr><tr><td class="docs"><p>\(\sqrt{3}\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const SQRT3 (sqrt 3.0))</pre></td></tr><tr><td class="docs"><p>\(\sqrt{5}\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const SQRT5 (sqrt 5.0))</pre></td></tr><tr><td class="docs"><p>\(\sqrt{\pi}\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const SQRTPI (sqrt PI))</pre></td></tr><tr><td class="docs"><p>Golden ratio \(\varphi\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const PHI (* (+ 1.0 SQRT5) 0.5))</pre></td></tr><tr><td class="docs"><p>math.h predefined constants names</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const M_E E)
-(def ^:const M_LOG2E LOG2E)
-(def ^:const M_LOG10E LOG10E)
-(def ^:const M_LN2 LN2)
-(def ^:const M_LN10 LN10)
-(def ^:const M_PI PI)
-(def ^:const M_PI_2 HALF_PI)
-(def ^:const M_PI_4 QUARTER_PI)
-(def ^:const M_1_PI (/ 1.0 PI))
-(def ^:const M_2_PI (/ 2.0 PI))
-(def ^:const M_2_SQRTPI (/ 2.0 SQRTPI))
-(def ^:const M_SQRT2 SQRT2)
-(def ^:const M_SQRT1_2 (/ 1.0 SQRT2))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def ^:const M_TWOPI TWO_PI)
-(def ^:const M_3PI_4 (* PI 0.75))
-(def ^:const M_SQRT_PI SQRTPI)
-(def ^:const M_LN2LO 1.9082149292705877000E-10)
-(def ^:const M_LN2HI 6.9314718036912381649E-1)
-(def ^:const M_SQRT3 SQRT3)
-(def ^:const M_IVLN10 (/ 1.0 LN10))
-(def ^:const M_LOG2_E LN2)
-(def ^:const M_INVLN2 (/ 1.0 LN2))</pre></td></tr><tr><td class="docs"><p>Return 1 if the specified value is > 0, 0 if it is 0, -1 otherwise</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double SQRT2 (sqrt 2.0))
+(def ^:const ^double SQRT2_2 (* 0.5 SQRT2))</pre></td></tr><tr><td class="docs"><p>\(\sqrt{3}\)</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double SQRT3 (sqrt 3.0))</pre></td></tr><tr><td class="docs"><p>\(\sqrt{5}\)</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double SQRT5 (sqrt 5.0))</pre></td></tr><tr><td class="docs"><p>\(\sqrt{\pi}\)</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double SQRTPI (sqrt PI))</pre></td></tr><tr><td class="docs"><p>Golden ratio \(\varphi\)</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double PHI (* (+ 1.0 SQRT5) 0.5))</pre></td></tr><tr><td class="docs"><p>math.h predefined constants names</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double M_E E)
+(def ^:const ^double M_LOG2E LOG2E)
+(def ^:const ^double M_LOG10E LOG10E)
+(def ^:const ^double M_LN2 LN2)
+(def ^:const ^double M_LN10 LN10)
+(def ^:const ^double M_PI PI)
+(def ^:const ^double M_PI_2 HALF_PI)
+(def ^:const ^double M_PI_4 QUARTER_PI)
+(def ^:const ^double M_1_PI (/ 1.0 PI))
+(def ^:const ^double M_2_PI (/ 2.0 PI))
+(def ^:const ^double M_2_SQRTPI (/ 2.0 SQRTPI))
+(def ^:const ^double M_SQRT2 SQRT2)
+(def ^:const ^double M_SQRT1_2 (/ 1.0 SQRT2))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double M_TWOPI TWO_PI)
+(def ^:const ^double M_3PI_4 (* PI 0.75))
+(def ^:const ^double M_SQRT_PI SQRTPI)
+(def ^:const ^double M_LN2LO 1.9082149292705877000E-10)
+(def ^:const ^double M_LN2HI 6.9314718036912381649E-1)
+(def ^:const ^double M_SQRT3 SQRT3)
+(def ^:const ^double M_IVLN10 (/ 1.0 LN10))
+(def ^:const ^double M_LOG2_E LN2)
+(def ^:const ^double M_INVLN2 (/ 1.0 LN2))</pre></td></tr><tr><td class="docs"><p>Return 1 if the specified value is > 0, 0 if it is 0, -1 otherwise</p>
 </td><td class="codes"><pre class="brush: clojure">(defn signum
-  [value]
-  (cond (pos? value) 1
-        (neg? value) -1
+  ^double [^double value]
+  (cond (pos? value) 1.0
+        (neg? value) -1.0
         :else 0))</pre></td></tr><tr><td class="docs"><p>Return -1 when value is negative, 1 otherwise</p>
 </td><td class="codes"><pre class="brush: clojure">(defn sgn
-  [value]
-  (if (neg? value) -1 1))</pre></td></tr><tr><td class="docs"><p>Clamp value between mn and mx</p>
+  ^double [^double value]
+  (if (neg? value) -1.0 1.0))</pre></td></tr><tr><td class="docs"><p>Clamp value between mn and mx</p>
 
 <p><code>(constrain 0.5 1 2) =&gt; 1</code> <br />
 <code>(constrain 1.5 1 2) =&gt; 1.5</code> <br />
 <code>(constrain 2.5 1 2) =&gt; 2</code>  </p>
 </td><td class="codes"><pre class="brush: clojure">(defn constrain
-  [value mn mx]
+  ^double [^double value ^double mn ^double mx]
+  (if (&gt; value mx) 
+    mx
+    (if (&lt; value mn) 
+      mn 
+      value)))</pre></td></tr><tr><td class="docs"><p>Clamp value between mn and mx</p>
+</td><td class="codes"><pre class="brush: clojure">(defn iconstrain
+  ^long [^long value ^long mn ^long mx]
   (if (&gt; value mx) 
     mx
     (if (&lt; value mn) 
@@ -3058,11 +3073,22 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
 <p>Map value from range <code>[start1,stop1]</code> to new range <code>[start2,stop2]</code> or if new range is not given map to <code>[0,1]</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn norm
   ([v start1 stop1 start2 stop2] ;; map
-   (+ start2 (* (- stop2 start2) (norm v start1 stop1))))
-  ([v start stop] ;; norm
-   (if (= start stop)
-     (if (&lt; v start) 0 1)
-     (/ (- v start) (double (- stop start))))))</pre></td></tr><tr><td class="docs"><p>Constrained version of norm</p>
+   (+ ^double start2 (* (- ^double stop2 ^double start2) ^double (norm v start1 stop1))))
+  (^double [^double v ^double start ^double stop] ;; norm
+   (if (== start stop)
+     (if (&lt; v start) 0.0 1.0)
+     (/ (- v start) (- stop start)))))</pre></td></tr><tr><td class="docs"><p>Make map/norm function</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-norm
+  ([^double start ^double stop]
+   (let [r (- stop start)]
+       (fn ^double [^double v ^double dstart ^double dstop]
+          (let [vn (/ (- v start) r)]
+            (+ dstart (* (- dstop dstart) vn))))))
+  ([^double start ^double stop ^double dstart ^double dstop]
+   (let [r (- stop start)]
+       (fn ^double [^double v]
+          (let [vn (/ (- v start) r)]
+            (+ dstart (* (- dstop dstart) vn)))))))</pre></td></tr><tr><td class="docs"><p>Constrained version of norm</p>
 
 <p>Map and constrain values
 <code>(cnorm 1.5 0 1 100 200) =&gt; 200</code></p>
@@ -3070,29 +3096,29 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
   ([v start1 stop1 start2 stop2]
    (constrain (norm v start1 stop1 start2 stop2) start2 stop2))
   ([v start stop]
-   (constrain (norm v start stop) 0 1)))</pre></td></tr><tr><td class="docs"><p>Processing lerp</p>
+   (constrain (norm v start stop) 0.0 1.0)))</pre></td></tr><tr><td class="docs"><p>Processing lerp</p>
 
 <p>Linear interpolation between <code>start</code> and <code>stop</code>.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn lerp
-  [start stop t]
+  ^double [^double start ^double stop ^double t]
   (let [t1 (- 1.0 t)]
     (+ (* t1 start) (* t stop))))</pre></td></tr><tr><td class="docs"><p>oF interpolateCosine</p>
 
 <p>Cosine interpolation between <code>start</code> and <code>stop</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn cos-interpolation
-  [start stop t]
-  (let [t1 (* 0.5 (- 1.0 (qcos (* t PI))))]
-    (lerp start stop t1)))</pre></td></tr><tr><td class="docs">
+  ^double [^double start ^double stop ^double t]
+  (let [t1 (* 0.5 (- 1.0 ^double (cos (* t PI))))]
+    (lerp start stop t1)))</pre></td></tr><tr><td class="docs"><p>GL smoothstep</p>
 </td><td class="codes"><pre class="brush: clojure">(defn smoothstep
-  [start stop x]
-  (let [t (norm x start stop)]
+  ^double [^double start ^double stop ^double x]
+  (let [t ^double (norm x start stop)]
     (* t t (- 3.0 (* 2.0 t)))))</pre></td></tr><tr><td class="docs"><p>Wrap overflowed value into the range, ofWrap</p>
 
 <p><code>(wrap 0 -1 1) =&gt; 0.0</code> <br />
 <code>(wrap -1.1 -1 1) =&gt; 0.8999999999999999</code> <br />
 <code>(wrap 1.1 -1 1) =&gt; -0.8999999999999999</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn wrap
-  [value start stop]
+  ^double [^double start ^double stop ^double value]
   (let [p (&gt; start stop)
         from (if p stop start)
         to (if p start stop)
@@ -3100,7 +3126,6 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
     (if (zero? cycle)
       to
       (-&gt;&gt; cycle
-           (double)
            (/ (- value from))
            (floor)
            (* cycle)
@@ -3132,14 +3157,14 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
 <code>(quantile 0.75 '(1 2 3 -1 -1 2 -1 11 111)) =&gt; 7.0</code>
 <code>(quantile 0.9  '(1 2 3 -1 -1 2 -1 11 111)) =&gt; 111</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn quantile
-  ([p vs]
+  (^double [^double p vs]
      (let [svs (sort vs)]
        (quantile p (count vs) svs (first svs) (last svs))))
   ([p c svs mn mx]
-     (let [pic (* p (inc c))
-           k (int pic)
-           d (- pic k)
-           ndk (if (zero? k) mn (nth svs (dec k)))]
+   (let [pic (* p (inc c))
+         k (round pic)
+         d (- pic k)
+         ndk (if (zero? k) mn (nth svs (dec k)))]
        (cond
         (zero? k) mn
         (= c (dec k)) mx
@@ -3154,28 +3179,28 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
 <p><code>(mean '(1 2 3 -1 -1 2 -1 11 111)) =&gt; 14.11111111111111</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn mean
   ([vs] (mean (reduce + vs) (count vs)))
-  ([sm sz] (/ sm (double sz))))</pre></td></tr><tr><td class="docs"><p>Calculate standard deviation of a list</p>
+  ([^double sm sz] (/ sm (double sz))))</pre></td></tr><tr><td class="docs"><p>Calculate standard deviation of a list</p>
 
 <p><code>(standard-deviation '(1 2 3 -1 -1 2 -1 11 111)) =&gt; 34.43333154064031</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn standard-deviation
   ([vs]
-   (standard-deviation vs (count vs) (mean vs)))
-  ([vs sz u]
-   (sqrt (/ (reduce + (map #(pow (- % u) 2) vs)) sz))))</pre></td></tr><tr><td class="docs"><p>Calculate MAD</p>
+   (standard-deviation vs (double (count vs)) (mean vs)))
+  ([vs ^double sz ^double u]
+   (sqrt (/ ^double (reduce + (map #(pow (- ^double % u) 2) vs)) sz))))</pre></td></tr><tr><td class="docs"><p>Calculate MAD</p>
 
 <p><code>(median-absolute-deviation '(1 2 3 -1 -1 2 -1 11 111))  =&gt; 3.0</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn median-absolute-deviation
   ([vs]
      (median-absolute-deviation vs (median vs)))
-  ([vs m]
-     (median (map #(abs (- % m)) vs))))</pre></td></tr><tr><td class="docs"><p><code>(lower-adjacent-value '(1 2 3 -1 -1 2 -1 11 111)) =&gt; -1</code></p>
+  ([vs ^double m]
+     (median (map #(abs (- ^double % m)) vs))))</pre></td></tr><tr><td class="docs"><p><code>(lower-adjacent-value '(1 2 3 -1 -1 2 -1 11 111)) =&gt; -1</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn lower-adjacent-value
   ([vs]
-     (let [q1 (quantile 0.25 vs)
-           m (median vs)
-           q3 (quantile 0.75 vs)]
+   (let [q1 (quantile 0.25 vs)
+         m (median vs)
+         q3 (quantile 0.75 vs)]
        (lower-adjacent-value (sort vs) m (- q3 q1))))
-  ([svs m qd]
+  ([svs ^double m ^double qd]
      (let [l (- m qd)]
        (first (filter (partial &lt; l) svs)))))</pre></td></tr><tr><td class="docs"><p><code>(upper-adjacent-value '(1 2 3 -1 -1 2 -1 11 111)) =&gt; 3</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn upper-adjacent-value
@@ -3184,9 +3209,9 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
            m (median vs)
            q3 (quantile 0.75 vs)]
        (upper-adjacent-value (reverse (sort vs)) m (- q3 q1))))
-  ([rsvs m qd]
+  ([rsvs ^double m ^double qd]
      (let [l (+ m qd)]
-       (first (filter #(&lt; % l) rsvs)))))</pre></td></tr><tr><td class="docs"><p><code>(stats-map '(1 2 3 -1 -1 2 -1 11 111))</code>
+       (first (filter #(&lt; ^double % l) rsvs)))))</pre></td></tr><tr><td class="docs"><p><code>(stats-map '(1 2 3 -1 -1 2 -1 11 111))</code>
 <code>=&gt; {:MAD 3.0, :Max 111, :Size 9, :LAV -1, :Mode -1, :Mean 14.11111111111111, :Q1 -1.0, :Q3 7.0, :Min -1, :Total 127, :SD 34.43333154064031, :UAV 3, :Median 2.0}</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn stats-map
   ([vs]
@@ -3202,7 +3227,7 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
            q3 (quantile 0.75 sz svs mn mx)
            sd (standard-deviation vs sz u)
            mad (median-absolute-deviation vs mdn)
-           qd (- q3 q1)
+           qd (- ^double q3 ^double q1)
            lav (lower-adjacent-value svs mdn qd)
            uav (upper-adjacent-value rsvs mdn qd)]
        {
@@ -3223,11 +3248,11 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
      (zipmap ks (map (stats-map vs) ks))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- closest-mean-fn
   [means]
-  (fn [v] (reduce (partial min-key #(sq (- v %))) means)))</pre></td></tr><tr><td class="docs"><p>k-means clustering</p>
+  (fn [^double v] (reduce (partial min-key #(sq (- v ^double %))) means)))</pre></td></tr><tr><td class="docs"><p>k-means clustering</p>
 
 <p><code>(k-means 4 '(1 2 3 -1 -1 2 -1 11 111)) =&gt; (-1.0 2.0 11.0 111.0)</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn k-means
-  [k vs]
+  [^long k vs]
   (let [vs (map double vs)
         svs (set vs)]
     (if (&gt; k (count svs))
@@ -3265,30 +3290,28 @@ As a RNG source <a href="http://commons.apache.org/proper/commons-math/apidocs/o
 <li><code>:isaac</code> - ISAAC</li>
 <li><code>:well512a</code>, <code>:well1024a</code>, <code>:well19937a</code>, <code>:well19937c</code>, <code>:well44497a</code>, <code>:well44497b</code> - several WELL variants</li>
 </ul>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Create function for next random value (long, int, double, float, gaussian) with scale and shift</p>
-
-<p>This macro creates function with 1,2 or 3 parameters for every primitive type variant.
-Macro accepts two parameters: native class random method and predicate to distinguish between floating point and integers.</p>
-
-<p>Created function accepts RNG object itself and parameters for range.</p>
-
-<p>Macro is used internally to extend RandomGenerator interface.</p>
-</td><td class="codes"><pre class="brush: clojure">(defmacro next-random-value-fn
-  [func int?]
-  (let [r (vary-meta (gensym &quot;r&quot;) assoc :tag 'RandomGenerator)
-        mx2 (gensym &quot;mx2&quot;)
-        mn (gensym &quot;mn&quot;)
-        mx (gensym &quot;mx&quot;)]
-    `(fn self#
-       ([~r] (~func ~r))
-       ([~r ~mx2]
-        ~(if int?
-           `(mod (~func ~r) ~mx2)
-           `(* ~mx2 (~func ~r))))
-       ([~r ~mn ~mx]
-        (let [diff# (- ~mx ~mn)]
-          (if (zero? diff#) ~mn
-            (+ ~mn (self# ~r diff#))))))))</pre></td></tr><tr><td class="docs"><p>Create protocol Randomizer with following functions:</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn next-random-value-long
+  (^long [^RandomGenerator r] (.nextLong r))
+  (^long [^RandomGenerator r ^long mx] (mod (.nextLong r) mx))
+  (^long [r ^long mn ^long mx]
+   (let [diff (- mx mn)]
+     (if (zero? diff) mn
+         (+ mn (next-random-value-long r diff))))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn next-random-value-double
+  (^double [^RandomGenerator r] (.nextDouble r))
+  (^double [^RandomGenerator r ^double mx] (* (.nextDouble r) mx))
+  (^double [r ^double mn ^double mx]
+   (let [diff (- mx mn)]
+     (if (zero? diff) mn
+         (+ mn (next-random-value-double r diff))))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn next-random-value-gaussian
+  (^double [^RandomGenerator r] (.nextGaussian r))
+  (^double [^RandomGenerator r ^double mx] (* (.nextGaussian r) mx))
+  (^double [r ^double mn ^double mx]
+   (let [diff (- mx mn)]
+     (if (zero? diff) mn
+         (+ mn (next-random-value-gaussian r diff))))))</pre></td></tr><tr><td class="docs"><p>Create protocol Randomizer with following functions:</p>
 
 <ul>
 <li><code>irandom</code> - return random integer from uniform distribution</li>
@@ -3329,27 +3352,23 @@ Macro accepts two parameters: native class random method and predicate to distin
   (lrandom [t] [t mx] [t mn mx] &quot;long random&quot;)
   (frandom [t] [t mx] [t mn mx] &quot;float random&quot;)
   (grandom [t] [t std] [t avg std] &quot;gaussian random&quot;)
-  (brandom [t] [t thr] &quot;boolean random, with probability option&quot;))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def next-gaussian (next-random-value-fn .nextGaussian false))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn next-random-with-probability
-  [^RandomGenerator r thr]
-  (&lt; (drandom r) thr))</pre></td></tr><tr><td class="docs"><p>Extend RandomGenerator interface with functions created by macro <code>next-random-value-fn</code>. This way all RNG classes are enriched with new, more convenient functions.</p>
+  (brandom [t] [t thr] &quot;boolean random, with probability option&quot;))</pre></td></tr><tr><td class="docs"><p>Extend RandomGenerator interface with functions created by macro <code>next-random-value-fn</code>. This way all RNG classes are enriched with new, more convenient functions.</p>
 
 <p>Note that <code>grandom</code> is under special care due to different [mn mx] range meaning.</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(extend RandomGenerator
   Randomizer
-  {:irandom (next-random-value-fn .nextInt true)
-   :lrandom (next-random-value-fn .nextLong true)
-   :frandom (next-random-value-fn .nextFloat false)
-   :drandom (next-random-value-fn .nextDouble false)
+  {:irandom (comp unchecked-int next-random-value-long)
+   :lrandom next-random-value-long
+   :frandom (comp float next-random-value-double)
+   :drandom next-random-value-double
    :grandom (fn
-            ([^RandomGenerator t] (next-gaussian t))
-            ([^RandomGenerator t std] (next-gaussian t std))
-            ([^RandomGenerator t avg std] (next-gaussian t avg (+ avg std))))
+            ([^RandomGenerator t] (next-random-value-gaussian t))
+            ([^RandomGenerator t std] (next-random-value-gaussian t std))
+            ([^RandomGenerator t ^double avg ^double std] (next-random-value-gaussian t avg (+ avg std))))
    :brandom (fn
             ([^RandomGenerator t] (.nextBoolean t))
-            ([^RandomGenerator t thr] (next-random-with-probability t thr)))})</pre></td></tr><tr><td class="docs"><p>Create object of the class with (or not) given seed</p>
+            ([^RandomGenerator t ^double thr] (&lt; (next-random-value-double t) thr)))})</pre></td></tr><tr><td class="docs"><p>Create object of the class with (or not) given seed</p>
 
 <p>Helper macro which creates RNG object of given class and/or seed.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmacro create-object-with-seed
@@ -3411,9 +3430,9 @@ Macro accepts two parameters: native class random method and predicate to distin
 (def brand (partial brandom default-random))</pre></td></tr><tr><td class="docs"><h2>Noise</h2>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn noise-with
-  ([^Perlin n x] (* 0.5 (+ 1.0 (.getValue n x 0.5 0.5))))
-  ([^Perlin n x y] (* 0.5 (+ 1.0 (.getValue n x y 0.5))))
-  ([^Perlin n x y z] (* 0.5 (+ 1.0 (.getValue n x y z)))))</pre></td></tr><tr><td class="docs">
+  (^double [^Perlin n x] (* 0.5 (+ 1.0 (.getValue n x 0.5 0.5))))
+  (^double [^Perlin n x y] (* 0.5 (+ 1.0 (.getValue n x y 0.5))))
+  (^double [^Perlin n x y z] (* 0.5 (+ 1.0 (.getValue n x y z)))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-perlin-noise
   ([] (partial noise-with (Perlin.)))
   ([seed]
@@ -3427,10 +3446,12 @@ Macro accepts two parameters: native class random method and predicate to distin
      (partial noise-with n))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def noise (make-perlin-noise))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def ^:const AM (/ 1.0 2147483647))</pre></td></tr><tr><td class="docs"><p>Discrete noise</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double AM (/ 1.0 2147483647.0))</pre></td></tr><tr><td class="docs"><p>Discrete noise</p>
 </td><td class="codes"><pre class="brush: clojure">(defn discrete-noise
-  [X Y]
-  (let [n (unchecked-add-int X (unchecked-multiply-int Y 57))
+  ^double [^long X ^long Y]
+  (let [X (unchecked-int X)
+        Y (unchecked-int Y)
+        n (unchecked-add-int X (unchecked-multiply-int Y 57))
         nn (unchecked-int (bit-xor n (bit-shift-left n 13)))
         nnn (unchecked-add-int 1376312589 (unchecked-multiply-int nn (unchecked-add-int 789221 (unchecked-multiply-int nn (unchecked-multiply-int nn 15731)))))]
     (* AM (unchecked-int (bit-and 0x7fffffff nnn)))))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;

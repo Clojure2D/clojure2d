@@ -2880,13 +2880,13 @@ net.brehaut.ClojureTools = (function (SH) {
 </td><td class="codes"><pre class="brush: clojure">(defn- blend-shift-and-add-f
   [ch ^Pixels p1 ^Pixels p2 x y]
   (let [c1 (p/get-value p1 ch x y)
-        c2 (p/get-value p2 ch (dec x) y)]
-    (add-compose c1 c2)))</pre></td></tr><tr><td class="docs">
+        c2 (p/get-value p2 ch (dec ^long x) y)]
+    (c/convert-and-blend add-compose c1 c2)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn draw-lines
-  [canvas w h]
+  [canvas ^long w ^long h]
   (dorun 
      (for [y (range 0 h 3)]
-       (let [y+ (inc y)
+       (let [y+ (inc ^long y)
              y++ (inc y+)]
          (core/set-color canvas (Color. (int (m/irand 180 200)) 0 0 42))
          (core/line canvas 0 y w y)
@@ -2916,7 +2916,7 @@ net.brehaut.ClojureTools = (function (SH) {
 </td><td class="codes"><pre class="brush: clojure">(defn make-noise
   [alpha w h]
   (let [fc (fn [v] 
-            (int (c/clamp255 (+ 100 (* 20 (m/grand))))))
+            (c/clamp255 (+ 100.0 (* 20.0 ^double (m/grand)))))
         fa (fn [v] alpha)
         ^Pixels p (p/filter-channels (partial p/filter-channel fc) nil nil (partial p/filter-channel fa) (p/make-pixels w h))]
     (p/set-channel p 1 (p/get-channel p 0))
@@ -2934,30 +2934,30 @@ net.brehaut.ClojureTools = (function (SH) {
    (render-noise (make-noise 80 (.getWidth img) (.getHeight img)) img)))</pre></td></tr><tr><td class="docs"><p>spots</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn spots
-  [alpha basecolor w h]
+  [^double alpha ^double basecolor ^long w ^long h]
   (let [size (* 4 w h)
-        limita (min 5 (int (* 1.0e-5 (/ size 4))))
-        limitb (min 6 (int (* 6.0e-5 (/ size 4))))
+        limita (int (min 5.0 (* 1.0e-5 (/ size 4.0))))
+        limitb (int (min 6.0 (* 6.0e-5 (/ size 4.0))))
         ^ints pc (int-array size)
         ^ints pa (int-array size)
         alphas (/ alpha 255.0)]
     (dorun (repeatedly (m/irand limita limitb)
-                       #(let [i (m/irand 10 (- w 10))
-                              j (m/irand 10 (- h 10))]
-                          (dorun (for [m (range i (+ i (m/irand 1 8)))
-                                       n (range (- j (m/irand 6)) (+ j (m/irand 1 6)))]
-                                   (let [bc (-&gt; (m/grand)
-                                                (* 40)
+                       #(let [^int i (m/irand 10 (- w 10))
+                              ^int j (m/irand 10 (- h 10))]
+                          (dorun (for [^int m (range i (+ i ^int (m/irand 1 8)))
+                                       ^int n (range (- j ^int (m/irand 6)) (+ j ^int (m/irand 1 6)))]
+                                   (let [bc (-&gt; ^double (m/grand)
+                                                (* 40.0)
                                                 (+ basecolor)
                                                 (int))
-                                         a (-&gt; (m/grand)
-                                               (* 30)
-                                               (+ 180)
-                                               (m/constrain 0 255)
+                                         a (-&gt; ^double (m/grand)
+                                               (* 30.0)
+                                               (+ 180.0)
+                                               (m/constrain 0.0 255.0)
                                                (* alphas)
                                                (int))]
-                                     (aset pc ^int (+ m (* w n)) bc)
-                                     (aset pa ^int (+ m (* w n)) a)))))))
+                                     (aset pc (+ m (* w n)) bc)
+                                     (aset pa (+ m (* w n)) a)))))))
     (let [^Pixels p (p/make-pixels w h)]
       (p/set-channel p 0 pc)
       (p/set-channel p 3 pa)

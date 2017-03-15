@@ -2875,7 +2875,9 @@ mathematical vectors: 2d, 3d and 4d </p>
 to mitigate approximation errors</p>
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.math.vector
   (:require [clojure2d.math :as m]))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def ^:const TOLERANCE 1.0e-6)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double TOLERANCE 1.0e-6)</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defprotocol VectorProto
   (applyf [v f])
   (magsq [v1])
@@ -2924,11 +2926,11 @@ to mitigate approximation errors</p>
   (sub [_] (Vec2. (- x) (- y)))
   (sub [_ v2]
     (let [^Vec2 v2 v2] (Vec2. (- x (.x v2)) (- y (.y v2)))))
-  (mult [_ v] (Vec2. (* x v) (* y v)))
+  (mult [_ v] (Vec2. (* x ^double v) (* y ^double v)))
   (emult [_ v] 
     (let [^Vec2 v v] (Vec2. (* x (.x v)) (* y (.y v)))))
   (div [_ v] 
-    (let [v1 (/ 1.0 v)] (Vec2. (* x v1) (* y v1))))
+    (let [v1 (/ 1.0 ^double v)] (Vec2. (* x v1) (* y v1))))
   (abs [_] (Vec2. (m/abs x) (m/abs y)))
   (mx [_] (max x y))
   (mn [_] (min x y))
@@ -2984,11 +2986,11 @@ to mitigate approximation errors</p>
   (sub [_] (Vec3. (- x) (- y) (- z)))
   (sub [_ v2]
     (let [^Vec3 v2 v2] (Vec3. (- x (.x v2)) (- y (.y v2)) (- z (.z v2)))))
-  (mult [_ v] (Vec3. (* x v) (* y v) (* z v)))
+  (mult [_ v] (Vec3. (* x ^double v) (* y ^double v) (* z ^double v)))
   (emult [_ v] 
     (let [^Vec3 v v] (Vec3. (* x (.x v)) (* y (.y v)) (* z (.z v)))))
   (div [_ v] 
-    (let [v1 (/ 1.0 v)] (Vec3. (* x v1) (*  y v1) (* z v1))))
+    (let [v1 (/ 1.0 ^double v)] (Vec3. (* x v1) (*  y v1) (* z v1))))
   (abs [_] (Vec3. (m/abs x) (m/abs y) (m/abs z)))
   (mx [_] (max x y z))
   (mn [_] (min x y z))
@@ -3090,7 +3092,7 @@ to mitigate approximation errors</p>
       (Vec3. nx ny nz)))
   (to-polar [v1]
     (let [r (mag v1)
-          zr (/ z r)
+          zr (/ z ^double r)
           theta (cond
                   (&lt;= zr -1) m/PI
                   (&gt;= zr 1) 0
@@ -3120,11 +3122,11 @@ to mitigate approximation errors</p>
   (sub [_] (Vec4. (- x) (- y) (- z) (- w)))
   (sub [_ v2] 
     (let [^Vec4 v2 v2] (Vec4. (- x (.x v2)) (- y (.y v2)) (- z (.z v2)) (- w (.w v2)))))
-  (mult [_ v] (Vec4. (* x v) (* y v) (* z v) (* w v)))
+  (mult [_ v] (Vec4. (* x ^double v) (* y ^double v) (* z ^double v) (* w ^double v)))
   (emult [_ v]
     (let [^Vec4 v v] (Vec4. (* x (.x v)) (* y (.y v)) (* z (.z v)) (* w (.w v)))))
   (div [_ v]
-    (let [v1 (/ 1.0 v)] (Vec4. (* x v1) (* y v1) (* z v1) (* w v1))))
+    (let [v1 (/ 1.0 ^double v)] (Vec4. (* x v1) (* y v1) (* z v1) (* w v1))))
   (abs [_] (Vec4. (m/abs x) (m/abs y) (m/abs z) (m/abs w)))
   (mx [_] (max x y z w))
   (mn [_] (min x y z w))
@@ -3168,8 +3170,8 @@ to mitigate approximation errors</p>
   [v len]
   (mult (normalize v) len))</pre></td></tr><tr><td class="docs"><p>Limit length of the vector by given value</p>
 </td><td class="codes"><pre class="brush: clojure">(defn limit
-  [v len]
-  (if (&gt; (magsq v) (* len len))
+  [v ^double len]
+  (if (&gt; ^double (magsq v) (* len len))
     (scale v len)
     v))</pre></td></tr><tr><td class="docs"><p>Angle between two vectors</p>
 </td><td class="codes"><pre class="brush: clojure">(defn angle-between
@@ -3177,7 +3179,7 @@ to mitigate approximation errors</p>
   (if (or (is-zero? v1) (is-zero? v2))
     0
     (let [d (dot v1 v2)
-          amt (/ d (* (mag v1) (mag v2)))]
+          amt (/ ^double d (* ^double (mag v1) ^double (mag v2)))]
       (cond
         (&lt;= amt -1) m/PI
         (&gt;= amt 1) 0
@@ -3199,10 +3201,10 @@ to mitigate approximation errors</p>
    (Vec4. (f) (f) (f) (f))))</pre></td></tr><tr><td class="docs"><p>Are vectors aligned (have the same direction)?</p>
 </td><td class="codes"><pre class="brush: clojure">(defn aligned?
   [v1 v2]
-  (&lt; (angle-between v1 v2) TOLERANCE))</pre></td></tr><tr><td class="docs"><p>flip normal</p>
+  (&lt; ^double (angle-between v1 v2) TOLERANCE))</pre></td></tr><tr><td class="docs"><p>flip normal</p>
 </td><td class="codes"><pre class="brush: clojure">(defn faceforward
   [n v]
-  (if (neg? (dot n v))
+  (if (neg? ^double (dot n v))
     n
     (sub n)))</pre></td></tr><tr><td class="docs"><p>(perpendicular (Vec3. 1 2 0) (Vec3. 4 3 0))
 (perpendicular (Vec2. 1 0))</p>
