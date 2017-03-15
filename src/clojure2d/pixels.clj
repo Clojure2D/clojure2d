@@ -14,7 +14,7 @@
 (def ^:dynamic *pixels-edge* :edge)
 
 ;; how many cores we have?
-(def ^:const ^long cores (.availableProcessors (Runtime/getRuntime)))
+(def ^:const ^long cores (inc (.availableProcessors (Runtime/getRuntime))))
 
 (defprotocol PixelsProto
   (get-value [pixels ch idx] [pixels ch x y])
@@ -84,6 +84,7 @@
     (set-value pixels ch (+ ^long x (* ^long y w)) v))
 
   (set-color [_ idx v]
+    ""
     (let [^Vec4 v v]
       (aset ^ints p ^long (pos 0 idx) (int (.x v)))
       (aset ^ints p ^long (pos 1 idx) (int (.y v)))
