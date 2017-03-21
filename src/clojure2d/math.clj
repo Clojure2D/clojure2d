@@ -1,50 +1,15 @@
-;; ## Math functions
+;; # Namespace scope
 ;;
-;; Here you can find FastMath function wrappers plus some additional functions and constants.
-;; Wrappers are made to provide Clojure functions.
+;; Collection of math function:
 ;;
-;; ### List of constants
-;;
-;; * Processing names: `PI`, `HALF_PI`, `QUARTER_PI`, `TWO_PI`, `TAU`, `E`
-;; * Small quantity: `EPSILON`
-;; * Logarithms: `LN2`, `LN10`, `LOG2E`, `LOG10E`, `INV_LOG_HALF`
-;; * Square roots: `SQRT2`, `SQRT3`, `SQRT5`, `SQRTPI`
-;; * Golden ration: `PHI`
-;; * C (math.h) constants: `M_E`, `M_LOG2E`, `M_LOG10E`, `M_LN2`, `M_LN10`, `M_PI`, `M_PI_2`, `M_PI_4`, `M_1_PI`, `M_2_PI`, `M_2_SQRTPI`, `M_SQRT2`, `M_SQRT1_2`, `M_TWOPI`, `M_3PI_4`, `M_SQRTPI`, `M_LN2LO`, `M_LN2HI`, `M_SQRT3`, `M_IVLN10`, `M_LOG2_E`, `M_INVLN2`
-;;
-;; ### Trigonometry
-;;
-;; * `sin`, `cos`, `tan`, `cot`, `set`, `csc`
-;; * `asin`, `acos`, `atan`, `acot`, `aset`, `acsc`, `atan2`
-;; * `sinh`, `cosh`, `tanh`, `coth`, `seth`, `csch`
-;; * `asinh`, `acosh`, `atanh`, `acoth`, `aseth`, `acsch`
-;; * quick/fast versions: `qsin`, `qcos` 
-;;
-;; ### Powers / Logarithms / Roots
-;;
-;; * `log`/`ln`, `log2`, `log10`, `logb`
-;; * `exp`, `pow`, `sq`/`pow2`, `pow3`
-;; * `sqrt`, `cbrt`
-;; * `hypot`
-;; * `low-2-exp` `high-2-exp`
-;; * quick/fast/safe versions: `qexp`, `qlog`, `qpow`/`fpow`, `safe-sqrt`, `qsqrt`
-;;
-;; ### Rounding
-;;
-;; * `floor`, `ceil`, `round`, `rint`
-;; * `reminder`
-;; * `abs`, `iabs`
-;;
-;; ### Other
-;;
-;; * `signum`
-;; * `constrain`
-;; * `norm`, `cnorm`
-;; * `lerp`, `cos-interpolation`
-;; * `wrap`
+;; * Several constants from Java, C, Processing, etc.
+;; * Functions based on FastMath wrapped in Clojure functions (trigonometry, powers/logartihms/roots, rounding)
+;; * Additional math functions (signum, constrain, interpolation)
+;; * Statistics
+;; * Noise and random
 
 (ns clojure2d.math
-  "FastMath wrappers + helper functions"
+  "Math functions"
   (:import [net.jafama FastMath]
            [org.apache.commons.math3.random RandomGenerator ISAACRandom JDKRandomGenerator MersenneTwister
             Well512a Well1024a Well19937a Well19937c Well44497a Well44497b]
@@ -53,7 +18,12 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-;; Bunch of math constants
+;; ## Math functions
+;;
+;; FastMath functions type hinted wrapped in processing function (to allow composition etc.).
+;; All functions operate and return `double` or in some cases `long`.
+
+;; Processing math constants
 (def ^:const ^double PI Math/PI)
 (def ^:const ^double HALF_PI (/ PI 2.0))
 (def ^:const ^double QUARTER_PI (/ PI 4.0))
@@ -64,6 +34,7 @@
 ;; Very small number \\(\varepsilon\\)
 (def ^:const ^double EPSILON 1.0e-10)
 
+;; Trigonometry
 (defn sin ^double [^double v] (FastMath/sin v))
 (defn cos ^double [^double v] (FastMath/cos v))
 (defn tan ^double [^double v] (FastMath/tan v))
@@ -77,21 +48,14 @@
 (defn acosh ^double [^double v] (FastMath/acosh v))
 (defn atanh ^double [^double v] (FastMath/atanh v))
 
-(defn exp ^double [^double v] (FastMath/exp v))
-(defn log ^double [^double v] (FastMath/log v))
-(defn log10 ^double [^double v] (FastMath/log10 v))
-
-(defn sqrt ^double [^double v] (FastMath/sqrt v))
-(defn cbrt ^double [^double v] (FastMath/cbrt v))
+;; Quick and less accurate `sin` and `cos`
+(defn qsin ^double [^double v] (FastMath/sinQuick v))
+(defn qcos ^double [^double v] (FastMath/cosQuick v))
 
 ;; Additional trigonometry functions
 (defn cot ^double [^double v] (FastMath/tan (- HALF_PI v)))
 (defn sec ^double [^double v] (/ 1.0 (FastMath/cos v)))
 (defn csc ^double [^double v] (/ 1.0 (FastMath/sin v)))
-
-;; Quick and less accurate `sin` and `cos`
-(defn qsin ^double [^double v] (FastMath/sinQuick v))
-(defn qcos ^double [^double v] (FastMath/cosQuick v))
 
 ;; Additional cyclometric functions
 (defn acot ^double [^double v] (- HALF_PI (FastMath/atan v)))
@@ -109,10 +73,19 @@
 (defn asech ^double [^double v] (FastMath/acosh (/ 1.0 v)))
 (defn acsch ^double [^double v] (FastMath/asinh (/ 1.0 v)))
 
+;; exp and log
+(defn exp ^double [^double v] (FastMath/exp v))
+(defn log ^double [^double v] (FastMath/log v))
+(defn log10 ^double [^double v] (FastMath/log10 v))
+
+;; Roots (square and cubic)
+(defn sqrt ^double [^double v] (FastMath/sqrt v))
+(defn cbrt ^double [^double v] (FastMath/cbrt v))
+
 ;; Quick version of exponential \\(e^x\\)
 (defn qexp ^double [^double v] (FastMath/expQuick v))
 
-;; Alias for logarithm
+;; Alias for natural logarithm
 (def ln log)
 
 ;; Few logarithm constants
@@ -137,6 +110,7 @@
   ^double [^double base ^double v]
   (/ (FastMath/log v) (FastMath/log base)))
 
+;; Quick logarithm
 (defn qlog ^double [^double v] (FastMath/logQuick v))
 
 ;; \\(\log_2 e\\)
@@ -238,7 +212,7 @@
   ^double [^double value]
   (cond (pos? value) 1.0
         (neg? value) -1.0
-        :else 0))
+        :else 0.0))
 
 (defn sgn
   "Return -1 when value is negative, 1 otherwise"
@@ -258,7 +232,7 @@
       value)))
 
 (defn iconstrain
-  "Clamp value between mn and mx"
+  "Clamp value between mn and mx (`long` optimized version)"
   ^long [^long value ^long mn ^long mx]
   (if (> value mx) 
     mx
@@ -277,13 +251,13 @@
      (/ (- v start) (- stop start)))))
 
 (defn make-norm
-  "Make map/norm function"
-  ([^double start ^double stop]
+  "Make type hinted map/norm function"
+  (^double [^double start ^double stop]
    (let [r (- stop start)]
        (fn ^double [^double v ^double dstart ^double dstop]
           (let [vn (/ (- v start) r)]
             (+ dstart (* (- dstop dstart) vn))))))
-  ([^double start ^double stop ^double dstart ^double dstop]
+  (^double [^double start ^double stop ^double dstart ^double dstop]
    (let [r (- stop start)]
        (fn ^double [^double v]
           (let [vn (/ (- v start) r)]
@@ -300,7 +274,7 @@
 
 ;; Linear interpolation between `start` and `stop`.
 (defn lerp
-  "Processing lerp"
+  "Lerp function (same as in Processing)"
   ^double [^double start ^double stop ^double t]
   (let [t1 (- 1.0 t)]
     (+ (* t1 start) (* t stop))))
@@ -315,7 +289,7 @@
 (defn smoothstep
   "GL smoothstep"
   ^double [^double start ^double stop ^double x]
-  (let [t ^double (norm x start stop)]
+  (let [t (norm x start stop)]
     (* t t (- 3.0 (* 2.0 t)))))
 
 ;;`(wrap 0 -1 1) => 0.0`  
@@ -336,7 +310,6 @@
            (* cycle)
            (- value)))))
 
-;;
 ;; ### Statistics
 ;;
 ;; Whole code is taken from public GIST: https://gist.github.com/scottdw/2960070
@@ -432,6 +405,7 @@
 ;; `(stats-map '(1 2 3 -1 -1 2 -1 11 111))`
 ;; `=> {:MAD 3.0, :Max 111, :Size 9, :LAV -1, :Mode -1, :Mean 14.11111111111111, :Q1 -1.0, :Q3 7.0, :Min -1, :Total 127, :SD 34.43333154064031, :UAV 3, :Median 2.0}`
 (defn stats-map
+  "Calculate several statistics from the list and return as map"
   ([vs]
      (let [sz (count vs)
            svs (sort vs)
@@ -448,8 +422,7 @@
            qd (- ^double q3 ^double q1)
            lav (lower-adjacent-value svs mdn qd)
            uav (upper-adjacent-value rsvs mdn qd)]
-       {
-        :Size sz
+       {:Size sz
         :Min mn
         :Max mx
         :Mean u
@@ -486,7 +459,7 @@
 
 ;; ## Random function wrappers
 ;; 
-;; Main goal for this namespace is to prepare various functions for various RNG algorithms.
+;; RNG wrapper for various RNG source.
 ;; As a RNG source [Apache Commons Math](http://commons.apache.org/proper/commons-math/apidocs/org/apache/commons/math3/random/package-summary.html) project was chosen.
 ;;
 ;; You get following functions:
@@ -497,7 +470,7 @@
 ;;
 ;; The concept is as follows
 ;;
-;; * create `Randomizer` protocol with more processing-like random functions for every primitive type: `int`, `long`, `float`, `double` and `boolean`. Additionally provide similar contract for Gaussian random, and boolean random with set probability (you set probability for getting `true`)
+;; * create `Randomizer` protocol with more processing-like random functions for every primitive type: `int`, `long`, `float` and `double`. Additionally provide similar contract for Gaussian random, and boolean random with set probability (you set probability for getting `true`)
 ;; * enhance every given RNG class with `Randomizer` protocol. This is done by extension of RandomGenerator interface. Every RNG from Apache Commons Math implements it.
 ;; * create factory multimethod to generate RNG object for every class
 ;;
@@ -508,8 +481,13 @@
 ;; * `:isaac` - ISAAC
 ;; * `:well512a`, `:well1024a`, `:well19937a`, `:well19937c`, `:well44497a`, `:well44497b` - several WELL variants
 
+;; Type hinted functions generating random value
 (defn next-random-value-long
-  ""
+  "Generate next long.
+
+  * arity 0 - from 0 to maximum long value
+  * arity 1 - from 0 to provided integer (excluded)
+  * arity 2 - from the provided range (included, excluded)"
   (^long [^RandomGenerator r] (.nextLong r))
   (^long [^RandomGenerator r ^long mx] (mod (.nextLong r) mx))
   (^long [r ^long mn ^long mx]
@@ -518,7 +496,11 @@
          (+ mn (next-random-value-long r diff))))))
 
 (defn next-random-value-double
-  ""
+  "Generate next double.
+
+  * arity 0 - from 0 to 1 (exluded)
+  * arity 1 - from 0 to provided double (excluded)
+  * arity 2 - from the provided range (included, excluded)"
   (^double [^RandomGenerator r] (.nextDouble r))
   (^double [^RandomGenerator r ^double mx] (* (.nextDouble r) mx))
   (^double [r ^double mn ^double mx]
@@ -527,7 +509,11 @@
          (+ mn (next-random-value-double r diff))))))
 
 (defn next-random-value-gaussian
-  ""
+  "Generate next random value from normal distribution.
+
+  * arity 0 - N(0,1)
+  * arity 1 - N(0,par)
+  * arity 2 - N(par1,par2)"
   (^double [^RandomGenerator r] (.nextGaussian r))
   (^double [^RandomGenerator r ^double mx] (* (.nextGaussian r) mx))
   (^double [r ^double mn ^double mx]
@@ -598,11 +584,11 @@
      (new ~cl (int arg#))
      (new ~cl)))
 
-;; Multimethod `make-randomizer` creates object with new set of functions
+;; Multimethod `make-randomizer` creates RNG object with new set of functions
 ;;
 ;;`(make-randomizer :well512a) => #object[org.apache.commons.math3.random.Well512a 0x1a8535ec "org.apache.commons.math3.random.Well512a@1a8535ec"]`
 ;;
-;;`(make-randomizer :aaaa 123) => #object[org.apache.commons.math3.random.JDKRandomGenerator 0x3f12abed "org.apache.commons.math3.random.JDKRandomGenerator@3f12abed"]`
+;;`(make-randomizer :default 123) => #object[org.apache.commons.math3.random.JDKRandomGenerator 0x3f12abed "org.apache.commons.math3.random.JDKRandomGenerator@3f12abed"]`
 ;;
 ;; Couple of examples
 ;;
