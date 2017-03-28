@@ -144,6 +144,8 @@ I've prepared several examples with results where you can check current state of
 * ex22 - ray-marching 3d example
 * ex23 - ray-marching 3d example (using SDF ray marching functions from extra/raymarching namespace)
 * ex24 - triangle stripe
+* ex25 - Gaussian Free Field
+* ex26 - FreeArt-Source live coding result (http://subsite.hr/2017/03/performans-silent-coding-u-okviru-izlozbe-free_art_-_source/)
 
 ## TODO
 
