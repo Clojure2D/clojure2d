@@ -140,11 +140,11 @@
     
     (->> (p/get-canvas-pixels canvas)
          (p/filter-channels p/gaussian-blur-1 nil) ;;;; change!
-         (p/compose-channels :mdodge (images frame)) ;;;; change!
+         (p/compose-channels :multiply (images frame)) ;;;; change!
 
          (sonification (* 5.0 (m/sin (/ time 45.0))) (* 5.0  (m/sin (/ time 50.0)))) ;;;; change!
          
-         (g/color-reducer-machine palette) ;;;; change!
+                                        ; (g/color-reducer-machine palette) ;;;; change!
          (p/filter-channels p/equalize-filter nil) ;;;; change!
          (p/set-canvas-pixels canvas))
 
