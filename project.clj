@@ -25,6 +25,8 @@
                                         ; [org.bytedeco/javacv-platform "1.3.2"]
                  ]
   :resource-path "resources/"
+  :codox {:output-path "docs/codox/"
+          :exclude-vars nil}
   :repl-options {:timeout 120000}
   :target-path "target/%s"
   :jvm-opts ["-Xmx4096M"
