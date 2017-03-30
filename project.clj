@@ -10,7 +10,7 @@
             [lein-cljfmt "0.5.6"]
             [lein-deps-tree "0.1.2"]
             [lein-marginalia "0.9.0"]
-            [com.jakemccrary/lein-test-refresh "0.18.1"]
+            [com.jakemccrary/lein-test-refresh "0.19.0"]
             [lein-codox "0.10.3"]]
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"
@@ -20,17 +20,18 @@
                  [org.apache.commons/commons-math3 "3.6.1"]
                  [com.flowpowered/flow-noise "1.0.0"]
                  [com.sudoplay.joise/joise "1.0.5"]
-		 [de.sciss/jwave "1.0.3"]
+                                        ;	 [de.sciss/jwave "1.0.3"]
                  [criterium "0.4.4"]
-                 [primitive-math "0.1.5"]]
+                                        ; [org.bytedeco/javacv-platform "1.3.2"]
+                 ]
   :resource-path "resources/"
   :repl-options {:timeout 120000}
   :target-path "target/%s"
   :jvm-opts ["-Xmx4096M"
-          ;   "-Dcom.sun.management.jmxremote"
-          ;   "-Dcom.sun.management.jmxremote.ssl=false"
-          ;   "-Dcom.sun.management.jmxremote.authenticate=false"
-          ;   "-Dcom.sun.management.jmxremote.port=43210"
+                                        ;   "-Dcom.sun.management.jmxremote"
+                                        ;   "-Dcom.sun.management.jmxremote.ssl=false"
+                                        ;   "-Dcom.sun.management.jmxremote.authenticate=false"
+                                        ;   "-Dcom.sun.management.jmxremote.port=43210"
              ]
   :marginalia {:javascript ["https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML"]}
   :profiles {:uberjar {:aot :all}})
