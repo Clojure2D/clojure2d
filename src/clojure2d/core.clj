@@ -622,7 +622,7 @@
   "Repaint canvas on window with set FPS.
 
   * Input: frame, is-display-running? atom, function to run before repaint, canvas and sleep time."
-  [^Canvas panel is-display-running? draw-fun buffer stime]
+  [panel is-display-running? draw-fun buffer stime]
   (loop [cnt (long 0)
          result nil]
     (let [new-result (when draw-fun (draw-fun @buffer cnt result))]
@@ -655,7 +655,7 @@
          buffer (atom canvas)
          frame (JFrame.)
          panel (create-panel buffer wname width height)]
-     (SwingUtilities/invokeLater #(build-frame frame panel is-display-running? buffer wname width height))
+     (SwingUtilities/invokeAndWait #(build-frame frame panel is-display-running? buffer wname width height))
      (future (refresh-screen-task panel is-display-running? draw-fun buffer (/ 1000.0 fps)))
      [frame is-display-running? buffer
       {:frame frame
