@@ -574,6 +574,7 @@
     (doto panel
       (.setName windowname)
       (.addMouseListener mouse-processor)
+      (.addKeyListener key-processor)
       (.addMouseMotionListener mouse-motion-processor)
       (.setIgnoreRepaint true)
       (.setPreferredSize (Dimension. width height)))))

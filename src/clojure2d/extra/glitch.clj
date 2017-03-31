@@ -250,19 +250,22 @@
                        :palette (c/make-random-palette num)})
                 0.5 {:type :colourlovers
                      :palette (rand-nth c/palettes)}
-                0.6 (let [preset (rand-nth (keys c/paletton-presets))]
+                0.6 (let [preset (rand-nth (keys c/paletton-presets))
+                          preset :pastels]
                       {:type :colourlovers-paletton
                        :preset preset
                        :palette (let [p (rand-nth c/palettes)
                                       v (map #(c/make-monochromatic-palette 
                                                (c/get-hue360 %) 
-                                               (preset c/paletton-presets)) (rand-nth c/palettes))]
+                                               (preset c/paletton-presets)) p)]
+                                  (println p)
+                                  (println (c/get-hue360 (first p)))
                                   (vec (flatten (concat v p))))})
-                (let [conf {:compl (m/brand 0.5)
-                            :angle (m/drand 5.0 90.0)
+                (let [conf {:compl (m/brand 0.6)
+                            :angle (m/drand 10.0 90.0)
                             :adj (m/brand 0.5)
                             :preset (rand-nth (keys c/paletton-presets))}
-                      t (rand-nth [:monochromatic :triad :triad :triad :tetrad :tetrad])
+                      t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
                       h (m/drand 360.0)]
                   {:type :paletton
                    :conf conf
@@ -271,10 +274,9 @@
          pal (if (m/brand 0.2)
                (update bpal :palette conj (Vec4. 0.0 0.0 0.0 255.0) (Vec4. 255.0 255.0 255.0 255.0))
                bpal)
-         pal (merge pal {:distf (rand-nth [v/dist v/dist-abs v/dist-cheb v/dist-sq])})]
+         pal (assoc pal :distf (rand-nth [v/dist v/dist-abs v/dist-cheb v/dist-sq]))]
      pal))
   ([conf p]
    (p/filter-colors (c/make-reduce-color-filter (:distf conf) (:palette conf)) p))
   ([p]
    (color-reducer-machine p (color-reducer-machine))))
-
