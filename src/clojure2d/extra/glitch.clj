@@ -256,10 +256,8 @@
                        :preset preset
                        :palette (let [p (rand-nth c/palettes)
                                       v (map #(c/make-monochromatic-palette 
-                                               (c/get-hue360 %) 
+                                               (c/paletton-rgb-to-hue %) 
                                                (preset c/paletton-presets)) p)]
-                                  (println p)
-                                  (println (c/get-hue360 (first p)))
                                   (vec (flatten (concat v p))))})
                 (let [conf {:compl (m/brand 0.6)
                             :angle (m/drand 10.0 90.0)

@@ -26,7 +26,9 @@
     (set-color canvas col)
     (rect canvas id bh box-size hh)))
 
-(defmethod key-pressed ["Palettes" \space] [_]
+(defn do-it
+  ""
+  []
   (let [fpalette (g/color-reducer-machine)
         palette (:palette fpalette)
         box-size (int (/ ww (count palette)))
@@ -40,5 +42,12 @@
       (rect 0 0 width halfh)
       (set-color 235 235 235)
       (rect 0 halfh width halfh)
-      (draw-palette values box-size))))
+      (draw-palette values box-size)))
 
+  :done)
+
+
+(defmethod key-pressed ["Palettes" \space] [_]
+  (do-it))
+
+(do-it)

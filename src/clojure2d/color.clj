@@ -1097,7 +1097,10 @@
             :b (:rg paletton-base-values)
             :f (fn ^double [^double e]
                  (if (== e 0.0) -1.0
-                       (* 0.5 (m/tan (* m/HALF_PI (/ (- 120.0 e) 120.0))))))
+                     (* 0.5 (m/tan (* m/HALF_PI (/ (- 120.0 e) 120.0))))))
+            :fi (fn ^double [^double e]
+                  (if (== e -1.0) 0.0
+                      (- 120.0 (* 2.0 (/ (* (m/atan (/ e 0.5)) 120.0) m/PI)))))
             :g s
             :rgb (fn [e n r] (Vec4. e n r 255.0))}
      180.0 {:a (:rg paletton-base-values)
@@ -1105,6 +1108,9 @@
             :f (fn ^double [^double e]
                  (if (== e 180.0) -1.0
                      (* 0.5 (m/tan (* m/HALF_PI (/ (- e 120.0) 60.0))))))
+            :fi (fn ^double [^double e]
+                  (if (== e -1.0) 180.0
+                      (+ 120.0 (* 2.0 (/ (* (m/atan (/ e 0.5)) 60.0) m/PI)))))
             :g i
             :rgb (fn [e n r] (Vec4. n e r 255.0))}
      
@@ -1113,6 +1119,9 @@
             :f (fn ^double [^double e]
                  (if (== e 180.0) -1.0
                      (* 0.75 (m/tan (* m/HALF_PI (/ (- 210.0 e) 30.0))))))
+            :fi (fn ^double [^double e]
+                  (if (== e -1.0) 180.0
+                      (- 210 (* 2.0 (/ (* (m/atan (/ e 0.75)) 30.0) m/PI)))))
             :g s
             :rgb (fn [e n r] (Vec4. r e n 255.0))}
      255.0 {:a (:gb paletton-base-values)
@@ -1120,6 +1129,9 @@
             :f (fn ^double [^double e]
                  (if (== e 255.0) -1.0
                      (* 1.33 (m/tan (* m/HALF_PI (/ (- e 210.0) 45.0))))))
+            :fi (fn ^double [^double e]
+                  (if (== e -1.0) 255.0
+                      (+ 210.0 (* 2.0 (/ (* (m/atan (/ e 1.33)) 45.0) m/PI)))))
             :g i
             :rgb (fn [e n r] (Vec4. r n e 255.0))}
      
@@ -1128,6 +1140,9 @@
             :f (fn ^double [^double e]
                  (if (== e 255.0) -1.0
                      (* 1.33 (m/tan (* m/HALF_PI (/ (- 315.0 e) 60.0))))))
+            :fi (fn ^double [^double e]
+                  (if (== e -1.0) 255.0
+                      (- 315.0 (* 2.0 (/ (* (m/atan (/ e 1.33)) 60.0) m/PI)))))
             :g s
             :rgb (fn [e n r] (Vec4. n r e 255.0))}
      360.0 {:a (:br paletton-base-values)
@@ -1135,6 +1150,9 @@
             :f (fn ^double [^double e]
                  (if (== e 0.0) -1.0
                      (* 1.33 (m/tan (* m/HALF_PI (/ (- e 315.0) 45.0))))))
+            :fi (fn ^double [^double e]
+                  (if (== e -1.0) 0.0
+                      (+ 315.0 (* 2.0 (/ (* (m/atan (/ e 1.33)) 45.0) m/PI)))))
             :g i
             :rgb (fn [e n r] (Vec4. e r n 255.0))}}))
 
@@ -1145,8 +1163,8 @@
         kv (m/constrain kv 0.0 2.0)
         ^double h (mod hue 360.0)
         upd (fn ^double [^double e ^double t] (if (<= t 1.0)
-                        (* e t)
-                        (+ e (* (- 1.0 e) (dec t)))))
+                                                (* e t)
+                                                (+ e (* (- 1.0 e) (dec t)))))
         {:keys [a b f g rgb]} (second (first (filter #(< h ^double (% 0)) paletton-base-data)))
         av (second a)
         bv (second b)
@@ -1161,6 +1179,30 @@
               (/ (+ r (* n b)) (inc n)))]
     (rgb r g b)))
 
+(defn paletton-rgb-to-hue
+  ""
+  ([^double r ^double g ^double b]
+   (if (== r g b)
+     (Vec4. 0.0 0.0 (get-luma3 (Vec3. r g b)) 255.0)
+     (let [f (max r g b)
+           p (min r g b)
+           [l i] (if (== f r)
+                   (if (== p b)
+                     [g (:fi (paletton-base-data 120.0))]
+                     [b (:fi (paletton-base-data 360.0))])
+                   (if (== f g)
+                     (if (== p r)
+                       [b (:fi (paletton-base-data 210.0))]
+                       [r (:fi (paletton-base-data 180.0))])
+                     (if (== p r)
+                       [g (:fi (paletton-base-data 255.0))]
+                       [r (:fi (paletton-base-data 315.0))])))
+                                        ;d (/ (- f p) f) ;; saturation
+                                        ;v (/ f 255.0)   ;; value
+           s (i (if (== l p) -1.0
+                    (/ (- f l) (- l p))))]
+       s)))
+  ([^Vec4 c] (paletton-rgb-to-hue (.x c) (.y c) (.z c))))
 
 (def paletton-presets
   {:pale-light [[0.24649 1.78676] [0.09956 1.95603] [0.17209 1.88583] [0.32122 1.65929] [0.39549 1.50186]]
