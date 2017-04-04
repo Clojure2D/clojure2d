@@ -251,23 +251,25 @@
                 0.5 {:type :colourlovers
                      :palette (rand-nth c/palettes)}
                 0.6 (let [preset (rand-nth (keys c/paletton-presets))
-                          preset :pastels]
+                          p (rand-nth c/palettes)
+                          h (mapv #(c/paletton-rgb-to-hue %) p)]
                       {:type :colourlovers-paletton
-                       :preset preset
-                       :palette (let [p (rand-nth c/palettes)
-                                      v (map #(c/make-monochromatic-palette 
-                                               (c/paletton-rgb-to-hue %) 
-                                               (preset c/paletton-presets)) p)]
+                       :conf {:hue h
+                              :preset preset
+                              :type :monochromatic
+                              :compl false}
+                       :palette (let [v (map #(c/make-monochromatic-palette % (preset c/paletton-presets)) h)]
                                   (vec (flatten (concat v p))))})
-                (let [conf {:compl (m/brand 0.6)
+                (let [h (m/drand 360.0)
+                      t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
+                      conf {:compl (m/brand 0.6)
                             :angle (m/drand 10.0 90.0)
                             :adj (m/brand 0.5)
-                            :preset (rand-nth (keys c/paletton-presets))}
-                      t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
-                      h (m/drand 360.0)]
+                            :hue h
+                            :preset (rand-nth (keys c/paletton-presets))
+                            :type t}]
                   {:type :paletton
                    :conf conf
-                   :hue h
                    :palette (c/paletton-palette t h conf)}))
          pal (if (m/brand 0.2)
                (update bpal :palette conj (Vec4. 0.0 0.0 0.0 255.0) (Vec4. 255.0 255.0 255.0 255.0))

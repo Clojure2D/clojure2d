@@ -20,6 +20,7 @@
                  [org.apache.commons/commons-math3 "3.6.1"]
                  [com.flowpowered/flow-noise "1.0.0"]
                  [com.sudoplay.joise/joise "1.0.5"]
+                 [net.littleredcomputer/sicmutils "0.9.8"]
                                         ;	 [de.sciss/jwave "1.0.3"]
                  [criterium "0.4.4"]
                                         ; [org.bytedeco/javacv-platform "1.3.2"]

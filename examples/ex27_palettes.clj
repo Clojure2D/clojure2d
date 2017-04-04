@@ -36,15 +36,16 @@
                             palette)]
     (println (str "Type: " (:type fpalette))) 
     (println (str "Size: " (count palette)))
+    (println (str "Conf: " (:conf fpalette)))
     
     (with-canvas canvas
       (set-color 20 20 20)
       (rect 0 0 width halfh)
       (set-color 235 235 235)
       (rect 0 halfh width halfh)
-      (draw-palette values box-size)))
+      (draw-palette values box-size))
 
-  :done)
+    fpalette))
 
 
 (defmethod key-pressed ["Palettes" \space] [_]

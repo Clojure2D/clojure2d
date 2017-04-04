@@ -1025,7 +1025,7 @@
 ;;;; read 200 palettes from colourlovers
 ;;
 
-(defn- hex-to-vec
+(defn hex-to-vec
   ""
   [s]
   (let [x (Long/parseLong s 16)
@@ -1034,10 +1034,10 @@
         x3 (bit-and 0xff x)]
     (Vec4. x1 x2 x3 255)))
 
-(defn- hex-to-vecs
+(defn hex-to-vecs
   ""
   [xs]
-  (vec (map hex-to-vec xs)))
+  (mapv hex-to-vec xs))
 
 (def palettes
   (let [p1 (xml/parse (io/file (io/resource "colourlovers1.xml")))
@@ -1050,7 +1050,7 @@
                                                                 :content))) (range 100)))
         l1 (f p1)
         l2 (f p2)]
-    (vec (map hex-to-vecs (concat l1 l2)))))
+    (mapv hex-to-vecs (concat l1 l2))))
 
 ;; 
 
@@ -1078,7 +1078,7 @@
         c (v/generate-vec3 (partial m/drand 2))
         d (v/generate-vec3 m/drand)
         f (create-palette-fn a b c d)]
-    (vec (map f (range 0.0 1.0 (/ 1.0 num))))))
+    (mapv f (range 0.0 1.0 (/ 1.0 num)))))
 
 ;; paletton palettes
 
@@ -1181,7 +1181,7 @@
 
 (defn paletton-rgb-to-hue
   ""
-  ([^double r ^double g ^double b]
+  (^double [^double r ^double g ^double b]
    (if (== r g b)
      (Vec4. 0.0 0.0 (get-luma3 (Vec3. r g b)) 255.0)
      (let [f (max r g b)
@@ -1235,7 +1235,7 @@
 (defn make-monochromatic-palette
   ""
   [hue preset]
-  (vec (map (fn [[ks kv]] (paletton-hsv-to-rgb hue ks kv)) preset)))
+  (mapv (fn [[ks kv]] (paletton-hsv-to-rgb hue ks kv)) preset))
 
 (defmulti paletton-palette (fn [m hue & conf] m))
 
