@@ -29,9 +29,7 @@
 (def ^:const ^double simulation-time 10.0) ; time of simulation (it's not animation time)
 (def ^:const ^double speed 0.5) ; simulation speed, set to 1.0 to have real time animation
 
-
 (do
-
   ;; precalculated parameters
   (def ^:const ^double len1 len)
   (def ^:const ^double len2 (- 1.0 len))
@@ -48,7 +46,7 @@
   (defn observe
     "StepHandler callback function (see org.apache.commons.math3.ode.nonstiff.GraggBulirschStoerIntegrator)"
     [_ ^Struct state]
-    (let [[a0 a1] (ss/structure->vector ((.v state) 1)) ;; current position (angles)
+    (let [[_ [a0 a1] _] state ;; current position (angles)
           ;; polar to cartesian
           posx1 (+ 300.0 (* l1 (m/sin a0)))
           posy1 (+ 300.0 (* l1 (m/cos a0)))
