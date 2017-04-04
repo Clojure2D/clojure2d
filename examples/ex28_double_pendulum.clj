@@ -6,8 +6,7 @@
   (:require [sicmutils.examples.double-pendulum :refer :all]
             [sicmutils.structure :as ss]
             [clojure2d.core :refer :all]
-            [clojure2d.math :as m])
-  (:import [sicmutils.structure Struct]))
+            [clojure2d.math :as m]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -45,7 +44,7 @@
 
   (defn observe
     "StepHandler callback function (see org.apache.commons.math3.ode.nonstiff.GraggBulirschStoerIntegrator)"
-    [_ ^Struct state]
+    [_ state]
     (let [[_ [a0 a1] _] state ;; current position (angles)
           ;; polar to cartesian
           posx1 (+ 300.0 (* l1 (m/sin a0)))

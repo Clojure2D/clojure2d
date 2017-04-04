@@ -148,6 +148,7 @@ I've prepared several examples with results where you can check current state of
 * ex26 - FreeArt-Source live coding result (http://subsite.hr/2017/03/performans-silent-coding-u-okviru-izlozbe-free_art_-_source/)
 * ex27 - color palette generator
 * ex28 - double pendulum (with https://github.com/littleredcomputer/sicmutils/blob/master/src/sicmutils/examples/double_pendulum.clj)
+* ex29 - 2d chaotic maps
 
 ## TODO
 
