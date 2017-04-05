@@ -5,8 +5,9 @@
 (ns examples.ex28-double-pendulum 
   (:require [sicmutils.examples.double-pendulum :refer :all]
             [sicmutils.structure :as ss]
-            [clojure2d.core :refer :all]
-            [clojure2d.math :as m]))
+            [clojure2d.core :refer :all] 
+            [clojure2d.math :as m]
+            [clojure2d.math.random :as r]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -24,7 +25,7 @@
 (def ^:const ^double mass1 4) ; mass of the first ball
 (def ^:const ^double mass2 10) ; mass of the second ball
 (def ^:const ^double theta (- m/PI 0.1)) ; angle of the first rod
-(def ^:const ^double phi (m/drand m/TWO_PI)) ; angle of the second rod
+(def ^:const ^double phi (r/drand m/TWO_PI)) ; angle of the second rod
 (def ^:const ^double simulation-time 10.0) ; time of simulation (it's not animation time)
 (def ^:const ^double speed 0.5) ; simulation speed, set to 1.0 to have real time animation
 

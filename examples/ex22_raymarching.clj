@@ -6,11 +6,11 @@
 (ns examples.ex22-raymarching
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
+            [clojure2d.math.random :refer :all]
             [clojure2d.math.vector :as v]
             [clojure2d.color :as c]
             [clojure2d.extra.variations :as var])
-  (:import [clojure2d.math.vector Vec2 Vec3]
-           [java.awt Color]))
+  (:import [clojure2d.math.vector Vec2 Vec3]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -93,7 +93,7 @@
   ""
   [^double x ^double y]
   (let [^Vec2 v (terrain-f (Vec2. (+ x 0.5) y))]
-    (* 3.5 ^double (m/noise (* 0.08 (.x v)) (* 0.08 (.y v))))))
+    (* 3.5 ^double (noise (* 0.08 (.x v)) (* 0.08 (.y v))))))
 
 (defn normal
   ""

@@ -2,7 +2,8 @@
   (:require [clojure2d.core :as core]
             [clojure2d.pixels :as p]
             [clojure2d.color :as c]
-            [clojure2d.math :as m])
+            [clojure2d.math :as m]
+            [clojure2d.math.random :as r])
   (:import [java.awt.image BufferedImage]
            [java.awt Color]
            [clojure2d.pixels Pixels]))
@@ -23,15 +24,15 @@
   ""
   [canvas ^long w ^long h]
   (dorun 
-     (for [y (range 0 h 3)]
-       (let [y+ (inc ^long y)
-             y++ (inc y+)]
-         (core/set-color canvas (Color. (int (m/irand 180 200)) 0 0 42))
-         (core/line canvas 0 y w y)
-         (core/set-color canvas (Color. 0 (int (m/irand 180 200)) 0 42))
-         (core/line canvas 0 y+ w y+)
-         (core/set-color canvas (Color. 0 0 (int  (m/irand 180 200)) 42))
-         (core/line canvas 0 y++ w y++))))
+   (for [y (range 0 h 3)]
+     (let [y+ (inc ^long y)
+           y++ (inc y+)]
+       (core/set-color canvas (r/irand 180 200) 0 0 42)
+       (core/line canvas 0 y w y)
+       (core/set-color canvas 0 (r/irand 180 200) 0 42)
+       (core/line canvas 0 y+ w y+)
+       (core/set-color canvas 0 0 (r/irand 180 200) 42)
+       (core/line canvas 0 y++ w y++))))
   canvas)
 
 (defn render-rgb-scanlines
@@ -60,7 +61,7 @@
   ""
   [alpha w h]
   (let [fc (fn [v] 
-            (c/clamp255 (+ 100.0 (* 20.0 ^double (m/grand)))))
+             (c/clamp255 (+ 100.0 (* 20.0 ^double (r/grand)))))
         fa (fn [v] alpha)
         ^Pixels p (p/filter-channels (partial p/filter-channel fc) nil nil (partial p/filter-channel fa) (p/make-pixels w h))]
     (p/set-channel p 1 (p/get-channel p 0))
@@ -90,16 +91,16 @@
         ^ints pc (int-array size)
         ^ints pa (int-array size)
         alphas (/ alpha 255.0)]
-    (dorun (repeatedly (m/irand limita limitb)
-                       #(let [^int i (m/irand 10 (- w 10))
-                              ^int j (m/irand 10 (- h 10))]
-                          (dorun (for [^int m (range i (+ i ^int (m/irand 1 8)))
-                                       ^int n (range (- j ^int (m/irand 6)) (+ j ^int (m/irand 1 6)))]
-                                   (let [bc (-> ^double (m/grand)
+    (dorun (repeatedly (r/irand limita limitb)
+                       #(let [^int i (r/irand 10 (- w 10))
+                              ^int j (r/irand 10 (- h 10))]
+                          (dorun (for [^int m (range i (+ i ^int (r/irand 1 8)))
+                                       ^int n (range (- j ^int (r/irand 6)) (+ j ^int (r/irand 1 6)))]
+                                   (let [bc (-> ^double (r/grand)
                                                 (* 40.0)
                                                 (+ basecolor)
                                                 (int))
-                                         a (-> ^double (m/grand)
+                                         a (-> ^double (r/grand)
                                                (* 30.0)
                                                (+ 180.0)
                                                (m/constrain 0.0 255.0)

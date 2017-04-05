@@ -1,12 +1,12 @@
 (ns examples.ex23-raymarching2
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
+            [clojure2d.math.random :refer :all]
             [clojure2d.math.vector :as v]
             [clojure2d.color :as c]
             [clojure2d.extra.raymarching :as r])
   (:import [clojure2d.math.vector Vec2 Vec3]
-           [clojure2d.extra.raymarching HitData Material]
-           [java.awt Color]))
+           [clojure2d.extra.raymarching HitData Material]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -45,7 +45,7 @@
   (defn fn-plane
     ""
     [^Vec3 p]
-    (let [v (- (* 1.5 ^double (m/noise (* 0.06 (.x p)) (* 0.06 (.z p)))) 1.5)]
+    (let [v (- (* 1.5 ^double (noise (* 0.06 (.x p)) (* 0.06 (.z p)))) 1.5)]
       (HitData. (- (.y p) v) m1)))
 
   ;; scene
@@ -69,7 +69,7 @@
   (def light1-fn (r/make-light light1 scene (Vec3. 1.0 1.0 1.0) (Vec3. 1.0 1.0 1.0) 0.1))
   (def light2-fn (r/make-light light2 scene (Vec3. 1.0 1.0 1.0) (Vec3. 1.0 1.0 1.0) 0.1))
   
-    ;; fog
+  ;; fog
   (def fog (r/make-distance-fog (.color bg) -0.01))
 
   (defn calc-color
@@ -110,5 +110,5 @@
             (rect canvas x y 1 1)))))))
 
 (with-canvas canvas
-  (set-background Color/black)
+  (set-background 0 0 0)
   (do-it))

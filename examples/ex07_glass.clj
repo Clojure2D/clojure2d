@@ -1,6 +1,7 @@
 (ns examples.ex07-glass
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
+            [clojure2d.math.random :as r]
             [clojure2d.math.vector :as v]
             [clojure2d.extra.variations :as vr]
             [clojure2d.color :as c])
@@ -12,7 +13,7 @@
 (defn create-field
   ""
   []
-  (let [one-field? (m/brand 0.5)
+  (let [one-field? (r/brand 0.5)
         field-name1 (rand-nth vr/variation-list-not-random)
         field-name2 (rand-nth vr/variation-list-not-random)
         field (if one-field?
@@ -34,8 +35,8 @@
         (let [xt (/ (- x ww) 120.0)
               yt (/ (- y hw) 120.0)
               ^Vec2 n (field (Vec2. xt yt))
-              n1 (m/noise (.x n) (.y n))
-              n2 (m/noise (.y n) (.x n) 0.3)
+              n1 (r/noise (.x n) (.y n))
+              n2 (r/noise (.y n) (.x n) 0.3)
               v1 (m/constrain n1 0 1)
               v2 (m/constrain n2 0 1)]
           (set-color canvas (c/make-color (* 255.0 v1 v1) (* 255.0 v1 v2) (* 255.0 v2)))
@@ -51,12 +52,11 @@
         [_ disp] (show-window canvas "glass" 800 800 25)]
 
     (defmethod key-pressed ["glass" \space] [_]
-      (let [r (to-hex (m/irand) 8)]
-        (save-canvas canvas (str "results/ex07/" r ".jpg"))))
+      (save-canvas canvas (next-filename "results/ex07/" ".jpg")))
 
 
     (with-canvas canvas
-      (set-background (Color. 200 200 210))
+      (set-background 200 200 210)
       (draw-glass disp 800 800)))
   :done)
 

@@ -3,11 +3,11 @@
 (ns examples.ex21-popcorn
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
+            [clojure2d.math.random :as r]
             [clojure2d.math.vector :as v]
             [clojure2d.extra.variations :refer :all]
             [clojure2d.math.joise :as j])
-  (:import  [java.awt Color]
-            [clojure2d.math.vector Vec2]))
+  (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -22,8 +22,8 @@
 (defn make-particle
   ""
   []
-  (let [^double r (m/drand 0.5 m/TWO_PI)
-        ^double a (m/drand m/TWO_PI)]
+  (let [^double r (r/drand 0.5 m/TWO_PI)
+        ^double a (r/drand m/TWO_PI)]
     (Vec2. (* r (m/qcos a)) (* r (m/qsin a)))))
 
 (def sinusoidal (make-variation :sinusoidal 1.0 {}))
@@ -42,10 +42,7 @@
         screeny (m/norm ny -8.0 8.0 0 height)]
     (if (and (<= 40 screeny (- height 41)) (<= 40 screenx (- width 41)))
       (do
-        (with-canvas canvas
-          (set-color (Color. 49 52 59 alpha))
-          (set-stroke point-size)
-          (point screenx screeny))
+        (point canvas screenx screeny)
         (Vec2. nx ny))
       (make-particle))))
 
@@ -56,8 +53,8 @@
         b [j/make-random-basis-module
            j/make-random-basis-module
            j/make-random-cell-module]
-        l (m/drand 1 3)
-        f (m/drand 1 3)
+        l (r/drand 1 3)
+        f (r/drand 1 3)
         params {:type type
                 :lacunarity l
                 :frequency f
@@ -72,32 +69,38 @@
     (Vec2. (- ^double (f (.x in) (.y in)) 0.5)
            (- ^double (f (.y in) (.x in) 0.3) 0.5))))
 
+(defn go-for-it
+  ""
+  [canvas particles running mv-fun]
+  (loop [xs particles]
+    (when @running
+      (recur (mapv mv-fun xs))))
+  canvas)
+
+
 (defn example-21
   []
   (let [canvas (create-canvas width height)
         [frame running] (show-window canvas "popcorn" width height 25)
         variation1 (rand-nth variation-list-not-random)
         variation2 (rand-nth variation-list-not-random)
-        vrand (Vec2. (m/drand -1 1) (m/drand -1 1))
-        noisef (if (m/brand 0.2) (partial get-noise (make-random-noise)) (fn [_] (Vec2. 0.0 0.0)))
+        vrand (Vec2. (r/drand -1 1) (r/drand -1 1))
+        noisef (if (r/brand 0.2) (partial get-noise (make-random-noise)) (fn [_] (Vec2. 0.0 0.0)))
         mv-fun (partial move-particle canvas vrand noisef (comp (make-variation variation2 1.0 {}) (make-variation variation1 1.0 {})))
         
-        particles (vec (repeatedly 15000 make-particle))]
+        particles (repeatedly 15000 make-particle)]
     
     (defmethod key-pressed ["popcorn" \space] [_]
       (binding [*jpeg-image-quality* 0.9]
-        (save-canvas canvas (str (next-filename "results/ex21/") ".jpg"))))
+        (save-canvas canvas (next-filename "results/ex21/" ".jpg"))))
 
     (with-canvas canvas
-      (set-background (Color. 240 240 240)))
+      (set-background 240 240 240)
+      (set-color 49 52 59 alpha)
+      (set-stroke point-size)
+      (go-for-it particles running mv-fun))
 
-    (println (str variation1 " " variation2))
-
-    (loop [xs particles]
-      (when @running
-        (recur (mapv mv-fun xs))))
-    
-    ))
+    (println (str variation1 " " variation2))))
 
 (example-21)
 

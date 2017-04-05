@@ -5,18 +5,19 @@
 (ns examples.ex25-gff
   "Gaussian Free Field" 
   (:require [clojure2d.core :refer :all]
-            [clojure2d.math :as m])
+            [clojure2d.math :as m]
+            [clojure2d.math.random :as r])
   (:import [java.awt Color]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
 ;; size of discrete gaussian free field grid (grid of size gff-size x gff-size)
-(def ^:const ^int gff-size (m/irand 5 100))
+(def ^:const ^int gff-size (r/irand 5 100))
 (def ^:const ^int rays 75)
 (def ^:const ^double rsteps (/ m/TWO_PI rays))
 
-(defn gff-rows [] (vec (repeatedly gff-size m/grand)))
+(defn gff-rows [] (vec (repeatedly gff-size r/grand)))
 (def gff (vec (repeatedly gff-size gff-rows)))
 
 (def ^:const ^int width 800)

@@ -1,6 +1,7 @@
 (ns examples.ex05-particles
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
+            [clojure2d.math.random :as r]
             [clojure2d.math.vector :as v]
             [clojure2d.math.joise :as n]
             [clojure2d.extra.variations :refer :all])
@@ -22,7 +23,7 @@
 (defn make-particle
   ""
   []
-  (Vec2. (m/drand width) (m/drand height)))
+  (Vec2. (r/drand width) (r/drand height)))
 
 (defn move-particle
   ""
@@ -35,11 +36,11 @@
         ang (* n m/TWO_PI angle-mult)
         nx (+ (.x in) (* point-step (m/qcos ang)))
         ny (+ (.y in) (* point-step (m/qsin ang)))
-        col (int (m/cnorm (m/sqrt n) 0 1 100 250))]
+        col (m/cnorm (m/sqrt n) 0 1 100 250)]
     (if (and (<= 80 ny (- height 81)) (<= 80 nx (- width 81)))
       (do
         (with-canvas canvas
-          (set-color (Color. col col col alpha))
+          (set-color col col col alpha)
           (set-stroke point-size)
                                         ;      (line (.x in) (.y in) nx ny)
           (point nx ny))
@@ -53,15 +54,14 @@
         noise (n/make-random-fractal)
         variation1 (rand-nth variation-list-not-random)
         variation2 (rand-nth variation-list-not-random)
-        vrand (Vec2. (m/drand -1 1) (m/drand -1 1))
+        vrand (Vec2. (r/drand -1 1) (r/drand -1 1))
         compv (make-variation :erf 1.0 {})
         mv-fun (partial move-particle canvas vrand (comp (make-variation variation2 1.0 {}) (make-variation variation1 1.0 {})) noise)
         
         particles (vec (repeatedly 25000 make-particle))]
     
     (defmethod key-pressed ["particles" \space] [_]
-      (let [r (to-hex (m/irand) 8)]
-    (save-canvas canvas (str "results/ex05/" r ".jpg"))))
+      (save-canvas canvas (next-filename "results/ex05/" ".jpg")))
 
     (println (str variation1 " " variation2))
 

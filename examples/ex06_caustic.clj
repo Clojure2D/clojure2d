@@ -1,10 +1,10 @@
 (ns examples.ex06-caustic
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
+            [clojure2d.math.random :as r]
             [clojure2d.math.vector :as v]
             [clojure2d.extra.variations :as vr])
-  (:import [clojure2d.math.vector Vec2]
-           [java.awt Color]))
+  (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -18,7 +18,7 @@
 (defn create-field
   ""
   []
-  (let [one-field? (m/brand 0.5)
+  (let [one-field? (r/brand 0.5)
         field-name1 (rand-nth vr/variation-list-not-random)
         field-name2 (rand-nth vr/variation-list-not-random)
         field (if one-field?
@@ -44,7 +44,7 @@
               ^double hy (m/norm (- y hh) (- hh) hh min-range max-range)
               hhx (* tilt-scale hx)
               hhy (* tilt-scale hy)
-              delta (* delta-scale ^double (m/norm (m/noise hx hy) 0 1 -1 1))
+              delta (* delta-scale ^double (m/norm (r/noise hx hy) 0 1 -1 1))
               ^Vec2 v1 (field (Vec2. (- hhx delta) (- hhy delta)))
               ^Vec2 v2 (field (Vec2. (+ hhx delta) (+ hhy delta)))
               dx (* d (- (.x v1) (.x v2)))
@@ -61,12 +61,11 @@
         [_ disp] (show-window canvas "caustic" 800 800 25)]
 
     (defmethod key-pressed ["caustic" \space] [_]
-      (let [r (to-hex (m/irand) 8)]
-        (save-canvas canvas (str "results/ex06/" r ".jpg"))))
+      (save-canvas canvas (next-filename "results/ex06/" ".jpg")))
 
     (with-canvas canvas
-      (set-color (Color. 10 20 40 30))
-      (set-background (Color. 200 200 210))
+      (set-color 10 20 40 30)
+      (set-background 200 200 210)
       (draw-caustic disp 800 800)))
   :done)
 

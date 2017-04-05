@@ -1,6 +1,7 @@
 (ns clojure2d.color
   (:require [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
+            [clojure2d.math.random :as r]
             [clojure.xml :as xml]
             [clojure.java.io :as io])
   (:import [clojure2d.math.vector Vec4 Vec3]
@@ -1073,10 +1074,10 @@
 (defn make-random-palette
   ""
   [^long num]
-  (let [a (v/generate-vec3 (partial m/drand 0.3 0.7))
+  (let [a (v/generate-vec3 (partial r/drand 0.3 0.7))
         b (v/sub (Vec3. 1.0 1.0 1.1) a)
-        c (v/generate-vec3 (partial m/drand 2))
-        d (v/generate-vec3 m/drand)
+        c (v/generate-vec3 (partial r/drand 2))
+        d (v/generate-vec3 r/drand)
         f (create-palette-fn a b c d)]
     (mapv f (range 0.0 1.0 (/ 1.0 num)))))
 

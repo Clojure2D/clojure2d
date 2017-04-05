@@ -3,6 +3,7 @@
 (ns clojure2d.extra.segmentation
   (:require [clojure2d.core :as core]
             [clojure2d.math :as m]
+            [clojure2d.math.random :as r]
             [clojure2d.pixels :as p])
   (:import [clojure2d.pixels Pixels]))
 
@@ -20,8 +21,8 @@
      (loop [A 0.0
             Q 0.0
             k 1]
-       (let [^int posx (m/irand w)
-             ^int posy (m/irand h)
+       (let [^int posx (r/irand w)
+             ^int posy (r/irand h)
              xk (double (p/get-value pixels ch (+ sx posx) (+ sy posy)))
              newA (+ A (/ (- xk A) k))
              newQ (+ Q (* (- xk A) (- xk newA)) )]

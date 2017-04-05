@@ -3,6 +3,7 @@
 (ns examples.ex14-metaballs
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
+            [clojure2d.math.random :as r]
             [clojure2d.color :as c]
             [clojure2d.math.vector :as v])
   (:import [java.awt Color]
@@ -18,12 +19,12 @@
 (defn make-ball
   ""
   ^Ball []
-  (Ball. (m/irand SIZE)
-         (m/irand SIZE)
-         (m/irand 1 7)
-         (m/irand 1 7)
-         (m/irand 40 55)
-         (Vec3. (m/drand 255) (m/drand 255) (m/drand 255))))
+  (Ball. (r/irand SIZE)
+         (r/irand SIZE)
+         (r/irand 1 7)
+         (r/irand 1 7)
+         (r/irand 40 55)
+         (Vec3. (r/drand 255) (r/drand 255) (r/drand 255))))
 
 (defn direction
   ""
@@ -85,4 +86,4 @@
     (show-window canvas "metaballs" SIZE SIZE 25 (partial draw-balls n)))
   :done)
 
-(example-14 (m/irand 2 6))
+(example-14 (r/irand 2 6))

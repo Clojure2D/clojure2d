@@ -1,6 +1,7 @@
 (ns examples.ex29-explore-map
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
+            [clojure2d.math.random :as r]
             [clojure2d.math.complex :as c])
   (:import [clojure2d.math.complex Complex]))
 
@@ -12,7 +13,7 @@
 
 (defmethod key-pressed ["Explore map" \space] [_]
   (binding [*jpeg-image-quality* 0.9]
-    (save-canvas canvas (str (next-filename "results/ex29/") ".jpg"))))
+    (save-canvas canvas (next-filename "results/ex29/" ".jpg"))))
 
 (defn make-standard-map
   "Standard Map"
@@ -87,9 +88,9 @@
   [canvas [rmin rmax ^double step] [rminx rmaxx rminy rmaxy] scale f]
   (set-background canvas 10 10 10)
   (set-color canvas 240 240 240 20)
-  (doseq [o (map #(+ (* 2.0 step ^double (m/grand)) ^double %) (range rmin rmax step))]
+  (doseq [o (map #(+ (* 2.0 step ^double (r/grand)) ^double %) (range rmin rmax step))]
     (draw-map-position canvas o o scale f) ;; initial point on diagonal line
-    (draw-map-position canvas (m/drand rmin rmax) (m/drand rmin rmax) scale f))) ;; random initial point
+    (draw-map-position canvas (r/drand rmin rmax) (r/drand rmin rmax) scale f))) ;; random initial point
 
 (def maps {:standard-map [[0 m/TWO_PI 0.015] [0.0 m/TWO_PI 0.0 m/TWO_PI] [0.0 m/TWO_PI 0.0 m/TWO_PI]
                           make-standard-map [[-5 5]]]
@@ -106,7 +107,7 @@
 
 (let [random-map (rand-nth (keys maps))
       [steps r scale f pars] (random-map maps)
-      rpars (map #(apply m/drand %) pars)]
+      rpars (map #(apply r/drand %) pars)]
   (println random-map)
   (println rpars)
   (with-canvas canvas

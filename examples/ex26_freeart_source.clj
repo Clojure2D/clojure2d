@@ -20,6 +20,7 @@
 (ns examples-ex26-freeart-source
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
+            [clojure2d.math.random :as r]
             [clojure2d.pixels :as p]
             [clojure2d.extra.overlays :as o]
             [clojure2d.extra.glitch :as g]
@@ -130,11 +131,11 @@
 
     (set-color canvas color (- 255 color) 11 200) ;;;; change!
     (dotimes [x width]
-      (let [^double n (m/noise (/ frame 100.0) (/ frame 200.0) (/ x 20.0))] ;;;; change!
+      (let [^double n (r/noise (/ frame 100.0) (/ frame 200.0) (/ x 20.0))] ;;;; change!
         (when (> n 0.636) ;;;; change!
           (line canvas x 0 x height))))
 
-    (doseq [[x y size] (filter (fn [_] (m/brand 0.985)) (segments frame))] ;;;; change!
+    (doseq [[x y size] (filter (fn [_] (r/brand 0.985)) (segments frame))] ;;;; change!
       (set-color canvas (p/get-color (images frame) x y))
       (ellipse canvas x y size size)) ;;;; change! (use rect)
     

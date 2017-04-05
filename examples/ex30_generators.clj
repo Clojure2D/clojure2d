@@ -4,6 +4,7 @@
 (ns examples.ex30-generators
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
+            [clojure2d.math.random :as r]
             [clojure2d.math.vector :as v])
   (:import [clojure2d.math.vector Vec2]))
 
@@ -20,7 +21,7 @@
 (defn draw-random-rect
   "Draw random rectangle from dots from random sequence"
   [canvas s posx posy scale num]
-  (let [generator (m/make-sequence-generator s 2)
+  (let [generator (r/make-sequence-generator s 2)
         transformed (map #(v/mult % scale) (generator))]
     (doseq [^Vec2 v (take num transformed)]
       (ellipse canvas (+ ^double posx (.x v)) (+ ^double posy (.y v)) 3 3)))

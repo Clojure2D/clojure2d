@@ -3,11 +3,11 @@
 (ns examples.ex09-curvature
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
+            [clojure2d.math.random :as r]
             [clojure2d.math.vector :as v]
             [clojure2d.math.joise :as n]
             [clojure2d.extra.variations :refer :all])
-  (:import  [java.awt Color]
-            [clojure2d.math.vector Vec2 Vec3]))
+  (:import [clojure2d.math.vector Vec2 Vec3]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -24,7 +24,7 @@
 (defn make-particle
   ""
   []
-  (Vec3. (m/drand border (- width border)) (m/drand border (- height border)) (m/drand m/TWO_PI)))
+  (Vec3. (r/drand border (- width border)) (r/drand border (- height border)) (r/drand m/TWO_PI)))
 
 (defn move-particle
   ""
@@ -36,11 +36,18 @@
         ^Vec2 v (fun (v/mult (Vec2. xx yy) coord-scale))
         ^Vec2 vv (v/add v vshift)
         angle (+ (.z in) (* angle-scale ^double (m/norm (noise (.x vv) (.y vv)) 0 1 -1 1)))]
-    (with-canvas canvas
-      (set-color (Color. 20 20 20 20))
-      (set-stroke point-size)
-      (point nx ny))
+    
+    (point canvas nx ny)
+    
     (Vec3. nx ny angle)))
+
+(defn go-for-it
+  ""
+  [canvas particles running mv-fun]
+  (loop [xs particles]
+    (when @running
+      (recur (mapv mv-fun xs))))
+  canvas)
 
 (defn example-09
   []
@@ -49,24 +56,20 @@
         noise (n/make-random-fractal)
         variation1 (rand-nth variation-list)
         variation2 (rand-nth variation-list)
-        vshift (Vec2. (m/drand -3 3) (m/drand -3 3))
+        vshift (Vec2. (r/drand -3 3) (r/drand -3 3))
         mv-fun (partial move-particle canvas vshift (comp (make-variation variation2 1.0 {}) (make-variation variation1 1.0 {})) noise)
-        particles (vec (repeatedly 5000 make-particle))]
+        particles (repeatedly 5000 make-particle)]
     
     (defmethod key-pressed ["curvature" \space] [_]
-      (let [r (to-hex (m/irand) 8)]
-    (save-canvas canvas (str "results/ex09/" r ".jpg"))))
+      (save-canvas canvas (next-filename "results/ex09/" ".jpg")))
 
     (println (str variation1 " " variation2))
 
     (with-canvas canvas
-      (set-background (Color. 240 240 240)))
-
-    (loop [xs particles]
-      (when @running
-        (recur (mapv mv-fun xs))))
-    
-    ))
+      (set-background 240 240 240)
+      (set-color 20 20 20 20)
+      (set-stroke point-size)
+      (go-for-it particles running mv-fun))))
 
 
 (example-09)

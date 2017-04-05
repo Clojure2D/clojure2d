@@ -13,7 +13,8 @@
 ;;
 (ns clojure2d.extra.variations
   "Variations namespace"
-  (:require [clojure2d.math :as m]
+  (:require [clojure2d.math :refer :all]
+            [clojure2d.math.random :refer :all]
             [clojure2d.math.vector :as v]
             [clojure2d.math.complex :as c])
   (:import [clojure2d.math.vector Vec2]
@@ -82,10 +83,10 @@
 (defn- srandom
   "Symetric random from [-mx -mn] and [mn mx]"
   ^double  [^double mn ^double mx]
-  (let [^double rand (m/drand mn mx)]
-  (if (m/brand)
-    rand
-    (* -1 rand))))
+  (let [^double rand (drand mn mx)]
+    (if (brand)
+      rand
+      (* -1 rand))))
 
 (def ^Vec2 unitx (Vec2. 1.0 0.0))
 (def ^Vec2 zerov (Vec2. 0.0 0.0))
@@ -110,9 +111,9 @@
   "Auger configuration
   params: `:freq` `:weight` `:sym` `:scale`"
   [p]
-  (merge {:freq (m/drand -5 5)
-          :weight (m/drand -1 1)
-          :sym (m/drand -2 2)
+  (merge {:freq (drand -5 5)
+          :weight (drand -1 1)
+          :sym (drand -2 2)
           :scale (srandom 0.5 2)} p))
 (make-config-method auger)
 
@@ -122,10 +123,10 @@
   (fn [^Vec2 v]
     (let [x (.x v)
           y (.y v)
-          s (m/sin (* freq x))
-          t (m/sin (* freq y))
-          dy (+ y (* weight (+ (m/abs y) (* 0.5 s scale)) s))
-          dx (+ x (* weight (+ (m/abs x) (* 0.5 t scale)) t))
+          s (sin (* freq x))
+          t (sin (* freq y))
+          dy (+ y (* weight (+ (abs y) (* 0.5 s scale)) s))
+          dx (+ x (* weight (+ (abs x) (* 0.5 t scale)) t))
           xx (* amount (+ x (* sym (- dx x))))
           yy (* amount dy)]
       (Vec2. xx yy))))
@@ -138,12 +139,12 @@
   ""
   [^double amount _]
   (fn [^Vec2 v]
-    (let [ang (* amount ^double (m/drand m/PI))
-          sinr (m/sin ang)
-          cosr (m/cos ang)]
+    (let [ang (* amount ^double (drand PI))
+          sinr (sin ang)
+          cosr (cos ang)]
       (if (zero? cosr) zerov
           (Vec2. (* amount sinr)
-                 (* amount (/ (m/sq sinr) cosr)))))))
+                 (* amount (/ (sq sinr) cosr)))))))
 (make-var-method arch)
 (register-random-var :arch)
 
@@ -155,10 +156,10 @@
   params: `:num` `:a`"
   [p]
   (let [m (merge {:num (srandom 1 30)
-                  :a (m/drand 2)} p)
-        bcn-pi (* ^double (:num m) m/M_1_PI)
-        pi-bcn (/ m/PI ^double (:num m))
-        bca-bcn (/ (* m/PI ^double (:a m)) ^double (:num m))]
+                  :a (drand 2)} p)
+        bcn-pi (* ^double (:num m) M_1_PI)
+        pi-bcn (/ PI ^double (:num m))
+        bca-bcn (/ (* PI ^double (:a m)) ^double (:num m))]
     (assoc m
            :bcn-pi bcn-pi
            :pi-bcn pi-bcn
@@ -171,17 +172,17 @@
   (fn [^Vec2 v]
     (let [v+ (v/add v unitx)
           v- (Vec2. (- 1.0 (.x v)) (.y v))
-          tau (* 0.5 (- (m/log (v/magsq v+))
-                        (m/log (v/magsq v-))))
-          pre-sigma (- m/PI ^double (v/heading v+) ^double (v/heading v-))
+          tau (* 0.5 (- (log (v/magsq v+))
+                        (log (v/magsq v-))))
+          pre-sigma (- PI ^double (v/heading v+) ^double (v/heading v-))
           alt (int (* pre-sigma bcn-pi))
           sigma (if (even? alt)
                   (+ (* alt pi-bcn) (rem (+ pre-sigma bca-bcn) pi-bcn))
                   (+ (* alt pi-bcn) (rem (- pre-sigma bca-bcn) pi-bcn)))
-          sinht (m/sinh tau)
-          cosht (m/cosh tau)
-          sins (m/sin sigma)
-          coss (m/cos sigma)
+          sinht (sinh tau)
+          cosht (cosh tau)
+          sins (sin sigma)
+          coss (cos sigma)
           temp (/ 1.0 (- cosht coss))
           xx (* amount sinht temp)
           yy (* amount sins temp)]
@@ -194,8 +195,8 @@
   "bSwirl configuration
   params: `:in` `:out`"
   [p]
-  (merge {:in (m/drand -2.0 2.0)
-          :out (m/drand -2.0 2.0)} p))
+  (merge {:in (drand -2.0 2.0)
+          :out (drand -2.0 2.0)} p))
 (make-config-method bswirl)
 
 (defn make-bswirl
@@ -204,14 +205,14 @@
   (fn [^Vec2 v]
     (let [v+ (v/add v unitx)
           v- (Vec2. (- 1.0 (.x v)) (.y v))
-          tau (* 0.5 (- (m/log (v/magsq v+))
-                        (m/log (v/magsq v-))))
-          pre-sigma (- m/PI ^double (v/heading v+) ^double (v/heading v-))
+          tau (* 0.5 (- (log (v/magsq v+))
+                        (log (v/magsq v-))))
+          pre-sigma (- PI ^double (v/heading v+) ^double (v/heading v-))
           sigma (+ pre-sigma (* tau out) (/ in tau))
-          sinht (m/sinh tau)
-          cosht (m/cosh tau)
-          sins (m/sin sigma)
-          coss (m/cos sigma)
+          sinht (sinh tau)
+          cosht (cosh tau)
+          sins (sin sigma)
+          coss (cos sigma)
           temp (- cosht coss)]
       (if (zero? temp)
         (Vec2. 0.0 0.0)
@@ -225,7 +226,7 @@
   ""
   [^double amount _]
   (fn [^Vec2 v]
-    (Vec2. (* amount ^double (v/mag v) (BesselJ/value (m/abs (.x v)) (m/abs (.y v))))
+    (Vec2. (* amount ^double (v/mag v) (BesselJ/value (abs (.x v)) (abs (.y v))))
            (* amount ^double (v/heading v)))))
 (make-var-method besselj)
 (register-regular-var :besselj)
@@ -235,7 +236,7 @@
   ""
   [^double amount _]
   (fn [^Vec2 v]
-    (Vec2. (* amount (Beta/logBeta (+ m/EPSILON (m/abs (.x v))) (+ m/EPSILON (m/abs (.y v)))))
+    (Vec2. (* amount (Beta/logBeta (+ EPSILON (abs (.x v))) (+ EPSILON (abs (.y v)))))
            (* amount ^double (v/heading v)))))
 (make-var-method beta)
 (register-regular-var :beta)
@@ -259,9 +260,9 @@
   ""
   [^double amount _]
   (fn [^Vec2 v]
-    (let [r (* ^double (m/drand amount) ^double (v/mag v))
-          sinr (m/sin r)
-          cosr (m/cos r)]
+    (let [r (* ^double (drand amount) ^double (v/mag v))
+          sinr (sin r)
+          cosr (cos r)]
       (Vec2. (* amount (.x v) (+ cosr sinr))
              (* amount (.x v) (- cosr sinr))))))
 (make-var-method blade)
@@ -271,9 +272,9 @@
   ""
   [^double amount _]
   (fn [^Vec2 v]
-    (let [r (* ^double (m/drand amount) ^double (v/mag v))
-          sinr (m/sin r)
-          cosr (m/cos r)]
+    (let [r (* ^double (drand amount) ^double (v/mag v))
+          sinr (sin r)
+          cosr (cos r)]
       (Vec2. (* amount (.x v) (+ cosr sinr))
              (* amount (.y v) (- cosr sinr))))))
 (make-var-method blade2)
@@ -285,16 +286,16 @@
   ""
   [^double amount _]
   (fn [^Vec2 v]
-    (let [roundx (m/rint (.x v))
-          roundy (m/rint (.y v))
+    (let [roundx (rint (.x v))
+          roundy (rint (.y v))
           offsetx (- (.x v) roundx)
           offsety (- (.y v) roundy)
           hoffsetx (* 0.5 offsetx)
           hoffsety (* 0.5 offsety)]
-      (if (m/brand 0.75)
+      (if (brand 0.75)
         (Vec2. (* amount (+ roundx hoffsetx))
                (* amount (+ roundy hoffsety)))
-        (if (>= (m/abs offsetx) (m/abs offsety))
+        (if (>= (abs offsetx) (abs offsety))
           
           (if (>= offsetx 0.0)
             (Vec2. (* amount (+ hoffsetx roundx 0.25))
@@ -318,8 +319,8 @@
   (fn [^Vec2 v]
     (let [wx (* amount 1.3029400317411197908970256609023)
           y2 (* 2.0 (.y v))
-          r (* wx (m/sqrt (/ (m/abs (* (.y v) (.x v)))
-                             (+ m/EPSILON (m/sq (.x v)) (m/sq y2)))))]
+          r (* wx (sqrt (/ (abs (* (.y v) (.x v)))
+                             (+ EPSILON (sq (.x v)) (sq y2)))))]
       (Vec2. (* r (.x v))
              (* r y2)))))
 
@@ -333,14 +334,14 @@
   "CircleLinear configuration
   params: `:Sc` `:K` `:Dens1` `:Dens2` `:Reverse` `:X` `:Y` `:Seed`"
   [p]
-  (let [m (merge {:Sc (m/drand 1)
-                  :K (m/drand -2 2)
-                  :Dens1 (m/drand 1)
-                  :Dens2 (m/drand 1)
-                  :Reverse (m/drand -1 1)
-                  :X (m/drand 20)
-                  :Y (m/drand 20)
-                  :Seed (m/irand Integer/MAX_VALUE)} p)]
+  (let [m (merge {:Sc (drand 1)
+                  :K (drand -2 2)
+                  :Dens1 (drand 1)
+                  :Dens2 (drand 1)
+                  :Reverse (drand -1 1)
+                  :X (drand 20)
+                  :Y (drand 20)
+                  :Seed (irand Integer/MAX_VALUE)} p)]
     (assoc m :dd (* ^double (:Dens1 m) ^double (:Dens2 m)))))
 (make-config-method circlelinear)
 
@@ -351,12 +352,12 @@
     (let [M (->> Sc
                  (/ (.x v))
                  (* 0.5)
-                 (m/floor)
+                 (floor)
                  (long))
           N (->> Sc
                  (/ (.y v))
                  (* 0.5)
-                 (m/floor)
+                 (floor)
                  (long))
           X (- (.x v) (->> M
                            (* 2.0)
@@ -366,12 +367,12 @@
                            (* 2.0)
                            (inc)
                            (* Sc)))
-          U (m/hypot X Y)
-          V (->> (m/discrete-noise (+ M 10) (+ N 3))
+          U (hypot X Y)
+          V (->> (discrete-noise (+ M 10) (+ N 3))
                  (* 0.7)
                  (+ 0.3)
                  (* Sc))
-          Z1 (m/discrete-noise (+ M Seed) N)
+          Z1 (discrete-noise (+ M Seed) N)
           [^double XX ^double YY] (if (and (< Z1 Dens1) (< U V)) 
                                     (if (pos? Reverse)
                                       (if (< Z1 dd)
@@ -412,7 +413,7 @@
   "CSin configuraion
   params `:stretch`"
   [p]
-  (let [m (merge {:stretch (m/drand -3 3)} p)]
+  (let [m (merge {:stretch (drand -3 3)} p)]
     (assoc m :s-cx (Complex. (:stretch m) 0.0))))
 (make-config-method csin)
 
@@ -452,8 +453,8 @@
     (let [^double length (v/mag v)
           sina (/ (.x v) length)
           cosa (/ (.y v) length)
-          sinr (m/sin length)
-          cosr (m/cos length)]
+          sinr (sin length)
+          cosr (cos length)]
       (Vec2. (* amount sina cosr)
              (* amount cosa sinr)))))
 (make-var-method diamond)
@@ -466,8 +467,8 @@
   "eMod configuration
   params: `:radius` `:distance`"
   [p]
-  (let [m (merge {:radius (m/drand 0.1 4)
-                  :distance (m/drand 2)} p)]
+  (let [m (merge {:radius (drand 0.1 4)
+                  :distance (drand 2)} p)]
     (assoc m :radius2 (* 2.0 ^double (:radius m))
            :rdr (+ ^double (:radius m) (* ^double (:distance m) ^double (:radius m))))))
 (make-config-method emod)
@@ -478,20 +479,20 @@
   (fn [^Vec2 v]
     (let [tmp (inc ^double (v/magsq v))
           tmp2 (* 2.0 (.x v))
-          xmax-pre (* 0.5 (+ (m/safe-sqrt (+ tmp tmp2))
-                             (m/safe-sqrt (- tmp tmp2))))
-          xmax (m/constrain xmax-pre 1.0 xmax-pre)
-          t (m/constrain (/ (.x v) xmax) -1.0 1.0)
-          nu-pre (m/acos t)
+          xmax-pre (* 0.5 (+ (safe-sqrt (+ tmp tmp2))
+                             (safe-sqrt (- tmp tmp2))))
+          xmax (constrain xmax-pre 1.0 xmax-pre)
+          t (constrain (/ (.x v) xmax) -1.0 1.0)
+          nu-pre (acos t)
           nu (if (neg? (.y v)) (* -1.0 nu-pre) nu-pre)
-          mu-pre (m/acosh xmax)          
+          mu-pre (acosh xmax)          
           mu (if (and (< mu-pre radius) (< (* -1.0 mu-pre) radius))
                (if (pos? nu)
                  (- (rem (+ mu-pre rdr) radius2) radius)
                  (+ (rem (- mu-pre rdr) radius2) radius))
                mu-pre)
-          xx (* amount (m/cosh mu) (m/cos nu))
-          yy (* amount (m/sinh mu) (m/sin nu))]
+          xx (* amount (cosh mu) (cos nu))
+          yy (* amount (sinh mu) (sin nu))]
       (Vec2. xx yy))))
 (make-var-method emod)
 (register-regular-var :emod)
@@ -511,9 +512,9 @@
   ""
   [^double amount _]
   (fn [^Vec2 v]
-    (let [e (m/exp (.x v))]
-      (Vec2. (* amount e (m/cos (.y v)))
-             (* amount e (m/sin (.y v)))))))
+    (let [e (exp (.x v))]
+      (Vec2. (* amount e (cos (.y v)))
+             (* amount e (sin (.y v)))))))
 (make-var-method exp)
 (register-regular-var :exp)
 
@@ -522,8 +523,8 @@
   "fan2 configuration
   params: `:x` `:y`"
   [p]
-  (merge {:x (m/drand -1 1)
-          :y (m/drand -1 1)} p))
+  (merge {:x (drand -1 1)
+          :y (drand -1 1)} p))
 (make-config-method fan2)
 
 (defn make-fan2
@@ -533,14 +534,14 @@
     (let [^double r (v/mag v)
           ^double angle (v/heading v)
           dy y
-          dx (+ 1.0e-6 (* m/PI x x))
+          dx (+ 1.0e-6 (* PI x x))
           dx2 (* 0.5 dx)
           t (+ angle (- dy (* dx (long (/ (+ angle dy) dx)))))
           a (if (> t dx2)
               (- angle dx2)
               (+ angle dx2))]
-      (Vec2. (* amount r (m/sin a))
-             (* amount r (m/cos a))))))
+      (Vec2. (* amount r (sin a))
+             (* amount r (cos a))))))
 (make-var-method fan2)
 (register-regular-var :fan2)
 
@@ -564,7 +565,7 @@
   ""
   [^double amount _]
   (fn [^Vec2 v]
-    (let [r (/ amount (m/sqrt (inc ^double (v/magsq v))))]
+    (let [r (/ amount (sqrt (inc ^double (v/magsq v))))]
       (Vec2. (* r (.x v))
              (* r (.y v))))))
 (make-var-method hemisphere)
@@ -577,11 +578,11 @@
   "Julia"
   [^double amount _]
   (fn [^Vec2 v]
-    (let [a (+ (* 0.5 ^double (v/heading v)) (* m/PI ^double (m/irand 2)))
+    (let [a (+ (* 0.5 ^double (v/heading v)) (* PI ^double (irand 2)))
           r (->> (v/mag v)
-                 (m/sqrt)
+                 (sqrt)
                  (* amount))]
-      (Vec2. (* r (m/cos a)) (* r (m/sin a))))))
+      (Vec2. (* r (cos a)) (* r (sin a))))))
 (make-var-method julia)
 (register-random-var :julia)
 
@@ -591,9 +592,9 @@
   params: `:power` `:dist`"
   [p]
   (let [m (merge {:power (srandom 1 10)
-                  :dist (m/drand -4 4)} p)]
+                  :dist (drand -4 4)} p)]
     (assoc m
-           :abspower (m/abs (:power m))
+           :abspower (abs (:power m))
            :cpower (* 0.5 (/ ^double (:dist m) ^double (:power m))))))
 (make-config-method julian)
 
@@ -601,9 +602,9 @@
   "JuliaN"
   [^double amount {:keys [^double power ^double abspower ^double cpower]}]
   (fn [^Vec2 v]
-    (let [a (/ (+ ^double (v/heading v) (* m/TWO_PI ^double (m/drand abspower))) power)
-          r (* amount (m/pow (v/magsq v) cpower))]
-      (Vec2. (* r (m/cos a)) (* r (m/sin a))))))
+    (let [a (/ (+ ^double (v/heading v) (* TWO_PI ^double (drand abspower))) power)
+          r (* amount (pow (v/magsq v) cpower))]
+      (Vec2. (* r (cos a)) (* r (sin a))))))
 (make-var-method julian)
 (register-random-var :julian)
 
@@ -613,10 +614,10 @@
   params: `:power` `:divisor`"
   [p]
   (let [m (merge {:power (srandom 1 10)
-                  :divisor (m/drand -8 8)} p)
+                  :divisor (drand -8 8)} p)
         inv-power (/ ^double (:divisor m) ^double (:power m))
         half-inv-power (* 0.5 inv-power)
-        inv-power-2pi (/ m/TWO_PI ^double (:power m))]
+        inv-power-2pi (/ TWO_PI ^double (:power m))]
     (assoc m
            :inv-power inv-power
            :half-inv-power half-inv-power
@@ -628,9 +629,9 @@
   [^double amount {:keys [^double inv-power ^double inv-power-2pi ^double half-inv-power] :as all}]
   (fn [^Vec2 v]
     (let [a (+ (* inv-power ^double (v/heading v))
-               (* inv-power-2pi ^double (m/drand (Integer/MAX_VALUE))))
-          r (* amount (m/pow (v/magsq v) half-inv-power))]
-      (Vec2. (* r (m/cos a)) (* r (m/sin a))))))
+               (* inv-power-2pi ^double (drand (Integer/MAX_VALUE))))
+          r (* amount (pow (v/magsq v) half-inv-power))]
+      (Vec2. (* r (cos a)) (* r (sin a))))))
 (make-var-method juliaq)
 (register-random-var :juliaq)
 
@@ -645,24 +646,24 @@
   params: `:slices` `:rotation` `:thickness`"
   [p]
   (merge {:slices (srandom 0.01 7.0)
-          :rotation (m/drand m/TWO_PI)
-          :thickness (m/drand -2.0 2.0)} p))
+          :rotation (drand TWO_PI)
+          :thickness (drand -2.0 2.0)} p))
 (make-config-method pie)
 
 (defn make-pie
   "pie from jwildfire"
   [^double amount {:keys [^double slices ^double rotation ^double thickness]}]
   (fn [^Vec2 v]
-    (let [sl (m/round (+ 0.5 (* slices ^double (m/drand))))
+    (let [sl (round (+ 0.5 (* slices ^double (drand))))
           a (-> thickness
-                (* ^double (m/drand))
+                (* ^double (drand))
                 (+ sl)
-                (* m/TWO_PI)
+                (* TWO_PI)
                 (/ slices)
                 (+ rotation))
-          r (* amount ^double (m/drand))]
-      (Vec2. (* r (m/cos a))
-             (* r (m/sin a))))))
+          r (* amount ^double (drand))]
+      (Vec2. (* r (cos a))
+             (* r (sin a))))))
 (make-var-method pie)
 (register-random-var :pie)
 
@@ -672,9 +673,9 @@
   "Popcorn2 configuration
   params: `:x` `:y` `:c`"
   [p]
-  (merge {:x (m/drand -1.5 1.5)
-          :y (m/drand -1.5 1.5)
-          :c (m/drand -5.0 5.0)} p))
+  (merge {:x (drand -1.5 1.5)
+          :y (drand -1.5 1.5)
+          :c (drand -5.0 5.0)} p))
 (make-config-method popcorn2)
 
 (defn make-popcorn2
@@ -683,15 +684,15 @@
   (fn [^Vec2 v]
     (let [xx (->> (.y v)
                   (* c)
-                  (m/tan)
-                  (m/sin)
+                  (tan)
+                  (sin)
                   (* x)
                   (+ (.x v))
                   (* amount))
           yy (->> (.x v)
                   (* c)
-                  (m/tan)
-                  (m/sin)
+                  (tan)
+                  (sin)
                   (* y)
                   (+ (.y v))
                   (* amount))]
@@ -711,8 +712,8 @@
           d (-> 1.0
                 (/ amount)
                 (+ t)
-                (* (m/sqrt t))
-                (+ m/EPSILON))
+                (* (sqrt t))
+                (+ EPSILON))
           r (/ 1.0 d)]
       (v/mult v r))))
 (make-var-method scry)
@@ -723,7 +724,7 @@
   "Sinusoidal"
   [^double amount _]
   (fn [^Vec2 v]
-    (Vec2. (* amount (m/sin (.x v))) (* amount (m/sin (.y v))))))
+    (Vec2. (* amount (sin (.x v))) (* amount (sin (.y v))))))
 (make-var-method sinusoidal)
 (register-regular-var :sinusoidal)
 
@@ -732,7 +733,7 @@
   "STwin configuration
   params: `:distort` `:multiplier`"
   [p]
-  (merge {:distort (m/drand -6 6)
+  (merge {:distort (drand -6 6)
           :multiplier (srandom 0.001 3.0)} p))
 (make-config-method stwin)
 
@@ -747,7 +748,7 @@
           x2+y2 (+ x2 y2)
           x2-y2 (- x2 y2)
           div (if (zero? x2+y2) 1.0 x2+y2)
-          result (/ (* x2-y2 (m/sin (* m/TWO_PI distort (+ x y)))) div)]
+          result (/ (* x2-y2 (sin (* TWO_PI distort (+ x y)))) div)]
       (Vec2. (+ (* amount (.x v)) result)
              (+ (* amount (.y v)) result)))))
 (make-var-method stwin)
@@ -759,10 +760,10 @@
 (defn config-trade
   "Trade configuration"
   [p]
-  (let [m (merge {:r1 (m/drand 0.1 3.0)
-                  :r2 (m/drand 0.1 3.0)
-                  :d1 (m/drand -2.0 2.0)
-                  :d2 (m/drand -2.0 2.0)} p)]
+  (let [m (merge {:r1 (drand 0.1 3.0)
+                  :r2 (drand 0.1 3.0)
+                  :d1 (drand -2.0 2.0)
+                  :d2 (drand -2.0 2.0)} p)]
     (assoc m :c1 (+ ^double (:r1 m) ^double (:d1 m))
            :c2 (+ ^double (:r2 m) ^double (:d2 m)))))
 (make-config-method trade)
@@ -778,8 +779,8 @@
           ^double rm (v/mag nv)
           r (* rm fr)
           a (v/heading nv)
-          res (Vec2. (+ cc2 (* r (m/cos a)))
-                     (* r (m/sin a)))]
+          res (Vec2. (+ cc2 (* r (cos a)))
+                     (* r (sin a)))]
       (if (<= rm rr)
         (v/mult res amount)
         (v/mult v amount)))))
@@ -795,9 +796,9 @@
   [p]
   (merge {:k (srandom 0.6 1.3)
           :step (srandom 0.1 1.2)
-          :num (m/drand 0.1 25.0)
-          :xseed (m/irand)
-          :yseed (m/irand)} p))
+          :num (drand 0.1 25.0)
+          :xseed (irand)
+          :yseed (irand)} p))
 (make-config-method voron)
 
 (deftype VoronResType [^double R ^double X0 ^double Y0])
@@ -809,9 +810,9 @@
   (fn [^Vec2 v]
     (let [fk (fn ^VoronCalcType [^long M1 ^long N1]
                (VoronCalcType. M1 N1
-                               (long (inc (m/floor (* (m/discrete-noise (+ (+ (* M1 19) (* N1 257)) xseed) 0) num))))))
-          m (long (m/floor (/ (.x v) step)))
-          n (long (m/floor (/ (.y v) step)))
+                               (long (inc (floor (* (discrete-noise (+ (+ (* M1 19) (* N1 257)) xseed) 0) num))))))
+          m (long (floor (/ (.x v) step)))
+          n (long (floor (/ (.y v) step)))
           m- (dec m)
           m+ (inc m)
           n- (dec n)
@@ -821,13 +822,13 @@
                                       (loop [i (long 0)
                                              ^VoronResType currl curr]
                                         (if (< i (.k calc))
-                                          (let [X (* step (+ (.M1 calc) (m/discrete-noise (+
+                                          (let [X (* step (+ (.M1 calc) (discrete-noise (+
                                                                                            (+ i (* 64 (.M1 calc)))
                                                                                            (+ xseed (* 15 (.N1 calc)))) 0)))
-                                                Y (* step (+ (.N1 calc) (m/discrete-noise (+
+                                                Y (* step (+ (.N1 calc) (discrete-noise (+
                                                                                            (+ i (* 21 (.M1 calc)))
                                                                                            (+ yseed (* 33 (.N1 calc)))) 0)))
-                                                R (m/hypot (- (.x v) X) (- (.y v) Y))]
+                                                R (hypot (- (.x v) X) (- (.y v) Y))]
                                             (recur (unchecked-inc i)
                                                    (if (< R (.R currl))
                                                      (VoronResType. R X Y)
@@ -850,11 +851,11 @@
   [^double amount _]
   (fn [^Vec2 v]
     (v/mult (Vec2. (.x v)
-                   (->> (m/constrain (.y v) -1.9634 1.9634)
+                   (->> (constrain (.y v) -1.9634 1.9634)
                         (* 0.4)
-                        (+ m/QUARTER_PI)
-                        (m/tan)
-                        (m/log)
+                        (+ QUARTER_PI)
+                        (tan)
+                        (log)
                         (* 1.25))) amount)))
 
 (make-var-method miller)
@@ -867,10 +868,10 @@
     (v/mult (Vec2. (.x v)
                    (-> (.y v)
                        (* 0.8)
-                       (m/exp)
-                       (m/atan)
+                       (exp)
+                       (atan)
                        (* 2.5)
-                       (- (* 0.625 m/PI)))) amount)))
+                       (- (* 0.625 PI)))) amount)))
 (make-var-method millerrev)
 (register-regular-var :millerrev)
 
@@ -879,14 +880,14 @@
   [^double amount _]
   (fn [^Vec2 v]
     (let [k (* 0.5 (.y v))
-          cosk (m/cos k)
+          cosk (cos k)
           xx (->> cosk
                   (* cosk)
-                  (* (m/cos (.y v)))
-                  (* (/ (.x v) m/SQRTPI))
+                  (* (cos (.y v)))
+                  (* (/ (.x v) SQRTPI))
                   (* 2)
                   (* amount))
-          yy (* amount m/SQRTPI (m/tan k))]
+          yy (* amount SQRTPI (tan k))]
       (Vec2. xx yy))))
 (make-var-method foucaut)
 (register-regular-var :foucaut)

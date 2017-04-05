@@ -1,5 +1,6 @@
 (ns clojure2d.extra.glitch
   (:require [clojure2d.math :as m]
+            [clojure2d.math.random :as r]
             [clojure2d.pixels :as p]
             [clojure2d.core :refer :all]
             [clojure2d.math.vector :as v]
@@ -20,14 +21,14 @@
   ""
   ([n]
    (let [f (fn []
-             (let [r (m/irand 4)]
+             (let [r (r/irand 4)]
                {:wave (rand-nth s/waves)
                 :freq (freqs r)
                 :amp (amps r)
-                :phase (m/drand)}))]
-     (filter (fn [_] (m/brand 0.8)) (repeatedly n f))))
+                :phase (r/drand)}))]
+     (filter (fn [_] (r/brand 0.8)) (repeatedly n f))))
   ([]
-   (slitscan-random-setup (m/irand 2 6))))
+   (slitscan-random-setup (r/irand 2 6))))
 
 (defn make-slitscan-waves
   ""
@@ -210,18 +211,18 @@
 (defn random-blend-get-cs
   "Return colorspace or nil"
   []
-  (if (m/brand 0.9) (rand-nth c/colorspaces-names) nil))
+  (if (r/brand 0.9) (rand-nth c/colorspaces-names) nil))
 
 (defn blend-machine
   "Do random blend of two pixels, use random colorspace"
   ([]
    (let [cs1 (random-blend-get-cs) ; let's convert to some colorspace (or leave rgb)
-         cs2 (if (m/brand 0.2) (random-blend-get-cs) cs1) ; maybe different cs on second image?
-         outcs (if (m/brand 0.2) (random-blend-get-cs) cs1) ; maybe some random colorspace on output?
-         bl1 (if (m/brand 0.85) (rand-nth c/blends-names) nil) ; ch1 blend
-         bl2 (if (m/brand 0.85) (rand-nth c/blends-names) nil) ; ch2 blend
-         bl3 (if (m/brand 0.85) (rand-nth c/blends-names) nil)] ; ch3 blend
-     {:switch (m/brand 0.5)
+         cs2 (if (r/brand 0.2) (random-blend-get-cs) cs1) ; maybe different cs on second image?
+         outcs (if (r/brand 0.2) (random-blend-get-cs) cs1) ; maybe some random colorspace on output?
+         bl1 (if (r/brand 0.85) (rand-nth c/blends-names) nil) ; ch1 blend
+         bl2 (if (r/brand 0.85) (rand-nth c/blends-names) nil) ; ch2 blend
+         bl3 (if (r/brand 0.85) (rand-nth c/blends-names) nil)] ; ch3 blend
+     {:switch (r/brand 0.5)
       :in-cs1 cs1
       :in-cs2 cs2
       :out-cs outcs
@@ -244,8 +245,8 @@
 (defn color-reducer-machine
   "Randomize color reducing filter, random method, random colors"
   ([]
-   (let [bpal (condp > (m/drand 1.0)
-                0.1 (let [num (m/irand 5 20)]
+   (let [bpal (condp > (r/drand 1.0)
+                0.1 (let [num (r/irand 5 20)]
                       {:type :iq
                        :palette (c/make-random-palette num)})
                 0.5 {:type :colourlovers
@@ -260,18 +261,18 @@
                               :compl false}
                        :palette (let [v (map #(c/make-monochromatic-palette % (preset c/paletton-presets)) h)]
                                   (vec (flatten (concat v p))))})
-                (let [h (m/drand 360.0)
+                (let [h (r/drand 360.0)
                       t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
-                      conf {:compl (m/brand 0.6)
-                            :angle (m/drand 10.0 90.0)
-                            :adj (m/brand 0.5)
+                      conf {:compl (r/brand 0.6)
+                            :angle (r/drand 10.0 90.0)
+                            :adj (r/brand 0.5)
                             :hue h
                             :preset (rand-nth (keys c/paletton-presets))
                             :type t}]
                   {:type :paletton
                    :conf conf
                    :palette (c/paletton-palette t h conf)}))
-         pal (if (m/brand 0.2)
+         pal (if (r/brand 0.2)
                (update bpal :palette conj (Vec4. 0.0 0.0 0.0 255.0) (Vec4. 255.0 255.0 255.0 255.0))
                bpal)
          pal (assoc pal :distf (rand-nth [v/dist v/dist-abs v/dist-cheb v/dist-sq]))]

@@ -3,6 +3,7 @@
 (ns examples.ex18-waves
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
+            [clojure2d.math.random :as r]
             [clojure2d.extra.signal :as s]))
 
 (set! *warn-on-reflection* true)
@@ -13,8 +14,7 @@
 (def display (show-window canvas "waves" 600 600 25))
 
 (defmethod key-pressed ["waves" \space] [_]
-  (let [r (to-hex (m/irand) 8)]
-    (save-canvas canvas (str "results/ex18/" r ".jpg"))))
+  (save-canvas canvas (next-filename "results/ex18/" ".jpg")))
 
 ;; frequencies and amplitudes
 (def f (into [] (map #(bit-shift-left 1 ^long %) (range 16))))
@@ -27,12 +27,12 @@
     (rect canvas x (+ 300.0 (* 300.0 ^double (f (/ x 600.0)))) 1 1)))
 
 ;; run several times
-(let [lst (into [] (map #(s/make-wave (rand-nth s/waves) (f %) (a %) (m/drand 1)) (range 1 5)))]
-    (with-canvas canvas
-      (set-color (java.awt.Color/white))
-      (set-background java.awt.Color/black)
-      (draw-fun (s/make-sum-wave lst)))
-    :done)
+(let [lst (into [] (map #(s/make-wave (rand-nth s/waves) (f %) (a %) (r/drand 1)) (range 1 5)))]
+  (with-canvas canvas
+    (set-color (java.awt.Color/white))
+    (set-background java.awt.Color/black)
+    (draw-fun (s/make-sum-wave lst)))
+  :done)
 
 (defn draw-fun2
   ""
@@ -48,9 +48,9 @@
 ;; try several times
 (let [num 7
       wvs (repeatedly num #(rand-nth s/waves))
-      phases (repeatedly num #(m/drand 1.0))
-      phasemult (repeatedly num #(m/drand -3.0 3.0))
-      octaves (repeatedly num #(m/irand num))]
+      phases (repeatedly num #(r/drand 1.0))
+      phasemult (repeatedly num #(r/drand -3.0 3.0))
+      octaves (repeatedly num #(r/irand num))]
   (dotimes [y 600]
     (let [yy (/ y 600.0)
           lst (map #(s/make-wave (nth wvs %) (f (nth octaves %)) (a (nth octaves %)) (+ (* yy ^double (nth phasemult %)) ^double (nth phases %))) (range num))]
@@ -66,6 +66,6 @@
 ;; open in Audacity as RAW 16 bit signed, mono, big-endian, 44100Hz
 (let [num 10
       amp (* 1.5 (/ 1.0 num))
-      lst (into [] (map #(s/make-wave (rand-nth s/waves) (* 150 ^long %) amp (m/drand 1)) (range 1 (inc num))))
+      lst (into [] (map #(s/make-wave (rand-nth s/waves) (* 150 ^long %) amp (r/drand 1)) (range 1 (inc num))))
       f (s/make-sum-wave lst)]
   (s/save-signal (s/make-signal-from-wave f 44100 10) "results/ex18/wave.raw"))

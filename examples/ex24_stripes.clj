@@ -1,7 +1,8 @@
 (ns examples.ex24-stripes
   "Draw stripes" 
   (:require [clojure2d.core :refer :all]
-            [clojure2d.math :as m])
+            [clojure2d.math :as m]
+            [clojure2d.math.random :as r])
   (:import [java.awt Color]))
 
 (set! *warn-on-reflection* true)
@@ -14,7 +15,7 @@
 (defn draw
   ""
   [canvas]
-  (let [step (/ m/TWO_PI ^int (m/irand 3 60))
+  (let [step (/ m/TWO_PI ^int (r/irand 3 60))
         step2 (/ step 2.0)
         vs (reduce #(let [p1x (+ 300 (* 200 (m/cos %2)))
                           p1y (+ 300 (* 200 (m/sin %2)))

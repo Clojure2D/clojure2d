@@ -1,6 +1,7 @@
 (ns examples.ex04-noise
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
+            [clojure2d.math.random :as r]
             [clojure2d.math.joise :as j]
             [clojure2d.color :as c])
   (:import  [java.awt Color]))
@@ -33,11 +34,10 @@
 (show-window canvas "noise" 600 600 10)
 
 (defmethod key-pressed ["noise" \space] [_]
-  (let [r (to-hex (m/irand) 8)]
-    (save-canvas canvas (str "results/ex04/" r ".jpg"))))
+  (save-canvas canvas (next-filename "results/ex04/" ".jpg")))
 
-; results/ex04/B129FE12.jpg
-(draw-noise m/noise)
+;; results/ex04/B129FE12.jpg
+(draw-noise r/noise)
 
 ; results/ex04/53230C85.jpg
 (draw-noise j/perlin-noise)
@@ -62,7 +62,7 @@
 ;saving: results/ex04/D9164162.jpg
 ;saving: results/ex04/A72AC802.jpg
 ;saving: results/ex04/B14C2C21.jpg
-(let [coeffs [(m/drand -5.0 5.0) (m/drand -5.0 5.0) (m/drand -5.0 5.0) (m/drand -5.0 5.0)]]
+(let [coeffs [(r/drand -5.0 5.0) (r/drand -5.0 5.0) (r/drand -5.0 5.0) (r/drand -5.0 5.0)]]
   (draw-noise (j/make-noise (j/auto-correct (j/make-cell {:coeffs coeffs}) 500)))
   coeffs)
 
@@ -78,8 +78,8 @@
 (let [type (rand-nth (keys j/fractal-type))
       b [j/make-random-basis-module
          j/make-random-cell-module]
-      l (m/drand 1 3)
-      f (m/drand 1 3)
+      l (r/drand 1 3)
+      f (r/drand 1 3)
       params {:type type
               :lacunarity l
               :frequency f

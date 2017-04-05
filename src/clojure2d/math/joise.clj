@@ -1,5 +1,6 @@
 (ns clojure2d.math.joise
-  (:require [clojure2d.math :refer :all])
+  (:require [clojure2d.math :refer :all]
+            [clojure2d.math.random :refer :all])
   (:import [com.sudoplay.joise.module Module SourcedModule ScalarParameter
             ModuleBasisFunction ModuleBasisFunction$BasisType ModuleBasisFunction$InterpolationType
             ModuleCellular ModuleCellGen
