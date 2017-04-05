@@ -12,7 +12,8 @@
   "Math functions"
   (:import [net.jafama FastMath]
            [org.apache.commons.math3.random RandomGenerator ISAACRandom JDKRandomGenerator MersenneTwister
-            Well512a Well1024a Well19937a Well19937c Well44497a Well44497b]
+            Well512a Well1024a Well19937a Well19937c Well44497a Well44497b
+            RandomVectorGenerator HaltonSequenceGenerator SobolSequenceGenerator UnitSphereRandomVectorGenerator]
            [com.flowpowered.noise.module.source Perlin]))
 
 (set! *warn-on-reflection* true)
@@ -640,39 +641,109 @@
 (def grand (partial grandom default-random))
 (def brand (partial brandom default-random))
 
-;; ## Noise
+;; ## Random Vector Sequences
+;;
+;; Couple of functions to generate sequences of numbers or vectors.
+;; You can generate sequence of `double`, `Vec2`, `Vec3` or `Vec4` types. Just pass the size to creator function.
+;;
+;; To create generator call `make-sequence-generator` with generator name and vector size [1,4].
+;; Following generators are available:
+;;
+;; * :halton - Halton low-discrepancy sequence; range [0,1]
+;; * :sobol - Sobol low-discrepancy sequence; range [0,1]
+;; * :sphere - uniformly random distributed on unit sphere
+;; * :gaussian - gaussian distributed (mean=0, stddev=1)
+;; * :default - uniformly random; range:[0,1]
+;;
+;; After creation you get function equivalent to `(repeatedly fn)`
 
-(defn noise-with
-  ""
+(defn- commons-math-generators
+  "Generators from commons math"
+  [gen size]
+  (let [s (iconstrain size 1 4)
+        ^RandomVectorGenerator g (case gen
+                                   :halton (HaltonSequenceGenerator. s)
+                                   :sobol (SobolSequenceGenerator. s)
+                                   :sphere (UnitSphereRandomVectorGenerator. s))
+        gf (case s
+             1 #(aget (.nextVector g) 0)
+             2 #(clojure2d.math.vector/array->vec2 (.nextVector g))
+             3 #(clojure2d.math.vector/array->vec3 (.nextVector g))
+             4 #(clojure2d.math.vector/array->vec4 (.nextVector g)))]
+    #(repeatedly gf)))
+
+(defn- random-generators
+  "Random JDK generators"
+  [gen size]
+  (let [s (iconstrain size 1 4)
+        g (case gen
+            :default drand
+            :gaussian grand)
+        gf (case s
+             1 drand
+             2 (partial clojure2d.math.vector/generate-vec2 g)
+             3 (partial clojure2d.math.vector/generate-vec3 g)
+             4 (partial clojure2d.math.vector/generate-vec4 g))]
+    #(repeatedly gf)))
+
+;; Sequence creators
+(defmulti make-sequence-generator (fn [gen size] gen))
+(defmethod make-sequence-generator :halton [gen size] (commons-math-generators gen size))
+(defmethod make-sequence-generator :sobol [gen size] (commons-math-generators gen size))
+(defmethod make-sequence-generator :sphere [gen size] (commons-math-generators gen size))
+(defmethod make-sequence-generator :gaussian [gen size] (random-generators gen size))
+(defmethod make-sequence-generator :default [gen size] (random-generators gen size))
+
+;; ## Noise
+;;
+;; Basic perling noise function, see `clojure2d.math.joise` namespace for binding to composable noise system
+
+(defn with-noise
+  "Get noise value with given Perlin object. Returned value is from [0,1] range."
   (^double [^Perlin n x] (* 0.5 (+ 1.0 (.getValue n x 0.5 0.5))))
   (^double [^Perlin n x y] (* 0.5 (+ 1.0 (.getValue n x y 0.5))))
   (^double [^Perlin n x y z] (* 0.5 (+ 1.0 (.getValue n x y z)))))
 
 (defn make-perlin-noise
-  ""
-  ([] (partial noise-with (Perlin.)))
+  "Create noise functions and bind with freshly created Perlin object.
+
+  Parameters: 
+
+  * seed (optional)
+  * octaves (optional)
+
+  Returns `noise` function."
+  ([] (partial with-noise (Perlin.)))
   ([seed]
    (let [^Perlin n (Perlin.)]
      (.setSeed n seed)
-     (partial noise-with n)))
+     (partial with-noise n)))
   ([seed octaves]
    (let [^Perlin n (Perlin.)]
      (.setSeed n seed)
      (.setOctaveCount n octaves)
-     (partial noise-with n))))
+     (partial with-noise n))))
 
+;; default noise function with random seed and default octave numbers
 (def noise (make-perlin-noise))
 
-;;;
+;; ### Discrete noise
 
 (def ^:const ^double AM (/ 1.0 2147483647.0))
 
 (defn discrete-noise
-  "Discrete noise"
-  ^double [^long X ^long Y]
-  (let [X (unchecked-int X)
-        Y (unchecked-int Y)
-        n (unchecked-add-int X (unchecked-multiply-int Y 57))
-        nn (unchecked-int (bit-xor n (bit-shift-left n 13)))
-        nnn (unchecked-add-int 1376312589 (unchecked-multiply-int nn (unchecked-add-int 789221 (unchecked-multiply-int nn (unchecked-multiply-int nn 15731)))))]
-    (* AM (unchecked-int (bit-and 0x7fffffff nnn)))))
+  "Discrete noise. Parameters:
+
+  * X (long)
+  * Y (long, optional)
+
+  Returns double value from [0,1] range"
+  (^double [^long X ^long Y]
+   (let [X (unchecked-int X)
+         Y (unchecked-int Y)
+         n (unchecked-add-int X (unchecked-multiply-int Y 57))
+         nn (unchecked-int (bit-xor n (bit-shift-left n 13)))
+         nnn (unchecked-add-int 1376312589 (unchecked-multiply-int nn (unchecked-add-int 789221 (unchecked-multiply-int nn (unchecked-multiply-int nn 15731)))))]
+     (* AM (unchecked-int (bit-and 0x7fffffff nnn)))))
+  (^double [^long X]
+   (discrete-noise X 0)))

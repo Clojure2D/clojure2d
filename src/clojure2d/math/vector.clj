@@ -347,6 +347,18 @@
         (>= amt 1) 0
         :else (m/acos amt)))))
 
+(defn aligned?
+  "Are vectors aligned (have the same direction)?"
+  [v1 v2]
+  (< ^double (angle-between v1 v2) TOLERANCE))
+
+(defn faceforward
+  "flip normal"
+  [n v]
+  (if (neg? ^double (dot n v))
+    n
+    (sub n)))
+
 (defn generate-vec2
   ""
   ([f1 f2]
@@ -368,17 +380,21 @@
   ([f]
    (Vec4. (f) (f) (f) (f))))
 
-(defn aligned?
-  "Are vectors aligned (have the same direction)?"
-  [v1 v2]
-  (< ^double (angle-between v1 v2) TOLERANCE))
+(defn array->vec2
+  ""
+  [^doubles a]
+  (Vec2. (aget a 0) (aget a 1)))
 
-(defn faceforward
-  "flip normal"
-  [n v]
-  (if (neg? ^double (dot n v))
-    n
-    (sub n)))
+(defn array->vec3
+  ""
+  [^doubles a]
+  (Vec3. (aget a 0) (aget a 1) (aget a 2)))
+
+(defn array->vec4
+  ""
+  [^doubles a]
+  (Vec4. (aget a 0) (aget a 1) (aget a 2) (aget a 3)))
+
 
 ;;(perpendicular (Vec3. 1 2 0) (Vec3. 4 3 0))
 ;;(perpendicular (Vec2. 1 0))

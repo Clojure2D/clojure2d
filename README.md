@@ -147,6 +147,7 @@ I've prepared several examples with results where you can check current state of
 * ex27 - color palette generator
 * ex28 - double pendulum (with https://github.com/littleredcomputer/sicmutils/blob/master/src/sicmutils/examples/double_pendulum.clj)
 * ex29 - 2d chaotic maps
+* ex30 - random or low discrepancy sequences
 
 ## TODO
 
