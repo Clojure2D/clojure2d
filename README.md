@@ -56,12 +56,10 @@ No docs, no tests (yet)
 
 ## Installation
 
-DON'T USE IT! NOT UPDATED! WAIT FOR VERSION 0.1.0
-
 Add following line as a dependency to your `project.clj`
 
 ```clojure
-[clojure2d "0.0.1-SNAPSHOT"]
+[clojure2d "0.0.2-SNAPSHOT"]
 ```
 
 ## Usage

@@ -66,50 +66,50 @@
             ^Complex res (c/mult c (c/exp z))]
         [(.real res) (.imag res)]))))
 
-
 (defn draw-map-position
   "draw N points from given starting point"
   [canvas initx inity [sminx smaxx sminy smaxy] f]
   
   (loop [[x y] [initx inity]
          count (int 0)]
-    (when (< count 2000)
+    (when (< count 3000)
       (let [xx (m/norm x sminx smaxx 0 600)
             yy (m/norm y sminy smaxy 0 600)]
 
-        (point canvas xx yy)
+        (when (> count 20)
+          (point canvas xx yy))
         
         (recur (f x y)
                (unchecked-inc count))))))
 
 (defn draw-map
   "draw map from starting point grid"
-  [canvas num [rminx rmaxx rminy rmaxy] scale f]
-  (set-background canvas 0 0 0)
-  (set-color canvas 220 220 220 20)
-  (doseq [x (repeatedly num #(m/drand rminx rmaxx))
-          y (repeatedly num #(m/drand rminy rmaxy))]
-    (draw-map-position canvas x y scale f)))
+  [canvas [rmin rmax ^double step] [rminx rmaxx rminy rmaxy] scale f]
+  (set-background canvas 10 10 10)
+  (set-color canvas 240 240 240 20)
+  (doseq [o (map #(+ (* 2.0 step ^double (m/grand)) ^double %) (range rmin rmax step))]
+    (draw-map-position canvas o o scale f) ;; initial point on diagonal line
+    (draw-map-position canvas (m/drand rmin rmax) (m/drand rmin rmax) scale f))) ;; random initial point
 
-(def maps {:standard-map [20 [0.0 m/TWO_PI 0.0 m/TWO_PI] [0.0 m/TWO_PI 0.0 m/TWO_PI]
+(def maps {:standard-map [[0 m/TWO_PI 0.015] [0.0 m/TWO_PI 0.0 m/TWO_PI] [0.0 m/TWO_PI 0.0 m/TWO_PI]
                           make-standard-map [[-5 5]]]
-           :henon-quadratic-map [25 [-2.0 2.0 -2.0 2.0] [-4.0 4.0 -4.0 4.0]
-                                 make-henon-quadratic-map [[0.5 m/TWO_PI]]]
-           :henon-map [70 [-2.0 2.0 -2.0 2.0] [-5.0 5.0 -5.0 5.0]
-                       make-henon-map [[0.2 1.2] [0.5 1.2]]]
-           :gingerbreadman-map [70 [-10.0 20.0 -10.0 20.0] [-20.0 20.0 -20.0 20.0]
-                                make-gingerbreadman-map [[0.5 1.1] [0.5 1.5]]]
-           :ikeda-map [70 [-5.0 10.0 -5.0 10.0] [-5.0 10.0 -5.0 10.0]
-                       make-ikeda-map [[0.8 0.9999]]]
-           :exponential-map [100 [-2.0 2.0 -2.0 2.0] [-2.0 2.0 -2.0 2.0]
-                             make-exponential-map [[-1.2 1.2] [-1.2 1.2]]]})
+           :henon-quadratic-map [[-2.0 2.0 0.01] [-2.0 2.0 -2.0 2.0] [-1.5 1.5 -1.2 1.8]
+                                 make-henon-quadratic-map [[0.5 5.0]]]
+           :henon-map [[-2.0 2.0 0.003] [-2.0 2.0 -2.0 2.0] [-5.0 5.0 -5.0 5.0]
+                       make-henon-map [[0.1 1.05] [0.7 0.9999]]]
+           :gingerbreadman-map [[-5.0 10.0 0.01] [-5.0 10.0 -5.0 10.0] [-10.0 20.0 -10.0 20.0]
+                                make-gingerbreadman-map [[0.75 0.9999] [0.6 1.5]]]
+           :ikeda-map [[-5.0 10.0 0.01] [-5.0 10.0 -5.0 10.0] [-5.0 10.0 -5.0 10.0]
+                       make-ikeda-map [[0.9 0.9999]]]
+           :exponential-map [[-2.0 2.0 0.002] [-2.0 2.0 -2.0 2.0] [-2.0 2.0 -1.0 3.0]
+                             make-exponential-map [[0.6 1.05] [0.2 1.2]]]})
 
 (let [random-map (rand-nth (keys maps))
-      [num range scale f pars] (random-map maps)
+      [steps r scale f pars] (random-map maps)
       rpars (map #(apply m/drand %) pars)]
   (println random-map)
   (println rpars)
   (with-canvas canvas
-    (draw-map num range scale (apply f rpars)))
+    (draw-map steps r scale (apply f rpars)))
   :done)
 
