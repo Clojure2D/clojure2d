@@ -65,8 +65,7 @@
   (let [kappa (* (double frame) 0.0041)
         hf (/ (m/sqrt (* 8.0 (/ kappa m/PI))) 
               (- 4.0 kappa))]
-    (with-canvas canvas
-      (my-draw hf))))
+    (my-draw canvas hf)))
 
 (do
 

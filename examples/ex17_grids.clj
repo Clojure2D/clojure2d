@@ -14,7 +14,7 @@
 
 (def canvas (create-canvas 600 600))
 
-(show-window canvas "grid" 600 600 10)
+(def window (show-window canvas "grid" 600 600 10))
 
 (defmethod key-pressed ["grid" \space] [_]
   (save-canvas canvas (next-filename "results/ex17/" ".jpg")))

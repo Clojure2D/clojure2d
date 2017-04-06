@@ -75,8 +75,7 @@
   (let [balls (if result
                 (map move result)
                 (take n (repeatedly make-ball)))]
-    (with-canvas canvas
-      (draw balls))
+    (draw canvas balls)
     balls))
 
 (defn example-14

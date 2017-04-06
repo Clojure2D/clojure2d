@@ -24,11 +24,10 @@
 (defn draw
   ""
   [canvas framecount & res]
-  (with-canvas canvas
-    (set-awt-color foreground)
-    (set-stroke 1.85)
-    (set-awt-background background)
-    (draw-lines framecount)))
+  (set-awt-color canvas foreground)
+  (set-stroke canvas 1.85)
+  (set-awt-background canvas background)
+  (draw-lines canvas framecount))
 
 (defn example-03
   []

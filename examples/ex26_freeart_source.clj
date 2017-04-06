@@ -57,8 +57,7 @@
   (let [curr (or state canvases)
         id (mod frame number-of-frames)
         current-canvas (first curr)]
-    (with-canvas canvas
-      (image (@current-canvas 1)))
+    (image canvas (@current-canvas 1))
     (next curr)))
 
 ;; Display window. I don't know why but running first time shows blank window.

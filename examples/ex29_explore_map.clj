@@ -67,6 +67,23 @@
             ^Complex res (c/mult c (c/exp z))]
         [(.real res) (.imag res)]))))
 
+(defn gumo-mira-fn
+  "Gumowski-Mira function"
+  ^double [^double A ^double x]
+  (let [x2 (* x x)]
+    (+ (* A x) (/ (* 2.0 (- 1.0 A) x2) (m/sq (inc x2))))))
+
+
+(defn make-gumo-mira-map
+  "Gumowski Mira"
+  [^double A ^double B]
+  (fn [^double x ^double y]
+    (let [x' (+ (* B y) (gumo-mira-fn A x))
+          y' (- (gumo-mira-fn A x') x)]
+      [x' y'])))
+
+((make-gumo-mira-map 1 2) 1 1)
+
 (defn draw-map-position
   "draw N points from given starting point"
   [canvas initx inity [sminx smaxx sminy smaxy] f]
@@ -103,7 +120,9 @@
            :ikeda-map [[-5.0 10.0 0.01] [-5.0 10.0 -5.0 10.0] [-5.0 10.0 -5.0 10.0]
                        make-ikeda-map [[0.9 0.9999]]]
            :exponential-map [[-2.0 2.0 0.002] [-2.0 2.0 -2.0 2.0] [-2.0 2.0 -1.0 3.0]
-                             make-exponential-map [[0.6 1.05] [0.2 1.2]]]})
+                             make-exponential-map [[0.6 1.05] [0.2 1.2]]]
+           :gumowski-mira-map [[-1.0 1.0 0.003] [-1.0 1.0 -1.0 1.0] [-3.0 3.0 -3.0 3.0]
+                               make-gumo-mira-map [[-1.0 1.0] [0.7 1.05]]]})
 
 (let [random-map (rand-nth (keys maps))
       [steps r scale f pars] (random-map maps)

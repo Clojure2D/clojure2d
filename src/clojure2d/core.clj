@@ -197,6 +197,7 @@
 ;; Following functions and macro are responsible for creating and releasing `Graphics2D` object for a canvas.
 ;; You have to use `with-canvas` macro to draw on canvas. Internally it's a threading macro and accepts only list of methods which first parameter is canvas object.
 ;; Please do not use `flush-graphics` and `make-graphics` functions directly. Use `with-canvas` macro instead. I do not check state of `Graphics2D` anywhere.
+;; There is one exception: your `draw` function is already wrapped in `with-canvas` and you can freely use canvas object inside.
 
 (defn flush-graphics
   "Dispose current `Graphics2D`"
@@ -216,15 +217,15 @@
     (reset! canvas [ng b h])))
 
 (defmacro with-canvas
-  "Threading macro which takes care to create and destroy `Graphics2D` object for drawings on canvas. Macro returns canvas itself (with released `Graphics2d`."
+  "Threading macro which takes care to create and destroy `Graphics2D` object for drawings on canvas. Macro returns result of last call."
   [canvas & body]
   `(let [canvas# ~canvas]
      (do 
        (make-graphics canvas#)
-       (-> canvas#
-           ~@body)
-       (flush-graphics canvas#)
-       canvas#)))
+       (let [result# (-> canvas#
+                         ~@body)]
+         (flush-graphics canvas#)
+         result#))))
 
 ;; Next functions are canvas management functions: create, save, resize and set quality.
 
@@ -482,6 +483,8 @@
 ;;
 ;; Function should return current state, which is subject to pass to function when called next time.
 ;;
+;; Note: calls to `draw` is wrapped in `with-canvas` already.
+;;
 ;; See: examples/ex02_draw.clj
 ;;
 ;; ### Events
@@ -541,7 +544,8 @@
 (def mouse-event-map {MouseEvent/MOUSE_CLICKED  :mouse-clicked
                       MouseEvent/MOUSE_DRAGGED  :mouse-dragged
                       MouseEvent/MOUSE_PRESSED  :mouse-pressed
-                      MouseEvent/MOUSE_RELEASED :mouse-released})
+                      MouseEvent/MOUSE_RELEASED :mouse-released
+                      MouseEvent/MOUSE_MOVED    :mouse-moved})
 
 ;; Multimethod used to processed mouse events
 (defmulti mouse-event (fn [^MouseEvent e] [(component-name e) (mouse-event-map (.getID e))]))
@@ -559,9 +563,11 @@
                        (mouseClicked [^MouseEvent e] (mouse-event e))
                        (mousePressed [^MouseEvent e] (mouse-event e))
                        (mouseReleased [^MouseEvent e] (mouse-event e))))
-;; Mouse drag
+
+;; Mouse drag and move
 (def mouse-motion-processor (proxy [MouseMotionAdapter] []
-                              (mouseDragged [^MouseEvent e] (mouse-event e))))
+                              (mouseDragged [^MouseEvent e] (mouse-event e))
+                              (mouseMoved [^MouseEvent e] (mouse-event e))))
 
 ;; ### Frame machinery functions
 ;;
@@ -623,13 +629,16 @@
   "Repaint canvas on window with set FPS.
 
   * Input: frame, is-display-running? atom, function to run before repaint, canvas and sleep time."
-  [panel is-display-running? draw-fun buffer stime]
+  [panel is-display-running? draw-fun buffer stime]  
   (loop [cnt (long 0)
          result nil]
-    (let [new-result (when draw-fun (draw-fun @buffer cnt result))]
+    (let [canvas @buffer
+          new-result (when draw-fun 
+                       (with-canvas canvas
+                         (draw-fun cnt result)))]
       (Thread/sleep stime)
-      (repaint panel @buffer)
-      (when @is-display-running? (recur (inc cnt) new-result)))))
+      (repaint panel @buffer) 
+      (when @is-display-running? (recur (unchecked-inc cnt) new-result)))))
 
 ;; You may want to replace canvas to the other one on window. To make it pass result of `show-window` function and new canvas.
 ;; Internally it just resets buffer atom for another canvas.
