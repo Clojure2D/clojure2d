@@ -9,7 +9,8 @@
 ;; Tolerance for vector comparison used in `is-near-zero?` and `aligned?` functions
 ;; to mitigate approximation errors
 (ns clojure2d.math.vector
-  (:require [clojure2d.math :as m]))
+  (:require [clojure2d.math :as m])
+  (:import [clojure.lang Counted Sequential Seqable IFn PersistentVector]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -17,6 +18,7 @@
 (def ^:const ^double TOLERANCE 1.0e-6)
 
 (defprotocol VectorProto
+  (to-vec [v])
   (applyf [v f])
   (magsq [v1])
   (mag [v1])
@@ -52,10 +54,67 @@
 (declare angle-between)
 (declare normalize)
 
+(defn- find-idx-reducer-fn 
+  ""
+  [f]
+  #(let [[midx curr v] %1]
+     (if (f %2 v)
+       [curr (inc curr) %2]
+       [midx (inc curr) v])))
+
+(defn- near-zero?
+  "Is your value less than TOLERANCE?"
+  [v]
+  (< (m/abs v) TOLERANCE))
+
+(extend PersistentVector
+  VectorProto
+  {:to-vec identity
+   :applyf #(mapv %2 %1)
+   :magsq (fn [v] (reduce #(+ %1 (* %2 %2)) v))
+   :mag (comp m/sqrt magsq)
+   :dot #(reduce + (map * %1 %2))
+   :add #(mapv + %1 %2)
+   :sub #(mapv - %1 %2)
+   :mult (fn [v1 v] (map #(* % v) v1))
+   :emult #(mapv * %1 %2)
+   :div #(mult %1 (/ 1.0 %2))
+   :abs #(mapv m/abs %)
+   :mx #(reduce max %)
+   :mn #(reduce min %)
+   :emx #(mapv max %1 %2)
+   :emn #(mapv min %1 %2)
+   :maxdim #(first (reduce (find-idx-reducer-fn >) [0 0 (first %)] %))
+   :mindim #(first (reduce (find-idx-reducer-fn <) [0 0 (first %)] %))
+   :sum #(reduce + %)
+   :interpolate (fn
+                  ([v1 v2 t f]
+                   (mapv #(f %1 %2 t) v1 v2))
+                  ([v1 v2 t] (interpolate v1 v2 t m/lerp)))
+   :is-zero? #(every? zero? %)
+   :is-near-zero? #(every? near-zero? %)})
+
 (deftype Vec2 [^double x ^double y]
   Object
   (toString [_] (str "[" x ", " y "]"))
+  (equals [_ v]
+    (and (instance? Vec2 v)
+         (let [^Vec2 v v]
+           (and (== x (.x v))
+                (== y (.y v))))))
+  Sequential
+  Seqable
+  (seq [_] (list x y))
+  Counted
+  (count [_] 2)
+  IFn
+  (invoke [_ id]
+    (case (int id)
+      0 x
+      1 y
+      nil))
   VectorProto
+  (to-vec [_] [x y])
   (applyf [_ f] (Vec2. (f x) (f y)))
   (magsq [_] (+ (* x x) (* y y)))
   (mag [_] (m/hypot x y))
@@ -91,8 +150,7 @@
                               (f y (.y v2) t))))
   (interpolate [v1 v2 t] (interpolate v1 v2 t m/lerp))
   (is-zero? [_] (and (zero? x) (zero? y)))
-  (is-near-zero? [_] (and (< (m/abs x) TOLERANCE)
-                          (< (m/abs y) TOLERANCE)))
+  (is-near-zero? [_] (and (near-zero? x) (near-zero? y)))
   (heading [_] (m/atan2 y x))
   (rotate [_ angle]
     (let [sa (m/sin angle)
@@ -116,7 +174,26 @@
 (deftype Vec3 [^double x ^double y ^double z]
   Object
   (toString [_] (str "[" x ", " y ", " z "]"))
+  (equals [_ v]
+    (and (instance? Vec3 v)
+         (let [^Vec3 v v]
+           (and (== x (.x v))
+                (== y (.y v))
+                (== z (.z v))))))
+  Sequential
+  Seqable
+  (seq [_] (list x y z))
+  Counted
+  (count [_] 3)
+  IFn
+  (invoke [_ id]
+    (case (int id)
+      0 x
+      1 y
+      2 z
+      nil))
   VectorProto
+  (to-vec [_] [x y z])
   (applyf [_ f] (Vec3. (f x) (f y) (f z)))
   (magsq [_] (+ (* x x) (* y y) (* z z)))
   (mag [_] (m/hypot x y z))
@@ -160,16 +237,14 @@
                               (f z (.z v2) t))))
   (interpolate [v1 v2 t] (interpolate v1 v2 t m/lerp))
   (is-zero? [_] (and (zero? x) (zero? y) (zero? z)))
-  (is-near-zero? [_] (and (< (m/abs x) TOLERANCE)
-                          (< (m/abs y) TOLERANCE)
-                          (< (m/abs z) TOLERANCE)))
+  (is-near-zero? [_] (and (near-zero? x) (near-zero? y) (near-zero? z)))
   (heading [v1] (angle-between v1 (Vec3. 1 0 0)))
   (cross [_ v2]
-   (let [^Vec3 v2 v2
-         cx (- (* y (.z v2)) (* (.y v2) z))
-         cy (- (* z (.x v2)) (* (.z v2) x))
-         cz (- (* x (.y v2)) (* (.x v2) y))]
-     (Vec3. cx cy cz)))
+    (let [^Vec3 v2 v2
+          cx (- (* y (.z v2)) (* (.y v2) z))
+          cy (- (* z (.x v2)) (* (.z v2) x))
+          cz (- (* x (.y v2)) (* (.x v2) y))]
+      (Vec3. cx cy cz)))
   (perpendicular [v1 v2]
     (normalize (cross v1 v2)))
   (transform [_ o vx vy vz]
@@ -253,7 +328,28 @@
 (deftype Vec4 [^double x ^double y ^double z ^double w]
   Object
   (toString [_] (str "[" x ", " y ", " z ", " w "]"))
+  (equals [_ v]
+    (and (instance? Vec4 v)
+         (let [^Vec4 v v]
+           (and (== x (.x v))
+                (== y (.y v))
+                (== z (.z v))
+                (== w (.w v))))))
+  Sequential
+  Seqable
+  (seq [_] (list x y z w))
+  Counted
+  (count [_] 4)
+  IFn
+  (invoke [_ id]
+    (case (int id)
+      0 x
+      1 y
+      2 z
+      3 w
+      nil))
   VectorProto
+  (to-vec [_] [x y z w])
   (applyf [_ f] (Vec4. (f x) (f y) (f z) (f w)))
   (magsq [_] (+ (* x x) (* y y) (* z z) (* w w)))
   (mag [v1] (m/sqrt (magsq v1)))
@@ -277,6 +373,10 @@
     (let [^Vec4 v v] (Vec4. (max (.x v) x) (max (.y v) y) (max (.z v) z) (max (.w v) w))))
   (emn [_ v]
     (let [^Vec4 v v] (Vec4. (min (.x v) x) (min (.y v) y) (min (.z v) z) (min (.w v) w))))
+  (maxdim [_]
+    (max-key [x y z w] 0 1 2 3))
+  (mindim [_]
+    (min-key [x y z w] 0 1 2 3))
   (sum [_] (+ x y z w)) 
   (interpolate [_ v2 t f]
     (let [^Vec4 v2 v2] (Vec4. (f x (.x v2) t)
@@ -285,10 +385,7 @@
                               (f w (.w v2) t))))
   (interpolate [v1 v2 t] (interpolate v1 v2 t m/lerp))
   (is-zero? [_] (and (zero? x) (zero? y) (zero? z) (zero? w)))
-  (is-near-zero? [_] (and (< (m/abs x) TOLERANCE)
-                          (< (m/abs y) TOLERANCE)
-                          (< (m/abs z) TOLERANCE)
-                          (< (m/abs w) TOLERANCE)))
+  (is-near-zero? [_] (and (near-zero? x) (near-zero? y) (near-zero? z) (near-zero? w)))
   (heading [v1] (angle-between v1 (Vec4. 1 0 0 0))))
 
 ;; common functions
@@ -317,6 +414,28 @@
   "Chebyshev distance between 2d vectors"
   [v1 v2]
   (mx (abs (sub v1 v2))))
+
+(defn dist-canberra
+  ""
+  [v1 v2]
+  (let [num (abs (sub v1 v2))
+        denom (applyf (add (abs v1) (abs v2)) #(if (zero? %) 0.0 (/ 1.0 %)))]
+    (sum (emult num denom))))
+
+(defn dist-emd
+  "Earth Mover's Distance"
+  [v1 v2]
+  (first (reduce #(let [[s l] %1
+                        [a b] %2
+                        n (- (+ a l) b)]
+                    [(+ s (m/abs l)) n]) [0.0 0.0] (map vector v1 v2))))
+
+(def distances {:euclid dist
+                :euclid-sq dist-sq
+                :abs dist-abs
+                :cheb dist-cheb
+                :canberra dist-canberra
+                :emd dist-emd})
 
 (defn normalize
   "Normalize vector"
