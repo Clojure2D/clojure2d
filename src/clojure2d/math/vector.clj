@@ -55,7 +55,7 @@
 (declare normalize)
 
 (defn- find-idx-reducer-fn 
-  ""
+  "Helper function for reduce to find index for maximum/minimum value in vector."
   [f]
   #(let [[midx curr v] %1]
      (if (f %2 v)
