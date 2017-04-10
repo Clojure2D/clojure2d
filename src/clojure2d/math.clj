@@ -88,6 +88,7 @@
 ;; Few logarithm constants
 ;; \\(\ln 2\\)
 (def ^:const ^double LN2 (log 2.0))
+(def ^:const ^double INV_LN2 (/ 1.0 LN2))
 (def ^:const ^double LN2_2 (* 0.5 LN2))
 
 ;; \\(\ln 10\\)
@@ -99,7 +100,7 @@
 (defn log2
   "Log with base 2"
   ^double [^double v]
-  (/ (FastMath/log v) LN2))
+  (* (FastMath/log v) INV_LN2))
 
 ;; \\(\log_b x\\)
 (defn logb
@@ -249,16 +250,16 @@
 
 (defn make-norm
   "Make type hinted map/norm function"
-  (^double [^double start ^double stop]
+  ([^double start ^double stop]
    (let [r (- stop start)]
-       (fn ^double [^double v ^double dstart ^double dstop]
-          (let [vn (/ (- v start) r)]
-            (+ dstart (* (- dstop dstart) vn))))))
-  (^double [^double start ^double stop ^double dstart ^double dstop]
+     (fn ^double [^double v ^double dstart ^double dstop]
+       (let [vn (/ (- v start) r)]
+         (+ dstart (* (- dstop dstart) vn))))))
+  ([^double start ^double stop ^double dstart ^double dstop]
    (let [r (- stop start)]
-       (fn ^double [^double v]
-          (let [vn (/ (- v start) r)]
-            (+ dstart (* (- dstop dstart) vn)))))))
+     (fn ^double [^double v]
+       (let [vn (/ (- v start) r)]
+         (+ dstart (* (- dstop dstart) vn)))))))
 
 ;; Map and constrain values
 ;; `(cnorm 1.5 0 1 100 200) => 200`

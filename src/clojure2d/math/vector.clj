@@ -513,18 +513,3 @@
   ""
   [^doubles a]
   (Vec4. (aget a 0) (aget a 1) (aget a 2) (aget a 3)))
-
-
-;;(perpendicular (Vec3. 1 2 0) (Vec3. 4 3 0))
-;;(perpendicular (Vec2. 1 0))
-
-;;(transform (Vec3. 1 2 3) (Vec3. 1 2 3) (Vec3. 1 1 2) (Vec3. -1 1 2) (Vec3. 1 -5 1))
-
-;;(transform (Vec2. 1 2) (Vec2. 1 2) (Vec2. 1 1) (Vec2. 1 -5))
-
-;; (axis-rotate (Vec3. 1 2 3) PI (Vec3. 0 1 0))
-;;(axis-rotate (Vec3. 1 2 3) PI (Vec3. -1 1 1) (Vec3. 2 2 2))
-
-;;(rotate (Vec2. 1 1) (/ PI 4))
-
-;;(rotate (Vec3. 1 2 3) PI 0 0)

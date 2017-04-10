@@ -1,14 +1,16 @@
 (ns clojure2d.pixels
   (:require [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
+            [clojure2d.math.random :as r]
             [clojure2d.color :as c]
             [clojure2d.core :as core]
             [criterium.core :as b])
-  (:import [clojure2d.math.vector Vec4 Vec2]
+  (:import [clojure2d.math.vector Vec4 Vec3 Vec2]
+           [clojure.lang PersistentVector]
            [java.awt.image BufferedImage]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 ;; :zero, :edge :wrap or channel value 0-255
 (def ^:dynamic *pixels-edge* :edge)
@@ -654,3 +656,102 @@
   ""
   [ch target p]
   (filter-channel #(- 255 ^int %) ch target p))
+
+
+;;;;;;;;;;; Accumulator Bins for pixels - in progress
+
+(defprotocol BinPixelsProto
+  (add-pixel [binpixels x y ch1 ch2 ch3])
+  (to-pixels [binpixels width height]))
+
+(deftype BinPixels [^doubles bins
+                    ^doubles ch1
+                    ^doubles ch2
+                    ^doubles ch3
+                    ^double rminx ^double rmaxx ^double rminy ^double rmaxy ^long sizex ^long sizey
+                    fnormx fnormy fbilinear-add]
+  Object
+  (toString [_] (str "[" rminx "," rmaxx "]x" "[" rminy "," rmaxy "] -> " "[" sizex "," sizey "]"))
+  BinPixelsProto
+
+  (add-pixel [t x y ch1 ch2 ch3]
+    (let [^double vx (fnormx x)
+          ^double vy (fnormy y)]
+      (fbilinear-add vx vy))
+    t)
+
+  (to-pixels [t width height]
+    (let [^double mn (areduce bins idx ret Double/MAX_VALUE (min ret (aget bins idx)))
+          ^double mx (areduce bins idx ret -1.0 (max ret (aget bins idx)))
+          fc (/ 1.0 (- mx mn))
+          ^doubles lnbins (amap bins idx ret (m/sqrt (m/log2 (inc (* fc (- (aget bins idx) mn))))))
+          ^Pixels p (make-pixels width height)]
+      (println mn)
+      (println mx)
+      (dotimes [idx (* ^long width ^long height)]
+        (let [c (* 255.0 ^double (aget lnbins idx))]
+          (set-color p idx (Vec4. c c c 255))))
+      p
+      )
+    )
+  )
+
+(defn- make-bilinear-add-fn
+  ""
+  [^doubles bins ^long sizex ^long sizey]
+  (fn local-bilinear-add-fn
+    ([^double vx ^double vy ^double vv]
+     (let [ivx (long vx)
+           ivy (long vy)
+           ivx+ (inc ivx)
+           ivy+ (inc ivy)
+           restx (- vx ivx)
+           resty (- vy ivy)]
+
+       (when (and (< -1 ivx sizex)
+                  (< -1 ivy sizey))
+         (let [p (+ ivx (* ivy sizex))
+               v (aget bins p)]
+           (aset bins p (+ v (* vv restx resty)))))
+
+       (when (and (< -1 ivx+ sizex)
+                  (< -1 ivy sizey))
+         (let [p (+ ivx+ (* ivy sizex))
+               v (aget bins p)]
+           (aset bins p (+ v (* vv (- 1.0 restx) resty)))))
+
+       (when (and (< -1 ivx sizex)
+                  (< -1 ivy+ sizey))
+         (let [p (+ ivx (* ivy+ sizex))
+               v (aget bins p)]
+           (aset bins p (+ v (* vv restx (- 1.0 resty))))))
+
+       (when (and (< -1 ivx+ sizex)
+                  (< -1 ivy+ sizey))
+         (let [p (+ ivx+ (* ivy+ sizex))
+               v (aget bins p)]
+           (aset bins p (+ v (* vv (- 1.0 restx) (- 1.0 resty))))))))
+    ([^double vx ^double vy] (local-bilinear-add-fn vx vy 1.0))))
+
+(defn make-binpixels
+  "Create BinPixels type"
+  ^BinPixels [[rminx rmaxx rminy rmaxy] ^long sizex ^long sizey]
+  (let [bins (double-array (* sizex sizey))
+        ch1 (double-array (* sizex sizey))
+        ch2 (double-array (* sizex sizey))
+        ch3 (double-array (* sizex sizey))
+        fnormx (m/make-norm rminx rmaxx 0 sizex)
+        fnormy (m/make-norm rminy rmaxy 0 sizey)
+        fbilinear-add (make-bilinear-add-fn bins sizex sizey)]
+    (BinPixels. bins ch1 ch2 ch3 rminx rmaxx rminy rmaxy sizex sizey fnormx fnormy fbilinear-add)))
+
+;;(def ^BinPixels bp (make-binpixels [-10 10 -10 10] 1000 1000))
+
+;;(dotimes [x 100000000]
+;;(add-pixel bp (r/grand) (r/grand) 1 2 3))
+
+
+
+;;(save-pixels  (to-pixels bp 1000 1000) "test.png")
+
+
