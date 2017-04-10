@@ -661,39 +661,70 @@
 ;;;;;;;;;;; Accumulator Bins for pixels - in progress
 
 (defprotocol BinPixelsProto
+  (add-density [binpixels x y])
+  (get-density [binpixels x y])
   (add-pixel [binpixels x y ch1 ch2 ch3])
-  (to-pixels [binpixels width height]))
+  (to-pixels [binpixels gamma prepow] [binpixels gamma] [binpixels]))
 
 (deftype BinPixels [^doubles bins
                     ^doubles ch1
                     ^doubles ch2
                     ^doubles ch3
+                    ^ints density
                     ^double rminx ^double rmaxx ^double rminy ^double rmaxy ^long sizex ^long sizey
-                    fnormx fnormy fbilinear-add]
+                    fnormx fnormy
+                    fbilinear-add fgaussian-add]
   Object
   (toString [_] (str "[" rminx "," rmaxx "]x" "[" rminy "," rmaxy "] -> " "[" sizex "," sizey "]"))
   BinPixelsProto
 
+  (add-density [_ x y]
+    (let [xx (bit-shift-right (long x) 3)
+          yy (bit-shift-right (long y) 3)
+          sx (bit-shift-right sizex 3)
+          sy (bit-shift-right sizey 3)]
+      (when (and (< -1 xx sx)
+                 (< -1 yy sy))
+        (let [idx (+ xx (* yy sx))]
+          (aset density idx (inc (aget density idx)))))))
+
+  (get-density ^int [_ x y]
+    (let [xx (bit-shift-right (long x) 3)
+          yy (bit-shift-right (long y) 3)
+          sx (bit-shift-right sizex 3)
+          sy (bit-shift-right sizey 3)]
+      (when (and (< -1 xx sx)
+                 (< -1 yy sy))
+        (let [idx (+ xx (* yy sx))]
+          (aget density idx)))))
+  
   (add-pixel [t x y ch1 ch2 ch3]
     (let [^double vx (fnormx x)
-          ^double vy (fnormy y)]
-      (fbilinear-add vx vy))
+          ^double vy (fnormy y)
+          ivx (long vx)
+          ivy (long vy)]
+      (if (< (aget bins (+ ivx (* ivy sizex))) 5.0) ;; uzaleznic od min/max, fgaussian i fbilinear jako czesc typu
+        (fgaussian-add vx vy)
+        (fbilinear-add vx vy))
+      )
+    
     t)
-
-  (to-pixels [t width height]
+  
+  (to-pixels [_ gamma prepow]
     (let [^double mn (areduce bins idx ret Double/MAX_VALUE (min ret (aget bins idx)))
           ^double mx (areduce bins idx ret -1.0 (max ret (aget bins idx)))
-          fc (/ 1.0 (- mx mn))
-          ^doubles lnbins (amap bins idx ret (m/sqrt (m/log2 (inc (* fc (- (aget bins idx) mn))))))
-          ^Pixels p (make-pixels width height)]
+          fc (if (== mn mx) 0.0 (/ 1.0 (- mx mn)))
+          ^doubles lnbins (amap bins idx ret (m/pow (m/log2 (inc (m/pow (* fc (- (aget bins idx) mn)) prepow))) gamma))
+          ^Pixels p (make-pixels sizex sizey)]
       (println mn)
       (println mx)
-      (dotimes [idx (* ^long width ^long height)]
+      (dotimes [idx (* sizex sizey)]
         (let [c (* 255.0 ^double (aget lnbins idx))]
           (set-color p idx (Vec4. c c c 255))))
-      p
-      )
-    )
+      p))
+  (to-pixels [t gamma] (to-pixels t gamma 1.1))
+  (to-pixels [t] (to-pixels t 0.5 1.1))
+  
   )
 
 (defn- make-bilinear-add-fn
@@ -733,25 +764,76 @@
            (aset bins p (+ v (* vv (- 1.0 restx) (- 1.0 resty))))))))
     ([^double vx ^double vy] (local-bilinear-add-fn vx vy 1.0))))
 
-(defn make-binpixels
+
+(defn- gauss-kernel-val
+  ""
+  ^double [^double invsigma2 ^double x ^double y]
+  (m/exp (- (* (+ (* x x) (* y y)) invsigma2))))
+
+(defn get-gaussian-kernel-fn
+  ""
+  ^doubles [insigma]
+  (let [sigma (double insigma)
+        r (int (* 3.0 (m/sqrt sigma)))
+        rn (range (- r) (inc r))
+        r21 (inc (* 2 r))
+        invsigma2 (/ 1.0 (* 2.0 sigma sigma))
+        ^double sum (reduce + (for [x rn
+                                    y rn]
+                                (gauss-kernel-val invsigma2 x y)))
+        ^doubles arr (double-array (* r21 r21))]
+    (dotimes [y r21]
+      (let [row (* y r21)]
+        (dotimes [x r21]
+          (let [xx (- x r)
+                yy (- y r)]
+            (aset arr (+ row x) (/ (gauss-kernel-val invsigma2 xx yy) sum))))))
+    arr))
+
+(def get-gaussian-kernel (memoize get-gaussian-kernel-fn))
+
+(defn make-gaussian-add-fn
+  ""
+  [^doubles bins ^long sizex ^long sizey]
+  (fn local-gaussian-add-fn
+    ([^double vx ^double vy ^double vv]
+     (let [ivx (long vx)
+           ivy (long vy)
+           val (aget bins (+ ivx (* ivy sizey)))
+           ^double nval (m/cnorm val 5.0 0.0 0.1 2.0)
+           ^doubles kernel (get-gaussian-kernel (* 0.1 (int (* 20.0 (m/log (inc nval))))))
+           len (m/sqrt (alength kernel))
+           len2 (int (/ len 2.0))]
+       (dotimes [y len]
+         (let [row (* y len)]
+           (dotimes [x len]
+             (let [xx (+ ivx (- x len2))
+                   yy (+ ivy (- y len2))
+                   idx (+ xx (* yy sizex))]
+               (when (and (< -1.0 xx sizex) (< -1.0 yy sizey))
+                 (aset bins idx (+ (aget bins idx)
+                                   (* vv (aget kernel (+ row x))))))))))))
+    ([^double vx ^double vy] (local-gaussian-add-fn vx vy 1.0))))
+
+(m/log 351)
+
+(defn make-binpixels 
   "Create BinPixels type"
   ^BinPixels [[rminx rmaxx rminy rmaxy] ^long sizex ^long sizey]
   (let [bins (double-array (* sizex sizey))
         ch1 (double-array (* sizex sizey))
         ch2 (double-array (* sizex sizey))
         ch3 (double-array (* sizex sizey))
+        density (int-array (bit-shift-right (* sizex sizey) 6))
         fnormx (m/make-norm rminx rmaxx 0 sizex)
         fnormy (m/make-norm rminy rmaxy 0 sizey)
-        fbilinear-add (make-bilinear-add-fn bins sizex sizey)]
-    (BinPixels. bins ch1 ch2 ch3 rminx rmaxx rminy rmaxy sizex sizey fnormx fnormy fbilinear-add)))
+        fbilinear-add (make-bilinear-add-fn bins sizex sizey)
+        fgaussian-add (make-gaussian-add-fn bins sizex sizey)]
+    (BinPixels. bins ch1 ch2 ch3 density rminx rmaxx rminy rmaxy sizex sizey fnormx fnormy fbilinear-add fgaussian-add)))
 
 ;;(def ^BinPixels bp (make-binpixels [-10 10 -10 10] 1000 1000))
 
-;;(dotimes [x 100000000]
-;;(add-pixel bp (r/grand) (r/grand) 1 2 3))
+;;(time (dotimes [x 50000000]
+;;        (add-pixel bp (r/grand) (r/grand) 1 2 3)))
 
-
-
-;;(save-pixels  (to-pixels bp 1000 1000) "test.png")
-
-
+;;(save-pixels  (to-pixels bp) "test4.png")
