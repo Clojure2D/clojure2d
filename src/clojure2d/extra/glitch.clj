@@ -253,14 +253,14 @@
                      :palette (rand-nth c/palettes)}
                 0.6 (let [preset (rand-nth (keys c/paletton-presets))
                           p (rand-nth c/palettes)
-                          h (mapv #(c/paletton-rgb-to-hue %) p)]
+                          h (map #(c/paletton-rgb-to-hue %) p)]
                       {:type :colourlovers-paletton
                        :conf {:hue h
                               :preset preset
                               :type :monochromatic
                               :compl false}
-                       :palette (let [v (map #(c/make-monochromatic-palette % (preset c/paletton-presets)) h)]
-                                  (vec (flatten (concat v p))))})
+                       :palette (let [v (reduce #(concat %1 (c/make-monochromatic-palette %2 (preset c/paletton-presets))) p h)]
+                                  (vec v))})
                 (let [h (r/drand 360.0)
                       t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
                       conf {:compl (r/brand 0.6)

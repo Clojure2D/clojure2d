@@ -1184,7 +1184,7 @@
   ""
   (^double [^double r ^double g ^double b]
    (if (== r g b)
-     (Vec4. 0.0 0.0 (get-luma3 (Vec3. r g b)) 255.0)
+     0.0
      (let [f (max r g b)
            p (min r g b)
            [l i] (if (== f r)
