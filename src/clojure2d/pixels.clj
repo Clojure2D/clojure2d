@@ -661,179 +661,160 @@
 ;;;;;;;;;;; Accumulator Bins for pixels - in progress
 
 (defprotocol BinPixelsProto
-  (add-density [binpixels x y])
-  (get-density [binpixels x y])
+  (update-minmax [binpixels v])
   (add-pixel [binpixels x y ch1 ch2 ch3])
-  (to-pixels [binpixels gamma prepow] [binpixels gamma] [binpixels]))
+  (to-pixels [binpixels background gamma prepow] [binpixels background gamma] [binpixels background] [binpixels]))
 
 (deftype BinPixels [^doubles bins
                     ^doubles ch1
                     ^doubles ch2
                     ^doubles ch3
-                    ^ints density
-                    ^double rminx ^double rmaxx ^double rminy ^double rmaxy ^long sizex ^long sizey
-                    fnormx fnormy
-                    fbilinear-add fgaussian-add]
+                    ^doubles minmax 
+                    ^long sizex ^long sizey ^long sizex+
+                    fnormx fnormy]
   Object
-  (toString [_] (str "[" rminx "," rmaxx "]x" "[" rminy "," rmaxy "] -> " "[" sizex "," sizey "]"))
+  (toString [_] ("[" sizex "," sizey "]"))
   BinPixelsProto
 
-  (add-density [_ x y]
-    (let [xx (bit-shift-right (long x) 3)
-          yy (bit-shift-right (long y) 3)
-          sx (bit-shift-right sizex 3)
-          sy (bit-shift-right sizey 3)]
-      (when (and (< -1 xx sx)
-                 (< -1 yy sy))
-        (let [idx (+ xx (* yy sx))]
-          (aset density idx (inc (aget density idx)))))))
-
-  (get-density ^int [_ x y]
-    (let [xx (bit-shift-right (long x) 3)
-          yy (bit-shift-right (long y) 3)
-          sx (bit-shift-right sizex 3)
-          sy (bit-shift-right sizey 3)]
-      (when (and (< -1 xx sx)
-                 (< -1 yy sy))
-        (let [idx (+ xx (* yy sx))]
-          (aget density idx)))))
+  (update-minmax [_ v]
+    (when (> (aget minmax 0) ^double v) (aset minmax 0 ^double v))
+    (when (< (aget minmax 1) ^double v) (aset minmax 1 ^double v)))
   
-  (add-pixel [t x y ch1 ch2 ch3]
-    (let [^double vx (fnormx x)
+  (add-pixel [t x y v1 v2 v3]
+    (let [^double v1 v1
+          ^double v2 v2
+          ^double v3 v3
+          ^double vx (fnormx x)
           ^double vy (fnormy y)
           ivx (long vx)
           ivy (long vy)]
-      (if (< (aget bins (+ ivx (* ivy sizex))) 5.0) ;; uzaleznic od min/max, fgaussian i fbilinear jako czesc typu
-        (fgaussian-add vx vy)
-        (fbilinear-add vx vy))
-      )
-    
+      (when (and (< -1 ivx sizex) (< -1 ivy sizey))
+        (let [restx (- vx ivx)
+              resty (- vy ivy)
+              ivx+ (inc ivx)
+              ivy+ (inc ivy)]
+
+          (let [p (+ ivx (* ivy sizex+))
+                f (* restx resty)]
+            (update-minmax t (aset bins p (+ (aget bins p) f)))
+            (aset ch1 p (+ (aget ch1 p) (* f v1)))
+            (aset ch2 p (+ (aget ch2 p) (* f v2)))
+            (aset ch3 p (+ (aget ch3 p) (* f v3))))
+
+          (let [p (+ ivx+ (* ivy sizex+))
+                f (* (- 1.0 restx) resty)]
+            (update-minmax t (aset bins p (+ (aget bins p) f)))
+            (aset ch1 p (+ (aget ch1 p) (* f v1)))
+            (aset ch2 p (+ (aget ch2 p) (* f v2)))
+            (aset ch3 p (+ (aget ch3 p) (* f v3))))
+
+          (let [p (+ ivx (* ivy+ sizex+))
+                f (* restx (- 1.0 resty))]
+            (update-minmax t (aset bins p (+ (aget bins p) f)))
+            (aset ch1 p (+ (aget ch1 p) (* f v1)))
+            (aset ch2 p (+ (aget ch2 p) (* f v2)))
+            (aset ch3 p (+ (aget ch3 p) (* f v3))))
+
+          (let [p (+ ivx+ (* ivy+ sizex+))
+                f (* (- 1.0 restx) (- 1.0 resty))]
+            (update-minmax t (aset bins p (+ (aget bins p) f)))
+            (aset ch1 p (+ (aget ch1 p) (* f v1)))
+            (aset ch2 p (+ (aget ch2 p) (* f v2)))
+            (aset ch3 p (+ (aget ch3 p) (* f v3)))))))
     t)
   
-  (to-pixels [_ gamma prepow]
-    (let [^double mn (areduce bins idx ret Double/MAX_VALUE (min ret (aget bins idx)))
-          ^double mx (areduce bins idx ret -1.0 (max ret (aget bins idx)))
+  (to-pixels [_ background gamma prepow]
+    (let [^Vec4 background background
+          [^double mn ^double mx] minmax
           fc (if (== mn mx) 0.0 (/ 1.0 (- mx mn)))
           ^doubles lnbins (amap bins idx ret (m/pow (m/log2 (inc (m/pow (* fc (- (aget bins idx) mn)) prepow))) gamma))
           ^Pixels p (make-pixels sizex sizey)]
-      (println mn)
-      (println mx)
-      (dotimes [idx (* sizex sizey)]
-        (let [c (* 255.0 ^double (aget lnbins idx))]
-          (set-color p idx (Vec4. c c c 255))))
+      (dotimes [y sizey]
+        (let [row+ (* y sizex+)
+              row (- row+ y)]
+          (dotimes [x sizex]
+            (let [idx (+ x row+)
+                  hit (aget bins idx)]
+              (if (zero? hit)
+                (set-color p (+ x row) background)
+                (let [c (aget lnbins idx)
+                      rhit (/ 1.0 hit)
+                      ^Vec4 color (Vec4. (* rhit (aget ch1 idx))
+                                         (* rhit (aget ch2 idx))
+                                         (* rhit (aget ch3 idx))
+                                         255.0)]
+                  (set-color p (+ x row) (v/interpolate background color c))))
+              ))))
       p))
-  (to-pixels [t gamma] (to-pixels t gamma 1.1))
-  (to-pixels [t] (to-pixels t 0.5 1.1))
-  
-  )
+  (to-pixels [t background gamma] (to-pixels t background gamma 1.1))
+  (to-pixels [t background] (to-pixels t background 0.5 1.1))
+  (to-pixels [t] (to-pixels t (Vec4. 0.0 0.0 0.0 0.0) 0.5 1.1)))
 
-(defn- make-bilinear-add-fn
-  ""
-  [^doubles bins ^long sizex ^long sizey]
-  (fn local-bilinear-add-fn
-    ([^double vx ^double vy ^double vv]
-     (let [ivx (long vx)
-           ivy (long vy)
-           ivx+ (inc ivx)
-           ivy+ (inc ivy)
-           restx (- vx ivx)
-           resty (- vy ivy)]
+;; Gaussian test pad
 
-       (when (and (< -1 ivx sizex)
-                  (< -1 ivy sizey))
-         (let [p (+ ivx (* ivy sizex))
-               v (aget bins p)]
-           (aset bins p (+ v (* vv restx resty)))))
+(comment
 
-       (when (and (< -1 ivx+ sizex)
-                  (< -1 ivy sizey))
-         (let [p (+ ivx+ (* ivy sizex))
-               v (aget bins p)]
-           (aset bins p (+ v (* vv (- 1.0 restx) resty)))))
+  (defn- gauss-kernel-val
+    ""
+    ^double [^double invsigma2 ^double x ^double y]
+    (m/exp (- (* (+ (* x x) (* y y)) invsigma2))))
 
-       (when (and (< -1 ivx sizex)
-                  (< -1 ivy+ sizey))
-         (let [p (+ ivx (* ivy+ sizex))
-               v (aget bins p)]
-           (aset bins p (+ v (* vv restx (- 1.0 resty))))))
+  (defn get-gaussian-kernel-fn
+    ""
+    ^doubles [insigma]
+    (let [sigma (double insigma)
+          r (int (* 3.0 (m/sqrt sigma)))
+          rn (range (- r) (inc r))
+          r21 (inc (* 2 r))
+          invsigma2 (/ 1.0 (* 2.0 sigma sigma))
+          ^double sum (reduce + (for [x rn
+                                      y rn]
+                                  (gauss-kernel-val invsigma2 x y)))
+          ^doubles arr (double-array (* r21 r21))]
+      (dotimes [y r21]
+        (let [row (* y r21)]
+          (dotimes [x r21]
+            (let [xx (- x r)
+                  yy (- y r)]
+              (aset arr (+ row x) (/ (gauss-kernel-val invsigma2 xx yy) sum))))))
+      arr))
 
-       (when (and (< -1 ivx+ sizex)
-                  (< -1 ivy+ sizey))
-         (let [p (+ ivx+ (* ivy+ sizex))
-               v (aget bins p)]
-           (aset bins p (+ v (* vv (- 1.0 restx) (- 1.0 resty))))))))
-    ([^double vx ^double vy] (local-bilinear-add-fn vx vy 1.0))))
+  (def get-gaussian-kernel (memoize get-gaussian-kernel-fn))
 
-
-(defn- gauss-kernel-val
-  ""
-  ^double [^double invsigma2 ^double x ^double y]
-  (m/exp (- (* (+ (* x x) (* y y)) invsigma2))))
-
-(defn get-gaussian-kernel-fn
-  ""
-  ^doubles [insigma]
-  (let [sigma (double insigma)
-        r (int (* 3.0 (m/sqrt sigma)))
-        rn (range (- r) (inc r))
-        r21 (inc (* 2 r))
-        invsigma2 (/ 1.0 (* 2.0 sigma sigma))
-        ^double sum (reduce + (for [x rn
-                                    y rn]
-                                (gauss-kernel-val invsigma2 x y)))
-        ^doubles arr (double-array (* r21 r21))]
-    (dotimes [y r21]
-      (let [row (* y r21)]
-        (dotimes [x r21]
-          (let [xx (- x r)
-                yy (- y r)]
-            (aset arr (+ row x) (/ (gauss-kernel-val invsigma2 xx yy) sum))))))
-    arr))
-
-(def get-gaussian-kernel (memoize get-gaussian-kernel-fn))
-
-(defn make-gaussian-add-fn
-  ""
-  [^doubles bins ^long sizex ^long sizey]
-  (fn local-gaussian-add-fn
-    ([^double vx ^double vy ^double vv]
-     (let [ivx (long vx)
-           ivy (long vy)
-           val (aget bins (+ ivx (* ivy sizey)))
-           ^double nval (m/cnorm val 5.0 0.0 0.1 2.0)
-           ^doubles kernel (get-gaussian-kernel (* 0.1 (int (* 20.0 (m/log (inc nval))))))
-           len (m/sqrt (alength kernel))
-           len2 (int (/ len 2.0))]
-       (dotimes [y len]
-         (let [row (* y len)]
-           (dotimes [x len]
-             (let [xx (+ ivx (- x len2))
-                   yy (+ ivy (- y len2))
-                   idx (+ xx (* yy sizex))]
-               (when (and (< -1.0 xx sizex) (< -1.0 yy sizey))
-                 (aset bins idx (+ (aget bins idx)
-                                   (* vv (aget kernel (+ row x))))))))))))
-    ([^double vx ^double vy] (local-gaussian-add-fn vx vy 1.0))))
-
-(m/log 351)
+  (defn make-gaussian-add-fn
+    ""
+    [^doubles bins ^long sizex ^long sizey]
+    (fn local-gaussian-add-fn
+      ([^double vx ^double vy ^double vv]
+       (let [ivx (long vx)
+             ivy (long vy)
+             val (aget bins (+ ivx (* ivy sizey)))
+             ^double nval (m/cnorm val 5.0 0.0 0.1 2.0)
+             ^doubles kernel (get-gaussian-kernel (* 0.1 (int (* 20.0 (m/log (inc nval))))))
+             len (m/sqrt (alength kernel))
+             len2 (int (/ len 2.0))]
+         (dotimes [y len]
+           (let [row (* y len)]
+             (dotimes [x len]
+               (let [xx (+ ivx (- x len2))
+                     yy (+ ivy (- y len2))
+                     idx (+ xx (* yy sizex))]
+                 (when (and (< -1.0 xx sizex) (< -1.0 yy sizey))
+                   (aset bins idx (+ (aget bins idx)
+                                     (* vv (aget kernel (+ row x))))))))))))
+      ([^double vx ^double vy] (local-gaussian-add-fn vx vy 1.0)))))
 
 (defn make-binpixels 
   "Create BinPixels type"
   ^BinPixels [[rminx rmaxx rminy rmaxy] ^long sizex ^long sizey]
-  (let [bins (double-array (* sizex sizey))
-        ch1 (double-array (* sizex sizey))
-        ch2 (double-array (* sizex sizey))
-        ch3 (double-array (* sizex sizey))
-        density (int-array (bit-shift-right (* sizex sizey) 6))
+  (let [sizex+ (inc sizex)
+        sizey+ (inc sizey)
+        bins (double-array (* sizex+ sizey+))
+        ch1 (double-array (* sizex+ sizey+))
+        ch2 (double-array (* sizex+ sizey+))
+        ch3 (double-array (* sizex+ sizey+))
+        minmax (double-array [Double/MAX_VALUE -1.0]) ;; min and max values
         fnormx (m/make-norm rminx rmaxx 0 sizex)
-        fnormy (m/make-norm rminy rmaxy 0 sizey)
-        fbilinear-add (make-bilinear-add-fn bins sizex sizey)
-        fgaussian-add (make-gaussian-add-fn bins sizex sizey)]
-    (BinPixels. bins ch1 ch2 ch3 density rminx rmaxx rminy rmaxy sizex sizey fnormx fnormy fbilinear-add fgaussian-add)))
+        fnormy (m/make-norm rminy rmaxy 0 sizey)]
+    (BinPixels. bins ch1 ch2 ch3 minmax sizex sizey sizex+ fnormx fnormy)))
 
-;;(def ^BinPixels bp (make-binpixels [-10 10 -10 10] 1000 1000))
-
-;;(time (dotimes [x 50000000]
-;;        (add-pixel bp (r/grand) (r/grand) 1 2 3)))
-
-;;(save-pixels  (to-pixels bp) "test4.png")
