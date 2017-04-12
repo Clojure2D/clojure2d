@@ -666,14 +666,14 @@
   (add-pixel [binpixels x y ch1 ch2 ch3])
   (add-pixel-bilinear [binpixels x y ch1 ch2 ch3])
   (add-pixel-simple [binpixels x y ch1 ch2 ch3])
-  (to-pixels [binpixels background gamma prepow] [binpixels background gamma] [binpixels background] [binpixels]))
+  (to-pixels [binpixels background gamma intensity] [binpixels background gamma] [binpixels background] [binpixels]))
 
 (deftype BinPixels [^doubles bins ;; general sum of hits
                     ^doubles ch1 ;; sum of color values, channel1 (red)
                     ^doubles ch2 ;; channel2
                     ^doubles ch3 ;; channel3
                     ^doubles minmax ;; min and max bins value
-                    ^long sizex ^long sizey ^long sizex+ ;; size of the buffer
+                    ^long sizex ^long sizey ^long sizex+ ^double rarea ;; size of the buffer
                     fnormx fnormy] ;; normalization functions
   Object
   (toString [_] (str "[" sizex "," sizey "]"))
@@ -719,31 +719,42 @@
   (add-pixel [t x y v1 v2 v3]
     (add-pixel-bilinear t x y v1 v2 v3))
   
-  (to-pixels [_ background gamma prepow]
+  (to-pixels [_ background gamma intensity]
     (let [^Vec4 background background
+          ^double intensity intensity
+          rintensity (- 1.0 intensity)
           [^double mn ^double mx] minmax
           fc (if (== mn mx) 0.0 (/ 1.0 (- mx mn)))
-          ^doubles lnbins (amap bins idx ret (m/pow (m/log2 (inc (m/pow (* fc (- (aget bins idx) mn)) prepow))) gamma))
           ^Pixels p (make-pixels sizex sizey)]
       (dotimes [y sizey]
         (let [row+ (* y sizex+)
               row (- row+ y)]
           (dotimes [x sizex]
             (let [idx (+ x row+)
-                  hit (aget bins idx)]
+                  hit (aget bins idx)
+                  rhit (/ 1.0 hit)]
               (if (zero? hit)
                 (set-color p (+ x row) background)
-                (let [c (aget lnbins idx)
-                      rhit (/ 1.0 hit)
-                      ^Vec4 color (Vec4. (* rhit (aget ch1 idx))
-                                         (* rhit (aget ch2 idx))
-                                         (* rhit (aget ch3 idx))
-                                         255.0)]
-                  (set-color p (+ x row) (v/interpolate background color c))))))))
+                (let [loghit (m/log2 (inc (* fc hit)))
+                      alpha (m/pow loghit gamma)
+                      col1 (aget ^doubles c/r255 (m/iconstrain (int (* rhit (aget ch1 idx))) 0 255))
+                      col2 (aget ^doubles c/r255 (m/iconstrain (int (* rhit (aget ch2 idx))) 0 255))
+                      col3 (aget ^doubles c/r255 (m/iconstrain (int (* rhit (aget ch3 idx))) 0 255))
+                      col1log (m/log2 (inc col1))
+                      col2log (m/log2 (inc col2))
+                      col3log (m/log2 (inc col3))
+                      c1 (* 255.0 (+ (* intensity col1log)
+                                     (* rintensity (m/pow col1log gamma))))
+                      c2 (* 255.0 (+ (* intensity col2log)
+                                     (* rintensity (m/pow col2log gamma))))
+                      c3 (* 255.0 (+ (* intensity col3log)
+                                     (* rintensity (m/pow col3log gamma)))) 
+                      ^Vec4 color (v/applyf (Vec4. c1 c2 c3 255.0) c/clamp255)]
+                  (set-color p (+ x row) (v/interpolate background color alpha))))))))
       p))
-  (to-pixels [t background gamma] (to-pixels t background gamma 1.1))
-  (to-pixels [t background] (to-pixels t background 0.5 1.1))
-  (to-pixels [t] (to-pixels t (Vec4. 0.0 0.0 0.0 0.0) 0.5 1.1)))
+  (to-pixels [t background gamma] (to-pixels t background gamma 0.8))
+  (to-pixels [t background] (to-pixels t background (/ 1.0 3.0) 0.8))
+  (to-pixels [t] (to-pixels t (Vec4. 0.0 0.0 0.0 0.0) (/ 1.0 3.0) 0.8)))
 
 ;; Gaussian test pad
 
@@ -811,7 +822,7 @@
         minmax (double-array [Double/MAX_VALUE -1.0]) ;; min and max values
         fnormx (m/make-norm rminx rmaxx 0 sizex)
         fnormy (m/make-norm rminy rmaxy 0 sizey)]
-    (BinPixels. bins ch1 ch2 ch3 minmax sizex sizey sizex+ fnormx fnormy)))
+    (BinPixels. bins ch1 ch2 ch3 minmax sizex sizey sizex+ (/ 1.0 (* sizex sizey)) fnormx fnormy)))
 
 (defn merge-binpixels
   "Add two binpixels and recalculate min/max. Be sure a and b are equal. Use this function to merge results created in separated threads"
@@ -824,4 +835,5 @@
     (aset minmax 0 (double (areduce bins idx ret Double/MAX_VALUE (let [v (aget bins idx)]
                                                                     (if (pos? v) (min v ret) ret))))) ;; skip zeros
     (aset minmax 1 (double (areduce bins idx ret -1.0 (max ret ^double (aget bins idx)))))
-    (BinPixels. bins @ch1 @ch2 @ch3 minmax (.sizex a) (.sizey a) (.sizex+ a) (.fnormx a) (.fnormy a))))
+    (BinPixels. bins @ch1 @ch2 @ch3 minmax (.sizex a) (.sizey a) (.sizex+ a) (.rarea a) (.fnormx a) (.fnormy a))))
+

@@ -34,7 +34,7 @@
         ^double a3 (r/drand hwidth)
         a4 (- hwidth a3)
         n [(j/make-random-fractal) (j/make-random-fractal) r/noise r/noise r/noise r/noise r/noise r/noise]
-        pal (first (filter #(> (c/get-luma (first %)) 205) (repeatedly #(:palette (g/color-reducer-machine)))))
+        pal (first (filter #(> (c/get-luma (first %)) 80) (repeatedly #(:palette (g/color-reducer-machine)))))
         c1 (first pal)
         c2 (rand-nth pal)]
     {:f1 (rand-nth freqs)
@@ -116,7 +116,7 @@
     (if @run?
       (do
         (println time)
-        (p/set-canvas-pixels canvas (p/to-pixels bp (Vec4. 20 20 20 255) (/ 1.0 2.5)))
+        (p/set-canvas-pixels canvas (p/to-pixels bp (Vec4. 20 20 20 255) (/ 1.0 3.0) 0.9))
         (recur (iterate-harmonograph 1000000 time bp run? config)))
       (println :done))))
 
