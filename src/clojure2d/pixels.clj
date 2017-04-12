@@ -743,8 +743,7 @@
                                          (* rhit (aget ch2 idx))
                                          (* rhit (aget ch3 idx))
                                          255.0)]
-                  (set-color p (+ x row) (v/interpolate background color c))))
-              ))))
+                  (set-color p (+ x row) (v/interpolate background color c))))))))
       p))
   (to-pixels [t background gamma] (to-pixels t background gamma 1.1))
   (to-pixels [t background] (to-pixels t background 0.5 1.1))
@@ -817,3 +816,11 @@
         fnormx (m/make-norm rminx rmaxx 0 sizex)
         fnormy (m/make-norm rminy rmaxy 0 sizey)]
     (BinPixels. bins ch1 ch2 ch3 minmax sizex sizey sizex+ fnormx fnormy)))
+
+(defn merge-binpixels
+  "Add two binpixels and recalculate min/max. Be sure a and b are equal. Use this function to merge results created in separated threads"
+  ^BinPixels [^BinPixels a ^BinPixels b]
+  (let [sizey+ (inc (.sizey a))])
+  ;; tbc
+  )
+
