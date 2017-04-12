@@ -17,9 +17,12 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
-(def ^:const ^int width 1000)
-(def ^:const ^int height 1000)
+(def ^:const ^int width 2048)
+(def ^:const ^int height 2048)
 (def ^:const ^int hwidth (int (/ width 2)))
+(def ^:const ^int hheight (int (/ height 2)))
+(def r (mapv #(* 1.05 ^int %) [(- hwidth) hwidth (- hheight) hheight]))
+(def ^:const ^double step 0.00451234)
 
 (defn unit-fn ^double [_ _] 1.0)
 
@@ -33,10 +36,14 @@
         a2 (r/drand (- hwidth a1))
         ^double a3 (r/drand hwidth)
         a4 (- hwidth a3)
-        n [(j/make-random-fractal) (j/make-random-fractal) r/noise r/noise r/noise r/noise r/noise r/noise]
-        pal (first (filter #(> (c/get-luma (first %)) 80) (repeatedly #(:palette (g/color-reducer-machine)))))
-        c1 (first pal)
-        c2 (rand-nth pal)]
+        n [(j/make-random-fractal) (j/make-random-fractal) j/perlin-noise r/noise r/noise r/noise r/noise r/noise r/noise]
+        palseq (filter #(> (c/get-luma (first %)) 100) (repeatedly #(:palette (g/color-reducer-machine))))
+        pal1 (first palseq)
+        pal2 (second palseq)
+        c1 (first pal1)
+        c2 (rand-nth pal1)
+        c3 (rand-nth pal2)
+        c4 (rand-nth pal2)]
     {:f1 (rand-nth freqs)
      :f2 (rand-nth freqs)
      :f3 (rand-nth freqs)
@@ -53,28 +60,31 @@
      :nscaley1 (/ 1.0 ^double (r/drand (/ height 15.0) height))
      :nscalex2 (/ 1.0 ^double (r/drand (/ width 15.0) width))
      :nscaley2 (/ 1.0 ^double (r/drand (/ height 15.0) height))
-     :n1 (if (r/brand 0.75) (rand-nth n) unit-fn)
-     :n2 (if (r/brand 0.75) (rand-nth n) unit-fn)
-     :n3 (if (r/brand 0.75) (rand-nth n) unit-fn)
-     :n4 (if (r/brand 0.75) (rand-nth n) unit-fn)
+     :n1 (if (r/brand 0.65) (rand-nth n) unit-fn)
+     :n2 (if (r/brand 0.65) (rand-nth n) unit-fn)
+     :n3 (if (r/brand 0.65) (rand-nth n) unit-fn)
+     :n4 (if (r/brand 0.65) (rand-nth n) unit-fn)
      :c1 c1
      :c2 c2
-     :dampstepsx (if (r/brand 0.2) (vec (range 0.6 1.2 (/ 1.0 (double (r/irand 1 8))))) nil)
-     :dampstepsy (if (r/brand 0.2) (vec (range 0.6 1.2 (/ 1.0 (double (r/irand 1 8))))) nil)}))
+     :c3 c3
+     :c4 c4
+     :dampstepsx (if (r/brand 0.5) (vec (range 0.6 1.2 (/ 1.0 (double (r/irand 1 8))))) nil)
+     :dampstepsy (if (r/brand 0.5) (vec (range 0.6 1.2 (/ 1.0 (double (r/irand 1 8))))) nil)}))
 
 (defn iterate-harmonograph
   "Read configuration and do `n` iterations starting at time `start-time`, store everything in `BinPixels`."
-  [n start-time ^BinPixels bp run?
+  [n start-time run?
    {:keys [^double f1 ^double f2 ^double f3 ^double f4
            ^double p1 ^double p2 ^double p3 ^double p4
            ^double a1 ^double a2 ^double a3 ^double a4
            ^double nscalex1 ^double nscaley1
            ^double nscalex2 ^double nscaley2
            n1 n2 n3 n4
-           ^Vec4 c1 ^Vec4 c2
+           ^Vec4 c1 ^Vec4 c2 ^Vec4 c3 ^Vec c4
            dampstepsx dampstepsy]}]
   (let [^int dampxc (if dampstepsx (count dampstepsx) 0)
-        ^int dampyc (if dampstepsy (count dampstepsy) 0)]
+        ^int dampyc (if dampstepsy (count dampstepsy) 0)
+        ^BinPixels bp (p/make-binpixels r width height)]
     (loop [prevx (double 0.0)
            prevy (double 0.0)
            time (double start-time)
@@ -82,41 +92,60 @@
       (if (and @run? (< iter ^long n))
         (let [s1 (m/sin (+ (* time f2) p2))
               s2 (m/sin (+ (* time f3) p3))
-              ^Vec4 col (v/interpolate c1 c2 (m/abs (* s1 s2)))
-              
+
+              s3 (m/sin (+ (* time f1)
+                           (* m/TWO_PI ^double (n1 (* prevy nscaley2) p1))
+                           p1))
               ^double dampx (if (zero? dampxc) 1.0
                                 (dampstepsx (int (m/norm (m/qsin (+ time p1)) -1.0 1.1 0.0 dampxc))))
               ^double dampy (if (zero? dampyc) 1.0
                                 (dampstepsy (int (m/norm (m/qsin (+ time p4)) -1.0 1.1 0.0 dampyc))))              
-              
-              x (* dampx (+ (* a1 (m/sin (+ (* time f1)
-                                            (* m/TWO_PI ^double (n1 (* prevy nscaley2) p1))
-                                            p1)))
+
+              x (* dampx (+ (* a1 s3)
                             (* a2 s1 ^double (n2 (+ (* prevx nscalex1)) (* prevy nscaley1)))))
+              s4 (m/sin (+ (* time f4)
+                           (* m/TWO_PI ^double (n4 (* x nscaley2) p4))
+                           p4))
               y (* dampy (+ (* a3 s2 ^double (n3 (* (+ time prevx) nscalex2) (+ (* prevy nscaley2))))
-                            (* a4 (m/sin (+ (* time f4)
-                                            (* m/TWO_PI ^double (n4 (* x nscaley2) p4))
-                                            p4)))))]
+                            (* a4 s4)))
+              
+              ^Vec4 col1 (v/interpolate c1 c2 (m/abs (* s1 s2)))
+              ^Vec4 col2 (v/interpolate c3 c4 (m/abs (* s3 s4))) 
+              ^Vec4 col (v/interpolate col1 col2 (m/qsin time))]
           
           (p/add-pixel-bilinear bp x y (.x col) (.y col) (.z col))
-          (recur x y (+ time 0.0051234) (inc iter)))
-        time))))
+          (recur x y (+ time step) (inc iter)))
+        bp))))
 
 ;; Create canvas, windows, binpixels, configuration and iterate until window is closed
 ;; press `space` to save
 (let [config (make-random-config)
       canvas (create-canvas width height)
-      [_ run?] (show-window canvas "Harmonograph" width height 5)
-      ^BinPixels bp (p/make-binpixels [-520 520 -520 520] width height)]
+      [_ run?] (show-window canvas "Harmonograph" 800 800 5)]
 
   (defmethod key-pressed ["Harmonograph" \space] [_]
-    (save-canvas canvas (next-filename "results/ex32/" ".jpg")))
+    (save-canvas canvas (next-filename "results/ex32/" ".png")))
 
-  (loop [time (iterate-harmonograph 100000 0.0 bp run? config)]
-    (if @run?
-      (do
-        (println time)
-        (p/set-canvas-pixels canvas (p/to-pixels bp (Vec4. 20 20 20 255) (/ 1.0 3.0) 0.9))
-        (recur (iterate-harmonograph 1000000 time bp run? config)))
-      (println :done))))
-
+  ;; first run
+  (let [bp (iterate-harmonograph 200000 0.0 run? config)]
+    (p/set-canvas-pixels canvas (p/to-pixels bp
+                                             (Vec4. 8 10 15 255) {:saturation 1.5 :brightness 1.2}))
+    (loop [time (* step 200000.0)
+           prev bp]
+      (if @run?
+        (do
+          (println time)
+          (let [bp1 (future (iterate-harmonograph 2000000 time run? config))
+                bp2 (future (iterate-harmonograph 2000000 (+ time (* step 2000000.0)) run? config))
+                bp3 (future (iterate-harmonograph 2000000 (+ time (* step 4000000.0)) run? config))
+                bp4 (future (iterate-harmonograph 2000000 (+ time (* step 6000000.0)) run? config))
+                new (->> prev
+                         (p/merge-binpixels @bp4)
+                         (p/merge-binpixels @bp3)
+                         (p/merge-binpixels @bp2)
+                         (p/merge-binpixels @bp1))]
+            (p/set-canvas-pixels canvas (p/to-pixels new
+                                                     (Vec4. 8 10 15 255) {:saturation 1.5 :brightness 1.2}))
+            (recur (+ time (* step 8000000.0))
+                   new)))
+        (println :done)))))
