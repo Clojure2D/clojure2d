@@ -662,29 +662,45 @@
 
 (defprotocol BinPixelsProto
   (update-minmax [binpixels v])
+  (add-at-position [binpixels p s ch1 ch2 ch3]) ;; p - position, s - scale/value, ch1-ch3 - values
   (add-pixel [binpixels x y ch1 ch2 ch3])
+  (add-pixel-bilinear [binpixels x y ch1 ch2 ch3])
+  (add-pixel-simple [binpixels x y ch1 ch2 ch3])
   (to-pixels [binpixels background gamma prepow] [binpixels background gamma] [binpixels background] [binpixels]))
 
-(deftype BinPixels [^doubles bins
-                    ^doubles ch1
-                    ^doubles ch2
-                    ^doubles ch3
-                    ^doubles minmax 
-                    ^long sizex ^long sizey ^long sizex+
-                    fnormx fnormy]
+(deftype BinPixels [^doubles bins ;; general sum of hits
+                    ^doubles ch1 ;; sum of color values, channel1 (red)
+                    ^doubles ch2 ;; channel2
+                    ^doubles ch3 ;; channel3
+                    ^doubles minmax ;; min and max bins value
+                    ^long sizex ^long sizey ^long sizex+ ;; size of the buffer
+                    fnormx fnormy] ;; normalization functions
   Object
-  (toString [_] ("[" sizex "," sizey "]"))
+  (toString [_] (str "[" sizex "," sizey "]"))
   BinPixelsProto
 
   (update-minmax [_ v]
     (when (> (aget minmax 0) ^double v) (aset minmax 0 ^double v))
     (when (< (aget minmax 1) ^double v) (aset minmax 1 ^double v)))
+
+  (add-at-position [t p s v1 v2 v3]
+    (let [^long p p
+          ^double s s]
+      (update-minmax t (aset bins p (+ (aget bins p) s)))
+      (aset ch1 p (+ (aget ch1 p) (* s ^double v1)))
+      (aset ch2 p (+ (aget ch2 p) (* s ^double v2)))
+      (aset ch3 p (+ (aget ch3 p) (* s ^double v3)))))
   
-  (add-pixel [t x y v1 v2 v3]
-    (let [^double v1 v1
-          ^double v2 v2
-          ^double v3 v3
-          ^double vx (fnormx x)
+  (add-pixel-simple [t x y v1 v2 v3]
+    (let [ivx (long (fnormx x))
+          ivy (long (fnormy y))
+          p (+ ivx (* ivy sizex+))]
+      (when (and (< -1 ivx sizex) (< -1 ivy sizey))
+        (add-at-position t p 1.0 v1 v2 v3)))
+    t)
+  
+  (add-pixel-bilinear [t x y v1 v2 v3]
+    (let [^double vx (fnormx x)
           ^double vy (fnormy y)
           ivx (long vx)
           ivy (long vy)]
@@ -694,34 +710,14 @@
               ivx+ (inc ivx)
               ivy+ (inc ivy)]
 
-          (let [p (+ ivx (* ivy sizex+))
-                f (* restx resty)]
-            (update-minmax t (aset bins p (+ (aget bins p) f)))
-            (aset ch1 p (+ (aget ch1 p) (* f v1)))
-            (aset ch2 p (+ (aget ch2 p) (* f v2)))
-            (aset ch3 p (+ (aget ch3 p) (* f v3))))
-
-          (let [p (+ ivx+ (* ivy sizex+))
-                f (* (- 1.0 restx) resty)]
-            (update-minmax t (aset bins p (+ (aget bins p) f)))
-            (aset ch1 p (+ (aget ch1 p) (* f v1)))
-            (aset ch2 p (+ (aget ch2 p) (* f v2)))
-            (aset ch3 p (+ (aget ch3 p) (* f v3))))
-
-          (let [p (+ ivx (* ivy+ sizex+))
-                f (* restx (- 1.0 resty))]
-            (update-minmax t (aset bins p (+ (aget bins p) f)))
-            (aset ch1 p (+ (aget ch1 p) (* f v1)))
-            (aset ch2 p (+ (aget ch2 p) (* f v2)))
-            (aset ch3 p (+ (aget ch3 p) (* f v3))))
-
-          (let [p (+ ivx+ (* ivy+ sizex+))
-                f (* (- 1.0 restx) (- 1.0 resty))]
-            (update-minmax t (aset bins p (+ (aget bins p) f)))
-            (aset ch1 p (+ (aget ch1 p) (* f v1)))
-            (aset ch2 p (+ (aget ch2 p) (* f v2)))
-            (aset ch3 p (+ (aget ch3 p) (* f v3)))))))
+          (add-at-position t (+ ivx (* ivy sizex+)) (* restx resty) v1 v2 v3)
+          (add-at-position t (+ ivx+ (* ivy sizex+)) (* (- 1.0 restx) resty) v1 v2 v3)
+          (add-at-position t (+ ivx (* ivy+ sizex+)) (* restx (- 1.0 resty)) v1 v2 v3)
+          (add-at-position t (+ ivx+ (* ivy+ sizex+)) (* (- 1.0 restx) (- 1.0 resty)) v1 v2 v3))))
     t)
+
+  (add-pixel [t x y v1 v2 v3]
+    (add-pixel-bilinear t x y v1 v2 v3))
   
   (to-pixels [_ background gamma prepow]
     (let [^Vec4 background background
@@ -820,7 +816,12 @@
 (defn merge-binpixels
   "Add two binpixels and recalculate min/max. Be sure a and b are equal. Use this function to merge results created in separated threads"
   ^BinPixels [^BinPixels a ^BinPixels b]
-  (let [sizey+ (inc (.sizey a))])
-  ;; tbc
-  )
-
+  (let [ch1 (future (amap ^doubles (.ch1 a) idx ret (+ (aget ^doubles (.ch1 a) idx) (aget ^doubles (.ch1 b) idx))))
+        ch2 (future (amap ^doubles (.ch2 a) idx ret (+ (aget ^doubles (.ch2 a) idx) (aget ^doubles (.ch2 b) idx))))
+        ch3 (future (amap ^doubles (.ch3 a) idx ret (+ (aget ^doubles (.ch3 a) idx) (aget ^doubles (.ch3 b) idx))))
+        ^doubles bins (amap ^doubles (.bins a) idx ret (+ (aget ^doubles (.bins a) idx) (aget ^doubles (.bins b) idx)))
+        ^doubles minmax (double-array 2)]
+    (aset minmax 0 (double (areduce bins idx ret Double/MAX_VALUE (let [v (aget bins idx)]
+                                                                    (if (pos? v) (min v ret) ret))))) ;; skip zeros
+    (aset minmax 1 (double (areduce bins idx ret -1.0 (max ret ^double (aget bins idx)))))
+    (BinPixels. bins @ch1 @ch2 @ch3 minmax (.sizex a) (.sizey a) (.sizex+ a) (.fnormx a) (.fnormy a))))

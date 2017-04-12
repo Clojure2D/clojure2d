@@ -34,8 +34,8 @@
         ^double a3 (r/drand hwidth)
         a4 (- hwidth a3)
         n [(j/make-random-fractal) (j/make-random-fractal) r/noise r/noise r/noise r/noise r/noise r/noise]
-        pal (first (filter #(> (c/get-luma (first %)) 100) (repeatedly #(:palette (g/color-reducer-machine)))))
-        c1 (rand-nth pal)
+        pal (first (filter #(> (c/get-luma (first %)) 205) (repeatedly #(:palette (g/color-reducer-machine)))))
+        c1 (first pal)
         c2 (rand-nth pal)]
     {:f1 (rand-nth freqs)
      :f2 (rand-nth freqs)
@@ -98,7 +98,7 @@
                                             (* m/TWO_PI ^double (n4 (* x nscaley2) p4))
                                             p4)))))]
           
-          (p/add-pixel bp x y (.x col) (.y col) (.z col))
+          (p/add-pixel-bilinear bp x y (.x col) (.y col) (.z col))
           (recur x y (+ time 0.0051234) (inc iter)))
         time))))
 
@@ -116,7 +116,7 @@
     (if @run?
       (do
         (println time)
-        (p/set-canvas-pixels canvas (p/to-pixels bp (Vec4. 20 20 20 255)))
+        (p/set-canvas-pixels canvas (p/to-pixels bp (Vec4. 20 20 20 255) (/ 1.0 2.5)))
         (recur (iterate-harmonograph 1000000 time bp run? config)))
       (println :done))))
 
