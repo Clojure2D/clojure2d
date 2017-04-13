@@ -115,18 +115,19 @@
                                 (dampstepsy (int (m/norm (m/qsin (+ time p4)) -1.0 1.1 0.0 dampyc))))              
 
               x (* dampx (+ (* a1 s3)
-                            (* a2 s1 ^double (n2 (+ (* prevx nscalex1)) (* prevy nscaley1)))))
+                            (* a2 s1 (* ^double (n2 (* time prevx nscalex1) (* prevy nscaley1))
+                                        ^double (n1 s1 (* prevx prevy))))))
               s4 (m/sin (+ (* time f4)
-                           (* m/TWO_PI ^double (n4 (* (+ x (m/qsin time)) nscaley2) p4))
+                           (* m/TWO_PI ^double (n4 (* x nscaley2) p4))
                            p4))
-              y (* dampy (+ (* a3 s2 ^double (n3 (* prevx nscalex2) (+ (* prevy nscaley2))))
+              y (* dampy (+ (* a3 s2 ^double (n3 (* prevx nscalex2) (+ time (* prevy nscaley2))))
                             (* a4 s4)))
               
               ^Vec4 col1 (v/interpolate c1 c2 (m/abs (* s1 s2)))
               ^Vec4 col2 (v/interpolate c3 c4 (m/abs (* s3 s4))) 
               ^Vec4 col (v/interpolate col1 col2 (m/qsin time))]
 
-          (p/add-pixel bp x y (.x col) (.y col) (.z col))
+          (p/add-pixel-bilinear bp x y (.x col) (.y col) (.z col))
           (recur x y (+ time step) (inc iter)))
         bp))))
 
@@ -135,7 +136,7 @@
   [canvas ^BinPixels bp]
   (p/set-canvas-pixels canvas (p/to-pixels bp
                                            (Vec4. 8 10 15 255)
-                                           {:saturation 1.5 :brightness 1.2 :alpha-gamma 0.7}))  )
+                                           {:saturation 1.5 :brightness 1.2 :alpha-gamma 0.6}))  )
 
 ;; Create canvas, windows, binpixels, configuration and iterate until window is closed
 ;; press `space` to save
@@ -147,6 +148,8 @@
   (defmethod key-pressed ["Harmonograph" \space] [_]
     (save-canvas canvas (next-filename "results/ex32/" ".png")))
 
+  (println (:n3 config))
+  
   ;; first run
   (let [bp (iterate-harmonograph first-step 0.0 run? config)]
 
@@ -155,12 +158,11 @@
            prev bp]
       (if @run?
         (do
-          (println time)
-          (println (str "max: " (p/get-max prev)))
+          (println time) 
           (let [newb (reduce p/merge-binpixels prev
                              (map #(iterate-harmonograph steps-per-task (+ time (* step ^int % steps-per-task)) run? config)
                                   (range available-tasks)))] 
             (draw-on-canvas canvas newb)
-            (recur (+ time (* step steps-per-task available-tasks))
+            (recur (+ time ^double (r/grand) (* step steps-per-task available-tasks))
                    newb)))
         (println :done)))))
