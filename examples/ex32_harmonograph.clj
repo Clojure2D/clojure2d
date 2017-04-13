@@ -10,7 +10,8 @@
             [clojure2d.math.joise :as j]
             [clojure2d.math.vector :as v]
             [clojure2d.extra.glitch :as g]
-            [clojure2d.color :as c])
+            [clojure2d.color :as c]
+            [clojure2d.core :as core])
   (:import [clojure2d.pixels BinPixels]
            [clojure2d.math.vector Vec4]))
 
@@ -22,9 +23,21 @@
 (def ^:const ^int hwidth (int (/ width 2)))
 (def ^:const ^int hheight (int (/ height 2)))
 (def r (mapv #(* 1.05 ^int %) [(- hwidth) hwidth (- hheight) hheight]))
-(def ^:const ^double step 0.00451234)
+(def ^:const ^double step 0.00451234) ;; time step
+(def ^:const ^int first-step 200000)
+(def ^:const ^int steps-per-task 1000000)
 
 (defn unit-fn ^double [_ _] 1.0)
+
+(defn make-jnoise
+  ""
+  []
+  (j/make-noise (j/make-fractal {:type (rand-nth (keys j/fractal-type))
+                                 :lacunarity (r/drand 1.0 3.0)
+                                 :frequency (r/drand 1.0 3.0)
+                                 :octaves [[1 (j/make-random-basis-module)]
+                                           [1 (j/make-random-basis-module)]]})))
+
 
 (defn make-random-config
   "Make random harmonograph configuration: f1-f4 frequencies, p1-p4 phases, a1-a4 amplitudes,
@@ -36,7 +49,7 @@
         a2 (r/drand (- hwidth a1))
         ^double a3 (r/drand hwidth)
         a4 (- hwidth a3)
-        n [(j/make-random-fractal) (j/make-random-fractal) j/perlin-noise r/noise r/noise r/noise r/noise r/noise r/noise]
+        n [(make-jnoise) (make-jnoise) j/perlin-noise j/perlin-noise r/noise r/noise r/noise]
         palseq (filter #(> (c/get-luma (first %)) 100) (repeatedly #(:palette (g/color-reducer-machine))))
         pal1 (first palseq)
         pal2 (second palseq)
@@ -60,10 +73,10 @@
      :nscaley1 (/ 1.0 ^double (r/drand (/ height 15.0) height))
      :nscalex2 (/ 1.0 ^double (r/drand (/ width 15.0) width))
      :nscaley2 (/ 1.0 ^double (r/drand (/ height 15.0) height))
-     :n1 (if (r/brand 0.65) (rand-nth n) unit-fn)
-     :n2 (if (r/brand 0.65) (rand-nth n) unit-fn)
-     :n3 (if (r/brand 0.65) (rand-nth n) unit-fn)
-     :n4 (if (r/brand 0.65) (rand-nth n) unit-fn)
+     :n1 (if (r/brand 0.6) (rand-nth n) unit-fn)
+     :n2 (if (r/brand 0.6) (rand-nth n) unit-fn)
+     :n3 (if (r/brand 0.6) (rand-nth n) unit-fn)
+     :n4 (if (r/brand 0.6) (rand-nth n) unit-fn)
      :c1 c1
      :c2 c2
      :c3 c3
@@ -94,7 +107,7 @@
               s2 (m/sin (+ (* time f3) p3))
 
               s3 (m/sin (+ (* time f1)
-                           (* m/TWO_PI ^double (n1 (* prevy nscaley2) p1))
+                           (* m/TWO_PI ^double (n1 (* (+ time prevy) nscaley2) p1))
                            p1))
               ^double dampx (if (zero? dampxc) 1.0
                                 (dampstepsx (int (m/norm (m/qsin (+ time p1)) -1.0 1.1 0.0 dampxc))))
@@ -104,21 +117,29 @@
               x (* dampx (+ (* a1 s3)
                             (* a2 s1 ^double (n2 (+ (* prevx nscalex1)) (* prevy nscaley1)))))
               s4 (m/sin (+ (* time f4)
-                           (* m/TWO_PI ^double (n4 (* x nscaley2) p4))
+                           (* m/TWO_PI ^double (n4 (* (+ x (m/qsin time)) nscaley2) p4))
                            p4))
-              y (* dampy (+ (* a3 s2 ^double (n3 (* (+ time prevx) nscalex2) (+ (* prevy nscaley2))))
+              y (* dampy (+ (* a3 s2 ^double (n3 (* prevx nscalex2) (+ (* prevy nscaley2))))
                             (* a4 s4)))
               
               ^Vec4 col1 (v/interpolate c1 c2 (m/abs (* s1 s2)))
               ^Vec4 col2 (v/interpolate c3 c4 (m/abs (* s3 s4))) 
               ^Vec4 col (v/interpolate col1 col2 (m/qsin time))]
-          
-          (p/add-pixel-bilinear bp x y (.x col) (.y col) (.z col))
+
+          (p/add-pixel bp x y (.x col) (.y col) (.z col))
           (recur x y (+ time step) (inc iter)))
         bp))))
 
+(defn draw-on-canvas
+  ""
+  [canvas ^BinPixels bp]
+  (p/set-canvas-pixels canvas (p/to-pixels bp
+                                           (Vec4. 8 10 15 255)
+                                           {:saturation 1.5 :brightness 1.2 :alpha-gamma 0.7}))  )
+
 ;; Create canvas, windows, binpixels, configuration and iterate until window is closed
 ;; press `space` to save
+
 (let [config (make-random-config)
       canvas (create-canvas width height)
       [_ run?] (show-window canvas "Harmonograph" 800 800 5)]
@@ -127,25 +148,19 @@
     (save-canvas canvas (next-filename "results/ex32/" ".png")))
 
   ;; first run
-  (let [bp (iterate-harmonograph 200000 0.0 run? config)]
-    (p/set-canvas-pixels canvas (p/to-pixels bp
-                                             (Vec4. 8 10 15 255) {:saturation 1.5 :brightness 1.2}))
-    (loop [time (* step 200000.0)
+  (let [bp (iterate-harmonograph first-step 0.0 run? config)]
+
+    (draw-on-canvas canvas bp)
+    (loop [time (* step first-step)
            prev bp]
       (if @run?
         (do
           (println time)
-          (let [bp1 (future (iterate-harmonograph 2000000 time run? config))
-                bp2 (future (iterate-harmonograph 2000000 (+ time (* step 2000000.0)) run? config))
-                bp3 (future (iterate-harmonograph 2000000 (+ time (* step 4000000.0)) run? config))
-                bp4 (future (iterate-harmonograph 2000000 (+ time (* step 6000000.0)) run? config))
-                new (->> prev
-                         (p/merge-binpixels @bp4)
-                         (p/merge-binpixels @bp3)
-                         (p/merge-binpixels @bp2)
-                         (p/merge-binpixels @bp1))]
-            (p/set-canvas-pixels canvas (p/to-pixels new
-                                                     (Vec4. 8 10 15 255) {:saturation 1.5 :brightness 1.2}))
-            (recur (+ time (* step 8000000.0))
-                   new)))
+          (println (str "max: " (p/get-max prev)))
+          (let [newb (reduce p/merge-binpixels prev
+                             (map #(iterate-harmonograph steps-per-task (+ time (* step ^int % steps-per-task)) run? config)
+                                  (range available-tasks)))] 
+            (draw-on-canvas canvas newb)
+            (recur (+ time (* step steps-per-task available-tasks))
+                   newb)))
         (println :done)))))

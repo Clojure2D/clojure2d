@@ -30,6 +30,10 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
+;; how many tasks we can run (one less than available cores)?
+(def ^:const ^long available-cores (.availableProcessors (Runtime/getRuntime)))
+(def ^:const ^long available-tasks (max 1 (dec available-cores)))
+
 ;; ## Image
 
 ;; Let's start with setting dynamic variable which defines quality of the saved jpeg file. Values are from `0.0` to `1.0`.

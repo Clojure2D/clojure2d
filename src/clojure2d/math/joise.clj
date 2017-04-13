@@ -174,8 +174,6 @@
   []
   (let [type (rand-nth (keys fractal-type))
         b [(make-random-basis-module)
-           (make-random-basis-module)
-           (make-random-basis-module)
            (make-random-cell-module)]
         l (drand 1 3)
         f (drand 1 3)]

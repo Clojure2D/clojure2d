@@ -15,9 +15,6 @@
 ;; :zero, :edge :wrap or channel value 0-255
 (def ^:dynamic *pixels-edge* :edge)
 
-;; how many cores we have?
-(def ^:const ^long cores (inc (.availableProcessors (Runtime/getRuntime))))
-
 (defprotocol PixelsProto
   (get-value [pixels ch idx] [pixels ch x y])
   (get-color [pixels idx] [pixels x y])
@@ -244,7 +241,7 @@
   ""
   [f ^Pixels p]
   (let [^Pixels target (clone-pixels p)
-        pre-step (max 40000 ^long (/ (.size p) cores))
+        pre-step (max 40000 ^long (/ (.size p) core/available-tasks))
         step (int (m/ceil pre-step))
         parts (range 0 (.size p) step)
         ftrs (doall
@@ -661,50 +658,56 @@
 ;;;;;;;;;;; Accumulator Bins for pixels - in progress
 
 (defprotocol BinPixelsProto
-  (update-minmax [binpixels v])
+  (update-max [binpixels v])
+  (get-max [binpixels])
   (add-at-position [binpixels p s ch1 ch2 ch3]) ;; p - position, s - scale/value, ch1-ch3 - values
   (add-pixel [binpixels x y ch1 ch2 ch3])
   (add-pixel-bilinear [binpixels x y ch1 ch2 ch3])
-  (add-pixel-simple [binpixels x y ch1 ch2 ch3])
+  (add-pixel-simple [binpixels x y ch1 ch2 ch3] [binpixels x y v ch1 ch2 ch3])
   (to-pixels [binpixels background config] [binpixels background] [binpixels]))
 
 (deftype BinPixels [^doubles bins ;; general sum of hits
                     ^doubles ch1 ;; sum of color values, channel1 (red)
                     ^doubles ch2 ;; channel2
                     ^doubles ch3 ;; channel3
-                    ^doubles minmax ;; min and max bins value
+                    ^{:unsynchronized-mutable true} binsmax  ;; max bins value
                     ^long sizex ^long sizey ^long sizex+ ;; size of the buffer
-                    fnormx fnormy] ;; normalization functions
+                    fnormx fnormy gnorm] ;; normalization functions
   Object
   (toString [_] (str "[" sizex "," sizey "]"))
   BinPixelsProto
 
-  (update-minmax [_ v]
-    (when (> (aget minmax 0) ^double v) (aset minmax 0 ^double v))
-    (when (< (aget minmax 1) ^double v) (aset minmax 1 ^double v)))
+  (update-max [_ v]
+    (when (<  ^double binsmax ^double v) (set! binsmax v)))
 
+  (get-max [_]
+    binsmax)
+  
   (add-at-position [t p s v1 v2 v3]
     (let [^long p p
           ^double s s]
-      (update-minmax t (aset bins p (+ (aget bins p) s)))
+      (update-max t (aset bins p (+ (aget bins p) s)))
       (aset ch1 p (+ (aget ch1 p) (* s ^double v1)))
       (aset ch2 p (+ (aget ch2 p) (* s ^double v2)))
       (aset ch3 p (+ (aget ch3 p) (* s ^double v3)))))
   
-  (add-pixel-simple [t x y v1 v2 v3]
+  (add-pixel-simple [t x y v v1 v2 v3]
     (let [ivx (long (fnormx x))
           ivy (long (fnormy y))
           p (+ ivx (* ivy sizex+))]
-      (when (and (< -1 ivx sizex) (< -1 ivy sizey))
-        (add-at-position t p 1.0 v1 v2 v3)))
+      (when (and (< -1 ivx sizex) (< -1 ivy sizey)) 
+        (add-at-position t p v v1 v2 v3)))
     t)
+  
+  (add-pixel-simple [t x y v1 v2 v3]
+    (add-pixel-simple t x y 1.0 v1 v2 v3))
   
   (add-pixel-bilinear [t x y v1 v2 v3]
     (let [^double vx (fnormx x)
           ^double vy (fnormy y)
           ivx (long vx)
           ivy (long vy)]
-      (when (and (< -1 ivx sizex) (< -1 ivy sizey))
+      (when (and (< -1 ivx sizex) (< -1 ivy sizey)) 
         (let [restx (- vx ivx)
               resty (- vy ivy)
               ivx+ (inc ivx)
@@ -717,19 +720,30 @@
     t)
 
   (add-pixel [t x y v1 v2 v3]
-    (add-pixel-bilinear t x y v1 v2 v3))
+    (let [ivx (long (fnormx x))
+          ivy (long (fnormy y))]
+      (if (pos? ^double binsmax)
+        (when (and (< -1 ivx sizex) (< -1 ivy sizey))
+          (let [f (/ (m/log (inc ^double (aget bins (+ ivx (* ivy sizex+)))))
+                     (m/log (inc ^double binsmax)))]
+            (if (< f 0.05)
+              (let [factor (min 0.0 ^double (gnorm (* f f)))]
+                (add-pixel-simple t
+                                  (+ ^double x (* factor ^double (r/grand)))
+                                  (+ ^double y (* factor ^double (r/grand)))
+                                  (max 0.1 (* 20.0 f)) v1 v2 v3))
+              (add-pixel-bilinear t x y v1 v2 v3))))
+        (add-pixel-simple t x y 1.0 v1 v2 v3))))
   
-  (to-pixels [_ background {:keys [^double alpha-gamma ^double intensity ^double color-gamma ^double pre-damp
+  (to-pixels [_ background {:keys [^double alpha-gamma ^double intensity ^double color-gamma
                                    ^double saturation ^double brightness]
-                            :or {alpha-gamma 2.0 intensity 0.8 color-gamma 1.1 pre-damp 1.1 saturation 1.1 brightness 1.0}}] 
+                            :or {alpha-gamma 2.0 intensity 0.8 color-gamma 1.1 saturation 1.1 brightness 1.0}}] 
     (let [^Vec4 background background ;; background color
           rintensity (- 1.0 intensity) ;; complementary to intensity
           agamma (/ 1.0 alpha-gamma) ;; gamma factor for alpha
           cgamma (/ 1.0 color-gamma) ;; gamma factor for color
-          [^double mn ^double mx] minmax ;; min/max bin values
-          mxlog (/ 1.0 (m/log (inc mx))) ;; logarithm of max value
-          rmx (/ 1.0 mx) ;; reverse of max
-          fc (if (== mn mx) 0.0 (/ 1.0 (- mx mn))) ;; reverse of difference max-min
+          mxlog (/ 1.0 (m/log (inc ^double binsmax))) ;; logarithm of max value
+          rmx (/ 1.0 ^double binsmax) ;; reverse of max
           ^Pixels p (make-pixels sizex sizey) ;; target
           ^Vec4 multiplier (Vec4. 1.0 saturation brightness 1.0)] ;; multiply vector for brightness/saturation
       (dotimes [y sizey]
@@ -741,8 +755,8 @@
               (if (zero? hit)
                 (set-color p (+ x row) background) ;; nothing? set background
                 (let [rhit (/ 1.0 hit) ;; hit reverse
-                      pre (m/pow (* fc hit) pre-damp) ;; diminish low values
-                      loghit (* (m/log (inc (* pre hit))) mxlog) ;; log map for hit, result: 0.0-1.0
+                      loghit (* (m/log (inc hit)) mxlog) ;; log map for hit, result: 0.0-1.0
+                      ;; loghit (m/log2 (inc (* rmx hit))) ;; log map for hit, result: 0.0-1.0
                       alpha (m/pow loghit agamma) ;; gamma for alpha
                       col1 (aget ^doubles c/r255 (m/iconstrain (int (* rhit (aget ch1 idx))) 0 255)) ;; normalized red
                       col2 (aget ^doubles c/r255 (m/iconstrain (int (* rhit (aget ch2 idx))) 0 255)) ;; green
@@ -760,6 +774,8 @@
   (to-pixels [t] (to-pixels t (Vec4. 0.0 0.0 0.0 0.0) {})))
 
 ;; Gaussian test pad
+
+(/ (m/log 100) (m/log 10000))
 
 (comment
 
@@ -815,17 +831,19 @@
 
 (defn make-binpixels 
   "Create BinPixels type"
-  ^BinPixels [[rminx rmaxx rminy rmaxy] ^long sizex ^long sizey]
+  ^BinPixels [[^double rminx ^double rmaxx ^double rminy ^double rmaxy] ^long sizex ^long sizey]
   (let [sizex+ (inc sizex)
         sizey+ (inc sizey)
         bins (double-array (* sizex+ sizey+))
         ch1 (double-array (* sizex+ sizey+))
         ch2 (double-array (* sizex+ sizey+))
         ch3 (double-array (* sizex+ sizey+))
-        minmax (double-array [Double/MAX_VALUE -1.0]) ;; min and max values
+        binsmax Double/MIN_VALUE
         fnormx (m/make-norm rminx rmaxx 0 sizex)
-        fnormy (m/make-norm rminy rmaxy 0 sizey)]
-    (BinPixels. bins ch1 ch2 ch3 minmax sizex sizey sizex+ fnormx fnormy)))
+        fnormy (m/make-norm rminy rmaxy 0 sizey)
+        diff (min (m/abs (- rmaxx rminx)) (m/abs (- rmaxy rminy)))
+        gnorm (m/make-norm (m/sq 0.05) 0.0 (* 0.2 (/ 1.0 diff)) (* 0.02 0.2 diff))]
+    (BinPixels. bins ch1 ch2 ch3 binsmax sizex sizey sizex+ fnormx fnormy gnorm)))
 
 (defn merge-binpixels
   "Add two binpixels and recalculate min/max. Be sure a and b are equal. Use this function to merge results created in separated threads"
@@ -834,9 +852,5 @@
         ch2 (future (amap ^doubles (.ch2 a) idx ret (+ (aget ^doubles (.ch2 a) idx) (aget ^doubles (.ch2 b) idx))))
         ch3 (future (amap ^doubles (.ch3 a) idx ret (+ (aget ^doubles (.ch3 a) idx) (aget ^doubles (.ch3 b) idx))))
         ^doubles bins (amap ^doubles (.bins a) idx ret (+ (aget ^doubles (.bins a) idx) (aget ^doubles (.bins b) idx)))
-        ^doubles minmax (double-array 2)]
-    (aset minmax 0 (double (areduce bins idx ret Double/MAX_VALUE (let [v (aget bins idx)]
-                                                                    (if (pos? v) (min v ret) ret))))) ;; skip zeros
-    (aset minmax 1 (double (areduce bins idx ret -1.0 (max ret ^double (aget bins idx)))))
-    (BinPixels. bins @ch1 @ch2 @ch3 minmax (.sizex a) (.sizey a) (.sizex+ a) (.fnormx a) (.fnormy a))))
-
+        binsmax (double (areduce bins idx ret Double/MIN_VALUE (max ret ^double (aget bins idx))))]
+    (BinPixels. bins @ch1 @ch2 @ch3 binsmax (.sizex a) (.sizey a) (.sizex+ a) (.fnormx a) (.fnormy a) (.gnorm a))))
