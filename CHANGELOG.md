@@ -1,6 +1,37 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 0.0.2 - 2016-04-14
+### Added
+- Core:
+	- session management functions
+- Pixels:
+	- accumulation bins rendering support
+- Random:
+	- random and low discrepancy sequence generators (binding to apache commons math)
+- Color:
+	- color converters
+	- palette generators (paletton style, colourlovers 200 palettes, iq generator)
+- Extra:
+	- glitch functions - slitscan, mirror, color redutions, bleding
+	- raymarching - basic raymarching
+	- signal - signal processing for sonification (pixels to raw, raw to pixels converters, wave generators)
+- Examples: currently 32 examples
+
+### Changed
+
+- A lot of changes and huge number of code optimizations (for speed)
+- Draw function behaviour
+- Canvas wrapper (Graphics2d allocation and release)
+- Mouse moved event
+- JPanel -> java.awt.Canvas and custom paint function
+- Vectors as Seq + PersistentVector enhanced (VectorProto)
+- filters changed to signal ns
+
+### Fixed
+
+Bugs, bugs, bugs + optimization for speed
+
 ## 0.0.1 - 2016-11-01
 ### Added
 - Initial release
