@@ -1,6 +1,8 @@
 ;; Harmonograph on noise
 ;;
 ;; Version rendered using BinPixels object (accumulative bins)
+;;
+;; Eats a lot of memory, rendering is run on all but one cores
 
 (ns examples.ex32-harmonograph
   (:require [clojure2d.core :refer :all]
@@ -11,7 +13,8 @@
             [clojure2d.math.vector :as v]
             [clojure2d.extra.glitch :as g]
             [clojure2d.color :as c]
-            [clojure2d.core :as core])
+            [clojure2d.core :as core]
+            [clojure.pprint :refer [pprint]])
   (:import [clojure2d.pixels BinPixels]
            [clojure2d.math.vector Vec4]))
 
@@ -24,13 +27,13 @@
 (def ^:const ^int hheight (int (/ height 2)))
 (def r (mapv #(* 1.05 ^int %) [(- hwidth) hwidth (- hheight) hheight]))
 (def ^:const ^double step 0.00451234) ;; time step
-(def ^:const ^int first-step 200000)
+(def ^:const ^int first-step 500000)
 (def ^:const ^int steps-per-task 1000000)
 
 (defn unit-fn ^double [_ _] 1.0)
 
 (defn make-jnoise
-  ""
+  "Create own version of joise noise (only simplex based, no cells)"
   []
   (j/make-noise (j/make-fractal {:type (rand-nth (keys j/fractal-type))
                                  :lacunarity (r/drand 1.0 3.0)
@@ -47,15 +50,15 @@
         freqs (map #(/ (double %) m/TWO_PI) (range (- rngs) rngs (r/irand 1 6)))
         ^double a1 (r/drand hwidth)
         a2 (r/drand (- hwidth a1))
-        ^double a3 (r/drand hwidth)
-        a4 (- hwidth a3)
+        ^double a3 (r/drand hheight)
+        a4 (- hheight a3)
         n [(make-jnoise) (make-jnoise) j/perlin-noise j/perlin-noise r/noise r/noise r/noise]
         palseq (filter #(> (c/get-luma (first %)) 100) (repeatedly #(:palette (g/color-reducer-machine))))
         pal1 (first palseq)
         pal2 (second palseq)
         c1 (first pal1)
         c2 (rand-nth pal1)
-        c3 (rand-nth pal2)
+        c3 (first pal2)
         c4 (rand-nth pal2)]
     {:f1 (rand-nth freqs)
      :f2 (rand-nth freqs)
@@ -115,12 +118,11 @@
                                 (dampstepsy (int (m/norm (m/qsin (+ time p4)) -1.0 1.1 0.0 dampyc))))              
 
               x (* dampx (+ (* a1 s3)
-                            (* a2 s1 (* ^double (n2 (* time prevx nscalex1) (* prevy nscaley1))
-                                        ^double (n1 s1 (* prevx prevy))))))
+                            (* a2 s1 ^double (n2 (* prevx nscalex1) (* prevy nscaley1)))))
               s4 (m/sin (+ (* time f4)
-                           (* m/TWO_PI ^double (n4 (* x nscaley2) p4))
+                           (* m/TWO_PI ^double (n4 (* x nscalex2) p4))
                            p4))
-              y (* dampy (+ (* a3 s2 ^double (n3 (* prevx nscalex2) (+ time (* prevy nscaley2))))
+              y (* dampy (+ (* a3 s2 ^double (n3 (* (+ time prevx) nscalex2) (+ (* prevy nscaley2))))
                             (* a4 s4)))
               
               ^Vec4 col1 (v/interpolate c1 c2 (m/abs (* s1 s2)))
@@ -132,7 +134,7 @@
         bp))))
 
 (defn draw-on-canvas
-  ""
+  "Render BinPixels to canvas."
   [canvas ^BinPixels bp]
   (p/set-canvas-pixels canvas (p/to-pixels bp
                                            (Vec4. 8 10 15 255)
@@ -140,7 +142,7 @@
 
 ;; Create canvas, windows, binpixels, configuration and iterate until window is closed
 ;; press `space` to save
-
+;; close window to stop
 (let [config (make-random-config)
       canvas (create-canvas width height)
       [_ run?] (show-window canvas "Harmonograph" 800 800 5)]
@@ -148,7 +150,7 @@
   (defmethod key-pressed ["Harmonograph" \space] [_]
     (save-canvas canvas (next-filename "results/ex32/" ".png")))
 
-  (println (:n3 config))
+  (pprint config)
   
   ;; first run
   (let [bp (iterate-harmonograph first-step 0.0 run? config)]
