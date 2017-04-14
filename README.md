@@ -83,6 +83,7 @@ Defines also:
 * pixel filters (blur, erode, dilate, median, threshold, posterize, tint)
 * blending (composing) function of two Pixels
 * functions which operate on Pixels parallelly (filter-channels, blend-channels)
+* accumulation bins (smooth rendering helper)
 
 ### clojure2d.color
 
@@ -94,14 +95,13 @@ Defines also:
 
 * FastMath (jafama) bindings
 * statistic functions
-* random functions
-* basic noise (flow-noise binding)
 
 Additionally in following namespaces:
 
 * clojure2d.math.complex - Complex type and operations (code taken from Apache Commons Math)
 * clojure2d.math.vector - Vec2, Vec3 and Vec4 types and operations on vectors
 * clojure2d.math.joise - Joise library bindings (basic (simplex/perlin/value), cell (voronoi) and fractal noise + combinations)
+* clojure2d.math.random - Random functions and perlin noise from flow-noise library
 
 ### clojure2d.extra
 
@@ -148,6 +148,8 @@ I've prepared several examples with results where you can check current state of
 * ex28 - double pendulum (with https://github.com/littleredcomputer/sicmutils/blob/master/src/sicmutils/examples/double_pendulum.clj)
 * ex29 - 2d chaotic maps
 * ex30 - random or low discrepancy sequences
+* ex31 - wavy lines
+* ex32 - harmonograms on noise (accumulation bins rendering)
 
 ## TODO
 
@@ -163,7 +165,7 @@ I've prepared several examples with results where you can check current state of
   - variations
   - glitch filters in extra namespace (moved from Processing)
   - analog filters (for sonification part)
-* Canvas drawing functions (not filled shapes, PShape implementation)
+* Canvas drawing functions (PShape implementation - partially done)
 * Session handling (saving results in session, logging actions) - done, not tested
 * Sanity tests
 
