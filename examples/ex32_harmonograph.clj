@@ -47,7 +47,7 @@
   nscalex/nscaley - noise scale, n1-n4 noise functions (or value 1.0), c1-c2 colors, dampsteps"
   []
   (let [^int rngs (r/irand 8 32)
-        freqs (map #(/ (* (double %)) m/TWO_PI) (range (- rngs) rngs (r/irand 1 rngs)))
+        freqs (map #(/ (double %) m/TWO_PI) (range (- rngs) rngs (r/irand 1 rngs)))
         ^double a1 (r/drand hwidth)
         a2 (r/drand (- hwidth a1))
         ^double a3 (r/drand hheight)
@@ -110,7 +110,7 @@
               s2 (m/sin (+ (* time f3) p3))
 
               s3 (m/sin (+ (* time f1)
-                           (* m/TWO_PI ^double (n1 (* (+ time prevy) nscaley2) p1))
+                           (* m/TWO_PI ^double (n1 (* (* time prevy) nscaley2) p1))
                            p1))
               ^double dampx (if (zero? dampxc) 1.0
                                 (dampstepsx (int (m/norm (m/qsin (+ time p1)) -1.0 1.1 0.0 dampxc))))
