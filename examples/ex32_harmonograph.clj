@@ -23,10 +23,8 @@
 
 (def ^:const ^int width 2048)
 (def ^:const ^int height 2048)
-(def ^:const ^int hwidth (int (/ width 2)))
-(def ^:const ^int hheight (int (/ height 2)))
-(def r (mapv #(* 1.05 ^int %) [(- hwidth) hwidth (- hheight) hheight]))
-(def ^:const ^double step 0.00451234) ;; time step
+(def r [-1.1 1.1 -1.1 1.1])
+(def ^:const ^double step 0.003451234) ;; time step
 (def ^:const ^int first-step 500000)
 (def ^:const ^int steps-per-task 1000000)
 
@@ -47,13 +45,16 @@
   nscalex/nscaley - noise scale, n1-n4 noise functions (or value 1.0), c1-c2 colors, dampsteps"
   []
   (let [^int rngs (r/irand 8 32)
-        freqs (map #(/ (double %) m/TWO_PI) (range (- rngs) rngs (r/irand 1 rngs)))
-        ^double a1 (r/drand hwidth)
-        a2 (r/drand (- hwidth a1))
-        ^double a3 (r/drand hheight)
-        a4 (- hheight a3)
+        fct (if (r/brand 0.5)
+              m/TWO_PI
+              (m/drand 2.0 7.0))
+        freqs (map #(/ (* 5 fct) (double %)) (remove zero? (range (- rngs) rngs (r/irand 1 rngs))))
+        ^double a1 (r/drand)
+        a2 (r/drand (- 1.0 a1))
+        ^double a3 (r/drand)
+        a4 (- 1.0 a3)
         n [(make-jnoise) (make-jnoise) j/perlin-noise j/perlin-noise r/noise r/noise r/noise]
-        palseq (filter #(> (c/get-luma (first %)) 100) (repeatedly #(:palette (g/color-reducer-machine))))
+        palseq (filter #(> 240 (c/get-luma (first %)) 100) (repeatedly #(:palette (g/color-reducer-machine))))
         pal1 (first palseq)
         pal2 (second palseq)
         c1 (first pal1)
@@ -72,10 +73,10 @@
      :a2 a2
      :a3 a3
      :a4 a4
-     :nscalex1 (/ 1.0 ^double (r/drand (/ width 15.0) width))
-     :nscaley1 (/ 1.0 ^double (r/drand (/ height 15.0) height))
-     :nscalex2 (/ 1.0 ^double (r/drand (/ width 15.0) width))
-     :nscaley2 (/ 1.0 ^double (r/drand (/ height 15.0) height))
+     :nscalex1 (/ 1.0 ^double (r/drand 0.05 2))
+     :nscaley1 (/ 1.0 ^double (r/drand 0.05 2))
+     :nscalex2 (/ 1.0 ^double (r/drand 0.05 2))
+     :nscaley2 (/ 1.0 ^double (r/drand 0.05 2))
      :n1 (if (r/brand 0.6) (rand-nth n) unit-fn)
      :n2 (if (r/brand 0.6) (rand-nth n) unit-fn)
      :n3 (if (r/brand 0.6) (rand-nth n) unit-fn)
@@ -110,7 +111,7 @@
               s2 (m/sin (+ (* time f3) p3))
 
               s3 (m/sin (+ (* time f1)
-                           (* m/TWO_PI ^double (n1 (* (* time prevy) nscaley2) p1))
+                           (* m/TWO_PI ^double (n1 (* (+ time prevy) nscaley2) p1))
                            p1))
               ^double dampx (if (zero? dampxc) 1.0
                                 (dampstepsx (int (m/norm (m/qsin (+ time p1)) -1.0 1.1 0.0 dampxc))))
@@ -118,11 +119,11 @@
                                 (dampstepsy (int (m/norm (m/qsin (+ time p4)) -1.0 1.1 0.0 dampyc))))              
 
               x (* dampx (+ (* a1 s3)
-                            (* a2 s1 ^double (n2 (* prevx nscalex1) (* prevy nscaley1)))))
+                            (* a2 s1 ^double (n2 (* (+ time prevx) nscalex1) (* prevy nscaley1)))))
               s4 (m/sin (+ (* time f4)
                            (* m/TWO_PI ^double (n4 (* x nscalex2) p4))
                            p4))
-              y (* dampy (+ (* a3 s2 ^double (n3 (* (+ time prevx) nscalex2) (* prevy nscaley2)))
+              y (* dampy (+ (* a3 s2 ^double (n3 (* prevx nscalex2) (* prevy nscaley2)))
                             (* a4 s4)))
               
               ^Vec4 col1 (v/interpolate c1 c2 (m/abs (* s1 s2)))
@@ -143,28 +144,30 @@
 ;; Create canvas, windows, binpixels, configuration and iterate until window is closed
 ;; press `space` to save
 ;; close window to stop
-(let [config (make-random-config)
-      canvas (create-canvas width height)
-      [_ run?] (show-window canvas "Harmonograph" 800 800 5)]
+(def result (let [config (make-random-config)
+                  canvas (create-canvas width height)
+                  [_ run?] (show-window canvas "Harmonograph" 800 800 5)]
 
-  (defmethod key-pressed ["Harmonograph" \space] [_]
-    (save-canvas canvas (next-filename "results/ex32/" ".png")))
+              (defmethod key-pressed ["Harmonograph" \space] [_]
+                (save-canvas canvas (next-filename "results/ex32/" ".png")))
 
-  (pprint config)
-  
-  ;; first run
-  (let [bp (iterate-harmonograph first-step 0.0 run? config)]
+              (pprint config)
+              
+              ;; first run
+              (let [bp (iterate-harmonograph first-step 0.0 run? config)]
 
-    (draw-on-canvas canvas bp)
-    (loop [time (* step first-step)
-           prev bp]
-      (if @run?
-        (do
-          (println time) 
-          (let [newb (reduce p/merge-binpixels prev
-                             (map #(iterate-harmonograph steps-per-task (+ time (* step ^int % steps-per-task)) run? config)
-                                  (range available-tasks)))] 
-            (draw-on-canvas canvas newb)
-            (recur (+ time ^double (r/grand) (* step steps-per-task available-tasks))
-                   newb)))
-        (println :done)))))
+                (draw-on-canvas canvas bp)
+                (loop [time (* step first-step)
+                       prev bp]
+                  (if @run?
+                    (do
+                      (println time) 
+                      (let [newb (reduce #(p/merge-binpixels %1 (deref %2)) prev
+                                         (doall (map #(future (iterate-harmonograph steps-per-task (+ time (* step ^int % steps-per-task)) run? config))
+                                                     (range available-tasks))))] 
+                        (draw-on-canvas canvas newb)
+                        (recur (+ time ^double (r/grand) (* step steps-per-task available-tasks))
+                               newb)))
+                    (do
+                      (println :done)
+                      prev))))))

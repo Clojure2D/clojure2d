@@ -748,60 +748,6 @@
   (to-pixels [t background] (to-pixels t background {}))
   (to-pixels [t] (to-pixels t (Vec4. 0.0 0.0 0.0 0.0) {})))
 
-;; Gaussian test pad
-
-(comment
-
-  (defn- gauss-kernel-val
-    ""
-    ^double [^double invsigma2 ^double x ^double y]
-    (m/exp (- (* (+ (* x x) (* y y)) invsigma2))))
-
-  (defn get-gaussian-kernel-fn
-    ""
-    ^doubles [insigma]
-    (let [sigma (double insigma)
-          r (int (* 3.0 (m/sqrt sigma)))
-          rn (range (- r) (inc r))
-          r21 (inc (* 2 r))
-          invsigma2 (/ 1.0 (* 2.0 sigma sigma))
-          ^double sum (reduce + (for [x rn
-                                      y rn]
-                                  (gauss-kernel-val invsigma2 x y)))
-          ^doubles arr (double-array (* r21 r21))]
-      (dotimes [y r21]
-        (let [row (* y r21)]
-          (dotimes [x r21]
-            (let [xx (- x r)
-                  yy (- y r)]
-              (aset arr (+ row x) (/ (gauss-kernel-val invsigma2 xx yy) sum))))))
-      arr))
-
-  (def get-gaussian-kernel (memoize get-gaussian-kernel-fn))
-
-  (defn make-gaussian-add-fn
-    ""
-    [^doubles bins ^long sizex ^long sizey]
-    (fn local-gaussian-add-fn
-      ([^double vx ^double vy ^double vv]
-       (let [ivx (long vx)
-             ivy (long vy)
-             val (aget bins (+ ivx (* ivy sizey)))
-             ^double nval (m/cnorm val 5.0 0.0 0.1 2.0)
-             ^doubles kernel (get-gaussian-kernel (* 0.1 (int (* 20.0 (m/log (inc nval))))))
-             len (m/sqrt (alength kernel))
-             len2 (int (/ len 2.0))]
-         (dotimes [y len]
-           (let [row (* y len)]
-             (dotimes [x len]
-               (let [xx (+ ivx (- x len2))
-                     yy (+ ivy (- y len2))
-                     idx (+ xx (* yy sizex))]
-                 (when (and (< -1.0 xx sizex) (< -1.0 yy sizey))
-                   (aset bins idx (+ (aget bins idx)
-                                     (* vv (aget kernel (+ row x))))))))))))
-      ([^double vx ^double vy] (local-gaussian-add-fn vx vy 1.0)))))
-
 (defn make-binpixels 
   "Create BinPixels type"
   ^BinPixels [[^double rminx ^double rmaxx ^double rminy ^double rmaxy] ^long sizex ^long sizey]
