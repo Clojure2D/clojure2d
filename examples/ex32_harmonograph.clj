@@ -45,10 +45,10 @@
   nscalex/nscaley - noise scale, n1-n4 noise functions (or value 1.0), c1-c2 colors, dampsteps"
   []
   (let [^int rngs (r/irand 8 32)
-        fct (if (r/brand 0.5)
-              m/TWO_PI
-              (m/drand 2.0 7.0))
-        freqs (map #(/ (* 5 fct) (double %)) (remove zero? (range (- rngs) rngs (r/irand 1 rngs))))
+        ^double fct (if (r/brand 0.5)
+                      m/TWO_PI
+                      (r/drand 2.0 7.0))
+        freqs (map #(/ (* 5.0 fct) (double %)) (remove zero? (range (- rngs) rngs (r/irand 1 rngs))))
         ^double a1 (r/drand)
         a2 (r/drand (- 1.0 a1))
         ^double a3 (r/drand)

@@ -711,7 +711,7 @@
   
   (to-pixels [_ background {:keys [^double alpha-gamma ^double intensity ^double color-gamma
                                    ^double saturation ^double brightness]
-                            :or {alpha-gamma 2.0 intensity 0.8 color-gamma 1.1 saturation 1.1 brightness 1.0}}] 
+                            :or {alpha-gamma 2.0 intensity 0.8 color-gamma 1.1 saturation 1.0 brightness 1.0}}] 
     (let [binsmax (double (areduce bins idx ret Double/MIN_VALUE (max ret ^double (aget bins idx))))
           ^Vec4 background background ;; background color
           rintensity (- 1.0 intensity) ;; complementary to intensity
@@ -741,8 +741,11 @@
                       c2 (* 255.0 (+ (* intensity col2)
                                      (* rintensity (m/pow col2 cgamma))))
                       c3 (* 255.0 (+ (* intensity col3)
-                                     (* rintensity (m/pow col3 cgamma)))) 
-                      color (c/from-HSB (v/emult multiplier (c/to-HSB (v/applyf (Vec4. c1 c2 c3 255.0) c/clamp255))))] ;; apply brightness, saturation factors
+                                     (* rintensity (m/pow col3 cgamma))))
+                      color (v/applyf (Vec4. c1 c2 c3 255.0) c/clamp255)
+                      color (if (and (== 1.0 saturation) (== 1.0 brightness))
+                              color
+                              (c/from-HSB (v/emult multiplier (c/to-HSB color))))] ;; apply brightness, saturation factors
                   (set-color p (+ x row) (v/interpolate background color alpha)))))))) ;; store!
       p))
   (to-pixels [t background] (to-pixels t background {}))
