@@ -82,6 +82,12 @@
 ;; Quick version of exponential \\(e^x\\)
 (defn qexp ^double [^double v] (FastMath/expQuick v))
 
+;; Radians to degrees (and opposite) conversions
+(def ^:const ^double rad-in-deg (/ 180.0 PI))
+(def ^:const ^double deg-in-rad (/ PI 180.0))
+(defn deg-to-rad ^double [^double deg] (* deg-in-rad deg))
+(defn rad-to-deg ^double [^double rad] (* rad-in-deg rad))
+
 ;; Alias for natural logarithm
 (def ln log)
 

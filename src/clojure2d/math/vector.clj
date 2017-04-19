@@ -49,7 +49,7 @@
   (to-polar [v1])
   (from-polar [v1]))
 
-;; transform -   "Map point to coordinate system defined by origin, vx and vy (as bases)"
+;; transform - "Map point to coordinate system defined by origin, vx and vy (as bases)"
 
 (declare angle-between)
 (declare normalize)
