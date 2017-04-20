@@ -3,16 +3,16 @@
 ;; Straightforward implementation
 
 (ns clojure2d.math.matrix
-  (:require [clojure2d.math :as m]
-            [clojure2d.math.vector :as v]))
-
-(set! *warn-on-reflection* true)
-(set! *unchecked-math* :warn-on-boxed)
+  (:require [clojure2d.math :refer :all]
+            [clojure2d.math.vector :as v])
+  (:import [clojure2d.math.vector Vec4]))
 
 (defprotocol Matrix4x4Proto
   (transpose [m])
   (inverse [m])
-  (mult [m1 m2]))
+  (mult [m1 m2])
+  (emult [m a])
+  (vmult [m v]))
 
 (deftype Matrix4x4 [^double m00 ^double m01 ^double m02 ^double m03
                     ^double m10 ^double m11 ^double m12 ^double m13
@@ -191,36 +191,19 @@
                   (-> (* m30 (.m03 m))
                       (+ (* m31 (.m13 m)))
                       (+ (* m32 (.m23 m)))
-                      (+ (* m33 (.m33 m))))))))
+                      (+ (* m33 (.m33 m)))))))
+  (emult [_ e]
+    (let [^double e e]
+      (Matrix4x4. (* e m00) (* e m01) (* e m02) (* e m03)
+                  (* e m10) (* e m11) (* e m12) (* e m13)
+                  (* e m20) (* e m21) (* e m22) (* e m23)
+                  (* e m30) (* e m31) (* e m32) (* e m33))))
+  (vmult [_ v]
+    (let [^Vec4 v v]
+      (Vec4. (+ (* (.x v) m00) (* (.y v) m01) (* (.z v) m02) (* (.w v) m03))
+             (+ (* (.x v) m10) (* (.y v) m11) (* (.z v) m12) (* (.w v) m13))
+             (+ (* (.x v) m20) (* (.y v) m21) (* (.z v) m22) (* (.w v) m23))
+             (+ (* (.x v) m30) (* (.y v) m31) (* (.z v) m32) (* (.w v) m33)))))
+  )
 
 (def ^Matrix4x4 I (Matrix4x4. 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1))
-
-(defprotocol TransformProto
-  (multiply [t1 t2]))
-
-(deftype Transform [^Matrix4x4 m ^Matrix4x4 invm]
-  TransformProto
-  (multiply [_ t2]
-    (let [^Transform t2 t2]
-      (Transform. (mult m (.m t2))
-                  (mult (.invm t2) invm)))))
-
-(defn make-transform
-  "Create tranformation"
-  ([m minv] (Transform. m minv))
-  ([^Matrix4x4 m] (Transform. m (inverse m)))
-  ([] (Transform. I I)))
-
-(defn make-scale-transform
-  "Create scale transform"
-  []
-  )
-
-(defn make-translate-transform
-  ""
-  []
-  )
-
-
-
-(def m (Matrix4x4. 1 1 1 1 0 2 2 2 0 0 3 3 0 0 0 4))

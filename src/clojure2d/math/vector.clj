@@ -38,6 +38,7 @@
   (base-from [v])
   (sum [v1])  
   (interpolate [v1 v2 t] [v1 v2 t f])
+  (interpolatev [v1 v2 v] [v1 v2 v f])
   (is-zero? [v1])
   (is-near-zero? [v1])
   (heading [v1])
@@ -91,6 +92,10 @@
                   ([v1 v2 t f]
                    (mapv #(f %1 %2 t) v1 v2))
                   ([v1 v2 t] (interpolate v1 v2 t m/lerp)))
+   :interpolatev (fn
+                   ([v1 v2 v f]
+                    (mapv #(f %1 %2 %3) v1 v2 v))
+                   ([v1 v2 v] (interpolatev v1 v2 v m/lerp)))
    :is-zero? #(every? zero? %)
    :is-near-zero? #(every? near-zero? %)})
 
@@ -149,6 +154,12 @@
     (let [^Vec2 v2 v2] (Vec2. (f x (.x v2) t)
                               (f y (.y v2) t))))
   (interpolate [v1 v2 t] (interpolate v1 v2 t m/lerp))
+  (interpolatev [_ v2 v f]
+    (let [^Vec2 v2 v2
+          ^Vec2 v v]
+      (Vec2. (f x (.x v2) (.x v))
+             (f y (.y v2) (.y v)))))
+  (interpolatev [v1 v2 v] (interpolatev v1 v2 v m/lerp))
   (is-zero? [_] (and (zero? x) (zero? y)))
   (is-near-zero? [_] (and (near-zero? x) (near-zero? y)))
   (heading [_] (m/atan2 y x))
@@ -236,6 +247,13 @@
                               (f y (.y v2) t)
                               (f z (.z v2) t))))
   (interpolate [v1 v2 t] (interpolate v1 v2 t m/lerp))
+  (interpolatev [_ v2 v f]
+    (let [^Vec3 v2 v2
+          ^Vec3 v v]
+      (Vec3. (f x (.x v2) (.x v))
+             (f y (.y v2) (.y v))
+             (f z (.z v2) (.z v)))))
+  (interpolatev [v1 v2 v] (interpolatev v1 v2 v m/lerp))
   (is-zero? [_] (and (zero? x) (zero? y) (zero? z)))
   (is-near-zero? [_] (and (near-zero? x) (near-zero? y) (near-zero? z)))
   (heading [v1] (angle-between v1 (Vec3. 1 0 0)))
@@ -384,6 +402,14 @@
                               (f z (.z v2) t)
                               (f w (.w v2) t))))
   (interpolate [v1 v2 t] (interpolate v1 v2 t m/lerp))
+  (interpolatev [_ v2 v f]
+    (let [^Vec4 v2 v2
+          ^Vec4 v v]
+      (Vec4. (f x (.x v2) (.x v))
+             (f y (.y v2) (.y v))
+             (f z (.z v2) (.z v))
+             (f w (.w v2) (.w v)))))
+  (interpolatev [v1 v2 v] (interpolatev v1 v2 v m/lerp))
   (is-zero? [_] (and (zero? x) (zero? y) (zero? z) (zero? w)))
   (is-near-zero? [_] (and (near-zero? x) (near-zero? y) (near-zero? z) (near-zero? w)))
   (heading [v1] (angle-between v1 (Vec4. 1 0 0 0))))
