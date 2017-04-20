@@ -1,11 +1,11 @@
 ;; 3d space transformations, pbrt.org
 
-(ns clojure2d.math.transform
+(ns clojure2d.pbrt.transform
   (:require [clojure2d.math :refer :all]
             [clojure2d.math.vector :as v]
-            [clojure2d.math.matrix :as mat]
+            [clojure2d.pbrt.matrix :as mat]
             [clojure2d.math :as m])
-  (:import [clojure2d.math.matrix Matrix4x4]
+  (:import [clojure2d.pbrt.matrix Matrix4x4]
            [clojure2d.math.vector Vec3]))
 
 (set! *warn-on-reflection* true)

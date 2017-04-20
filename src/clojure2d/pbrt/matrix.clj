@@ -2,7 +2,7 @@
 ;;
 ;; Straightforward implementation
 
-(ns clojure2d.math.matrix
+(ns clojure2d.pbrt.matrix
   (:require [clojure2d.math :refer :all]
             [clojure2d.math.vector :as v])
   (:import [clojure2d.math.vector Vec4]))
