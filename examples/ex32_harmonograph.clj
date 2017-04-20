@@ -14,9 +14,10 @@
             [clojure2d.extra.glitch :as g]
             [clojure2d.color :as c]
             [clojure2d.core :as core]
+            [clojure2d.extra.variations :as var]
             [clojure.pprint :refer [pprint]])
   (:import [clojure2d.pixels BinPixels]
-           [clojure2d.math.vector Vec4]))
+           [clojure2d.math.vector Vec2 Vec4]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -125,11 +126,11 @@
                            p4))
               y (* dampy (+ (* a3 s2 ^double (n3 (* prevx nscalex2) (* prevy nscaley2)))
                             (* a4 s4)))
-              
+
               ^Vec4 col1 (v/interpolate c1 c2 (m/abs (* s1 s2)))
               ^Vec4 col2 (v/interpolate c3 c4 (m/abs (* s3 s4))) 
-              ^Vec4 col (v/interpolate col1 col2 (m/qsin time))]
-
+              ^Vec4 col (v/interpolate col1 col2 (m/qsin time))] 
+          
           (p/add-pixel-bilinear bp x y (.x col) (.y col) (.z col))
           (recur x y (+ time step) (inc iter)))
         bp))))

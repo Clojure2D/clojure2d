@@ -13,7 +13,7 @@
   (:import [clojure.lang Counted Sequential Seqable IFn PersistentVector]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 (def ^:const ^double TOLERANCE 1.0e-6)
 
@@ -36,7 +36,8 @@
   (maxdim [v])
   (mindim [v])
   (base-from [v])
-  (sum [v1])  
+  (sum [v1])
+  (permute [v idxs])
   (interpolate [v1 v2 t] [v1 v2 t f])
   (interpolatev [v1 v2 v] [v1 v2 v f])
   (is-zero? [v1])
@@ -58,7 +59,7 @@
 (defn- find-idx-reducer-fn 
   "Helper function for reduce to find index for maximum/minimum value in vector."
   [f]
-  #(let [[midx curr v] %1]
+  #(let [[^double midx ^double curr v] %1]
      (if (f %2 v)
        [curr (inc curr) %2]
        [midx (inc curr) v])))
@@ -72,22 +73,23 @@
   VectorProto
   {:to-vec identity
    :applyf #(mapv %2 %1)
-   :magsq (fn [v] (reduce #(+ %1 (* %2 %2)) v))
+   :magsq (fn [v] (reduce #(+ (double %1) (* (double %2) (double %2))) v))
    :mag (comp m/sqrt magsq)
    :dot #(reduce + (map * %1 %2))
    :add #(mapv + %1 %2)
    :sub #(mapv - %1 %2)
-   :mult (fn [v1 v] (map #(* % v) v1))
+   :mult (fn [v1 v] (map #(* (double %) ^double v) v1))
    :emult #(mapv * %1 %2)
-   :div #(mult %1 (/ 1.0 %2))
+   :div #(mult %1 (/ 1.0 (double %2)))
    :abs #(mapv m/abs %)
    :mx #(reduce max %)
    :mn #(reduce min %)
    :emx #(mapv max %1 %2)
    :emn #(mapv min %1 %2)
-   :maxdim #(first (reduce (find-idx-reducer-fn >) [0 0 (first %)] %))
-   :mindim #(first (reduce (find-idx-reducer-fn <) [0 0 (first %)] %))
+   :maxdim #(first (reduce (find-idx-reducer-fn >) [0.0 0.0 (first %)] %))
+   :mindim #(first (reduce (find-idx-reducer-fn <) [0.0 0.0 (first %)] %))
    :sum #(reduce + %)
+   :permute #(mapv (fn [idx] (%1 idx)) %2)
    :interpolate (fn
                   ([v1 v2 t f]
                    (mapv #(f %1 %2 t) v1 v2))
@@ -149,7 +151,9 @@
     (if (< x y) 0 1))
   (base-from [v]
     [v (perpendicular v)])
-  (sum [_] (+ x y)) 
+  (sum [_] (+ x y))
+  (permute [p [^long i1 ^long i2]]
+    (Vec2. (p i1) (p i2)))
   (interpolate [_ v2 t f]
     (let [^Vec2 v2 v2] (Vec2. (f x (.x v2) t)
                               (f y (.y v2) t))))
@@ -241,7 +245,9 @@
                (div (Vec3. (- z) 0.0 x) (m/hypot x z))
                (div (Vec3. 0.0 z (- y)) (m/hypot y z)))]
       [v v2 (cross v v2)]))
-  (sum [_] (+ x y z)) 
+  (sum [_] (+ x y z))
+  (permute [p [^long i1 ^long i2 ^long i3]]
+    (Vec3. (p i1) (p i2) (p i3)))
   (interpolate [_ v2 t f]
     (let [^Vec3 v2 v2] (Vec3. (f x (.x v2) t)
                               (f y (.y v2) t)
@@ -395,7 +401,9 @@
     (max-key [x y z w] 0 1 2 3))
   (mindim [_]
     (min-key [x y z w] 0 1 2 3))
-  (sum [_] (+ x y z w)) 
+  (sum [_] (+ x y z w))
+  (permute [p [^long i1 ^long i2 ^long i3 ^long i4]]
+    (Vec4. (p i1) (p i2) (p i3) (p i4)))
   (interpolate [_ v2 t f]
     (let [^Vec4 v2 v2] (Vec4. (f x (.x v2) t)
                               (f y (.y v2) t)
@@ -445,14 +453,14 @@
   ""
   [v1 v2]
   (let [num (abs (sub v1 v2))
-        denom (applyf (add (abs v1) (abs v2)) #(if (zero? %) 0.0 (/ 1.0 %)))]
+        denom (applyf (add (abs v1) (abs v2)) #(if (zero? ^double %) 0.0 (/ 1.0 ^double %)))]
     (sum (emult num denom))))
 
 (defn dist-emd
   "Earth Mover's Distance"
   [v1 v2]
-  (first (reduce #(let [[s l] %1
-                        [a b] %2
+  (first (reduce #(let [[^double s ^double l] %1
+                        [^double a ^double b] %2
                         n (- (+ a l) b)]
                     [(+ s (m/abs l)) n]) [0.0 0.0] (map vector v1 v2))))
 

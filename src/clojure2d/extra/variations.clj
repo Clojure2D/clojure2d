@@ -190,7 +190,7 @@
 (make-var-method bcollide)
 (register-regular-var :bcollide)
 
-;; ### bCollide
+;; ### bSwirl
 (defn config-bswirl
   "bSwirl configuration
   params: `:in` `:out`"
