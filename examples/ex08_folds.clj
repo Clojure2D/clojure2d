@@ -6,7 +6,8 @@
             [clojure2d.math.random :as r]
             [clojure2d.math.vector :as v]
             [clojure2d.extra.variations :as vr]
-            [clojure2d.extra.overlays :refer :all])
+            [clojure2d.extra.overlays :refer :all]
+            [clojure.pprint :refer [pprint]])
   (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
@@ -15,10 +16,10 @@
 (def ^:const ^long w 600)
 (def ^:const ^long h 600)
 
-(def ^:const ^double x1 -3.0)
-(def ^:const ^double y1 -3.0)
-(def ^:const ^double x2 3.0)
-(def ^:const ^double y2 3.0)
+(def ^:const ^double x1 -3.1)
+(def ^:const ^double y1 -3.1)
+(def ^:const ^double x2 3.1)
+(def ^:const ^double y2 3.1)
 (def ^:const ^double step (/ (- x2 x1) (* 2.321 w)))
 
 (def sinusoidal (vr/make-variation :sinusoidal 3.0 {}))
@@ -26,32 +27,14 @@
 (def s80 (make-spots 80 [60 120 180] 646 800))
 (def n80 (make-noise 80 646 800))
 
-(defn create-field
-  ""
-  []
-  (let [one-field? (r/brand 0.25)
-        derivative? (r/brand 0.15)
-        sinusoidal? (r/brand 0.75)
-        field-name1 (rand-nth vr/variation-list)
-        field-name2 (rand-nth vr/variation-list)
-        field (if one-field?
-                (vr/make-variation field-name1 1.0 {})
-                (comp (vr/make-variation field-name2 1.0 {}) (vr/make-variation field-name1 1.0 {})))
-        field (if derivative? (vr/derivative field) field)
-        field (if sinusoidal? (comp sinusoidal field) field)]
-    (when sinusoidal?
-      (print "sinusoidal "))
-    (when derivative?
-      (print "derivative "))
-    (if one-field?
-      (println field-name1)
-      (println (str field-name1 " " field-name2)))
-    field))
-
 (defn make-me
   ""
   [canvas disp]
-  (let [field (create-field)]
+  (let [field-config (vr/make-random-configuration)
+        field (comp sinusoidal (vr/make-combination field-config))]
+
+    (pprint field-config)
+    
     (loop [y y1]
       (loop [x x1]
         

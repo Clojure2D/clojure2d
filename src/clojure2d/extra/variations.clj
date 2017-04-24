@@ -16,7 +16,8 @@
   (:require [clojure2d.math :refer :all]
             [clojure2d.math.random :refer :all]
             [clojure2d.math.vector :as v]
-            [clojure2d.math.complex :as c])
+            [clojure2d.math.complex :as c]
+            [clojure2d.math :as m])
   (:import [clojure2d.math.vector Vec2]
            [clojure2d.math.complex Complex]
            [org.apache.commons.math3.special Gamma Beta Erf BesselJ]))
@@ -902,7 +903,7 @@
 
 ;;; combinator & randomizer
 
-;;;;
+(def ^:dynamic *skip-random-variations* false)
 
 (defn derivative
   ""
@@ -915,43 +916,60 @@
   ([f amount]
    (derivative f amount 0.001))
   ([f]
-   (derivative f 1.0)))
+   (derivative f 1.0 0.001)))
 
-;;;;
+(defn make-random-variation-conf
+  "Create configuration line for random variation"
+  []
+  (let [n (rand-nth (if *skip-random-variations* variation-list-not-random variation-list))]
+    {:type :variation :name n :amount 1.0 :config (make-configuration n {})}))
 
-(defn- binary-op
-  ""
-  [op f1 f2 ^double amount]
-  (fn [^Vec2 v]
-    (v/mult (op (f1 v) (f2 v)) amount)))
-
-;;;;
-(def addf (partial binary-op v/add))
-(def subf (partial binary-op v/sub))
-(def mulf (partial binary-op v/emult))
-
-(defn divf
-  ""
-  [f1 f2 ^double amount]
-  (fn [^Vec2 v]
-    (let [^Vec2 v1 (f1 v)
-          ^Vec2 v2 (f2 v)
-          x (if (zero? (.x v2)) 1.0 (.x v2))
-          y (if (zero? (.y v2)) 1.0 (.y v2))]
-      (v/mult (Vec2. (/ (.x v1) x) (/ (.y v1) y)) amount))))
-
-(defn compf
-  ""
-  [f1 f2 amount]
-  (fn [^Vec2 v]
-    (v/mult (f1 (f2 v)) amount)))
+(defn make-random-conf-step
+  "Create one step for combined variation configuration, one of: sum, multiplication, combination or derivative"
+  ([f1 f2]
+   (let [operand (rand-nth [:add :add :mult :comp :comp :comp])
+         ^double amount1 (if (= operand :comp) 1.0 (drand -2.0 2.0))
+         ^double amount2 (if (= operand :comp) 1.0 (drand -2.0 2.0))
+         type1 (:type f1)
+         type2 (:type f2)
+         var1 (if (= type1 :operation) f1 (merge f1 {:amount amount1}))
+         var2 (if (= type2 :operation) f2 (merge f2 {:amount amount2}))
+         v {:type :operation :name operand :var1 var1 :var2 var2}]
+     (case operand
+       :add (merge v {:amount (/ 1.0 (+ (abs amount1) (abs amount2)))})
+       :mult (merge v {:amount (/ 1.0 (* amount1 amount2))})
+       :comp (merge v {:amount 1.0}))))
+  ([f]
+   (if (brand 0.1) f ;; skip sometimes
+       (if (brand 0.2) ;; derivative?
+         {:type :operation :name :deriv :step (sq (drand 0.01 1.0)) :amount 1.0 :var f}
+         (make-random-conf-step f (make-random-variation-conf)))))
+  ([]
+   (make-random-conf-step (make-random-variation-conf) (make-random-variation-conf))))
 
 (defn make-random-configuration
-  ""
-  []
-  ())
+  "Create full random configuration for combined variations"
+  ([^long depth f]
+   (if (pos? depth)
+     (make-random-configuration (dec depth) (make-random-conf-step f))
+     f))
+  ([depth] (make-random-configuration depth (make-random-variation-conf)))
+  ([] (make-random-configuration (lrand 5))))
 
-(defn make-random-combination
-  ""
-  []
-  )
+(defn make-combination
+  "Parse configuration and return new variation function."
+  ([config]
+   (let [t (:type config)
+         n (:name config)
+         a (:amount config)]
+     (if (= t :variation)
+       (make-variation n a (:config config))
+       (if (= n :deriv)
+         (derivative (make-combination (:var config)) a (:step config))
+         (let [v1 (make-combination (:var1 config))
+               v2 (make-combination (:var2 config))]
+           (case n
+             :comp (fn ^Vec2 [^Vec2 v] (v/mult (v1 (v2 v)) a))
+             :add (fn ^Vec2 [^Vec2 v] (v/mult (v/add (v1 v) (v2 v)) a))
+             :mult (fn ^Vec2 [^Vec2 v] (v/mult (v/emult (v1 v) (v2 v)) a))))))))
+  ([] (make-combination (make-random-configuration))))
