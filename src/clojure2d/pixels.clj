@@ -3,8 +3,7 @@
             [clojure2d.math.vector :as v]
             [clojure2d.math.random :as r]
             [clojure2d.color :as c]
-            [clojure2d.core :as core]
-            [criterium.core :as b])
+            [clojure2d.core :as core])
   (:import [clojure2d.math.vector Vec4 Vec3 Vec2]
            [clojure.lang PersistentVector]
            [java.awt.image BufferedImage]))

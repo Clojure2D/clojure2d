@@ -572,6 +572,18 @@
 (make-var-method hemisphere)
 (register-regular-var :hemisphere)
 
+(defn make-hyperbolic
+  ""
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [r (+ EPSILON ^double (v/mag v))
+          theta (v/heading v)]
+      (Vec2. (/ (sin theta) r)
+             (* (cos theta) r)))))
+(make-var-method hyperbolic)
+(register-regular-var :hyperbolic)
+
+
 ;; ## J
 ;;
 ;; ### Julia
@@ -905,7 +917,7 @@
 
 (def ^:dynamic *skip-random-variations* false)
 
-(defn derivative
+(defn- derivative
   ""
   ([f ^double amount ^double a]
    (let [^Vec2 d (Vec2. a a)]
@@ -918,13 +930,13 @@
   ([f]
    (derivative f 1.0 0.001)))
 
-(defn make-random-variation-conf
+(defn- make-random-variation-conf
   "Create configuration line for random variation"
   []
   (let [n (rand-nth (if *skip-random-variations* variation-list-not-random variation-list))]
     {:type :variation :name n :amount 1.0 :config (make-configuration n {})}))
 
-(defn make-random-conf-step
+(defn- make-random-conf-step
   "Create one step for combined variation configuration, one of: sum, multiplication, combination or derivative"
   ([f1 f2]
    (let [operand (rand-nth [:add :add :mult :comp :comp :comp])
