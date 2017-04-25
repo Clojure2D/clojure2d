@@ -75,10 +75,13 @@
 
 (defmacro make-var-method
   "Add new multimethod for variation factory function"
-  [sym]
+  [sym t]
   (let [k (keyword sym)
         m (symbol (str "make-" sym))]
-    `(defmethod make-variation ~k [k# a# p#] (~m a# (make-configuration ~k p#)))))
+    `(do (defmethod make-variation ~k [k# a# p#] (~m a# (make-configuration ~k p#)))
+         ~(if (= t :regular)
+            `(register-regular-var ~k)
+            `(register-random-var ~k)))))
 
 ;; Locally used random function for some configuration parameters. Mostly used to avoid `0` value.
 (defn- srandom
@@ -131,8 +134,7 @@
           xx (* amount (+ x (* sym (- dx x))))
           yy (* amount dy)]
       (Vec2. xx yy))))
-(make-var-method auger)
-(register-regular-var :auger)
+(make-var-method auger :regular)
 
 ;; ### Arch
 
@@ -146,8 +148,7 @@
       (if (zero? cosr) zerov
           (Vec2. (* amount sinr)
                  (* amount (/ (sq sinr) cosr)))))))
-(make-var-method arch)
-(register-random-var :arch)
+(make-var-method arch :random)
 
 ;; ## B
 
@@ -188,8 +189,7 @@
           xx (* amount sinht temp)
           yy (* amount sins temp)]
       (Vec2. xx yy))))
-(make-var-method bcollide)
-(register-regular-var :bcollide)
+(make-var-method bcollide :regular)
 
 ;; ### bSwirl
 (defn config-bswirl
@@ -219,8 +219,7 @@
         (Vec2. 0.0 0.0)
         (Vec2. (* amount (/ sinht temp))
                (* amount (/ sins temp)))))))
-(make-var-method bswirl)
-(register-regular-var :bswirl)
+(make-var-method bswirl :regular)
 
 ;; ### BesselJ
 (defn make-besselj
@@ -229,8 +228,7 @@
   (fn [^Vec2 v]
     (Vec2. (* amount ^double (v/mag v) (BesselJ/value (abs (.x v)) (abs (.y v))))
            (* amount ^double (v/heading v)))))
-(make-var-method besselj)
-(register-regular-var :besselj)
+(make-var-method besselj :regular)
 
 ;; ### Beta
 (defn make-beta
@@ -239,8 +237,7 @@
   (fn [^Vec2 v]
     (Vec2. (* amount (Beta/logBeta (+ EPSILON (abs (.x v))) (+ EPSILON (abs (.y v)))))
            (* amount ^double (v/heading v)))))
-(make-var-method beta)
-(register-regular-var :beta)
+(make-var-method beta :regular)
 
 ;; ## Bent
 
@@ -252,8 +249,7 @@
           ny (if (neg? (.y v)) (* (.y v) 0.5) (.y v))]
       (Vec2. (* amount nx)
              (* amount ny)))))
-(make-var-method bent)
-(register-regular-var :bent)
+(make-var-method bent :regular)
 
 ;; ## Blade
 
@@ -266,8 +262,7 @@
           cosr (cos r)]
       (Vec2. (* amount (.x v) (+ cosr sinr))
              (* amount (.x v) (- cosr sinr))))))
-(make-var-method blade)
-(register-random-var :blade)
+(make-var-method blade :random)
 
 (defn make-blade2
   ""
@@ -278,8 +273,7 @@
           cosr (cos r)]
       (Vec2. (* amount (.x v) (+ cosr sinr))
              (* amount (.y v) (- cosr sinr))))))
-(make-var-method blade2)
-(register-random-var :blade2)
+(make-var-method blade2 :random)
 
 ;; ## Boarders
 
@@ -309,8 +303,7 @@
                    (* amount (+ hoffsety roundy 0.25)))
             (Vec2. (* amount (- (+ hoffsetx roundx) (/ (* 0.25 offsetx) offsety)))
                    (* amount (- (+ hoffsety roundy) 0.25)))))))))
-(make-var-method boarders)
-(register-random-var :boarders)
+(make-var-method boarders :random)
 
 ;; ## Butterfly
 
@@ -321,12 +314,10 @@
     (let [wx (* amount 1.3029400317411197908970256609023)
           y2 (* 2.0 (.y v))
           r (* wx (sqrt (/ (abs (* (.y v) (.x v)))
-                             (+ EPSILON (sq (.x v)) (sq y2)))))]
+                           (+ EPSILON (sq (.x v)) (sq y2)))))]
       (Vec2. (* r (.x v))
              (* r y2)))))
-
-(make-var-method butterfly)
-(register-regular-var :butterfly)
+(make-var-method butterfly :regular)
 
 ;; ## C
 
@@ -405,11 +396,29 @@
                   (* Sc)
                   (+ YY)
                   (* amount))))))
-(make-var-method circlelinear)
-(register-regular-var :circlelinear)
+(make-var-method circlelinear :regular)
+
+;; ### Cosine
+(defn make-cosine
+  ""
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [r (* PI (.x v))]
+      (Vec2. (* amount (cos r) (cosh (.y v)))
+             (- (* amount (sin r) (sinh (.y v))))))))
+(make-var-method cosine :regular)
+
+;; ### cross
+(defn make-cross
+  ""
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [s (- (sq (.x v)) (sq (.y v)))
+          r (* amount (sqrt (/ 1.0 (+ EPSILON (* s s)))))]
+      (Vec2. (* (.x v) r) (* (.y v) r)))))
+(make-var-method cross :regular)
 
 ;; ### csin
-
 (defn config-csin
   "CSin configuraion
   params `:stretch`"
@@ -426,8 +435,7 @@
                  (c/mult s-cx)
                  (c/sin)
                  (c/to-vec2)) amount)))
-(make-var-method csin)
-(register-regular-var :csin)
+(make-var-method csin :regular)
 
 ;; ### Cayley transform
 
@@ -440,8 +448,7 @@
       (let [^Complex c (c/from-vec2 v)]
         (c/to-vec2 (c/div (c/add c c/I-)
                           (c/add c c/I)))))))
-(make-var-method cayley)
-(register-regular-var :cayley)
+(make-var-method cayley :regular)
 
 ;; ## D
 
@@ -458,8 +465,7 @@
           cosr (cos length)]
       (Vec2. (* amount sina cosr)
              (* amount cosa sinr)))))
-(make-var-method diamond)
-(register-regular-var :diamond)
+(make-var-method diamond :regular)
 
 ;; ## E
 
@@ -495,8 +501,7 @@
           xx (* amount (cosh mu) (cos nu))
           yy (* amount (sinh mu) (sin nu))]
       (Vec2. xx yy))))
-(make-var-method emod)
-(register-regular-var :emod)
+(make-var-method emod :regular)
 
 ;; ### Erf
 (defn make-erf
@@ -505,21 +510,30 @@
   (fn [^Vec2 v]
     (Vec2. (* amount (Erf/erf (.x v) (.y v)))
            (* amount ^double (v/heading v)))))
-(make-var-method erf)
-(register-regular-var :erf)
+(make-var-method erf :regular)
 
 ;; ### Exp
 (defn make-exp
   ""
   [^double amount _]
   (fn [^Vec2 v]
-    (let [e (exp (.x v))]
-      (Vec2. (* amount e (cos (.y v)))
-             (* amount e (sin (.y v)))))))
-(make-var-method exp)
-(register-regular-var :exp)
+    (let [e (* amount (exp (.x v)))]
+      (Vec2. (* e (cos (.y v)))
+             (* e (sin (.y v)))))))
+(make-var-method exp :regular)
+
+;; ### Eyefish
+(defn make-eyefish
+  ""
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [r (/ (* amount 4.0) (inc ^double (v/mag v)))]
+      (Vec2. (* r (.x v)) (* r (.y v))))))
+(make-var-method eyefish :regular)
 
 ;; ## F
+
+;; ### Fan2
 (defn config-fan2
   "fan2 configuration
   params: `:x` `:y`"
@@ -543,8 +557,32 @@
               (+ angle dx2))]
       (Vec2. (* amount r (sin a))
              (* amount r (cos a))))))
-(make-var-method fan2)
-(register-regular-var :fan2)
+(make-var-method fan2 :regular)
+
+;; ### Fisheye
+(defn make-fisheye
+  ""
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [r (/ (* amount 4.0) (inc ^double (v/mag v)))]
+      (Vec2. (* r (.y v)) (* r (.x v))))))
+(make-var-method fisheye :regular)
+
+
+;; ### Foci
+(defn make-foci
+  ""
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [expx (* 0.5 (exp (.x v)))
+          expnx (/ 0.25 expx)
+          sy (sin (.y v))
+          cy (cos (.y v))
+          tmp (- (+ expx expnx) cy)
+          tmp (/ amount (if (zero? tmp) EPSILON tmp))]
+      (Vec2. (* tmp (- expx expnx))
+             (* tmp sy)))))
+(make-var-method foci :regular)
 
 ;; ## G
 
@@ -555,11 +593,24 @@
   (fn [^Vec2 v]
     (Vec2. (* amount (Gamma/logGamma (v/mag v)))
            (* amount ^double (v/heading v)))))
-(make-var-method gamma)
-(register-regular-var :gamma)
+(make-var-method gamma :regular)
 
 ;; ## H
 ;;
+
+;; ### Heart
+(defn make-heart
+  ""
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [^double r (v/mag v)
+          ^double theta (v/heading v)
+          rt (* r theta)
+          sr (sin rt)
+          cr (cos rt)]
+      (Vec2. (* amount r sr) (- (* amount r cr))))))
+(make-var-method heart :regular)
+
 ;; ### Hemisphere
 
 (defn make-hemisphere
@@ -569,8 +620,7 @@
     (let [r (/ amount (sqrt (inc ^double (v/magsq v))))]
       (Vec2. (* r (.x v))
              (* r (.y v))))))
-(make-var-method hemisphere)
-(register-regular-var :hemisphere)
+(make-var-method hemisphere :regular)
 
 (defn make-hyperbolic
   ""
@@ -580,9 +630,7 @@
           theta (v/heading v)]
       (Vec2. (/ (sin theta) r)
              (* (cos theta) r)))))
-(make-var-method hyperbolic)
-(register-regular-var :hyperbolic)
-
+(make-var-method hyperbolic :regular)
 
 ;; ## J
 ;;
@@ -596,8 +644,7 @@
                  (sqrt)
                  (* amount))]
       (Vec2. (* r (cos a)) (* r (sin a))))))
-(make-var-method julia)
-(register-random-var :julia)
+(make-var-method julia :random)
 
 ;; ### JuliaN
 (defn config-julian
@@ -618,8 +665,7 @@
     (let [a (/ (+ ^double (v/heading v) (* TWO_PI ^double (drand abspower))) power)
           r (* amount (pow (v/magsq v) cpower))]
       (Vec2. (* r (cos a)) (* r (sin a))))))
-(make-var-method julian)
-(register-random-var :julian)
+(make-var-method julian :random)
 
 ;; ### JuliaQ
 (defn config-juliaq
@@ -645,8 +691,7 @@
                (* inv-power-2pi ^double (drand (Integer/MAX_VALUE))))
           r (* amount (pow (v/magsq v) half-inv-power))]
       (Vec2. (* r (cos a)) (* r (sin a))))))
-(make-var-method juliaq)
-(register-random-var :juliaq)
+(make-var-method juliaq :random)
 
 ;; ## N
 
@@ -677,9 +722,37 @@
           r (* amount ^double (drand))]
       (Vec2. (* r (cos a))
              (* r (sin a))))))
-(make-var-method pie)
-(register-random-var :pie)
+(make-var-method pie :random)
 
+(defn make-polar
+  ""
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [ny (dec ^double (v/mag v))]
+      (Vec2. (* amount ^double (v/heading v) M_1_PI)
+             (* amount ny)))))
+(make-var-method polar :regular)
+
+;; ### Polar2
+(defn make-polar2
+  ""
+  [^double amount _]
+  (let [p2v (/ amount PI)
+        p2v2 (* 0.5 p2v)]
+    (fn [^Vec2 v] (Vec2. (* p2v ^double (v/heading v)) (* p2v2 (log (v/magsq v)))))))
+(make-var-method polar2 :regular)
+
+;; ### Power
+(defn make-power
+  ""
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [theta (v/heading v)
+          sa (sin theta)
+          ca (cos theta)
+          pow (* amount (pow (v/mag v) sa))]
+      (Vec2. (* pow ca) (* pow sa)))))
+(make-var-method power :regular)
 
 ;; ### Popcorn2
 (defn config-popcorn2
@@ -710,8 +783,7 @@
                   (+ (.y v))
                   (* amount))]
       (Vec2. xx yy))))
-(make-var-method popcorn2)
-(register-regular-var :popcorn2)
+(make-var-method popcorn2 :regular)
 
 ;; ## S
 
@@ -729,8 +801,7 @@
                 (+ EPSILON))
           r (/ 1.0 d)]
       (v/mult v r))))
-(make-var-method scry)
-(register-regular-var :scry)
+(make-var-method scry :regular)
 
 ;; ### Sinusoidal
 (defn make-sinusoidal
@@ -738,8 +809,21 @@
   [^double amount _]
   (fn [^Vec2 v]
     (Vec2. (* amount (sin (.x v))) (* amount (sin (.y v))))))
-(make-var-method sinusoidal)
-(register-regular-var :sinusoidal)
+(make-var-method sinusoidal :regular)
+
+;; ### Secant
+(defn make-secant2
+  ""
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [r (* amount ^double (v/mag v))
+          cr (cos r)
+          icr (/ 1.0 (if (zero? cr) EPSILON cr))
+          ny (if (neg? cr)
+               (* amount (inc cr))
+               (* amount (dec cr)))]
+      (Vec2. (* amount (.x v)) ny))))
+(make-var-method secant2 :regular)
 
 ;; ### STwin
 (defn config-stwin
@@ -764,10 +848,20 @@
           result (/ (* x2-y2 (sin (* TWO_PI distort (+ x y)))) div)]
       (Vec2. (+ (* amount (.x v)) result)
              (+ (* amount (.y v)) result)))))
-(make-var-method stwin)
-(register-regular-var :stwin)
+(make-var-method stwin :regular)
 
 ;; ## T
+
+;; ### Tangent
+(defn make-tangent
+  ""
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [d (cos (.y v))
+          id (/ 1.0 (if (zero? d) EPSILON d))]
+      (Vec2. (* amount (sin (.x v)) id)
+             (* amount (tan (.y v)))))))
+(make-var-method tangent :regular)
 
 ;; ### Trade
 (defn config-trade
@@ -797,8 +891,7 @@
       (if (<= rm rr)
         (v/mult res amount)
         (v/mult v amount)))))
-(make-var-method trade)
-(register-regular-var :trade)
+(make-var-method trade :regular)
 
 ;; ## V
 
@@ -849,13 +942,7 @@
                                           currl))) (VoronResType. 20.0 0.0 0.0) Ks)]
       (Vec2. (* amount (+ (.X0 res) (* k (- (.x v) (.X0 res)))))
              (* amount (+ (.Y0 res) (* k (- (.y v) (.Y0 res)))))))))
-(make-var-method voron)
-(register-regular-var :voron)
-
-(def vv (make-variation :voron 1.0 {}))
-
-(vv (Vec2. 0.9 0.2))
-;; => #object[clojure2d.math.vector.Vec2 0x34f5877c "[-0.6144291130318851, -0.03556826075794334]"]
+(make-var-method voron :regular)
 
 ;;;;; https://github.com/d3/d3-geo-projection/tree/master/src
 
@@ -871,8 +958,7 @@
                         (log)
                         (* 1.25))) amount)))
 
-(make-var-method miller)
-(register-regular-var :miller)
+(make-var-method miller :regular)
 
 (defn make-millerrev
   ""
@@ -885,8 +971,7 @@
                        (atan)
                        (* 2.5)
                        (- (* 0.625 PI)))) amount)))
-(make-var-method millerrev)
-(register-regular-var :millerrev)
+(make-var-method millerrev :regular)
 
 (defn make-foucaut
   ""
@@ -902,8 +987,7 @@
                   (* amount))
           yy (* amount SQRTPI (tan k))]
       (Vec2. xx yy))))
-(make-var-method foucaut)
-(register-regular-var :foucaut)
+(make-var-method foucaut :regular)
 
 ;;;;
 
@@ -939,7 +1023,7 @@
 (defn- make-random-conf-step
   "Create one step for combined variation configuration, one of: sum, multiplication, combination or derivative"
   ([f1 f2]
-   (let [operand (rand-nth [:add :add :mult :comp :comp :comp])
+   (let [operand (rand-nth [:add :add :mult :comp :comp :comp :comp])
          ^double amount1 (if (= operand :comp) 1.0 (drand -2.0 2.0))
          ^double amount2 (if (= operand :comp) 1.0 (drand -2.0 2.0))
          type1 (:type f1)
@@ -953,7 +1037,7 @@
        :comp (merge v {:amount 1.0}))))
   ([f]
    (if (brand 0.1) f ;; skip sometimes
-       (if (brand 0.2) ;; derivative?
+       (if (brand 0.15) ;; derivative?
          {:type :operation :name :deriv :step (sq (drand 0.01 1.0)) :amount 1.0 :var f}
          (make-random-conf-step f (make-random-variation-conf)))))
   ([]
@@ -970,18 +1054,15 @@
 
 (defn make-combination
   "Parse configuration and return new variation function."
-  ([config]
-   (let [t (:type config)
-         n (:name config)
-         a (:amount config)]
-     (if (= t :variation)
-       (make-variation n a (:config config))
-       (if (= n :deriv)
-         (derivative (make-combination (:var config)) a (:step config))
-         (let [v1 (make-combination (:var1 config))
-               v2 (make-combination (:var2 config))]
-           (case n
-             :comp (fn ^Vec2 [^Vec2 v] (v/mult (v1 (v2 v)) a))
-             :add (fn ^Vec2 [^Vec2 v] (v/mult (v/add (v1 v) (v2 v)) a))
-             :mult (fn ^Vec2 [^Vec2 v] (v/mult (v/emult (v1 v) (v2 v)) a))))))))
+  ([{:keys [type name amount config var step var1 var2]}]
+   (if (= type :variation)
+     (make-variation name amount config)
+     (if (= name :deriv)
+       (derivative (make-combination var) amount step)
+       (let [v1 (make-combination var1)
+             v2 (make-combination var2)]
+         (case name
+           :comp (fn ^Vec2 [^Vec2 v] (v/mult (v1 (v2 v)) amount))
+           :add (fn ^Vec2 [^Vec2 v] (v/mult (v/add (v1 v) (v2 v)) amount))
+           :mult (fn ^Vec2 [^Vec2 v] (v/mult (v/emult (v1 v) (v2 v)) amount)))))))
   ([] (make-combination (make-random-configuration))))
