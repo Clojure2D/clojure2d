@@ -15,7 +15,7 @@
 (def ^:const ^long height 1200)
 
 (def ^:const ^double point-step 15.0)
-(def ^:const ^double rscale 15.0)
+(def ^:const ^double rscale 25.0)
 (def ^:const ^double angle-mult 16.0)
 (def ^:const ^double point-size 0.9)
 (def ^:const ^int alpha 20)
@@ -27,7 +27,7 @@
 
 (defn move-particle
   ""
-  [canvas ^Vec2 vrand fun noise ^Vec2 in]
+  [^Vec2 vrand fun noise canvas ^Vec2 in ]
   (let [xx (m/norm (.x in) 0 width -2 2)
         yy (m/norm (.y in) 0 height -2 2)
         ^Vec2 vr (v/add vrand (Vec2. xx yy))
@@ -35,15 +35,14 @@
         ^double n (noise (.x v) (.y v))
         ang (* n m/TWO_PI angle-mult)
         nx (+ (.x in) (* point-step (m/qcos ang)))
-        ny (+ (.y in) (* point-step (m/qsin ang)))
-        col (m/cnorm (m/sqrt n) 0 1 100 250)]
+        ny (+ (.y in) (* point-step (m/qsin ang))) 
+        col (m/cnorm (m/sqrt n) 0 1 100 240)]
     (if (and (<= 80 ny (- height 81)) (<= 80 nx (- width 81)))
       (do
-        (with-canvas canvas
-          (set-color col col col alpha)
-          (set-stroke point-size)
-                                        ;      (line (.x in) (.y in) nx ny)
-          (point nx ny))
+        (set-color canvas col col col alpha)
+        ;; (line (.x in) (.y in) nx ny)
+        (point canvas nx ny)
+        
         (Vec2. nx ny))
       (make-particle))))
 
@@ -55,19 +54,22 @@
         variation1 (rand-nth variation-list-not-random)
         variation2 (rand-nth variation-list-not-random)
         vrand (Vec2. (r/drand -1 1) (r/drand -1 1))
-        compv (make-variation :erf 1.0 {})
-        mv-fun (partial move-particle canvas vrand (comp (make-variation variation2 1.0 {}) (make-variation variation1 1.0 {})) noise)
-        
-        particles (vec (repeatedly 25000 make-particle))]
+        mv-fun (partial move-particle vrand (comp (make-variation variation2 1.0 {}) (make-variation variation1 1.0 {})) noise)       
+        particles (vec (repeatedly 25000 make-particle))
+        looper (fn [canvas] (loop [xs particles]
+                              (if @running
+                                (recur (mapv (partial mv-fun canvas) xs))
+                                canvas)))]
     
     (defmethod key-pressed ["particles" \space] [_]
       (save-canvas canvas (next-filename "results/ex05/" ".jpg")))
 
     (println (str variation1 " " variation2))
 
-    (loop [xs particles]
-      (when @running
-        (recur (mapv mv-fun xs))))
+    (with-canvas canvas
+      (set-background 10 10 10)
+      (set-stroke point-size)
+      looper)    
     
     ))
 
