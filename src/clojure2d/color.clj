@@ -107,6 +107,12 @@
            ^int (clamp255 b)
            ^int (clamp255 a))))
 
+(defn set-alpha
+  "Set alpha channel"
+  [^Vec4 v ^double a]
+  (Vec4. (.x v) (.y v) (.z v) a))
+
+
 ;; blending part, operate on range 0-1
 
 (def r255 (double-array (map #(/ ^double % 255.0) (range 256))))

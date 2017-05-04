@@ -17,7 +17,8 @@
             [clojure2d.math.random :refer :all]
             [clojure2d.math.vector :as v]
             [clojure2d.math.complex :as c]
-            [clojure2d.math :as m])
+            [clojure2d.math :as m]
+            [clojure2d.math.random :as r])
   (:import [clojure2d.math.vector Vec2]
            [clojure2d.math.complex Complex]
            [org.apache.commons.math3.special Gamma Beta Erf BesselJ]))
@@ -512,6 +513,25 @@
            (* amount ^double (v/heading v)))))
 (make-var-method erf :regular)
 
+;; ### Elliptic
+(defn make-elliptic
+  ""
+  [^double amount _]
+  (let [-a (/ amount HALF_PI)]
+    (fn [^Vec2 v]
+      (let [tmp (inc ^double (v/magsq v))
+            x2 (+ (.x v) (.x v))
+            xmax (* 0.5 (+ (sqrt (+ tmp x2)) (sqrt (- tmp x2))))
+            a (/ (.x v) xmax)
+            b (safe-sqrt (- 1.0 (* a a)))
+            l (log (+ xmax (safe-sqrt (dec xmax))))
+            x (* -a (atan2 a b)) 
+            y (if (r/brand)
+                (* -a l)
+                (- (* -a l)))]
+        (Vec2. x y)))))
+(make-var-method elliptic :random)
+
 ;; ### Exp
 (defn make-exp
   ""
@@ -784,6 +804,9 @@
                   (* amount))]
       (Vec2. xx yy))))
 (make-var-method popcorn2 :regular)
+
+;; ## R
+
 
 ;; ## S
 
