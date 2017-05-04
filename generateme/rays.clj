@@ -47,7 +47,7 @@
 
   (def half (int (* ^double (m/norm (:curl config) m/PI (+ m/PI m/TWO_PI) 1.0 0.7) width 0.5)))
 
-  ;; (def half 700)
+  ;; (def half 2000)
 
   
   (def border (int (* 0.9 ^int half)))
@@ -85,7 +85,7 @@
                            (var1)
                            (v/mult scale-up))
               ^double n1 (if independent (noise1 (.x v1)) (noise1 (.x v1) (.y v1)))
-              ^double n2 (if independent (noise1 (.y v1) 1.11) (noise1 (.y v1) (.x v1) 1.11)) 
+              ^double n2 (if independent (noise1 (.y v1) 1.11) (noise1 (.y v1) (.x v1) 1.11))
               s (m/sin (+ (* curl n1) (.z v)))
               c (m/cos (+ (* curl n2) (.z v)))
               c1 (v/interpolate col1a col2a n1)
