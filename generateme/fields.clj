@@ -30,8 +30,8 @@
     []
     (binding [vr/*skip-random-variations* true]
       (let [var-conf (vr/make-random-configuration (r/irand 4))
-            palseq (filter #(< (c/get-luma (first %)) 40) (repeatedly #(:palette (g/color-reducer-machine))))
-            vrange ^double (r/drand 1 4)]
+            palseq (filter #(< ^double (v/mx (c/set-alpha (first %) 0)) 50) (repeatedly #(:palette (g/color-reducer-machine))))
+            vrange (double (r/drand 1 4))]
         {:noise (if (r/brand 0.3) (j/make-random-fractal) (r/make-perlin-noise (r/irand) (r/irand 2 4)))
          :col2 (ffirst palseq)
          :col1 (Vec4. 1 1 1 255)
@@ -39,6 +39,8 @@
          :variation (vr/make-combination var-conf) 
          :angle-mult (r/drand 1.0 50.0)
          :point-step (r/drand 1.0 50.0)
+         :with-noise (r/brand)
+         :angle-phase (r/drand m/TWO_PI)
          :mnrange (- vrange)
          :mxrange vrange
          :rscale (-> (r/drand 0.1 1.0)
@@ -65,19 +67,22 @@
   (defn make-do-step
     ""
     [canvas {:keys [noise variation ^double angle-mult ^double point-step ^double rscale ^Vec2 vshift
-                    ^Vec4 col1 ^Vec4 col2 ^double mnrange ^double mxrange]}]
+                    with-noise ^Vec4 col1 ^Vec4 col2 ^double mnrange ^double mxrange ^double angle-phase]}]
     (fn [^Vec3 v]
       (let [xx (m/norm (.x v) 0.0 width mnrange mxrange)
             yy (m/norm (.y v) 0.0 height mnrange mxrange)
             ^Vec2 vr (v/add vshift (Vec2. xx yy))
-            ^Vec2 res (v/div (variation vr) rscale)
-            ^double n (noise (.x res) (.y res))
-            ang (* n m/TWO_PI angle-mult)
+            ^Vec2 va (variation vr)
+            n ^double (if with-noise
+                        (let [^Vec2 res (v/div va rscale)]
+                          ^double (noise (.x res) (.y res)))
+                        (/ (+ m/PI ^double (v/heading va)) m/TWO_PI))
+            ang (+ angle-phase (* n m/TWO_PI angle-mult))
             sa (* point-step (m/sin ang))
             ca (* point-step (m/cos ang))
             nx (+ (.x v) sa)
             ny (+ (.y v) ca)
-            s (+ 2.0 (* n 4.0))
+            s (+ 2.0 (* n 6.0))
             col (c/set-alpha (v/interpolate col1 col2 n) 5)]
         (if (and (<= bleft ny bright)
                  (<= bleft nx bright)

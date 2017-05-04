@@ -468,6 +468,21 @@
              (* amount cosa sinr)))))
 (make-var-method diamond :regular)
 
+;; ### Disc
+
+(defn make-disc
+  ""
+  [^double amount _]
+  (let [api (/ amount PI)]
+    (fn [^Vec2 v]
+      (let [rpi (* PI ^double (v/mag v))
+            sinr (sin rpi)
+            cosr (cos rpi)
+            r (* api ^double (v/heading v))]
+        (Vec2. (* r sinr) (* r cosr))))))
+(make-var-method disc :regular)
+
+
 ;; ## E
 
 ;; ### eMod
@@ -504,6 +519,20 @@
       (Vec2. xx yy))))
 (make-var-method emod :regular)
 
+;; ### Ennepers
+
+(defn make-ennepers
+  ""
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [sx (* (.x v) (.x v))
+          sy (* (.y v) (.y v))
+          x (+ (- (.x v) (* 0.3333333 sx (.x v))) (* (.x v) sy))
+          y (+ (- (.y v) (* 0.3333333 sy (.y v))) (* (.y v) sx))]
+      (Vec2. (* amount x) (* amount y)))))
+(make-var-method ennepers :regular)
+
+
 ;; ### Erf
 (defn make-erf
   ""
@@ -531,6 +560,24 @@
                 (- (* -a l)))]
         (Vec2. x y)))))
 (make-var-method elliptic :random)
+
+;; ### Ex
+
+(defn make-ex
+  ""
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [^double r (v/mag v)
+          ^double h (v/heading v)
+          n0 (sin (+ h r))
+          n1 (cos (- h r))
+          m0 (* n0 n0 n0)
+          m1 (* n1 n1 n1)
+          ar (* amount r)]
+      (Vec2. (* ar (+ m0 m1))
+             (* ar (- m0 m1))))))
+(make-var-method ex :regular)
+
 
 ;; ### Exp
 (defn make-exp
@@ -713,6 +760,18 @@
       (Vec2. (* r (cos a)) (* r (sin a))))))
 (make-var-method juliaq :random)
 
+;; ## L
+
+;; ### Log
+
+(defn make-log
+  ""
+  [^double amount _]
+  (fn [^Vec2 v]
+    (Vec2. (* amount 0.5 (log ^double (v/magsq v)))
+           (* amount ^double (v/heading v)))))
+(make-var-method log :regular)
+
 ;; ## N
 
 
@@ -885,6 +944,34 @@
       (Vec2. (* amount (sin (.x v)) id)
              (* amount (tan (.y v)))))))
 (make-var-method tangent :regular)
+
+;; ### Taurus
+(defn config-taurus
+  "Taurus configuraion
+  params: `:r` `:n` `:sor` `:inv`"
+  [p]
+  (let [m (merge {:r (drand -5.0 5.0)
+                  :n (drand -5.0 5.0)
+                  :inv (drand -2.0 2.0)
+                  :sor (drand -2.0 2.0)} p)]
+    (assoc m
+           :rinv (* ^double (:r m) ^double (:inv m))
+           :revinv (- 1.0 ^double (:inv m)))))
+(make-config-method taurus)
+
+(defn make-taurus
+  ""
+  [^double amount {:keys [^double r ^double n ^double rinv ^double revinv]}]
+  (fn [^Vec2 v]
+    (let [sx (sin (.x v))
+          cx (cos (.x v))
+          sy (sin (.y v))
+          ir (+ rinv (* revinv r (cos (* n (.x v)))))
+          irsy (+ ir sy)]
+      (Vec2. (* amount cx irsy)
+             (* amount sx irsy)))))
+(make-var-method taurus :regular)
+
 
 ;; ### Trade
 (defn config-trade

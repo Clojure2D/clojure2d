@@ -24,14 +24,16 @@
 
 (def sinusoidal (vr/make-variation :sinusoidal 3.0 {}))
 
-(def s80 (make-spots 80 [60 120 180] 646 800))
-(def n80 (make-noise 80 646 800))
+(def s80 (make-spots 80 [60 120 180] w h))
+(def n80 (make-noise 80 w h))
 
 (defn make-me
   ""
   [canvas disp]
   (let [field-config (vr/make-random-configuration)
-        field (comp sinusoidal (vr/make-combination field-config))]
+        field (comp sinusoidal (vr/make-combination field-config))
+        field (comp sinusoidal (vr/make-variation :taurus 1.0 {}))
+        ] 
 
     (pprint field-config)
     
