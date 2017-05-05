@@ -13,26 +13,35 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-(def ^:const ^long w 600)
-(def ^:const ^long h 600)
+(def ^:const ^long w 540)
+(def ^:const ^long h 540)
 
-(def ^:const ^double x1 -3.1)
-(def ^:const ^double y1 -3.1)
-(def ^:const ^double x2 3.1)
-(def ^:const ^double y2 3.1)
-(def ^:const ^double step (/ (- x2 x1) (* 2.321 w)))
+(def ^:const ^double x1 -2.0)
+(def ^:const ^double y1 -2.0)
+(def ^:const ^double x2 2.0)
+(def ^:const ^double y2 2.0)
+(def ^:const ^double step (/ (- x2 x1) (* 1.8 w)))
 
-(def sinusoidal (vr/make-variation :sinusoidal 3.0 {}))
+(def ^:const ^double x1- (dec x1))
+(def ^:const ^double y1- (dec y1))
+(def ^:const ^double x2+ (inc x2))
+(def ^:const ^double y2+ (inc y2))
+(def ^:const ^long w- (dec w))
+(def ^:const ^long h- (dec h))
 
-(def s80 (make-spots 80 [60 120 180] w h))
-(def n80 (make-noise 80 w h))
+(def ^:const ^double scale 1.0)
+
+(def sinusoidal (vr/make-variation :sinusoidal 2.7 {}))
+
+(def s80 (make-spots 60 [60 120 180] w h))
+(def n80 (make-noise 60 w h))
 
 (defn make-me
   ""
   [canvas disp]
   (let [field-config (vr/make-random-configuration)
         field (comp sinusoidal (vr/make-combination field-config))
-        field (comp sinusoidal (vr/make-variation :taurus 1.0 {}))
+        field (comp sinusoidal (vr/make-variation :juliac 1.0 {}))
         ] 
 
     (pprint field-config)
@@ -40,9 +49,9 @@
     (loop [y y1]
       (loop [x x1]
         
-        (let [^Vec2 vv (field (Vec2. x y))
-              xx (m/norm (+ (.x vv) ^double (r/grand 0.003)) x1 x2 20 (- w 20))
-              yy (m/norm (+ (.y vv) ^double (r/grand 0.003)) y1 y2 20 (- h 20))]
+        (let [^Vec2 vv (v/mult (field (Vec2. x y)) scale)
+              xx (m/norm (+ (.x vv) ^double (r/grand 0.0012)) x1- x2+ 0.0 w)
+              yy (m/norm (+ (.y vv) ^double (r/grand 0.0012)) y1- y2+ 0.0 h)]
           (point canvas xx yy))
 
         (when (and @disp (< x x2)) (recur (+ x step))))
@@ -53,9 +62,8 @@
   ""
   [[canvas disp]]
   (with-canvas canvas
-    (set-background 250 250 250)
-    (set-color 20 20 20 15)
-    (set-stroke 0.9)
+    (set-background 255 250 245)
+    (set-color 35 35 35 16)
     (make-me disp)
     (image (render-noise n80 (@canvas 1)))
     (image (render-spots s80 (@canvas 1))))
@@ -73,3 +81,4 @@
     [canvas disp]))
 
 (draw-folds (example-08))
+

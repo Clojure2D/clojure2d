@@ -616,9 +616,9 @@
     (let [^double r (v/mag v)
           ^double angle (v/heading v)
           dy y
-          dx (+ 1.0e-6 (* PI x x))
+          dx (+ EPSILON (* PI x x))
           dx2 (* 0.5 dx)
-          t (+ angle (- dy (* dx (long (/ (+ angle dy) dx)))))
+          t (- (+ angle dy) (* dx (long (/ (+ angle dy) dx))))
           a (if (> t dx2)
               (- angle dx2)
               (+ angle dx2))]
@@ -713,23 +713,49 @@
       (Vec2. (* r (cos a)) (* r (sin a))))))
 (make-var-method julia :random)
 
+;; ### JuliaC
+(defn config-juliac
+  ""
+  [p]
+  (let [m (merge {:re (int (srandom 1.0 10.0))
+                  :im (* 0.01 ^double (drand -2.0 2.0))
+                  :dist (drand -2.0 2.0)} p)]
+    (assoc m :rre (/ 1.0 ^double (:re m)))))
+(make-config-method juliac)
+
+(defn make-juliac
+  ""
+  [^double amount {:keys [^double rre ^double re ^double im ^double dist]}]
+  (fn [^Vec2 v]
+    (let [arg (+ ^double (v/heading v)
+                 (* TWO_PI ^double (mod ^int (irand) re)))
+          lnmod (* dist (log (v/magsq v)))
+          a (+ (* arg rre)
+               (* lnmod im))
+          mod2 (* amount (exp (- (* lnmod rre)
+                                 (* arg im))))]
+      (Vec2. (* mod2 (cos a))
+             (* mod2 (sin a))))))
+(make-var-method juliac :random)
+
 ;; ### JuliaN
 (defn config-julian
   "JuliaN configuration
   params: `:power` `:dist`"
   [p]
-  (let [m (merge {:power (srandom 1 10)
+  (let [r (srandom 1 10)
+        m (merge {:power (if (brand) r (int r))
                   :dist (drand -4 4)} p)]
     (assoc m
-           :abspower (abs (:power m))
+           :abspower (int (abs (:power m)))
            :cpower (* 0.5 (/ ^double (:dist m) ^double (:power m))))))
 (make-config-method julian)
 
 (defn make-julian
   "JuliaN"
-  [^double amount {:keys [^double power ^double abspower ^double cpower]}]
+  [^double amount {:keys [^double power ^int abspower ^double cpower]}]
   (fn [^Vec2 v]
-    (let [a (/ (+ ^double (v/heading v) (* TWO_PI ^double (drand abspower))) power)
+    (let [a (/ (+ ^double (v/heading v) (* TWO_PI ^int (irand abspower))) power)
           r (* amount (pow (v/magsq v) cpower))]
       (Vec2. (* r (cos a)) (* r (sin a))))))
 (make-var-method julian :random)
@@ -739,8 +765,8 @@
   "Juliaq configuration
   params: `:power` `:divisor`"
   [p]
-  (let [m (merge {:power (srandom 1 10)
-                  :divisor (drand -8 8)} p)
+  (let [m (merge {:power (int (srandom 1 10))
+                  :divisor (srandom 1 8)} p)
         inv-power (/ ^double (:divisor m) ^double (:power m))
         half-inv-power (* 0.5 inv-power)
         inv-power-2pi (/ TWO_PI ^double (:power m))]
@@ -755,7 +781,7 @@
   [^double amount {:keys [^double inv-power ^double inv-power-2pi ^double half-inv-power] :as all}]
   (fn [^Vec2 v]
     (let [a (+ (* inv-power ^double (v/heading v))
-               (* inv-power-2pi ^double (drand (Integer/MAX_VALUE))))
+               (* inv-power-2pi ^int (irand)))
           r (* amount (pow (v/magsq v) half-inv-power))]
       (Vec2. (* r (cos a)) (* r (sin a))))))
 (make-var-method juliaq :random)
@@ -866,6 +892,38 @@
 
 ;; ## R
 
+;; ### Rectangles
+(defn config-rectangles
+  ""
+  [p]
+  (merge {:x (drand -1.5 1.5)
+          :y (drand -1.5 1.5)} p))
+(make-config-method rectangles)
+
+(defn make-rectangles
+  ""
+  [^double amount {:keys [^double x ^double y]}]
+  (fn [^Vec2 v]
+    (Vec2. (if (< (abs (.x v)) EPSILON)
+             (* amount (.x v))
+             (* amount (-> (.x v)
+                           (/ x)
+                           floor
+                           (* 2.0)
+                           inc
+                           (* x)
+                           (- (.x v)))))
+           (if (< (abs (.y v)) EPSILON)
+             (* amount (.y v))
+             (* amount (-> (.y v)
+                           (/ y)
+                           floor
+                           (* 2.0)
+                           inc
+                           (* y)
+                           (- (.y v))))))))
+(make-var-method rectangles :regular)
+
 
 ;; ## S
 
@@ -906,6 +964,65 @@
                (* amount (dec cr)))]
       (Vec2. (* amount (.x v)) ny))))
 (make-var-method secant2 :regular)
+
+;; ### Split
+(defn config-split
+  ""
+  [p]
+  (merge {:xsplit (* PI ^double (drand -2.0 2.0))
+          :ysplit (* PI ^double (drand -2.0 2.0))} p))
+(make-config-method split)
+
+(defn make-split
+  ""
+  [^double amount {:keys [^double xsplit ^double ysplit]}]
+  (fn [^Vec2 v]
+    (Vec2. (if (pos? (cos (* (.x v) xsplit)))
+             (* amount (.y v))
+             (- (* amount (.y v))))
+           (if (pos? (cos (* (.y v) ysplit)))
+             (* amount (.x v))
+             (- (* amount (.x v)))))))
+(make-var-method split :regular)
+
+;; ### Splits
+(defn config-splits
+  ""
+  [p]
+  (merge {:x (drand -1.5 1.5)
+          :y (drand -1.5 1.5)} p))
+(make-config-method splits)
+
+(defn make-splits
+  ""
+  [^double amount {:keys [^double x ^double y]}]
+  (fn [^Vec2 v]
+    (Vec2. (if (pos? (.x v))
+             (* amount (+ (.x v) x))
+             (* amount (- (.x v) x)))
+           (if (pos? (.y v))
+             (* amount (+ (.y v) y))
+             (* amount (- (.y v) y))))))
+(make-var-method splits :regular)
+
+;; ### Squirrel
+(defn config-squirrel
+  ""
+  [p]
+  (merge {:a (drand EPSILON 4.0)
+          :b (drand EPSILON 4.0)} p))
+(make-config-method squirrel)
+
+(defn make-squirrel
+  ""
+  [^double amount {:keys [^double a ^double b]}]
+  (fn [^Vec2 v]
+    (let [u (sqrt (+ (* a (sq (.x v)))
+                     (* b (sq (.y v)))))]
+      (Vec2. (* amount (cos u) (tan (.x v)))
+             (* amount (sin u) (tan (.y v)))))))
+(make-var-method squirrel :regular)
+
 
 ;; ### STwin
 (defn config-stwin

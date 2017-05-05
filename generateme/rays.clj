@@ -47,7 +47,7 @@
 
   (def half (int (* ^double (m/norm (:curl config) m/PI (+ m/PI m/TWO_PI) 1.0 0.7) width 0.5)))
 
-  ;; (def half 2000)
+  ;; (def half 300)
 
   
   (def border (int (* 0.9 ^int half)))
