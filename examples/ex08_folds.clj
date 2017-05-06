@@ -29,19 +29,17 @@
 (def ^:const ^long w- (dec w))
 (def ^:const ^long h- (dec h))
 
-(def ^:const ^double scale 1.0)
+(def ^:const ^double scale 0.7)
 
-(def sinusoidal (vr/make-variation :sinusoidal 2.7 {}))
-
-(def s80 (make-spots 60 [60 120 180] w h))
-(def n80 (make-noise 60 w h))
+(def s60 (make-spots 60 [60 120 180] w h))
+(def n40 (make-noise 40 w h))
 
 (defn make-me
   ""
   [canvas disp]
   (let [field-config (vr/make-random-configuration)
-        field (comp sinusoidal (vr/make-combination field-config))
-        field (comp sinusoidal (vr/make-variation :juliac 1.0 {}))
+        field (vr/make-combination field-config)
+        ;; field (vr/make-variation :perspective 1.0 {})
         ] 
 
     (pprint field-config)
@@ -49,7 +47,7 @@
     (loop [y y1]
       (loop [x x1]
         
-        (let [^Vec2 vv (v/mult (field (Vec2. x y)) scale)
+        (let [^Vec2 vv (v/mult (v/applyf (v/mult (field (Vec2. x y)) scale) m/sin) 2.7)
               xx (m/norm (+ (.x vv) ^double (r/grand 0.0012)) x1- x2+ 0.0 w)
               yy (m/norm (+ (.y vv) ^double (r/grand 0.0012)) y1- y2+ 0.0 h)]
           (point canvas xx yy))
@@ -65,8 +63,8 @@
     (set-background 255 250 245)
     (set-color 35 35 35 16)
     (make-me disp)
-    (image (render-noise n80 (@canvas 1)))
-    (image (render-spots s80 (@canvas 1))))
+    (image (render-noise n40 (@canvas 1)))
+    (image (render-spots s60 (@canvas 1))))
   :done)
 
 (defn example-08

@@ -82,7 +82,7 @@
             ca (* point-step (m/cos ang))
             nx (+ (.x v) sa)
             ny (+ (.y v) ca)
-            s (+ 2.0 (* n 6.0))
+            s (+ 2.0 (* n 4.0))
             col (c/set-alpha (v/interpolate col1 col2 n) 5)]
         (if (and (<= bleft ny bright)
                  (<= bleft nx bright)
