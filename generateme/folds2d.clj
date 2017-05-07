@@ -1,162 +1,112 @@
-(ns generateme.folds2d
+(ns generateme.folds
   (:require [clojure2d.core :refer :all]
-            [clojure2d.pixels :as p]
             [clojure2d.math :as m]
             [clojure2d.math.random :as r]
-            [clojure2d.math.joise :as j]
             [clojure2d.math.vector :as v]
-            [clojure2d.extra.glitch :as g]
             [clojure2d.extra.variations :as vr]
-            [clojure2d.color :as c]
-            [clojure2d.core :as core]
+            [clojure2d.extra.overlays :refer :all]
             [clojure.pprint :refer [pprint]])
-  (:import [clojure2d.pixels BinPixels]
-           [clojure2d.math.vector Vec2 Vec3 Vec4]))
+  (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* :warn-on-boxed)
+(set! *unchecked-math* true)
 
-(def ^:const ^int width 2048)
-(def ^:const ^int height 2048)
-(def ^:const ^int hwidth (int (/ width 2)))
-(def ^:const ^int hheight (int (/ height 2)))
+(def ^:const ^double x1 -2.0)
+(def ^:const ^double y1 -2.0)
+(def ^:const ^double x2 2.0)
+(def ^:const ^double y2 2.0)
 
-(defn make-jnoise
-  "Create own version of joise noise (only simplex based, no cells)"
+(def ^:const ^double x1- (dec x1))
+(def ^:const ^double y1- (dec y1))
+(def ^:const ^double x2+ (inc x2))
+(def ^:const ^double y2+ (inc y2))
+
+(def options {:low [800 1.6 false]
+              :medium [2048 3.4 true]
+              :high [6000 3.4 true]})
+
+(def config-atom (atom nil))
+
+(def window (show-window (create-canvas 1 1) "folds" 800 800 10))
+
+(defmethod key-pressed ["folds" \space] [_]
+  (let [fn (next-filename "generateme/folds2d/" ".png")]
+    (binding [*log-to-file* true]
+      (log fn)
+      (log (with-out-str (pprint @config-atom))))
+    (save-canvas @(window 2) fn)))
+
+(defmethod key-pressed ["folds" \m] [_]
+  (draw-folds :medium (or @config-atom (make-config))))
+
+(defmethod key-pressed ["folds" \l] [_]
+  (draw-folds :low (or @config-atom (make-config))))
+
+(defmethod key-pressed ["folds" \h] [_]
+  (draw-folds :high (or @config-atom (make-config))))
+
+(defmethod mouse-event ["folds" :mouse-clicked] [_]
+  (draw-folds :low))
+
+(defn make-config
+  "" 
   []
-  (j/make-noise (j/make-fractal {:type (rand-nth (keys j/fractal-type))
-                                 :lacunarity (r/drand 1.0 3.0)
-                                 :frequency (r/drand 1.0 3.0)
-                                 :octaves [[1 (j/make-random-basis-module)]
-                                           [1 (j/make-random-basis-module)]]})))
+  (let [config {:field-config (vr/make-random-configuration (r/irand 4))
+                :scale (if (r/brand 0.3) 0.7 (if (r/brand) 1.0 (r/drand 0.5 1.0)))
+                :shift (if (r/brand 0.7) [0.0 0.0] [(r/drand -1.0 1.0) (r/drand -1.0 1.0)])}]
+    (pprint config)
+    (reset! config-atom config)))
 
-(defn get-random-noise
+(defn make-me
   ""
-  []
-  (rand-nth [(make-jnoise) r/noise j/perlin-noise]))
+  [canvas result-size {:keys [field-config ^double scale shift]}]
+  (let [[_ disp] window
+        [shiftx shifty] shift
+        ^Vec2 shiftv (Vec2. shiftx shifty)
+        [^int width ^double step-size ellipse?] (result-size options)
+        step (/ (- x2 x1) (* step-size width))
+        field (vr/make-combination field-config)
+        s60 (future (make-spots 60 [60 120 180] width width))
+        n60 (future (make-noise 60 width width))] 
 
+    (loop [y y1]
+      (loop [x x1]
+        
+        (let [^Vec2 vv (->(Vec2. x y)
+                          (v/add shiftv)
+                          (field)
+                          (v/mult scale)
+                          (v/applyf m/sin)
+                          (v/mult 2.7))
+              xx (m/norm (+ (.x vv) ^double (r/grand 0.0012)) x1- x2+ 0.0 width)
+              yy (m/norm (+ (.y vv) ^double (r/grand 0.0012)) y1- y2+ 0.0 width)]
+          
+          (if ellipse?
+            (ellipse canvas xx yy 0.5 0.5)
+            (point canvas xx yy)))
 
-(def sinusoidal (vr/make-variation :sinusoidal 2.8 {}))
+        (when (and @disp (< x x2)) (recur (+ x step))))
+      (when (and @disp (< y y2)) (recur (+ y step))))
 
-(defn create-field
+    (image canvas (render-noise @n60 (@canvas 1)))
+    (image canvas (render-spots @s60 (@canvas 1))))
+
+  (println "DONE!")
+  
+  :done)
+
+(defn draw-folds
   ""
-  []
-  (let [one-field? (r/brand 0.25)
-        derivative? (r/brand 0.1)
-                                        ; sinusoidal? (r/brand 0.25)
-        field-name1 (rand-nth vr/variation-list-not-random)
-        field-name2 (rand-nth vr/variation-list-not-random)
-        field (if one-field?
-                (vr/make-variation field-name1 1.0 {})
-                (comp (vr/make-variation field-name2 1.0 {}) (vr/make-variation field-name1 1.0 {})))
-        field (if derivative? (vr/derivative field) field)
-                                        ;   field (if sinusoidal? (comp sinusoidal field) field)
-        ]    
-    ;; (when sinusoidal?
-    ;; (print "sinusoidal "))
-    (when derivative?
-      (print "derivative "))
-    (if one-field?
-      (println field-name1)
-      (println (str field-name1 " " field-name2)))
-    field))
+  ([result-size] (draw-folds result-size (make-config)))
+  ([result-size config] 
+   (let [width (first (result-size options))
+         canvas (create-canvas width width)] 
+     (future (with-canvas canvas
+               (set-background 255 250 245)
+               (set-color 35 35 35 16)
+               (make-me result-size config)))
+     (replace-canvas window canvas))))
 
-;; folds
-
-(defn iterate-folds
-  ""
-  [^long n run? field]
-  (let [bp (p/make-binpixels [-3.0 3.0 -3.0 3.0] width height)]
-    (loop [iter (long 0)]
-      (if (and @run? (< iter n))
-        (let [^Vec2 xy (Vec2. (r/drand -3.0 3.0) (r/drand -3.0 3.0))
-              ^Vec2 result (field xy)]
-          (p/add-pixel-bilinear bp (.x result) (.y result) 20 20 20)
-          (recur (inc iter)))
-        bp))))
+(draw-folds :low)
 
 
-;; flows
-
-(defn make-flow-particle
-  "Create flow particle vector x,y - pos; z - angle; w - step direction"
-  []
-  (Vec3. (- (* 0.8 hwidth))
-         (* height (+ (* 0.05 ^double (r/grand)) (/ (int (* 20.0 ^double (r/drand 0.2 0.8))) 20.0)))
-         (r/drand m/TWO_PI)))
-
-(defn make-move-particle-fn
-  ""
-  [^BinPixels bp {:keys [^double shift-x-step ^double shift-y-step ^double shift-x-scale ^double shift-y-scale
-                         ^double point-step ^double angle-scale step-noise angle-noise field
-                         ^Vec4 c1 ^Vec4 c2]}]
-  (fn [^Vec3 in]
-    (let [xs (* shift-x-scale (.x in))
-          ys (* shift-y-scale (.y in))
-          step-x (* shift-x-step ^double (step-noise xs ys) )
-          step-y (* shift-y-step ^double (m/norm (step-noise ys xs) 0.0 1.0 (- shift-y-scale) shift-y-scale))
-          nx (+ (.x in) step-x (* point-step (m/cos (.z in))))
-          ny (+ (.y in) step-y (* point-step (m/sin (.z in))))
-          xx (m/norm nx (- hwidth) width -3.0 3.0)
-          yy (m/norm ny 0 height -3.0 3.0)
-          ^Vec2 v (field (Vec2. xx yy))
-          ^double anoise (angle-noise (.x v) (.y v))
-          step-n (* angle-scale (* 2.0 (- anoise 0.5)))
-          nz (+ (.z in) step-n)
-          ^Vec4 c (v/interpolate c1 c2 anoise)]
-      (p/add-pixel-bilinear bp nx ny (.x c) (.y c) (.z c))
-      (if (or (< (- hwidth) nx hwidth)
-              (< -1.0 ny height))
-        (Vec3. nx ny nz)
-        (make-flow-particle)))))
-
-(defn iterate-flow
-  ""
-  [^long n run? particles config]
-  (let [bp (p/make-binpixels [(- hwidth) hwidth 0 height] width height)
-        mv (make-move-particle-fn bp config)]
-    (loop [iter (long 0)
-           p particles]
-      (if (and run? (< iter n))
-        (recur (inc iter)
-               (doall (map mv p)))
-        [bp p]))))
-
-(defn draw-on-canvas
-  "Render BinPixels to canvas."
-  [canvas ^BinPixels bp]
-  (p/set-canvas-pixels canvas (p/to-pixels bp
-                                           (Vec4. 240 240 240 255)
-                                           {:alpha-gamma 1.2 :color-gamma 2.6})))
-
-;; Create canvas, windows, binpixels, configuration and iterate until window is closed
-;; press `space` to save
-;; close window to stop
-(let [palseq (filter #(< 0 (c/get-luma (first %)) 20) (repeatedly #(:palette (g/color-reducer-machine))))
-      config {:shift-x-step 0.1 :shift-y-step 2.0 :shift-x-scale 0.05 :shift-y-scale 0.01 :point-step 0.8 :angle-scale (* 10 m/TWO_PI)
-              :step-noise (get-random-noise) :angle-noise (get-random-noise)
-              :field (create-field)
-              :c1 (ffirst palseq)
-              :c2 (first (second palseq))}
-      first-step 100
-      steps-per-task 1000
-      canvas (create-canvas width height)
-      [_ run?] (show-window canvas "Folds2d" 800 800 5)
-      particles (repeatedly 1000 make-flow-particle)]
-
-  (defmethod key-pressed ["Folds2d" \space] [_]
-    (save-canvas canvas (next-filename "generateme/folds2d/" ".png")))
-
-  ;; first run
-  (let [bp (iterate-flow first-step run? particles config)]
-
-    (draw-on-canvas canvas (first bp))
-    (loop [[prev p] bp]
-      (if @run?
-        (do
-          (println "tick")
-          (let [[newb currp] (iterate-flow steps-per-task run? p config)
-                currb (p/merge-binpixels prev newb)]
-            (draw-on-canvas canvas currb)
-            (recur [currb currp])))
-        (println :done)))))

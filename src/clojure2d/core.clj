@@ -636,9 +636,8 @@
   [panel is-display-running? draw-fun buffer stime]  
   (loop [cnt (long 0)
          result nil]
-    (let [canvas @buffer
-          new-result (when draw-fun 
-                       (with-canvas canvas
+    (let [new-result (when draw-fun 
+                       (with-canvas @buffer
                          (draw-fun cnt result)))]
       (Thread/sleep stime)
       (repaint panel @buffer) 
@@ -654,8 +653,7 @@
   * Input: window and new canvas
   * Returns canvas"
   [[_ _ buffer] canvas]
-  (reset! buffer canvas)
-  canvas)
+  (reset! buffer canvas))
 
 ;; Finally function which displays window. Function creates window's visibility status (`is-display-running?` atom), buffer as atomized canvas, creates frame, creates refreshing task (repainter) and shows window.
 

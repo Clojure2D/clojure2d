@@ -1,5 +1,3 @@
-;; rework of https://generateme.wordpress.com/2014/12/11/story-of-one-picture/
-
 (ns examples.ex08-folds
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
@@ -32,7 +30,7 @@
 (def ^:const ^double scale 0.7)
 
 (def s60 (make-spots 60 [60 120 180] w h))
-(def n40 (make-noise 40 w h))
+(def n60 (make-noise 60 w h))
 
 (defn make-me
   ""
@@ -63,7 +61,7 @@
     (set-background 255 250 245)
     (set-color 35 35 35 16)
     (make-me disp)
-    (image (render-noise n40 (@canvas 1)))
+    (image (render-noise n60 (@canvas 1)))
     (image (render-spots s60 (@canvas 1))))
   :done)
 
