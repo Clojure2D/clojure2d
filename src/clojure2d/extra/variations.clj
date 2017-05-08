@@ -1392,6 +1392,55 @@
   ([]
    (make-random-conf-step (make-random-variation-conf) (make-random-variation-conf))))
 
+(defn randomize-parametrization
+  ""
+  ([f]
+   (if (= (:type f) :variation)
+     (assoc f :amount 1.0 :config (make-configuration (:name f) {}))
+     (let [name (:name f)]
+       (println name)
+       (if (= name :deriv)
+         (assoc f :amount 1.0 :step (sq (drand 0.01 1.0)) :var (randomize-parametrization (:var f)))
+         (let [^double amount1 (if (= name :comp) 1.0 (drand -2.0 2.0))
+               ^double amount2 (if (= name :comp) 1.0 (drand -2.0 2.0)) 
+               amount (case name
+                        :add (/ 1.0 (+ (abs amount1) (abs amount2)))
+                        :mult (/ 1.0 (* amount1 amount2))
+                        :comp 1.0)]
+           (assoc f :amount amount
+                  :var1 (assoc (randomize-parametrization (:var1 f)) :amount amount1)
+                  :var2 (assoc (randomize-parametrization (:var2 f)) :amount amount2)))))))
+  ([]
+   (randomize-parametrization (make-random-tree))))
+
+(defn get-random-variation-cfg
+  ""
+  []
+  (let [n (rand-nth (if *skip-random-variations* variation-list-not-random variation-list))]
+    {:type :variation :name n}))
+
+(defn make-first-step
+  ""
+  ([f1 f2]
+   (let [operand (rand-nth [:comp :add :comp :add :comp :mult :comp])]
+     {:type :operation :name operand :var1 f1 :var2 f2}))
+  ([f]
+   (if (brand 0.1) f
+       (if (brand 0.15)
+         {:type :operation :name :deriv :var f}
+         (make-first-step f (get-random-variation-cfg)))))
+  ([]
+   (make-first-step (get-random-variation-cfg) (get-random-variation-cfg))))
+
+(defn make-random-tree
+  ""
+  ([] (make-random-tree (lrand 5)))
+  ([depth] (make-random-tree depth (get-random-variation-cfg)))
+  ([^long depth f]
+   (if (pos? depth)
+     (make-random-tree (dec depth) (make-first-step f))
+     f)))
+
 (defn make-random-configuration
   "Create full random configuration for combined variations"
   ([^long depth f]

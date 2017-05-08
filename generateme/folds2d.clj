@@ -36,26 +36,15 @@
       (log (with-out-str (pprint @config-atom))))
     (save-canvas @(window 2) fn)))
 
-(defmethod key-pressed ["folds" \m] [_]
-  (draw-folds :medium (or @config-atom (make-config))))
-
-(defmethod key-pressed ["folds" \l] [_]
-  (draw-folds :low (or @config-atom (make-config))))
-
-(defmethod key-pressed ["folds" \h] [_]
-  (draw-folds :high (or @config-atom (make-config))))
-
-(defmethod mouse-event ["folds" :mouse-clicked] [_]
-  (draw-folds :low))
-
 (defn make-config
   "" 
-  []
-  (let [config {:field-config (vr/make-random-configuration (r/irand 4))
-                :scale (if (r/brand 0.3) 0.7 (if (r/brand) 1.0 (r/drand 0.5 1.0)))
-                :shift (if (r/brand 0.7) [0.0 0.0] [(r/drand -1.0 1.0) (r/drand -1.0 1.0)])}]
-    (pprint config)
-    (reset! config-atom config)))
+  ([f-cfg]
+   (let [config {:field-config f-cfg
+                 :scale (if (r/brand 0.3) 0.7 (if (r/brand) 1.0 (r/drand 0.5 1.0)))
+                 :shift (if (r/brand 0.7) [0.0 0.0] [(r/drand -1.0 1.0) (r/drand -1.0 1.0)])}]
+     (pprint config)
+     (reset! config-atom config)))
+  ([] (make-config (vr/randomize-parametrization (:field-config @config-atom)))))
 
 (defn make-me
   ""
@@ -106,6 +95,22 @@
                (set-color 35 35 35 16)
                (make-me result-size config)))
      (replace-canvas window canvas))))
+
+(defmethod key-pressed ["folds" \m] [_]
+  (draw-folds :medium (or @config-atom (make-config))))
+
+(defmethod key-pressed ["folds" \l] [_]
+  (draw-folds :low (or @config-atom (make-config))))
+
+(defmethod key-pressed ["folds" \h] [_]
+  (draw-folds :high (or @config-atom (make-config))))
+
+(defmethod key-pressed ["folds" \n] [_]
+  (draw-folds :low (make-config)))
+
+(defmethod mouse-event ["folds" :mouse-clicked] [_]
+  (draw-folds :low (make-config (:field-config @config-atom))))
+
 
 (draw-folds :low)
 
