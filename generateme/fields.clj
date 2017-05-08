@@ -29,7 +29,7 @@
     ""
     []
     (binding [vr/*skip-random-variations* true]
-      (let [var-conf (vr/make-random-configuration (r/irand 4))
+      (let [var-conf (vr/make-random-configuration)
             palseq (filter #(< ^double (v/mx (c/set-alpha (first %) 0)) 50) (repeatedly #(:palette (g/color-reducer-machine))))
             vrange (double (r/drand 1 4))]
         {:noise (if (r/brand 0.3) (j/make-random-fractal) (r/make-perlin-noise (r/irand) (r/irand 2 4)))

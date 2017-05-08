@@ -62,7 +62,7 @@
         c2 (rand-nth pal1)
         c3 (first pal2)
         c4 (rand-nth pal2)
-        var1-conf (vr/make-random-configuration (r/irand 4))]
+        var1-conf (vr/make-random-configuration)]
     {:var1-conf var1-conf
      :var1 (vr/make-combination var1-conf) 
      :f1 (rand-nth freqs)

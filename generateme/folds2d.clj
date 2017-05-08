@@ -40,15 +40,14 @@
   "" 
   ([f-cfg]
    (let [config {:field-config f-cfg
-                 :scale (if (r/brand 0.3) 0.7 (if (r/brand) 1.0 (r/drand 0.5 1.0)))
+                 :scale (if (r/brand 0.3) 0.7 (if (r/brand) 1.0 (r/drand 0.5 1.5)))
                  :shift (if (r/brand 0.7) [0.0 0.0] [(r/drand -1.0 1.0) (r/drand -1.0 1.0)])}]
-     (pprint config)
      (reset! config-atom config)))
-  ([] (make-config (vr/randomize-parametrization (:field-config @config-atom)))))
+  ([] (make-config (vr/make-random-configuration))))
 
 (defn make-me
   ""
-  [canvas result-size {:keys [field-config ^double scale shift]}]
+  [canvas result-size {:keys [field-config ^double scale shift] :as cfg}]
   (let [[_ disp] window
         [shiftx shifty] shift
         ^Vec2 shiftv (Vec2. shiftx shifty)
@@ -58,6 +57,8 @@
         s60 (future (make-spots 60 [60 120 180] width width))
         n60 (future (make-noise 60 width width))] 
 
+    (pprint cfg)
+    
     (loop [y y1]
       (loop [x x1]
         
@@ -80,7 +81,7 @@
     (image canvas (render-noise @n60 (@canvas 1)))
     (image canvas (render-spots @s60 (@canvas 1))))
 
-  (println "DONE!")
+  (println (str result-size " DONE!\n---------------------\n"))
   
   :done)
 
@@ -109,8 +110,7 @@
   (draw-folds :low (make-config)))
 
 (defmethod mouse-event ["folds" :mouse-clicked] [_]
-  (draw-folds :low (make-config (:field-config @config-atom))))
-
+  (draw-folds :low (make-config (vr/randomize-parametrization (:field-config @config-atom)))))
 
 (draw-folds :low)
 

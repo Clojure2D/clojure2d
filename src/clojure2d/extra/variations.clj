@@ -1363,34 +1363,24 @@
   ([f]
    (derivative f 1.0 0.001)))
 
-(defn- make-random-variation-conf
-  "Create configuration line for random variation"
+(defn- build-random-variation-step
+  ""
   []
   (let [n (rand-nth (if *skip-random-variations* variation-list-not-random variation-list))]
     {:type :variation :name n :amount 1.0 :config (make-configuration n {})}))
 
-(defn- make-random-conf-step
-  "Create one step for combined variation configuration, one of: sum, multiplication, combination or derivative"
+(defn- build-random-configuration-step
+  ""
   ([f1 f2]
-   (let [operand (rand-nth [:comp :add :comp :add :comp :mult :comp])
-         ^double amount1 (if (= operand :comp) 1.0 (drand -2.0 2.0))
-         ^double amount2 (if (= operand :comp) 1.0 (drand -2.0 2.0))
-         type1 (:type f1)
-         type2 (:type f2)
-         var1 (if (= type1 :operation) f1 (merge f1 {:amount amount1}))
-         var2 (if (= type2 :operation) f2 (merge f2 {:amount amount2}))
-         v {:type :operation :name operand :var1 var1 :var2 var2}]
-     (case operand
-       :add (merge v {:amount (/ 1.0 (+ (abs amount1) (abs amount2)))})
-       :mult (merge v {:amount (/ 1.0 (* amount1 amount2))})
-       :comp (merge v {:amount 1.0}))))
+   (let [operand (rand-nth [:comp :add :comp :add :comp :mult :comp])]
+     {:type :operation :name operand :var1 f1 :var2 f2}))
   ([f]
-   (if (brand 0.1) f ;; skip sometimes
-       (if (brand 0.15) ;; derivative?
-         {:type :operation :name :deriv :step (sq (drand 0.01 1.0)) :amount 1.0 :var f}
-         (make-random-conf-step f (make-random-variation-conf)))))
+   (if (brand 0.1) f
+       (if (brand 0.15)
+         {:type :operation :name :deriv :var f}
+         (build-random-configuration-step f (build-random-variation-step)))))
   ([]
-   (make-random-conf-step (make-random-variation-conf) (make-random-variation-conf))))
+   (build-random-configuration-step (build-random-variation-step) (build-random-variation-step))))
 
 (defn randomize-parametrization
   ""
@@ -1398,7 +1388,6 @@
    (if (= (:type f) :variation)
      (assoc f :amount 1.0 :config (make-configuration (:name f) {}))
      (let [name (:name f)]
-       (println name)
        (if (= name :deriv)
          (assoc f :amount 1.0 :step (sq (drand 0.01 1.0)) :var (randomize-parametrization (:var f)))
          (let [^double amount1 (if (= name :comp) 1.0 (drand -2.0 2.0))
@@ -1409,46 +1398,16 @@
                         :comp 1.0)]
            (assoc f :amount amount
                   :var1 (assoc (randomize-parametrization (:var1 f)) :amount amount1)
-                  :var2 (assoc (randomize-parametrization (:var2 f)) :amount amount2)))))))
-  ([]
-   (randomize-parametrization (make-random-tree))))
-
-(defn get-random-variation-cfg
-  ""
-  []
-  (let [n (rand-nth (if *skip-random-variations* variation-list-not-random variation-list))]
-    {:type :variation :name n}))
-
-(defn make-first-step
-  ""
-  ([f1 f2]
-   (let [operand (rand-nth [:comp :add :comp :add :comp :mult :comp])]
-     {:type :operation :name operand :var1 f1 :var2 f2}))
-  ([f]
-   (if (brand 0.1) f
-       (if (brand 0.15)
-         {:type :operation :name :deriv :var f}
-         (make-first-step f (get-random-variation-cfg)))))
-  ([]
-   (make-first-step (get-random-variation-cfg) (get-random-variation-cfg))))
-
-(defn make-random-tree
-  ""
-  ([] (make-random-tree (lrand 5)))
-  ([depth] (make-random-tree depth (get-random-variation-cfg)))
-  ([^long depth f]
-   (if (pos? depth)
-     (make-random-tree (dec depth) (make-first-step f))
-     f)))
+                  :var2 (assoc (randomize-parametrization (:var2 f)) :amount amount2))))))))
 
 (defn make-random-configuration
-  "Create full random configuration for combined variations"
+  ""
+  ([] (make-random-configuration (lrand 5)))
+  ([depth] (make-random-configuration depth (build-random-variation-step)))
   ([^long depth f]
    (if (pos? depth)
-     (make-random-configuration (dec depth) (make-random-conf-step f))
-     f))
-  ([depth] (make-random-configuration depth (make-random-variation-conf)))
-  ([] (make-random-configuration (lrand 5))))
+     (make-random-configuration (dec depth) (randomize-parametrization (build-random-configuration-step f)))
+     f)))
 
 (defn make-combination
   "Parse configuration and return new variation function."
