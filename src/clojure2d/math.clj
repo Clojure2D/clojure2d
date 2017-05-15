@@ -10,10 +10,11 @@
 
 (ns clojure2d.math
   "Math functions"
-  (:import [net.jafama FastMath]))
+  (:import [net.jafama FastMath])
+  (:require [clojure2d.math :as m]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 ;; ## Math functions
 ;;
@@ -87,6 +88,14 @@
 (def ^:const ^double deg-in-rad (/ PI 180.0))
 (defn deg-to-rad ^double [^double deg] (* deg-in-rad deg))
 (defn rad-to-deg ^double [^double rad] (* rad-in-deg rad))
+
+;; Sinc
+(defn sinc
+  "Sinc function"
+  ^double [^double v]
+  (let [x (* PI (FastMath/abs v))]
+    (if (< x 1.0e-5) 1.0
+        (/ (FastMath/sin x) x))))
 
 ;; Alias for natural logarithm
 (def ln log)
@@ -343,18 +352,18 @@
 (defn quantile
   "Calculate p-quantile of a list"
   (^double [^double p vs]
-     (let [svs (sort vs)]
-       (quantile p (count vs) svs (first svs) (last svs))))
+   (let [svs (sort vs)]
+     (quantile p (count vs) svs (first svs) (last svs))))
   ([p c svs mn mx]
-   (let [pic (* p (inc c))
+   (let [pic (* ^double p (inc ^long c))
          k (round pic)
          d (- pic k)
-         ndk (if (zero? k) mn (nth svs (dec k)))]
-       (cond
-        (zero? k) mn
-        (= c (dec k)) mx
-        (= c k) mx
-        :else (+ ndk (* d (- (nth svs k) ndk)))))))
+         ^double ndk (if (zero? k) mn (nth svs (dec k)))]
+     (cond
+       (zero? k) mn
+       (= c (dec k)) mx
+       (= c k) mx
+       :else (+ ndk (* d (- ^double (nth svs k) ndk)))))))
 
 ;; `(median '(1 2 3 -1 -1 2 -1 11 111)) => 2.0`
 (defn median

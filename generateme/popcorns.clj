@@ -42,6 +42,7 @@
        :with-noise (r/brand)
        :mnrange (- vrange)
        :mxrange vrange
+       :sinusoidal? (r/brand 0.7)
        :rscale (-> (r/drand 0.1 1.0)
                    m/sq
                    (* 30.0))
@@ -79,21 +80,24 @@
   (defn make-do-step
     ""
     [canvas {:keys [noise variation ^double rscale ^Vec2 vshift
-                    with-noise ^Vec4 col1 ^Vec4 col2 ^double mnrange ^double mxrange]}]
+                    with-noise ^Vec4 col1 ^Vec4 col2 ^double mnrange ^double mxrange
+                    sinusoidal?]}]
     (fn [^Vec2 v]
       (let [xx (m/norm (.x v) 0.0 width mnrange mxrange)
             yy (m/norm (.y v) 0.0 height mnrange mxrange)
 
-            ^Vec2 ress (sinusoidal (v/mult (->> (Vec2. xx yy)
-                                                (v/add vshift)
-                                                variation 
-                                                (get-noise with-noise noise rscale)) m/TWO_PI))
+            ^Vec2 resss (->> (Vec2. xx yy)
+                             (v/add vshift)
+                             variation 
+                             (get-noise with-noise noise rscale))
             
-            ^Vec2 resv (v/add v ress)
+            ^Vec2 resv (v/add v (if sinusoidal?
+                                  (sinusoidal (v/mult resss m/TWO_PI))
+                                  resss))
 
-            n (m/abs (* (.x ress) (.y ress)))
+            n (m/abs (m/qsin (* m/TWO_PI  (.x resss) (.y resss))))
             
-            s (+ 1.0 (* n 6.0))
+            s (+ 1.0 (* n 4.0))
             col (c/set-alpha (v/interpolate col1 col2 n) 5)]
         (if (and (<= bleft (.y resv) bright)
                  (<= bleft (.x resv) bright))

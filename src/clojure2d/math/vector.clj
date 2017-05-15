@@ -38,6 +38,7 @@
   (base-from [v])
   (sum [v1])
   (permute [v idxs])
+  (reciprocal [v])
   (interpolate [v1 v2 t] [v1 v2 t f])
   (interpolatev [v1 v2 v] [v1 v2 v f])
   (is-zero? [v1])
@@ -90,6 +91,7 @@
    :mindim #(first (reduce (find-idx-reducer-fn <) [0.0 0.0 (first %)] %))
    :sum #(reduce + %)
    :permute #(mapv (fn [idx] (%1 idx)) %2)
+   :reciprocal #(mapv (fn [v] (/ 1.0 ^double v)) %)
    :interpolate (fn
                   ([v1 v2 t f]
                    (mapv #(f %1 %2 t) v1 v2))
@@ -154,6 +156,7 @@
   (sum [_] (+ x y))
   (permute [p [^long i1 ^long i2]]
     (Vec2. (p i1) (p i2)))
+  (reciprocal [_] (Vec2. (/ 1.0 x) (/ 1.0 y)))
   (interpolate [_ v2 t f]
     (let [^Vec2 v2 v2] (Vec2. (f x (.x v2) t)
                               (f y (.y v2) t))))
@@ -248,6 +251,7 @@
   (sum [_] (+ x y z))
   (permute [p [^long i1 ^long i2 ^long i3]]
     (Vec3. (p i1) (p i2) (p i3)))
+  (reciprocal [_] (Vec3. (/ 1.0 x) (/ 1.0 y) (/ 1.0 z)))
   (interpolate [_ v2 t f]
     (let [^Vec3 v2 v2] (Vec3. (f x (.x v2) t)
                               (f y (.y v2) t)
@@ -404,6 +408,7 @@
   (sum [_] (+ x y z w))
   (permute [p [^long i1 ^long i2 ^long i3 ^long i4]]
     (Vec4. (p i1) (p i2) (p i3) (p i4)))
+  (reciprocal [_] (Vec4. (/ 1.0 x) (/ 1.0 y) (/ 1.0 z) (/ 1.0 w)))
   (interpolate [_ v2 t f]
     (let [^Vec4 v2 v2] (Vec4. (f x (.x v2) t)
                               (f y (.y v2) t)
@@ -423,6 +428,11 @@
   (heading [v1] (angle-between v1 (Vec4. 1 0 0 0))))
 
 ;; common functions
+
+(defn ediv
+  ""
+  [v1 v2]
+  (emult v1 (reciprocal v2)))
 
 (defn average-vectors
   "Average / centroid of vectors"
