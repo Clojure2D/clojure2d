@@ -41,15 +41,30 @@
   ([f-cfg]
    (let [config {:field-config f-cfg
                  :scale (if (r/brand 0.3) 0.7 (if (r/brand) 1.0 (r/drand 0.5 1.5)))
-                 :shift (if (r/brand 0.7) [0.0 0.0] [(r/drand -1.0 1.0) (r/drand -1.0 1.0)])}]
+                 :shift (if (r/brand 0.7) [0.0 0.0] [(r/drand -1.0 1.0) (r/drand -1.0 1.0)])
+                 :rotate (if (r/brand) (r/drand m/TWO_PI) 0.0)}]
      (reset! config-atom config)))
   ([] (make-config (vr/make-random-configuration))))
 
+(defn make-rotate
+  ""
+  [^double angle]
+  (if (zero? angle)
+    identity
+    (let [sa (m/sin angle)
+          ca (m/cos angle)
+          a (Vec2. ca (- sa))
+          b (Vec2. sa ca)]
+      (fn [^Vec2 v]
+        (Vec2. (v/dot v a) (v/dot v b))))))
+
+
 (defn make-me
   ""
-  [canvas result-size {:keys [field-config ^double scale shift] :as cfg}]
+  [canvas result-size {:keys [field-config ^double scale shift ^double rotate] :as cfg}]
   (let [[_ disp] window
         [shiftx shifty] shift
+        rotate-fn (make-rotate rotate)
         ^Vec2 shiftv (Vec2. shiftx shifty)
         [^int width ^double step-size ellipse?] (result-size options)
         step (/ (- x2 x1) (* step-size width))
@@ -62,12 +77,13 @@
     (loop [y y1]
       (loop [x x1]
         
-        (let [^Vec2 vv (->(Vec2. x y)
-                          (v/add shiftv)
-                          (field)
-                          (v/mult scale)
-                          (v/applyf m/sin)
-                          (v/mult 2.7))
+        (let [^Vec2 vv (-> (Vec2. x y)
+                           (v/add shiftv)
+                           (field)
+                           (v/mult scale)
+                           (rotate-fn)
+                           (v/applyf m/sin)
+                           (v/mult 2.7))
               xx (m/norm (+ (.x vv) ^double (r/grand 0.0012)) x1- x2+ 0.0 width)
               yy (m/norm (+ (.y vv) ^double (r/grand 0.0012)) y1- y2+ 0.0 width)]
           
@@ -78,8 +94,9 @@
         (when (and @disp (< x x2)) (recur (+ x step))))
       (when (and @disp (< y y2)) (recur (+ y step))))
 
-    (image canvas (render-noise @n60 (@canvas 1)))
-    (image canvas (render-spots @s60 (@canvas 1))))
+    ;; (image canvas (render-noise @n60 (@canvas 1)))
+    ;; (image canvas (render-spots @s60 (@canvas 1)))
+    )
 
   (println (str result-size " DONE!\n---------------------\n"))
   

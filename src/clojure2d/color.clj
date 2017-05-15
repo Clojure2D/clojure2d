@@ -1057,8 +1057,8 @@
   (mapv hex-to-vec xs))
 
 (def palettes
-  (let [p1 (xml/parse (io/file (io/resource "colourlovers1.xml")))
-        p2 (xml/parse (io/file (io/resource "colourlovers2.xml")))
+  (let [p1 (xml/parse (java.io.ByteArrayInputStream. (.getBytes ^String (slurp (io/resource "colourlovers1.xml")))))
+        p2 (xml/parse (java.io.ByteArrayInputStream. (.getBytes ^String (slurp (io/resource "colourlovers2.xml")))))
         f (fn [xml-in] (map (fn [x] (map #((:content %) 0) (->> x
                                                                 ((:content xml-in))
                                                                 :content
