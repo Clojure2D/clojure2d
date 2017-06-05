@@ -622,6 +622,7 @@
     (loop []
       (loop []
         (let [^Graphics2D graphics-context (.getDrawGraphics strategy)]
+          (.setRenderingHints graphics-context (:mid rendering-hints))
           (.drawImage graphics-context (@buffer 1) 0 0 (.getWidth panel) (.getHeight panel) nil)
           (.dispose graphics-context))
         (when (.contentsRestored strategy) (recur)))

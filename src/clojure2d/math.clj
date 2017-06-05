@@ -24,6 +24,7 @@
 ;; Processing math constants
 (def ^:const ^double PI Math/PI)
 (def ^:const ^double HALF_PI (/ PI 2.0))
+(def ^:const ^double THIRD_PI (/ PI 3.0))
 (def ^:const ^double QUARTER_PI (/ PI 4.0))
 (def ^:const ^double TWO_PI (* PI 2.0))
 (def ^:const ^double TAU TWO_PI)
@@ -31,6 +32,11 @@
 
 ;; Very small number \\(\varepsilon\\)
 (def ^:const ^double EPSILON 1.0e-10)
+
+;; Common fractions
+(def ^:const ^double THIRD (/ 1.0 3.0))
+(def ^:const ^double TWO_THIRD (/ 2.0 3.0))
+(def ^:const ^double SIXTH (/ 1.0 6.0))
 
 ;; Trigonometry
 (defn sin ^double [^double v] (FastMath/sin v))
@@ -86,8 +92,8 @@
 ;; Radians to degrees (and opposite) conversions
 (def ^:const ^double rad-in-deg (/ 180.0 PI))
 (def ^:const ^double deg-in-rad (/ PI 180.0))
-(defn deg-to-rad ^double [^double deg] (* deg-in-rad deg))
-(defn rad-to-deg ^double [^double rad] (* rad-in-deg rad))
+(defn radians ^double [^double deg] (* deg-in-rad deg))
+(defn degrees ^double [^double rad] (* rad-in-deg rad))
 
 ;; Sinc
 (defn sinc
@@ -163,6 +169,9 @@
 (defn ceil ^double [^double v] (FastMath/ceil v))
 (defn round ^long [^double v] (FastMath/round v))
 (defn rint ^double [^double v] (FastMath/rint v))
+
+;; fractional part, always returns values from 0.0 to 1.0 (exclusive)
+(defn frac ^double [^double v] (FastMath/abs (- v (long v))))
 
 ;; Find power of 2 exponent for double number where  
 ;; \\(2^(n-1)\leq x\leq 2^n\\)  
@@ -282,27 +291,45 @@
   "Constrained version of norm"
   ([v start1 stop1 start2 stop2]
    (constrain (norm v start1 stop1 start2 stop2) start2 stop2))
-  ([v start stop]
+  (^double [v start stop]
    (constrain (norm v start stop) 0.0 1.0)))
+
+;;; Interpolation functions
 
 ;; Linear interpolation between `start` and `stop`.
 (defn lerp
   "Lerp function (same as in Processing)"
   ^double [^double start ^double stop ^double t]
-  (let [t1 (- 1.0 t)]
-    (+ (* t1 start) (* t stop))))
+  (+ start (* t (- stop start))))
+
+(defmacro mlerp
+  "lerp macro version"
+  [start stop t]
+  `(+ ~start (* ~t (- ~stop ~start))))
 
 ;; Cosine interpolation between `start` and `stop`
 (defn cos-interpolation
   "oF interpolateCosine"
   ^double [^double start ^double stop ^double t]
-  (let [t1 (* 0.5 (- 1.0 ^double (cos (* t PI))))]
-    (lerp start stop t1)))
+  (mlerp start stop (* 0.5 (- 1.0 (cos (* t PI))))))
+
+(defn smooth-interpolation
+  "smoothstep based interpolation"
+  ^double [^double start ^double stop ^double t]
+  (mlerp start stop (* t t (- 3.0 (* 2.0 t)))))
+
+(defn quad-interpolation
+  ""
+  ^double [^double start ^double stop ^double t]
+  (mlerp start stop (let [t' (* 2.0 t)]
+                      (if (< t' 1.0)
+                        (* 0.5 (* t' t'))
+                        (* -0.5 (dec (* (dec t') (- t' 3.0))))))))
 
 (defn smoothstep
   "GL smoothstep"
   ^double [^double start ^double stop ^double x]
-  (let [t (norm x start stop)]
+  (let [t (cnorm x start stop)]
     (* t t (- 3.0 (* 2.0 t)))))
 
 ;;`(wrap 0 -1 1) => 0.0`  
