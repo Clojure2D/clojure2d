@@ -27,7 +27,7 @@
 
 (defn move-particle
   ""
-  [^Vec2 vrand fun noise canvas ^Vec2 in ]
+  [^Vec2 vrand line? fun noise canvas ^Vec2 in]
   (let [xx (m/norm (.x in) 0 width -2 2)
         yy (m/norm (.y in) 0 height -2 2)
         ^Vec2 vr (v/add vrand (Vec2. xx yy))
@@ -40,8 +40,10 @@
     (if (and (<= 80 ny (- height 81)) (<= 80 nx (- width 81)))
       (do
         (set-color canvas col col col alpha)
-        ;; (line (.x in) (.y in) nx ny)
-        (point canvas nx ny)
+        
+        (if line?
+          (line canvas (.x in) (.y in) nx ny)
+          (point canvas nx ny))
         
         (Vec2. nx ny))
       (make-particle))))
@@ -54,7 +56,7 @@
         variation1 (rand-nth variation-list-not-random)
         variation2 (rand-nth variation-list-not-random)
         vrand (Vec2. (r/drand -1 1) (r/drand -1 1))
-        mv-fun (partial move-particle vrand (comp (make-variation variation2 1.0 {}) (make-variation variation1 1.0 {})) noise)       
+        mv-fun (partial move-particle vrand (r/brand) (comp (make-variation variation2 1.0 {}) (make-variation variation1 1.0 {})) noise)       
         particles (vec (repeatedly 25000 make-particle))
         looper (fn [canvas] (loop [xs particles]
                               (if @running
