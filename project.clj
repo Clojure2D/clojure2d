@@ -1,6 +1,6 @@
 (defproject clojure2d "0.0.2-SNAPSHOT"
   :description "Creative coding / glitch library backed by Java2D"
-  :plugins [[refactor-nrepl "2.3.0-SNAPSHOT"]
+  :plugins [[refactor-nrepl "2.3.1"]
             [cider/cider-nrepl "0.15.0-SNAPSHOT"]
             [lein-ancient "0.6.10"]
             [lein-kibit "0.1.3"]
@@ -19,8 +19,8 @@
                  [net.jafama/jafama "2.1.0"]
                  [org.apache.commons/commons-math3 "3.6.1"]
                  [com.flowpowered/flow-noise "1.0.0"]
-                 [com.sudoplay.joise/joise "1.0.5"]
-                 [net.littleredcomputer/sicmutils "0.9.8"]
+                 [com.sudoplay.joise/joise "1.1.0-RC2"]
+                 [net.littleredcomputer/sicmutils "0.10.0"]
                                         ;	 [de.sciss/jwave "1.0.3"]
                  [criterium "0.4.4"]
                                         ; [org.bytedeco/javacv-platform "1.3.2"]

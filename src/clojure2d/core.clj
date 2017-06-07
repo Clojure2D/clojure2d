@@ -390,7 +390,7 @@
 
 (defn set-awt-color
   "Set color with valid java `Color` object. Use it when you're sure you pass `java.awt.Color`."
-  [canvas c]
+  [canvas ^java.awt.Color c]
   (let [[^Graphics2D g] @canvas]
     (.setColor g c)
     canvas))
