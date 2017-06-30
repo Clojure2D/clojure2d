@@ -76,7 +76,7 @@
          canvas (core/with-canvas (core/create-canvas w h)
                   (core/image img)
                   (core/image noise))]
-     (@canvas 1)))
+     (core/get-image canvas)))
   ([^BufferedImage img]
    (render-noise (make-noise 80 (.getWidth img) (.getHeight img)) img)))
 
@@ -139,4 +139,4 @@
          h (.getHeight img)
          canvas (core/with-canvas (core/create-canvas w h)
                   (apply-images img spots))]     
-     (@canvas 1))))
+     (core/get-image canvas))))

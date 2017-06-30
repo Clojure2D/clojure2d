@@ -38,7 +38,7 @@
     (defmethod key-pressed [name2 \space] [_]
       (println (str "Window: " name2)))
 
-    (defmethod mouse-event [name1 :mouse-released] [^MouseEvent e]
+    (defmethod mouse-event [name1 :mouse-pressed] [^MouseEvent e]
       (let [canvas (make-canvas 1 1)
             x (.getX e)
             y (.getY e)

@@ -17,7 +17,7 @@
            [javax.swing ImageIcon]
            [javax.imageio ImageIO ImageWriter ImageWriteParam IIOImage]
            [java.awt Graphics2D Image RenderingHints GraphicsEnvironment 
-            Transparency BasicStroke Color Container Dimension Component Toolkit Canvas]
+            Transparency BasicStroke Color Container Dimension Component Toolkit Shape]
            [java.util Iterator]
            [java.awt.geom Line2D Line2D$Double
             Rectangle2D Rectangle2D$Double
@@ -28,11 +28,11 @@
            [javax.swing JFrame SwingUtilities]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 ;; how many tasks we can run (one less than available cores)?
 (def ^:const ^long available-cores (.availableProcessors (Runtime/getRuntime)))
-(def ^:const ^long available-tasks (max 1 (dec available-cores)))
+(def ^:const ^long available-tasks (inc available-cores))
 
 ;; ## Image
 
@@ -78,8 +78,7 @@
   * Input: image filename
   * Returns extension (without dot)"
   [filename]
-  (let [[_ ext] (re-find #"\.(\w+)$" filename)]
-    ext))
+  (second (re-find #"\.(\w+)$" filename)))
 
 ;; Memoize above function (in case you'll be saving file very often).
 (def file-extension (memoize file-extension-int))
@@ -111,9 +110,10 @@
    (do-save filename img writer (.getDefaultWriteParam writer)))
   ([filename ^BufferedImage img ^ImageWriter writer param]
    (with-open [os (output-stream filename)]
-     (.setOutput writer (ImageIO/createImageOutputStream os))
-     (.write writer nil (IIOImage. img nil nil) param)
-     (.dispose writer))))
+     (doto writer
+       (.setOutput (ImageIO/createImageOutputStream os))
+       (.write nil (IIOImage. img nil nil) param)
+       (.dispose)))))
 
 ;; Now we define multimethod which saves image. Multimethod is used here because some image types requires additional actions.
 (defmulti save-file-type (fn [filename _ _] (keyword (file-extension filename))))
@@ -123,8 +123,9 @@
   [filename img ^ImageWriter writer]
   (let [nimg (flatten-image img)
         ^ImageWriteParam param (.getDefaultWriteParam writer)]
-    (.setCompressionMode param ImageWriteParam/MODE_EXPLICIT)
-    (.setCompressionQuality param *jpeg-image-quality*)
+    (doto param
+      (.setCompressionMode ImageWriteParam/MODE_EXPLICIT)
+      (.setCompressionQuality *jpeg-image-quality*))
     (do-save filename nimg writer param)))
 
 ;; BMP also requires image flattening
@@ -163,33 +164,48 @@
   [img width height]
   (let [^BufferedImage target (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)
         ^Graphics2D g (.createGraphics target)]
-    (.setRenderingHint g RenderingHints/KEY_INTERPOLATION RenderingHints/VALUE_INTERPOLATION_BICUBIC)
-    (.setRenderingHint g RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON)
-    (.drawImage g img 0 0 width height nil)
-    (.dispose g)
+    (doto g
+      (.setRenderingHint RenderingHints/KEY_INTERPOLATION RenderingHints/VALUE_INTERPOLATION_BICUBIC)
+      (.setRenderingHint RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON)
+      (.drawImage img 0 0 width height nil)
+      (.dispose))
     target))
 
 ;; ## Canvas
 ;;
-;; Canvas is an object you can draw on and which can be displayed in the window also saved. Technically it's an atom consisting vector of `Graphics2D` object which is internally used to draw on the image, image (`BufferedImage` object) and rendering quality hints. What is important: to draw on canvas you have to wrap your operations in `with-canvas` macro. `with-canvas` is responsible for creating and releasing `Graphics2D` object. Initially `Graphics2D` is set to `nil`.
+;; Canvas is an object you can draw on and which can be displayed in the window also saved. Technically it's a type cosisting of `Graphics2D` object which is internally used to draw on the image, image (`BufferedImage` object), rendering quality hints and singletons for primitives. What is important: to draw on canvas you have to wrap your operations in `with-canvas` macro. `with-canvas` is responsible for creating and releasing `Graphics2D` object. Initially `Graphics2D` is set to `nil`.
 ;; Canvas should be accelerated by Java and your video card.
 ;; Reminder: Drawing on canvas is single threaded.
 
+(defprotocol ImageProto
+  (get-image [t]))
+
+(deftype Canvas [^Graphics2D graphics
+                 ^BufferedImage buffer
+                 ^Line2D line-obj
+                 ^Rectangle2D rect-obj
+                 ^Ellipse2D ellipse-obj
+                 hints
+                 ^long width
+                 ^long height]
+  ImageProto
+  (get-image [_] buffer))
+
 ;; First let's define three rendering quality options: `:low`, `:mid` and `:high`. Where `:low` is fastest but has poor quality and `:high` has best quality but may be slow. Rendering options are used when you create canvas.
-(def rendering-hints { :low {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF
-                             RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR
-                             RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
-                             RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED
-                             RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED
-                             RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF
-                             RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_OFF}
-                      :mid  {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON
-                             RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BILINEAR
-                             RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
-                             RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED
-                             RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED
-                             RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF
-                             RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON}
+(def rendering-hints {:low {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF
+                            RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR
+                            RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
+                            RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED
+                            RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED
+                            RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF
+                            RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_OFF}
+                      :mid {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON
+                            RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BILINEAR
+                            RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
+                            RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED
+                            RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED
+                            RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF
+                            RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON}
                       :high {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON
                              RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC
                              RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY
@@ -205,31 +221,32 @@
 
 (defn flush-graphics
   "Dispose current `Graphics2D`"
-  [canvas]
-  (let [[^Graphics2D g b h] @canvas]
-    (.dispose g)
-    (reset! canvas [nil b h])))
+  [^Canvas canvas]
+  (.dispose ^Graphics2D (.graphics canvas)))
 
 (defn make-graphics
   "Create new `Graphics2D` object and set renedering hints"
-  [canvas]
-  (let [[_ ^BufferedImage b ^RenderingHints h] @canvas
-        ^Graphics2D ng (.createGraphics b)]
-    (if h 
-      (.setRenderingHints ng h)
-      (.setRenderingHints ng (rendering-hints :high))  )
-    (reset! canvas [ng b h])))
+  [^Canvas canvas]
+  (let [^Graphics2D ng (.createGraphics ^BufferedImage (.buffer canvas))]
+    (.setRenderingHints ng (or (.hints canvas) (rendering-hints :high)))
+    (Canvas. ng
+             (.buffer canvas)
+             (.line-obj canvas)
+             (.rect-obj canvas)
+             (.ellipse-obj canvas)
+             (.hints canvas)
+             (.width canvas)
+             (.height canvas))))
 
 (defmacro with-canvas
   "Threading macro which takes care to create and destroy `Graphics2D` object for drawings on canvas. Macro returns result of last call."
-  [canvas & body]
-  `(let [canvas# ~canvas]
-     (do 
-       (make-graphics canvas#)
-       (let [result# (-> canvas#
-                         ~@body)]
-         (flush-graphics canvas#)
-         result#))))
+  [canvas & body]  
+  `(let [newcanvas# (make-graphics ~canvas)
+         result# (-> newcanvas#
+                     ~@body)]
+     (do
+       (flush-graphics newcanvas#)
+       result#)))
 
 ;; Next functions are canvas management functions: create, save, resize and set quality.
 
@@ -239,15 +256,20 @@
 
 (defn create-canvas
   "Create and return canvas with `width`, `height` and quality hint name (keyword). Default hint is `:high`"
-  ([width height hints]
+  ([^long width ^long height hint]
    (let
        [^BufferedImage buffer (.. GraphicsEnvironment 
                                   (getLocalGraphicsEnvironment)
                                   (getDefaultScreenDevice)
                                   (getDefaultConfiguration)
-                                  (createCompatibleImage width height Transparency/TRANSLUCENT))
-        h (rendering-hints hints)
-        result (atom [nil buffer h])]
+                                  (createCompatibleImage width height Transparency/TRANSLUCENT))        
+        result (Canvas. nil
+                        buffer
+                        (Line2D$Double.)
+                        (Rectangle2D$Double.)
+                        (Ellipse2D$Double.)
+                        (rendering-hints (or (some #{hint} (keys rendering-hints)) :high))
+                        width height)]
      (with-canvas result
        (set-background Color/black)
        (set-stroke))))
@@ -259,23 +281,21 @@
 
 (defn resize-canvas
   "Resize canvas to new dimensions. Creates and returns new canvas."
-  [canvas width height]
-  (let [[_ b h] @canvas
-        ncanvas (create-canvas width height h)]
+  [^Canvas canvas width height]
+  (let [ncanvas (create-canvas width height (.hints canvas))]
     (with-canvas ncanvas
-      (image b))))
+      (image (.buffer canvas)))))
 
-(defn set-canvas-quality
-  "Change canvas quality"
-  [canvas hints]
-  (let [[g b] @canvas]
-    (reset! canvas [g b (rendering-hints hints)])))
+(comment defn set-canvas-quality
+         "Change canvas quality"
+         [canvas hints]
+         (let [[g b] @canvas]
+           (reset! canvas [g b (rendering-hints hints)])))
 
 (defn save-canvas
   "Save canvas to the file"
-  [canvas filename]
-  (let [[_ b] @canvas]
-    (save-image b filename)))
+  [^Canvas canvas filename]
+  (save-image (.buffer canvas) filename))
 
 ;; ### Drawing functions
 ;;
@@ -288,16 +308,13 @@
 ;; All functions return canvas object
 
 ;; Since drawing on the canvas is single threaded we can use internal mutable objects to draw things.
-(def ^Line2D line-obj (Line2D$Double.))
-(def ^Rectangle2D rect-obj (Rectangle2D$Double.))
-(def ^Ellipse2D ellipse-obj (Ellipse2D$Double.))
 
 (defn line
   "Draw line from point `(x1,y1)` to `(x2,y2)`"
-  [canvas x1 y1 x2 y2]
-  (.setLine line-obj x1 y1 x2 y2)
-  (let [[^Graphics2D g] @canvas]
-    (.draw g line-obj))
+  [^Canvas canvas x1 y1 x2 y2]
+  (let [^Line2D l (.line-obj canvas)]
+    (.setLine l x1 y1 x2 y2)
+    (.draw ^Graphics2D (.graphics canvas) l))
   canvas)
 
 (defn point
@@ -308,39 +325,41 @@
 
 (defn- draw-fill-or-stroke
   "Draw filled or stroked object."
-  [^Graphics2D g obj stroke?]
+  [^Graphics2D g ^Shape obj stroke?]
   (if stroke?
     (.draw g obj)
     (.fill g obj)))
 
 (defn rect
   "Draw rectangle with top-left corner at `(x,y)` position with width `w` and height `h`."
-  ([canvas x1 y1 w h stroke?]
-   (.setFrame rect-obj x1 y1 w h)
-   (draw-fill-or-stroke (@canvas 0) rect-obj stroke?)
+  ([^Canvas canvas x1 y1 w h stroke?]
+   (let [^Rectangle2D r (.rect-obj canvas)] 
+     (.setFrame r x1 y1 w h)
+     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) r stroke?))
    canvas)
   ([canvas x1 y1 w h]
    (rect canvas x1 y1 w h false)))
 
 (defn ellipse
   "Draw ellipse with middle at `(x,y)` position with width `w` and height `h`."
-  ([canvas x1 y1 w h stroke?]
-   (.setFrame ellipse-obj (- ^double x1 (/ ^double w 2.0)) (- ^double y1 (/ ^double h 2.0)) w h)
-   (draw-fill-or-stroke (@canvas 0) ellipse-obj stroke?)
+  ([^Canvas canvas x1 y1 w h stroke?]
+   (let [^Ellipse2D e (.ellipse_obj canvas)]
+     (.setFrame e (- ^double x1 (/ ^double w 2.0)) (- ^double y1 (/ ^double h 2.0)) w h)
+     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) e stroke?))
    canvas)
   ([canvas x1 y1 w h]
    (ellipse canvas x1 y1 w h false)))
 
 (defn triangle
   "Draw triangle with corners at 3 positions."
-  ([canvas x1 y1 x2 y2 x3 y3 stroke?]
-   (let [p (Path2D$Double.)]
+  ([^Canvas canvas x1 y1 x2 y2 x3 y3 stroke?]
+   (let [^Path2D p (Path2D$Double.)]
      (doto p
        (.moveTo x1 y1)
        (.lineTo x2 y2)
        (.lineTo x3 y3)
        (.closePath))
-     (draw-fill-or-stroke (@canvas 0) p stroke?))
+     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?))
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3]
    (triangle canvas x1 y2 x2 y2 x3 y3 false)))
@@ -364,24 +383,23 @@
 
 (defn quad
   "Draw quad with corners at 4 positions."
-  ([canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
-   (let [p (Path2D$Double.)]
+  ([^Canvas canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
+   (let [^Path2D p (Path2D$Double.)]
      (doto p
        (.moveTo x1 y1)
        (.lineTo x2 y2)
        (.lineTo x3 y3)
        (.lineTo x4 y4)
        (.closePath))
-     (draw-fill-or-stroke (@canvas 0) p stroke?))
+     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?))
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
    (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false)))
 
 (defn set-stroke
   "Set stroke (line) attributes like `cap`, `join` and size. Default `CAP_ROUND` and `JOIN_MITER` is used. Default size is `1.0`."
-  ([canvas size cap join]
-   (let [[^Graphics2D g] @canvas]
-     (.setStroke g (BasicStroke. size cap join)))
+  ([^Canvas canvas size cap join]
+   (.setStroke ^Graphics2D (.graphics canvas) (BasicStroke. size cap join))
    canvas)
   ([canvas size]
    (set-stroke canvas size BasicStroke/CAP_ROUND BasicStroke/JOIN_MITER))
@@ -390,10 +408,9 @@
 
 (defn set-awt-color
   "Set color with valid java `Color` object. Use it when you're sure you pass `java.awt.Color`."
-  [canvas ^java.awt.Color c]
-  (let [[^Graphics2D g] @canvas]
-    (.setColor g c)
-    canvas))
+  [^Canvas canvas ^java.awt.Color c]
+  (.setColor ^Graphics2D (.graphics canvas) c)
+  canvas)
 
 (defn set-color
   "Set global color. You can pass:
@@ -410,12 +427,13 @@
   
 (defn set-awt-background
   "Set background color. Expects valid `Color` object."
-  [canvas c]
-  (let [[^Graphics2D g ^BufferedImage b] @canvas
+  [^Canvas canvas c]
+  (let [^Graphics2D g (.graphics canvas)
         ^Color currc (.getColor g)] 
     (set-color canvas c)
-    (.fillRect g 0 0 (.getWidth b) (.getHeight b))
-    (.setColor g currc))
+    (doto g
+      (.fillRect 0 0 (.width canvas) (.height canvas))
+      (.setColor currc)))
   canvas)
 
 (defn set-background
@@ -433,13 +451,11 @@
 
 (defn image
   "Draw an image. You can specify position and size of the image. Default it's placed on whole canvas."
-  ([canvas ^BufferedImage img x y w h]
-   (let [[^Graphics2D g] @canvas]
-     (.drawImage g img x y w h nil)
-     canvas))
-  ([canvas img]
-   (let [[_ ^BufferedImage b] @canvas] 
-     (image canvas img 0 0 (.getWidth b) (.getHeight b)))))
+  ([^Canvas canvas ^BufferedImage img x y w h]
+   (.drawImage ^Graphics2D (.graphics canvas) img x y w h nil)
+   canvas)
+  ([^Canvas canvas img]
+   (image canvas img 0 0 (.width canvas) (.height canvas))))
 
 ;; ## Display window
 ;;
@@ -522,16 +538,20 @@
 ;; 
 ;; See: examples/ex01_events.clj
 
+(defrecord Window [^JFrame frame
+                   active?
+                   buffer
+                   ^java.awt.Canvas panel
+                   ^double fps
+                   ^long width
+                   ^long height
+                   window-name]
+  ImageProto
+  (get-image [_] (get-image @buffer)))
+
 ;; ### Events function
 
-;; Function used to close and dispose window. As a side effect `is-display-running?` atom is set to false.
-(defn close-window
-  "Close window frame"
-  [^JFrame frame is-display-running?]
-  (reset! is-display-running? false)
-  (.dispose frame))
-
-;; Next we have private method which extracts the name of your window (set when `show-window` is called).
+;; Private method which extracts the name of your window (set when `show-window` is called).
 
 (defn- component-name
   "Returns name of the component. Used to dispatch events."
@@ -580,7 +600,7 @@
 (defn- create-panel
   "Create panel which displays canvas. Attach mouse events, give a name (same as window), set size etc."
   [buffer windowname width height]
-  (let [panel (Canvas.)]
+  (let [panel (java.awt.Canvas.)]
     (doto panel
       (.setName windowname)
       (.addMouseListener mouse-processor)
@@ -589,11 +609,18 @@
       (.setIgnoreRepaint true)
       (.setPreferredSize (Dimension. width height)))))
 
+;; Function used to close and dispose window. As a side effect `active?` atom is set to false.
+(defn- close-window
+  "Close window frame"
+  [^JFrame frame active?]
+  (reset! active? false)
+  (.dispose frame))
+
 (defn- build-frame
   "Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event."
-  [^JFrame frame ^Canvas panel is-display-running? buffer windowname width height]
+  [^JFrame frame ^java.awt.Canvas panel active? windowname width height]
   (let [closer (proxy [WindowAdapter] []
-                 (windowClosing [^WindowEvent e] (close-window frame is-display-running?)))]
+                 (windowClosing [^WindowEvent e] (close-window frame active?)))]
     (.add frame panel)
     (doto frame
       (.addKeyListener key-processor)
@@ -617,13 +644,14 @@
 
 (defn- repaint
   "Draw buffer on panel using `BufferStrategy` object."
-  [^Canvas panel buffer]
+  [^java.awt.Canvas panel ^Canvas canvas]
   (let [^BufferStrategy strategy (.getBufferStrategy panel)]
     (loop []
       (loop []
-        (let [^Graphics2D graphics-context (.getDrawGraphics strategy)]
+        (let [^Graphics2D graphics-context (.getDrawGraphics strategy)
+              ^BufferedImage b (.buffer canvas)]
           (.setRenderingHints graphics-context (:mid rendering-hints))
-          (.drawImage graphics-context (@buffer 1) 0 0 (.getWidth panel) (.getHeight panel) nil)
+          (.drawImage graphics-context b 0 0 (.getWidth panel) (.getHeight panel) nil)
           (.dispose graphics-context))
         (when (.contentsRestored strategy) (recur)))
       (.show strategy)
@@ -633,8 +661,8 @@
 (defn- refresh-screen-task
   "Repaint canvas on window with set FPS.
 
-  * Input: frame, is-display-running? atom, function to run before repaint, canvas and sleep time."
-  [panel is-display-running? draw-fun buffer stime]  
+  * Input: frame, active? atom, function to run before repaint, canvas and sleep time."
+  [panel active? draw-fun buffer stime]  
   (loop [cnt (long 0)
          result nil]
     (let [new-result (when draw-fun 
@@ -642,7 +670,7 @@
                          (draw-fun cnt result)))]
       (Thread/sleep stime)
       (repaint panel @buffer) 
-      (when @is-display-running? (recur (unchecked-inc cnt) new-result)))))
+      (when @active? (recur (unchecked-inc cnt) new-result)))))
 
 ;; You may want to replace canvas to the other one on window. To make it pass result of `show-window` function and new canvas.
 ;; Internally it just resets buffer atom for another canvas.
@@ -653,10 +681,10 @@
 
   * Input: window and new canvas
   * Returns canvas"
-  [[_ _ buffer] canvas]
-  (reset! buffer canvas))
+  [^Window window canvas]
+  (reset! (:buffer window) canvas))
 
-;; Finally function which displays window. Function creates window's visibility status (`is-display-running?` atom), buffer as atomized canvas, creates frame, creates refreshing task (repainter) and shows window.
+;; Finally function which displays window. Function creates window's visibility status (`active?` atom), buffer as atomized canvas, creates frame, creates refreshing task (repainter) and shows window.
 
 (defn show-window
   "Show window with width/height, name and required fps of refresh. Optionally pass callback function.
@@ -664,23 +692,27 @@
   * Input: canvas, window name, width, height, frames per seconds, (optional) `draw` function.
   * Returns vector with: `JFrame` object, visibility status atom, buffer atom (canvas packed into the atom). For convenience last element of the vector is a map with all used objects and passed parameters."
   ([canvas wname width height fps draw-fun]
-   (let [is-display-running? (atom true)
+   (let [active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
          panel (create-panel buffer wname width height)]
-     (SwingUtilities/invokeAndWait #(build-frame frame panel is-display-running? buffer wname width height))
-     (future (refresh-screen-task panel is-display-running? draw-fun buffer (/ 1000.0 fps)))
-     [frame is-display-running? buffer
-      {:frame frame
-       :is-display-running? is-display-running?
-       :buffer buffer
-       :panel panel
-       :fps fps
-       :width width
-       :height height
-       :name wname}]))
+     (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
+     (future (refresh-screen-task panel active? draw-fun buffer (/ 1000.0 ^double fps)))
+     (->Window frame
+               active?
+               buffer
+               panel
+               fps
+               width
+               height
+               wname)))
   ([canvas wname width height fps]
    (show-window canvas wname width height fps nil)))
+
+(defn window-active?
+  "Helper function, check if window is active"
+  [^Window window]
+  @(.active? window))
 
 ;; ## Utility functions
 ;;
@@ -712,7 +744,7 @@
 
 (defn make-counter
   "Create counter function, each call returns next number."
-  ([v]
+  ([^long v]
    (let [tick (atom (dec v))]
      #(swap! tick inc)))
   ([]

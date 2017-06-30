@@ -4,9 +4,11 @@
             [clojure2d.math.random :as r]
             [clojure2d.math.vector :as v]
             [clojure2d.math.joise :as n]
-            [clojure2d.extra.variations :refer :all])
+            [clojure2d.extra.variations :refer :all]
+            [clojure.pprint :refer [pprint]])
   (:import  [java.awt Color]
-            [clojure2d.math.vector Vec2]))
+            [clojure2d.math.vector Vec2]
+            [clojure2d.core Window]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -50,30 +52,31 @@
 
 (defn example-05
   []
-  (let [canvas (create-canvas width height)
-        [frame running] (show-window canvas "particles" width height 25)
-        noise (n/make-random-fractal)
-        variation1 (rand-nth variation-list-not-random)
-        variation2 (rand-nth variation-list-not-random)
-        vrand (Vec2. (r/drand -1 1) (r/drand -1 1))
-        mv-fun (partial move-particle vrand (r/brand) (comp (make-variation variation2 1.0 {}) (make-variation variation1 1.0 {})) noise)       
-        particles (vec (repeatedly 25000 make-particle))
-        looper (fn [canvas] (loop [xs particles]
-                              (if @running
-                                (recur (mapv (partial mv-fun canvas) xs))
-                                canvas)))]
-    
-    (defmethod key-pressed ["particles" \space] [_]
-      (save-canvas canvas (next-filename "results/ex05/" ".jpg")))
+  (binding [*skip-random-variations* true]
+    (let [canvas (create-canvas width height)
+          window (show-window canvas "particles" width height 25)
+          noise (n/make-random-fractal)
+          field-config (make-random-configuration)
+          field (make-combination field-config)
+          vrand (Vec2. (r/drand -1 1) (r/drand -1 1))
+          mv-fun (partial move-particle vrand (r/brand) field noise)       
+          particles (repeatedly 25000 make-particle)
+          looper (fn [canvas] (loop [xs particles]
+                                (if (window-active? window)
+                                  (recur (mapv (partial mv-fun canvas) xs))
+                                  canvas)))]
+      
+      (defmethod key-pressed ["particles" \space] [_]
+        (save-canvas canvas (next-filename "results/ex05/" ".jpg")))
 
-    (println (str variation1 " " variation2))
+      (pprint field-config)
 
-    (with-canvas canvas
-      (set-background 10 10 10)
-      (set-stroke point-size)
-      looper)    
-    
-    ))
+      (with-canvas canvas
+        (set-background 10 10 10)
+        (set-stroke point-size)
+        looper)    
+      
+      )))
 
 (example-05)
 

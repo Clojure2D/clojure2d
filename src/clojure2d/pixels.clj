@@ -5,6 +5,7 @@
             [clojure2d.color :as c]
             [clojure2d.core :as core])
   (:import [clojure2d.math.vector Vec4 Vec3 Vec2]
+           [clojure2d.core Canvas]
            [clojure.lang PersistentVector]
            [java.awt.image BufferedImage]))
 
@@ -179,7 +180,7 @@
   ([b]
    (get-image-pixels b true)))
 
-(defn set-image-pixels
+(defn set-image-pixels!
   ""
   ([^BufferedImage b x y ^Pixels pin]
    (let [^Pixels p (if (.planar pin) (from-planar pin) pin)] 
@@ -188,13 +189,13 @@
          (setPixels ^int x ^int y (int (.w p)) (int (.h p)) ^ints (.p p))))
    b)
   ([^BufferedImage b ^Pixels p]
-   (set-image-pixels b 0 0 p)))
+   (set-image-pixels! b 0 0 p)))
 
 (defn image-from-pixels
   ""
   [^Pixels p]
   (let [^BufferedImage bimg (BufferedImage. (.w p) (.h p) BufferedImage/TYPE_INT_ARGB)]
-    (set-image-pixels bimg p)))
+    (set-image-pixels! bimg p)))
 
 ;;
 
@@ -202,23 +203,21 @@
 
 (defn get-canvas-pixels
   ""
-  ([canvas x y w h planar?]
-   (get-image-pixels (@canvas 1) x y w h planar?))
-  ([canvas x y w h]
-   (get-image-pixels (@canvas 1) x y w h true))
-  ([canvas]
-   (get-image-pixels (@canvas 1)))
-  ([canvas planar?]
-   (get-image-pixels (@canvas 1) planar?)))
+  ([^Canvas canvas x y w h planar?]
+   (get-image-pixels (.buffer canvas) x y w h planar?))
+  ([^Canvas canvas x y w h]
+   (get-image-pixels (.buffer canvas) x y w h true))
+  ([^Canvas canvas]
+   (get-image-pixels (.buffer canvas)))
+  ([^Canvas canvas planar?]
+   (get-image-pixels (.buffer canvas) planar?)))
 
-(defn set-canvas-pixels
+(defn set-canvas-pixels!
   ""
-  ([canvas p x y]
-   (let [[_ b] @canvas]
-     (set-image-pixels b x y p)))
-  ([canvas p]
-   (let [[_ b] @canvas]
-     (set-image-pixels b p))))
+  ([^Canvas canvas p x y]
+   (set-image-pixels! (.buffer canvas) x y p))
+  ([^Canvas canvas p]
+   (set-image-pixels! (.buffer canvas) p)))
 
 ;;
 

@@ -22,9 +22,9 @@
 
     (set-background canvas 45 45 41 20)
     
-    (p/set-canvas-pixels canvas (->> canvas
-                                     p/get-canvas-pixels
-                                     (p/filter-channels p/gaussian-blur-2 nil)))
+    (p/set-canvas-pixels! canvas (->> canvas
+                                      p/get-canvas-pixels
+                                      (p/filter-channels p/gaussian-blur-2 nil)))
 
     (set-color canvas (- 146.0 ew) (- 199.0 cn) (- 163.0 eh))
     (ellipse canvas 100 100 ew eh)))
@@ -34,4 +34,4 @@
   []
   (show-window (make-canvas 200 200) "ellipse" 300 300 25 draw))
 
-(def window (example-02))
+(example-02)

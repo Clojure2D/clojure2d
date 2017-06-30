@@ -6,10 +6,11 @@
             [clojure2d.extra.variations :as vr]
             [clojure2d.extra.overlays :refer :all]
             [clojure.pprint :refer [pprint]])
-  (:import [clojure2d.math.vector Vec2]))
+  (:import [clojure2d.math.vector Vec2]
+           [clojure2d.core Window]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 (def ^:const ^long w 540)
 (def ^:const ^long h 540)
@@ -34,7 +35,7 @@
 
 (defn make-me
   ""
-  [canvas disp]
+  [canvas window]
   (let [field-config (vr/make-random-configuration)
         field (vr/make-combination field-config)
         ;; field (vr/make-variation :perspective 1.0 {})
@@ -50,8 +51,8 @@
               yy (m/norm (+ (.y vv) ^double (r/grand 0.0012)) y1- y2+ 0.0 h)]
           (point canvas xx yy))
 
-        (when (and @disp (< x x2)) (recur (+ x step))))
-      (when (and @disp (< y y2)) (recur (+ y step)))))
+        (when (and (window-active? window) (< x x2)) (recur (+ x step))))
+      (when (and (window-active? window) (< y y2)) (recur (+ y step)))))
   canvas)
 
 (defn draw-folds
@@ -61,20 +62,20 @@
     (set-background 255 250 245)
     (set-color 35 35 35 16)
     (make-me disp)
-    (image (render-noise n60 (@canvas 1)))
-    (image (render-spots s60 (@canvas 1))))
+    (image (render-noise n60 (get-image canvas)))
+    (image (render-spots s60 (get-image canvas))))
   :done)
 
 (defn example-08
   ""
   []
   (let [canvas (create-canvas w h)
-        [_ disp] (show-window canvas "folds" w h 25)]
+        window (show-window canvas "folds" w h 25)]
 
     (defmethod key-pressed ["folds" \space] [_]
       (save-canvas canvas (next-filename "results/ex08/" ".jpg")))
 
-    [canvas disp]))
+    [canvas window]))
 
 (draw-folds (example-08))
 

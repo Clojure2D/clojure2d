@@ -587,7 +587,7 @@
 (defn- from-XYZ-
   ""
   [^Vec4 c]
-  (let [^Vec3 rgb-raw (from-XYZ-raw (.x c) (.y c) (.z c))
+  (let [^Vec3 rgb-raw (from-XYZ-raw (Vec3. (.x c) (.y c) (.z c)))
         r (xyz-decorrect (.x rgb-raw))
         g (xyz-decorrect (.y rgb-raw))
         b (xyz-decorrect (.z rgb-raw))]
