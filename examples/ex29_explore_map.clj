@@ -2,8 +2,9 @@
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
             [clojure2d.math.random :as r]
-            [clojure2d.math.complex :as c])
-  (:import [clojure2d.math.complex Complex]))
+            [clojure2d.math.complex :as c]
+            [clojure2d.math.vector :as v])
+  (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -61,11 +62,11 @@
 (defn make-exponential-map
   "Exp map"
   [^double rec ^double imc]
-  (let [^Complex c (Complex. rec imc)]
+  (let [^Vec2 c (Vec2. rec imc)]
     (fn [^double re ^double im]
-      (let [^Complex z (Complex. re im)
-            ^Complex res (c/mult c (c/exp z))]
-        [(.real res) (.imag res)]))))
+      (let [^Vec2 z (Vec2. re im)
+            ^Vec2 res (c/mult c (c/exp z))]
+        [(.x res) (.y res)]))))
 
 (defn gumo-mira-fn
   "Gumowski-Mira function"

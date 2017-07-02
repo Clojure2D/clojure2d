@@ -59,7 +59,7 @@ No docs, no tests (yet)
 Add following line as a dependency to your `project.clj`
 
 ```clojure
-[clojure2d "0.0.2-SNAPSHOT"]
+[clojure2d "0.0.3-SNAPSHOT"]
 ```
 
 ## Usage
@@ -98,7 +98,7 @@ Defines also:
 
 Additionally in following namespaces:
 
-* clojure2d.math.complex - Complex type and operations (code taken from Apache Commons Math)
+* clojure2d.math.complex - Complex (Vec2) operations (code taken from Apache Commons Math)
 * clojure2d.math.vector - Vec2, Vec3 and Vec4 types and operations on vectors
 * clojure2d.math.joise - Joise library bindings (basic (simplex/perlin/value), cell (voronoi) and fractal noise + combinations)
 * clojure2d.math.random - Random functions and perlin noise from flow-noise library
@@ -150,6 +150,7 @@ I've prepared several examples with results where you can check current state of
 * ex30 - random or low discrepancy sequences
 * ex31 - wavy lines
 * ex32 - harmonograms on noise (accumulation bins rendering)
+* ex33 - interpolations / easings
 
 ## TODO
 

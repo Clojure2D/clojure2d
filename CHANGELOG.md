@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file. This change
 - Helper functions to check if window is visible
 - Helper function to get image from canvas and window
 - Color simplification (awt vs vec4)
+- Complex type is Vec2 now
 
 ## 0.0.2 - 2017-04-14
 ### Added

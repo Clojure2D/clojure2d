@@ -20,7 +20,6 @@
             [clojure2d.math :as m]
             [clojure2d.math.random :as r])
   (:import [clojure2d.math.vector Vec2]
-           [clojure2d.math.complex Complex]
            [org.apache.commons.math3.special Gamma Beta Erf BesselJ]))
 
 (set! *warn-on-reflection* true)
@@ -429,12 +428,11 @@
 (defn make-csin
   "CSin by zephyrtronium, http://fractal-resources.deviantart.com/art/CSin-Apophysis-Plugin-158332287"
   [^double amount {:keys [^double stretch]}]
-  (let [s-cx (Complex. stretch 0.0)]
+  (let [s-cx (Vec2. stretch 0.0)]
     (fn [^Vec2 v]
-      (v/mult (->> (c/from-vec2 v)
+      (v/mult (->> v
                    (c/mult s-cx)
-                   (c/sin)
-                   (c/to-vec2)) amount))))
+                   (c/sin)) amount))))
 (make-var-method csin :regular)
 
 ;; ### Cayley transform
@@ -445,9 +443,8 @@
   (fn [^Vec2 v]
     (if (== (.y v) -1.0)
       zerov
-      (let [^Complex c (c/from-vec2 v)]
-        (c/to-vec2 (c/div (c/add c c/I-)
-                          (c/add c c/I)))))))
+      (c/div (c/add v c/I-)
+             (c/add v c/I)))))
 (make-var-method cayley :regular)
 
 ;; ### Cylinder
