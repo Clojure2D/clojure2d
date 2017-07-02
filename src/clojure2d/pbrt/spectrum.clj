@@ -378,7 +378,7 @@
 
 (extend Vec3
   SpectrumProto
-  {:y c/get-luma3
+  {:y c/to-luma
    :to-rgb identity
    :from-rgb identity
    :to-xyz c/to-XYZ-raw

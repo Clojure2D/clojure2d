@@ -15,7 +15,7 @@
 (def ^:const ^long width 900)
 (def ^:const ^long height 900)
 
-(def ^:const ^double point-step 0.05) ; 0.01 - 2.0
+(def ^:const ^double point-step 0.02) ; 0.01 - 2.0
 (def ^:const ^double point-size 1.0) ; 0.6 - 1.2
 (def ^:const ^int alpha 20)
 
@@ -30,7 +30,7 @@
 
 (defn move-particle
   ""
-  [canvas ^Vec2 vrand noisef fun ^Vec2 in]
+  [^Vec2 vrand noisef fun canvas ^Vec2 in]
   (let [^Vec2 nf (noisef in)
         ^Vec2 v (v/add in (v/mult (sinusoidal (v/mult (->> in
                                                            (v/add vrand)
@@ -69,38 +69,34 @@
     (Vec2. (- ^double (f (.x in) (.y in)) 0.5)
            (- ^double (f (.y in) (.x in) 0.3) 0.5))))
 
-(defn go-for-it
-  ""
-  [canvas particles running mv-fun]
-  (loop [xs particles]
-    (when @running
-      (recur (mapv mv-fun xs))))
-  canvas)
-
-
 (defn example-21
   []
-  (let [canvas (create-canvas width height)
-        [frame running] (show-window canvas "popcorn" width height 25)
-        variation1 (rand-nth variation-list-not-random)
-        variation2 (rand-nth variation-list-not-random)
-        vrand (Vec2. (r/drand -1 1) (r/drand -1 1))
-        noisef (if (r/brand 0.2) (partial get-noise (make-random-noise)) (fn [_] (Vec2. 0.0 0.0)))
-        mv-fun (partial move-particle canvas vrand noisef (comp (make-variation variation2 1.0 {}) (make-variation variation1 1.0 {})))
-        
-        particles (repeatedly 15000 make-particle)]
-    
-    (defmethod key-pressed ["popcorn" \space] [_]
-      (binding [*jpeg-image-quality* 0.9]
-        (save-canvas canvas (next-filename "results/ex21/" ".jpg"))))
+  (binding [*skip-random-variations* true]
+    (let [canvas (create-canvas width height)
+          window (show-window canvas "popcorn" width height 25)
+          field-config (make-random-configuration)
+          field (make-combination field-config)
+          vrand (Vec2. (r/drand -1 1) (r/drand -1 1))
+          noisef (if (r/brand 0.2) (partial get-noise (make-random-noise)) (fn [_] (Vec2. 0.0 0.0)))
+          mv-fun (partial move-particle vrand noisef field)
+          
+          particles (repeatedly 15000 make-particle)
+          looper (fn [canvas] (loop [xs particles]
+                                (if (window-active? window)
+                                  (recur (mapv (partial mv-fun canvas) xs))
+                                  canvas)))]
+      
+      (defmethod key-pressed ["popcorn" \space] [_]
+        (binding [*jpeg-image-quality* 0.9]
+          (save-canvas canvas (next-filename "results/ex21/" ".jpg"))))
 
-    (with-canvas canvas
-      (set-background 240 240 240)
-      (set-color 49 52 59 alpha)
-      (set-stroke point-size)
-      (go-for-it particles running mv-fun))
-
-    (println (str variation1 " " variation2))))
+      (println field-config)
+      
+      (with-canvas canvas
+        (set-background 240 240 240)
+        (set-color 49 52 59 alpha)
+        (set-stroke point-size)
+        (looper)))))
 
 (example-21)
 

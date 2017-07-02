@@ -6,9 +6,7 @@
             [clojure2d.math.joise :as n]
             [clojure2d.extra.variations :refer :all]
             [clojure.pprint :refer [pprint]])
-  (:import  [java.awt Color]
-            [clojure2d.math.vector Vec2]
-            [clojure2d.core Window]))
+  (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)

@@ -22,24 +22,24 @@
 
 ;; slitscan
 
-(p/set-canvas-pixels canvas (p/filter-channels (g/make-slitscan-filter) nil img))
+(p/set-canvas-pixels! canvas (p/filter-channels (g/make-slitscan-filter) nil img))
 
-(p/set-canvas-pixels canvas (p/filter-channels (g/make-slitscan-filter) (g/make-slitscan-filter) (g/make-slitscan-filter) nil img))
+(p/set-canvas-pixels! canvas (p/filter-channels (g/make-slitscan-filter) (g/make-slitscan-filter) (g/make-slitscan-filter) nil img))
 
 ;; channel shift
 
-(p/set-canvas-pixels canvas (p/filter-channels (g/make-shift-channels-filter 0.1 true true)
-                                  nil
-                                  (g/make-shift-channels-filter -0.1 true true)
-                                  nil img))
+(p/set-canvas-pixels! canvas (p/filter-channels (g/make-shift-channels-filter 0.1 true true)
+                                                nil
+                                                (g/make-shift-channels-filter -0.1 true true)
+                                                nil img))
 
-(p/set-canvas-pixels canvas (->> img
-                    (p/filter-colors c/to-HWB)
-                    (p/filter-channels (g/make-shift-channels-filter 0.1 true false)
-                                       nil
-                                       (g/make-shift-channels-filter -0.1 true false)
-                                       nil)
-                    (p/filter-colors c/from-HWB)))
+(p/set-canvas-pixels! canvas (->> img
+                                  (p/filter-colors c/to-HWB)
+                                  (p/filter-channels (g/make-shift-channels-filter 0.1 true false)
+                                                     nil
+                                                     (g/make-shift-channels-filter -0.1 true false)
+                                                     nil)
+                                  (p/filter-colors c/from-HWB)))
 
 ;; mirror image
 
@@ -52,36 +52,32 @@
            (g/make-mirror-filter (rand-nth (keys g/mirror-types)))
            nil))
 
-(p/set-canvas-pixels canvas (->> img
-                                 ((make-random-mirror))
-                                 ((make-random-mirror))))
+(p/set-canvas-pixels! canvas (->> img
+                                  ((make-random-mirror))
+                                  ((make-random-mirror))))
 
 
 ;; slitscan 2
 
-(let [v1name (rand-nth v/variation-list-not-random)
-      v2name (rand-nth v/variation-list-not-random)
-      v1 (v/make-variation v1name 1.0 {})
-      v2 (v/make-variation v2name 1.0 {})
-      f (comp v1 v2)]
+(binding [v/*skip-random-variations* true]
+  (let [field-config (v/make-random-configuration)
+        f (v/make-combination field-config)]
 
-  (binding [p/*pixels-edge* :wrap]
-    (println (str v1name " o " v2name))
-    (p/set-canvas-pixels canvas (p/filter-channels (g/make-slitscan2-filter f 2.03)
-                                                   (g/make-slitscan2-filter f 2.0)
-                                                   (g/make-slitscan2-filter f 1.97) nil img))))
+    (binding [p/*pixels-edge* :wrap]
+      (println field-config)
+      (p/set-canvas-pixels! canvas (p/filter-channels (g/make-slitscan2-filter f 2.03)
+                                                      (g/make-slitscan2-filter f 2.0)
+                                                      (g/make-slitscan2-filter f 1.97) nil img)))))
 
 
 ;; fold
 
-(let [v1name (rand-nth v/variation-list-not-random)
-      v2name (rand-nth v/variation-list-not-random)
-      v1 (v/make-variation v1name 1.0 {})
-      v2 (v/make-variation v2name 1.0 {})
-      f (comp v1 v2)]
+(binding [v/*skip-random-variations* true]
+  (let [field-config (v/make-random-configuration)
+        f (v/make-combination field-config)]
 
-  (binding [p/*pixels-edge* :wrap]
-    (println (str v2name " o " v1name))
-    (p/set-canvas-pixels canvas (p/filter-channels (g/make-fold-filter f 2.03)
-                                                   (g/make-fold-filter f 2.0)
-                                                   (g/make-fold-filter f 1.97) nil img))))
+    (binding [p/*pixels-edge* :wrap]
+      (println field-config)
+      (p/set-canvas-pixels! canvas (p/filter-channels (g/make-fold-filter f 2.03)
+                                                      (g/make-fold-filter f 2.0)
+                                                      (g/make-fold-filter f 1.97) nil img)))))

@@ -57,7 +57,7 @@
   (let [curr (or state canvases)
         id (mod frame number-of-frames)
         current-canvas (first curr)]
-    (image canvas (@current-canvas 1))
+    (image canvas (get-image current-canvas))
     (next curr)))
 
 ;; Display window. I don't know why but running first time shows blank window.
@@ -146,10 +146,10 @@
          
                                         ; (g/color-reducer-machine palette) ;;;; change!
          (p/filter-channels p/equalize-filter nil) ;;;; change!
-         (p/set-canvas-pixels canvas))
+         (p/set-canvas-pixels! canvas))
 
     (with-canvas (canvases frame)
-      (image (->> (@canvas 1)
+      (image (->> (get-image canvas)
                   (o/render-rgb-scanlines) ;;;; change!
                   (o/render-noise (noise-frames frame)) ;;;; change!
                   (o/render-spots (spots-frames frame))))))) ;;;; change!
@@ -173,7 +173,7 @@
       (let [frame (mod time number-of-frames)]
         (with-canvas buffer
           (scenario time frame)))
-      (when (and  @is-running @(second window)) (recur (inc time)))))
+      (when (and  @is-running (window-active? window)) (recur (inc time)))))
   (println "stopped"))
 
 ;; run updater in separate thread

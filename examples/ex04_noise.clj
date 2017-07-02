@@ -3,8 +3,7 @@
             [clojure2d.math :as m]
             [clojure2d.math.random :as r]
             [clojure2d.math.joise :as j]
-            [clojure2d.color :as c])
-  (:import  [java.awt Color]))
+            [clojure2d.color :as c]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -27,7 +26,7 @@
   ""
   [n]
   (with-canvas canvas
-    (set-background Color/black)
+    (set-background 0 0 0)
     (loop-noise n))
   nil)
 

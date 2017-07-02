@@ -10,8 +10,7 @@
 
 (ns clojure2d.math
   "Math functions"
-  (:import [net.jafama FastMath])
-  (:require [clojure2d.math :as m]))
+  (:import [net.jafama FastMath]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)

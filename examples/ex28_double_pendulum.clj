@@ -68,7 +68,7 @@
 
       ;; draw on window
       (with-canvas canvas
-        (image (@local-canvas 1)))
+        (image (get-image local-canvas)))
 
       ;; wait
       (Thread/sleep time-delay)))

@@ -128,8 +128,8 @@
 (defn desaturate
   ""
   [col]
-  (let [luma (c/get-luma3 col)]
-   (v/interpolate col (Vec3. luma luma luma) 0.2)))
+  (let [luma (c/to-luma col)]
+    (v/interpolate col (Vec3. luma luma luma) 0.2)))
 
 (defn reflect
   ""
@@ -157,23 +157,23 @@
                      (v/add (v/sub sky-color (v/mult (Vec3. (.y rd) (.y rd) (.y rd)) 0.9)))
                      (v/mult 0.9)) ;; sun color
             col (if (< t maxt) ;; terrain
-                        (let [^Vec3 pos (v/add ro (v/mult rd t))
-                              ^Vec3 nor (normal terrain pos t)
-                              hh (- 1.0 (smoothstep -2.0 1.0 (.y pos)))
-                              sun (m/constrain (v/dot nor sun-light) 0.0 1.0)
-                              sha (if (> sun 0.01) (softshadow pos sun-light terrain) 0.0)
-                              sky (+ 0.5 (* 0.5 (.y nor)))
+                  (let [^Vec3 pos (v/add ro (v/mult rd t))
+                        ^Vec3 nor (normal terrain pos t)
+                        hh (- 1.0 (smoothstep -2.0 1.0 (.y pos)))
+                        sun (m/constrain (v/dot nor sun-light) 0.0 1.0)
+                        sha (if (> sun 0.01) (softshadow pos sun-light terrain) 0.0)
+                        sky (+ 0.5 (* 0.5 (.y nor)))
 
-                              lin (v/emult (v/mult sun-lin sun) (Vec3. sha (m/pow sha 1.2) (m/pow sha 1.5)))]
-                          (calc-fog t lin bcol))
-                        bcol)
+                        lin (v/emult (v/mult sun-lin sun) (Vec3. sha (m/pow sha 1.2) (m/pow sha 1.5)))]
+                    (calc-fog t lin bcol))
+                  bcol)
             col (v/add col (v/mult glow-color (* (* 0.2 s s) (m/constrain (/ (+ (.y rd) 0.4) 0.4) 0.0 1.0)))) ;; sun glow
             c (-> col
                   gamma
                   contrast
                   desaturate
                   (v/mult 255)
-                  c/to-color3)]
+                  c/to-color)]
         (with-canvas canvas
           (set-color c)
           (rect x y 1 1))))))

@@ -6,8 +6,7 @@
   "Gaussian Free Field" 
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
-            [clojure2d.math.random :as r])
-  (:import [java.awt Color]))
+            [clojure2d.math.random :as r]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)

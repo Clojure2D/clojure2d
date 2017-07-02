@@ -32,71 +32,50 @@
   ^double [^double v]
   (m/abs (- v (m/rint v))))
 
-(defn get-luma
-  "get luma from color"
-  ^double [^Vec4 c]
-  (+ (* 0.212671 (.x c))
-     (* 0.715160 (.y c))
-     (* 0.072169 (.z c))))
+(defprotocol ColorProto
+  (to-color [c])
+  (to-awt-color [c]) 
+  (to-luma [c])  )
 
-(defn get-luma3
-  "get luma from color"
-  ^double [^Vec3 c]
-  (+ (* 0.212671 (.x c))
-     (* 0.715160 (.y c))
-     (* 0.072169 (.z c))))
+(extend-protocol ColorProto
+  Vec3
+  (to-color ^Vec4 [^Vec3 c]
+    (Vec4. (.x c) (.y c) (.z c) 255))
+  (to-awt-color [^Vec3 c]
+    (Color. ^int (clamp255 (.x c))
+            ^int (clamp255 (.y c))
+            ^int (clamp255 (.z c))))
+  (to-luma ^double [^Vec3 c]
+    (+ (* 0.212671 (.x c))
+       (* 0.715160 (.y c))
+       (* 0.072169 (.z c))))
+  Vec4
+  (to-color [c] c)
+  (to-awt-color [^Vec4 c]
+    (Color. ^int (clamp255 (.x c))
+            ^int (clamp255 (.y c))
+            ^int (clamp255 (.z c))
+            ^int (clamp255 (.w c))))
+  (to-luma ^double [^Vec4 c]
+    (+ (* 0.212671 (.x c))
+       (* 0.715160 (.y c))
+       (* 0.072169 (.z c))))
+  Color
+  (to-color [^Color c]
+    (Vec4. (.getRed c)
+           (.getGreen c)
+           (.getBlue c)
+           (.getAlpha c)))
+  (to-awt-color [c] c)
+  (to-luma ^double [^Color c]
+    (+ (* 0.212671 (.getRed c))
+       (* 0.715160 (.getGreen c))
+       (* 0.072169 (.getBlue c)))))
 
-(declare to-HSB)
-
-(defn get-hue
-  ""
-  ^double [^Vec4 c]
-  (let [^Vec4 ret (to-HSB c)]
-    (.x ret)))
-
-(defn get-hue360
-  ""
-  ^double [c]
-  (* 1.407843137254902 (get-hue c)))
-
-(defn to-color
-  ""
-  [^Vec4 v]
-  (Color. ^int (clamp255 (.x v))
-          ^int (clamp255 (.y v))
-          ^int (clamp255 (.z v))
-          ^int (clamp255 (.w v))))
-
-(defn to-color3
-  ""
-  [^Vec3 v]
-  (Color. ^int (clamp255 (.x v))
-          ^int (clamp255 (.y v))
-          ^int (clamp255 (.z v))))
-
-(defn from-color
-  ""
-  [^Color c]
-  (Vec4. (.getRed c)
-         (.getGreen c)
-         (.getBlue c)
-         (.getAlpha c)))
-
-(defn from-color3
-  ""
-  [^Color c]
-  (Vec3. (.getRed c)
-         (.getGreen c)
-         (.getBlue c)))
-
-(defn make-color
-  ""
+(defn make-awt-color
+  "Create java.awt.Color object"
   ([c]
-   (if (instance? Vec4 c)
-     (to-color c)
-     (if (instance? Vec3 c)
-       (to-color3 c)
-       c)))
+   (to-awt-color c))
   ([r g b]
    (Color. ^int (clamp255 r)
            ^int (clamp255 g)
@@ -107,11 +86,34 @@
            ^int (clamp255 b)
            ^int (clamp255 a))))
 
+(defn make-color
+  "Create Vec4 object as color representation"
+  ([c]
+   (to-color c))
+  ([r g b]
+   (Vec4. (clamp255 r)
+          (clamp255 g)
+          (clamp255 b)
+          255.0))
+  ([r g b a]
+   (Vec4. (clamp255 r)
+          (clamp255 g)
+          (clamp255 b)
+          (clamp255 a))))
+
+(declare to-HSB)
+
+(defn get-hue
+  ""
+  ^double [c]
+  (let [^Vec4 ret (to-HSB (to-color c))]
+    (.x ret)))
+
 (defn set-alpha
   "Set alpha channel"
-  [^Vec4 v ^double a]
-  (Vec4. (.x v) (.y v) (.z v) a))
-
+  [c ^double a]
+  (let [^Vec4 v (to-color c)]
+    (Vec4. (.x v) (.y v) (.z v) a)))
 
 ;; blending part, operate on range 0-1
 
@@ -470,7 +472,7 @@
 
 ;;; Colorspace functions
 
-(defn test-colors
+(defn- test-colors
   "to remove, check ranges"
   [f]
   (loop [cc (int 0)
@@ -784,31 +786,29 @@
                       [(* 255.0 (if (neg? h) (inc h) h)) s mx]))]
     (v/applyf (Vec4. h s b (.w c)) clamp255)))
 
-(m/remainder 123.01 22.1)
-
 (defn from-HSB
   ""
   [^Vec4 c]
   (if (zero? (.y c)) (Vec4. (.z c) (.z c) (.z c) (.w c))
-    (let [h (/ (.x c) 255.0)
-          s (/ (.y c) 255.0)
-          b (/ (.z c) 255.0)
-          h (* 6.0 (- h (m/floor h)))
-          f (- h (m/floor h))
-          p (* b (- 1.0 s))
-          q (* b (- 1.0 (* s f)))
-          t (* b (- 1.0 (* s (- 1.0 f))))
-          rgb (condp == (int h)
-                0 [b t p]
-                1 [q b p]
-                2 [p b t]
-                3 [p q b]
-                4 [t p b]
-                5 [b p q])
-          ^double r (rgb 0)
-          ^double g (rgb 1)
-          ^double b (rgb 2)]
-      (v/applyf (Vec4. (* 255.0 r) (* 255.0 g) (* 255.0 b) (.w c)) clamp255))))
+      (let [h (/ (.x c) 255.0)
+            s (/ (.y c) 255.0)
+            b (/ (.z c) 255.0)
+            h (* 6.0 (- h (m/floor h)))
+            f (- h (m/floor h))
+            p (* b (- 1.0 s))
+            q (* b (- 1.0 (* s f)))
+            t (* b (- 1.0 (* s (- 1.0 f))))
+            rgb (condp == (int h)
+                  0 [b t p]
+                  1 [q b p]
+                  2 [p b t]
+                  3 [p q b]
+                  4 [t p b]
+                  5 [b p q])
+            ^double r (rgb 0)
+            ^double g (rgb 1)
+            ^double b (rgb 2)]
+        (v/applyf (Vec4. (* 255.0 r) (* 255.0 g) (* 255.0 b) (.w c)) clamp255))))
 
 
 (def ^:const ^double to-hsi-const (-> 180.0

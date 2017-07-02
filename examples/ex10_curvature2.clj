@@ -7,7 +7,8 @@
             [clojure2d.math.random :as rr]
             [clojure2d.math.vector :as v]
             [clojure2d.math.joise :as n]
-            [clojure2d.extra.variations :refer :all])
+            [clojure2d.extra.variations :refer :all]
+            [clojure.pprint :refer [pprint]])
   (:import [clojure2d.math.vector Vec2 Vec3]))
 
 (set! *warn-on-reflection* true)
@@ -33,7 +34,7 @@
 
 (defn move-particle
   ""
-  [canvas ^Vec2 vshift fun noise time ^Vec3 in]
+  [^Vec2 vshift fun noise canvas time ^Vec3 in]
   (let [step-x-shift (* shift-x-step ^double (rr/noise time (/ (.x in) shift-x-scale)))
         ^double step-y-shift (m/norm (rr/noise (/ (.y in) shift-y-scale) time) 0 1 (- shift-y-step) shift-y-step)
         nx (+ (.x in) step-x-shift (* point-step (m/qcos (.z in))))
@@ -47,37 +48,33 @@
     (point canvas nx ny)
     (Vec3. nx ny angle)))
 
-(defn go-for-it
-  ""
-  [canvas particles running mv-fun]
-  (loop [xs particles
-         time (double 0.0)]
-    (when @running
-      (recur (mapv (partial mv-fun time) xs) (+ time 0.001))))
-  canvas)
-
-
 (defn example-10
   []
-  (let [canvas (create-canvas width height)
-        [frame running] (show-window canvas "curvature2" width height 25)
-        noise (n/make-random-fractal)
-        variation1 (rand-nth variation-list-not-random)
-        variation2 (rand-nth variation-list-not-random)
-        vshift (Vec2. (rr/drand -3 3) (rr/drand -3 3))
-        mv-fun (partial move-particle canvas vshift (comp (make-variation variation2 1.0 {}) (make-variation variation1 1.0 {})) noise)
-        particles (repeatedly 500 make-particle)]
-    
-    (defmethod key-pressed ["curvature2" \space] [_]
-      (save-canvas canvas (next-filename "results/ex10/" ".jpg")))
+  (binding [*skip-random-variations* true]
+    (let [canvas (create-canvas width height)
+          window (show-window canvas "curvature2" width height 25)
+          noise (n/make-random-fractal)
+          field-config (make-random-configuration)
+          field (make-combination field-config)
+          vshift (Vec2. (rr/drand -3 3) (rr/drand -3 3))
+          mv-fun (partial move-particle vshift field noise)
+          particles (repeatedly 500 make-particle)
+          looper (fn [canvas] (loop [xs particles
+                                     time (double 0.0)]
+                                (if (window-active? window)
+                                  (recur (mapv (partial mv-fun canvas time) xs) (+ time 0.001))
+                                  canvas)))]    
+      
+      (defmethod key-pressed ["curvature2" \space] [_]
+        (save-canvas canvas (next-filename "results/ex10/" ".jpg")))
 
-    (println (str variation1 " " variation2))
+      (pprint field-config)
 
-    (with-canvas canvas
-      (set-background 240 240 240)
-      (set-color 20 20 20 20)
-      (set-stroke point-size)
-      (go-for-it particles running mv-fun))))
+      (with-canvas canvas
+        (set-background 240 240 240)
+        (set-color 20 20 20 20)
+        (set-stroke point-size)
+        (looper)))))
 
 
 (example-10)

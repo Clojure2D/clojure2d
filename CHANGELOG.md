@@ -1,7 +1,16 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
-## 0.0.2 - 2016-04-14
+## 0.0.3 - 2017-07-02
+### Changed
+
+- Canvas as a type
+- Window as a type (record)
+- Helper functions to check if window is visible
+- Helper function to get image from canvas and window
+- Color simplification (awt vs vec4)
+
+## 0.0.2 - 2017-04-14
 ### Added
 - Core:
 	- session management functions

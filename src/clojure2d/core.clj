@@ -419,11 +419,11 @@
   * clojure2d.math.vector.Vec4 or Vec3 object
   * individual r, g, b (and optional alpha) as integers from 0-255. They are converted to integer and clamped if necessary."
   ([canvas c]
-   (set-awt-color canvas (c/make-color c)))
+   (set-awt-color canvas (c/make-awt-color c)))
   ([canvas r g b a]
-   (set-awt-color canvas (c/make-color r g b a)))
+   (set-awt-color canvas (c/make-awt-color r g b a)))
   ([canvas r g b]
-   (set-awt-color canvas (c/make-color r g b))))
+   (set-awt-color canvas (c/make-awt-color r g b))))
   
 (defn set-awt-background
   "Set background color. Expects valid `Color` object."
@@ -443,11 +443,11 @@
   * clojure2d.math.vector.Vec4 or Vec3 object
   * individual r, g, b (and optional alpha) as integers from 0-255. They are converted to integer and clamped if necessary."
   ([canvas c]
-   (set-awt-background canvas (c/make-color c)))
+   (set-awt-background canvas (c/make-awt-color c)))
   ([canvas r g b a]
-   (set-awt-background canvas (c/make-color r g b a)))
+   (set-awt-background canvas (c/make-awt-color r g b a)))
   ([canvas r g b]
-   (set-awt-background canvas (c/make-color r g b))))
+   (set-awt-background canvas (c/make-awt-color r g b))))
 
 (defn image
   "Draw an image. You can specify position and size of the image. Default it's placed on whole canvas."

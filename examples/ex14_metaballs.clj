@@ -6,8 +6,7 @@
             [clojure2d.math.random :as r]
             [clojure2d.color :as c]
             [clojure2d.math.vector :as v])
-  (:import [java.awt Color]
-           [clojure2d.math.vector Vec3]))
+  (:import [clojure2d.math.vector Vec3]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)

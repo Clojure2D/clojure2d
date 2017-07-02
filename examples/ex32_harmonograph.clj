@@ -55,7 +55,7 @@
         ^double a3 (r/drand)
         a4 (- 1.0 a3)
         n [(make-jnoise) (make-jnoise) j/perlin-noise j/perlin-noise r/noise r/noise r/noise]
-        palseq (filter #(> 240 (c/get-luma (first %)) 100) (repeatedly #(:palette (g/color-reducer-machine))))
+        palseq (filter #(> 240 (c/to-luma (first %)) 100) (repeatedly #(:palette (g/color-reducer-machine))))
         pal1 (first palseq)
         pal2 (second palseq)
         c1 (first pal1)
@@ -91,7 +91,7 @@
 
 (defn iterate-harmonograph
   "Read configuration and do `n` iterations starting at time `start-time`, store everything in `BinPixels`."
-  [n start-time run?
+  [n start-time window
    {:keys [^double f1 ^double f2 ^double f3 ^double f4
            ^double p1 ^double p2 ^double p3 ^double p4
            ^double a1 ^double a2 ^double a3 ^double a4
@@ -107,7 +107,7 @@
            prevy (double 0.0)
            time (double start-time)
            iter (long 0)]
-      (if (and @run? (< iter ^long n))
+      (if (and (window-active? window) (< iter ^long n))
         (let [s1 (m/sin (+ (* time f2) p2))
               s2 (m/sin (+ (* time f3) p3))
 
@@ -138,16 +138,16 @@
 (defn draw-on-canvas
   "Render BinPixels to canvas."
   [canvas ^BinPixels bp]
-  (p/set-canvas-pixels canvas (p/to-pixels bp
-                                           (Vec4. 8 10 15 255)
-                                           {:saturation 1.5 :brightness 1.2 :alpha-gamma 0.6}))  )
+  (p/set-canvas-pixels! canvas (p/to-pixels bp
+                                            (Vec4. 8 10 15 255)
+                                            {:saturation 1.5 :brightness 1.2 :alpha-gamma 0.6}))  )
 
 ;; Create canvas, windows, binpixels, configuration and iterate until window is closed
 ;; press `space` to save
 ;; close window to stop
 (def result (let [config (make-random-config)
                   canvas (create-canvas width height)
-                  [_ run?] (show-window canvas "Harmonograph" 800 800 5)]
+                  window (show-window canvas "Harmonograph" 800 800 5)]
 
               (defmethod key-pressed ["Harmonograph" \space] [_]
                 (save-canvas canvas (next-filename "results/ex32/" ".png")))
@@ -155,16 +155,16 @@
               (pprint config)
               
               ;; first run
-              (let [bp (iterate-harmonograph first-step 0.0 run? config)]
+              (let [bp (iterate-harmonograph first-step 0.0 window config)]
 
                 (draw-on-canvas canvas bp)
                 (loop [time (* step first-step)
                        prev bp]
-                  (if @run?
+                  (if (window-active? window)
                     (do
                       (println time) 
                       (let [newb (reduce #(p/merge-binpixels %1 (deref %2)) prev
-                                         (doall (map #(future (iterate-harmonograph steps-per-task (+ time (* step ^int % steps-per-task)) run? config))
+                                         (doall (map #(future (iterate-harmonograph steps-per-task (+ time (* step ^int % steps-per-task)) window config))
                                                      (range available-tasks))))] 
                         (draw-on-canvas canvas newb)
                         (recur (+ time ^double (r/grand) (* step steps-per-task available-tasks))

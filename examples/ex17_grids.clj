@@ -5,9 +5,9 @@
             [clojure2d.math :as m]
             [clojure2d.math.random :as r]
             [clojure2d.math.joise :as j]
-            [clojure2d.pixels :as p])
-  (:import  [java.awt Color]
-            [clojure2d.pixels Pixels]))
+            [clojure2d.pixels :as p]
+            [clojure2d.color :as c])
+  (:import [clojure2d.pixels Pixels]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -19,8 +19,8 @@
 (defmethod key-pressed ["grid" \space] [_]
   (save-canvas canvas (next-filename "results/ex17/" ".jpg")))
 
-(def dark (Color. 2 22 52))
-(def light (Color. 232 221 203))
+(def dark (c/make-awt-color 2 22 52))
+(def light (c/make-awt-color 232 221 203))
 
 (defn draw-grid
   ""
@@ -41,7 +41,7 @@
               yy (* (quot x nnx) (int (* nnx (inc ^double (noise (quot x nnx) time )))))
               xx (* (quot y nny) (int (* nny (inc ^double (noise (quot y nny) (- time))))))
               n (< ^double (noise (quot (+ x xx) nx) (quot (+ y yy) ny)) 0.5)]
-          (set-color canvas (if n dark light))
+          (set-awt-color canvas (if n dark light))
           (rect canvas x y 1 1))))))
 
 (do

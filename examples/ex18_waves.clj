@@ -17,8 +17,8 @@
   (save-canvas canvas (next-filename "results/ex18/" ".jpg")))
 
 ;; frequencies and amplitudes
-(def f (into [] (map #(bit-shift-left 1 ^long %) (range 16))))
-(def a (into [] (map #(/ 1.0 ^long %) f)))
+(def f (mapv #(bit-shift-left 1 ^long %) (range 16)))
+(def a (mapv #(/ 1.0 ^long %) f))
 
 (defn draw-fun
   ""

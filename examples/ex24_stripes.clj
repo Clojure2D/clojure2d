@@ -4,8 +4,7 @@
             [clojure2d.math :as m]
             [clojure2d.extra.glitch :as g]
             [clojure2d.math.random :as r])
-  (:import [java.awt Color]
-           [java.awt.event MouseEvent]))
+  (:import [java.awt.event MouseEvent]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -13,6 +12,8 @@
 (def canvas (create-canvas 600 600))
 
 (def colors (:palette (g/color-reducer-machine)))
+
+(def mouse-pos (atom [5 0]))
 
 (defn draw
   ""
@@ -28,11 +29,9 @@
                       (conj %1 [p1x p1y] [p2x p2y]))
                    []
                    (range 0 (+ step2 m/TWO_PI) step))]
-    (set-background canvas Color/black)
+    (set-background canvas 0 0 0)
     (set-color canvas (colors col))
     (triangle-strip canvas vs)))
-
-(def mouse-pos (atom [5 0]))
 
 (defmethod mouse-event ["stripes" :mouse-moved] [^MouseEvent e]
   (reset! mouse-pos

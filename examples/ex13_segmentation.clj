@@ -4,8 +4,7 @@
             [clojure2d.color :as clr]
             [clojure2d.extra.segmentation :as segm]
             [clojure2d.math :as m])
-  (:import [clojure2d.pixels Pixels]
-           [java.awt Color]))
+  (:import [clojure2d.pixels Pixels]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -33,21 +32,21 @@
            iter (core/make-counter 0)
 
            draw (fn [canv] (doseq [[x y size] segm]
-                             (let [defcol (Color. ^int (p/get-value img 0 x y)
-                                                  ^int (p/get-value img 1 x y)
-                                                  ^int (p/get-value img 2 x y))
+                             (let [defcol (clr/make-awt-color (p/get-value img 0 x y)
+                                                              (p/get-value img 1 x y)
+                                                              (p/get-value img 2 x y))
                                    col (condp = strategy
                                          :bw (if (even? (iter))
-                                               Color/black
-                                               Color/white)
+                                               (clr/make-awt-color 0 0 0)
+                                               (clr/make-awt-color 255 255 255))
                                          :size (let [g (int (m/cnorm (m/logb 2 size) 0 6 5 255))]
-                                                 (Color. g g g))
+                                                 (clr/make-awt-color g g g))
                                          defcol)]
-                               (core/set-color canv col)
+                               (core/set-awt-color canv col)
                                (core/rect canv x y size size))))]
 
-         (core/with-canvas canvas
-           (draw))))))
+       (core/with-canvas canvas
+         (draw))))))
 
 ;; color with image colors
 (example-13 canvas)

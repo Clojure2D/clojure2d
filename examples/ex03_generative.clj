@@ -7,8 +7,8 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-(def foreground (c/make-color 240 240 240 100))
-(def background (c/make-color 10 20 40 100))
+(def foreground (c/make-awt-color 240 240 240 100))
+(def background (c/make-awt-color 10 20 40 100))
 
 (defn draw-lines
   ""

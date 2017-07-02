@@ -106,7 +106,7 @@
           (let [yy (m/norm y 0.0 h 2.0 -2.0)
                 ^Vec3 rd (camera (v/normalize (Vec3. xx yy 1.0)))
                 col (calc-color ro rd 1)]
-            (set-color canvas (c/to-color3 (v/mult col 255)))
+            (set-color canvas (c/to-color (v/mult col 255)))
             (rect canvas x y 1 1)))))))
 
 (with-canvas canvas

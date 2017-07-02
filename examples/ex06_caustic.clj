@@ -5,8 +5,7 @@
             [clojure2d.math.vector :as v]
             [clojure2d.extra.variations :as vr]
             [clojure.pprint :refer [pprint]])
-  (:import [clojure2d.math.vector Vec2]
-           [clojure2d.core Window]))
+  (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
