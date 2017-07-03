@@ -372,7 +372,7 @@
    (when (> (count vs) 2)
      (loop [v1 (first vs)
             v2 (second vs)
-            vss (next (next vs))]
+            vss (nnext vs)]
        (when vss
          (let [v3 (first vss)]
            (triangle canvas (v2 0) (v2 1) (v3 0) (v3 1) (v1 0) (v1 1) stroke?)
@@ -754,20 +754,14 @@
 (def ^java.text.SimpleDateFormat simple-date-format (java.text.SimpleDateFormat. "yyyyMMddHHmmss"))
 (def ^java.text.SimpleDateFormat simple-date-format-full (java.text.SimpleDateFormat. "yyyy-MM-dd HH:mm:ss"))
 
-(defn make-session-name
-  "Create unique session name based on current time. Result is a vector with date and hash represented as hexadecimary number."
-  []
-  (let [date (java.util.Date.)]
-    [(.format simple-date-format date) (to-hex (hash date))]))
-
-;; Logging to file is turned off by default.
-(def ^:dynamic *log-to-file* false)
-
-;; Following block defines session related functions. I encapsulates some common variables as atoms or agents. These are:
+;; Following block defines session related functions.
+;; Session is a type of:
 ;;
-;; * session name which stores current date (formatted)
-;; * file writer as agent used to log your events
-;; * file counter - atom which stores current value of files saved under session
+;; * logger - file writer
+;; * name - session identifiers as vector with formatted current date and hash of this date
+;; * counter - used to create sequence filenames for session
+;;
+;; Session is encapsulated in agent and is global for library
 ;;
 ;; Example:
 ;;
@@ -779,72 +773,90 @@
 ;; * `(close-session) => nil`
 ;; * `(get-session-name) => nil`
 ;; * `(make-session) => ["20170123235625" "CD8B7204"]`
-;;
-;; It's not optimized to work parallely
 
-(def session-name (atom nil))
-(def session-file (agent nil))
-(def session-cnt (atom nil))
+(defrecord SessionType [logger
+                        name
+                        counter])
 
-(defn close-session
-  "Close current session."
+(def session-agent (agent (SessionType. nil nil nil)))
+
+;; Logging to file is turned off by default.
+(def ^:dynamic *log-to-file* false)
+
+(defn- close-session-fn
+  "Close current session"
+  [^SessionType s]
+  (let [^java.io.Writer o (:logger s)]
+    (when-not (nil? o)
+      (.flush o)
+      (.close o)))
+  (SessionType. nil nil nil))
+
+(defn- make-logger-fn
+  "Create writer for logger"
+  [session-name]
+  (let [fname (str "log/" (first session-name) ".log")]
+    (make-parents fname) 
+    (let [^java.io.Writer no (writer fname :append true)]
+      (.write no (str "Session id: " (second session-name) (System/lineSeparator) (System/lineSeparator)))
+      no)))
+
+(defn- make-session-name
+  "Create unique session name based on current time. Result is a vector with date and hash represented as hexadecimary number."
   []
-  (when-not (nil? @session-file)
-    (send session-file (fn [^java.io.Writer o]
-                         (.flush o)
-                         (.close o)
-                         nil)))
-  (reset! session-name nil)
-  (reset! session-cnt nil))
+  (let [date (java.util.Date.)]
+    [(.format simple-date-format date) (to-hex (hash date))]))
+
+(defn- make-session-fn 
+  "Create session"
+  [^SessionType s]
+  (close-session-fn s)
+  (let [nname (make-session-name)
+        writer (when *log-to-file* (make-logger-fn nname))]
+    (SessionType. writer nname (make-counter 0))))
 
 (defn make-session
-  "Create new session and log writer (if `log-to-file` set to true)."
+  "Create session via agent"
   []
-  (let [nname (make-session-name)]
-    (reset! session-name nname)
+  (send session-agent make-session-fn)
+  (await-for 1000 session-agent)
+  (:name @session-agent))
 
-    (when *log-to-file*
-      (let [fname (str "log/" (first nname) ".log")]
-        (make-parents fname)
-        (send session-file (fn [^java.io.Writer o]
-                             (do
-                               (when-not (nil? o)
-                                 (.flush o)
-                                 (.close o))
-                               (let [^java.io.Writer no (writer fname :append true)]
-                                 (.write no (str "Session id: " (second nname) "\n"))
-                                 no))))))
+(defn close-session
+  "Close session via agent"
+  []
+  (send session-agent close-session-fn)
+  (await-for 1000 session-agent))
 
-    (reset! session-cnt (make-counter 0))
-    nname))
+(defn ensure-session
+  "Ensure that session is active (create one if not"
+  []
+  (when (nil? (:name @session-agent))
+    (make-session)))
 
-(defn log
-  "Log message to the session log file."
-  [message]
-  (when *log-to-file*
-    (if (nil? @session-file)
-      (do
-        (make-session)
-        (log message))
-      (let [to-log (str (.format simple-date-format-full (java.util.Date.)) ": " message "\n")]
-        (send session-file (fn [^java.io.Writer o]
-                             (.write o to-log)
-                             (.flush o)
-                             o)))))
-  true)
+(defn get-session-name
+  "Get session name"
+  []
+  (:name @session-agent))
 
 (defn next-filename
-  "Create sequenced filename with prefix (folder name) and optional suffix (eg. file extension)."
+  "Create next unique filename based on session"
   ([prefix]
-   (if (nil? @session-name)
-     (do
-       (make-session)
-       (next-filename prefix))
-     (str prefix (second @session-name) "_" (format "%06d" (@session-cnt)))))
+   (ensure-session)
+   (let [^SessionType s @session-agent]
+     (str prefix (second (:name s)) "_" (format "%06d" ((:counter s))))))
   ([prefix suffix]
    (str (next-filename prefix) suffix)))
 
-(defn get-session-name
-  "Returns current session name (time and hash)"
-  []
-  @session-name)
+(defn log
+  "Log message to file or console"
+  [message]
+  (let [to-log (str (.format simple-date-format-full (java.util.Date.)) ": " message (System/lineSeparator))]
+    (ensure-session)
+    (if *log-to-file*
+      (send session-agent (fn [s]
+                            (let [^java.io.Writer o (or (:logger s) (make-logger-fn (:name s)))]
+                              (.write o to-log)
+                              (.flush o)
+                              (SessionType. o (:name s) (:counter s)))))
+      (println to-log))))

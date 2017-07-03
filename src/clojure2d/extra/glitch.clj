@@ -211,7 +211,7 @@
 (defn random-blend-get-cs
   "Return colorspace or nil"
   []
-  (if (r/brand 0.9) (rand-nth c/colorspaces-names) nil))
+  (when (r/brand 0.9) (rand-nth c/colorspaces-names)))
 
 (defn blend-machine
   "Do random blend of two pixels, use random colorspace"
@@ -219,9 +219,9 @@
    (let [cs1 (random-blend-get-cs) ; let's convert to some colorspace (or leave rgb)
          cs2 (if (r/brand 0.2) (random-blend-get-cs) cs1) ; maybe different cs on second image?
          outcs (if (r/brand 0.2) (random-blend-get-cs) cs1) ; maybe some random colorspace on output?
-         bl1 (if (r/brand 0.85) (rand-nth c/blends-names) nil) ; ch1 blend
-         bl2 (if (r/brand 0.85) (rand-nth c/blends-names) nil) ; ch2 blend
-         bl3 (if (r/brand 0.85) (rand-nth c/blends-names) nil)] ; ch3 blend
+         bl1 (when (r/brand 0.85) (rand-nth c/blends-names)) ; ch1 blend
+         bl2 (when (r/brand 0.85) (rand-nth c/blends-names)) ; ch2 blend
+         bl3 (when (r/brand 0.85) (rand-nth c/blends-names))] ; ch3 blend
      {:switch (r/brand 0.5)
       :in-cs1 cs1
       :in-cs2 cs2

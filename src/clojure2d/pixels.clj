@@ -136,9 +136,8 @@
   [^Pixels p]
   (let [len (alength ^ints (.p p))
         res (int-array len)]
-    (do
-      (System/arraycopy (.p p) 0 ^ints res 0 len)
-      (replace-pixels p res))))
+    (System/arraycopy (.p p) 0 ^ints res 0 len)
+    (replace-pixels p res)))
 
 ;; interleaved/planar
 
