@@ -85,13 +85,13 @@ Defines also:
 * functions which operate on Pixels parallelly (filter-channels, blend-channels)
 * accumulation bins (smooth rendering helper)
 
-### clojure2d.color
+### clojure2d.color [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.color.html)
 
 * colorspace converters
 * collection of blending basic functions (like add, subtract, divide, difference, etc.)
 * palette generation / color reducing filter
 
-### clojure2d.math
+### clojure2d.math [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.math.html)
 
 * FastMath (jafama) bindings
 * statistic functions
@@ -167,7 +167,7 @@ I've prepared several examples with results where you can check current state of
   - glitch filters in extra namespace (moved from Processing)
   - analog filters (for sonification part)
 * Canvas drawing functions (PShape implementation - partially done)
-* Session handling (saving results in session, logging actions) - done, not tested
+* ~~Session handling (saving results in session, logging actions) - done, not tested~~
 * Sanity tests
 
 ### Low priority or ideas

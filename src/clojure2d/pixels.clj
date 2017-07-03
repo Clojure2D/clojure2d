@@ -297,7 +297,7 @@
         stop (int (* (inc ^long ch) size))]
     (loop [idx start]
       (when (< idx stop)
-        (aset ^ints (.p target) idx (int (c/convert-and-blend f (aget ^ints (.p p1) idx) (aget ^ints (.p p2) idx))))
+        (aset ^ints (.p target) idx (int (c/blend-values f (aget ^ints (.p p1) idx) (aget ^ints (.p p2) idx))))
         (recur (unchecked-inc idx))))
     true))
 

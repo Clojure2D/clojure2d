@@ -2874,11 +2874,13 @@ mathematical vectors: 2d, 3d and 4d </p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Tolerance for vector comparison used in <code>is-near-zero?</code> and <code>aligned?</code> functions
 to mitigate approximation errors</p>
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.math.vector
-  (:require [clojure2d.math :as m]))</pre></td></tr><tr><td class="docs">
+  (:require [clojure2d.math :as m])
+  (:import [clojure.lang Counted Sequential Seqable IFn PersistentVector]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* true)</pre></td></tr><tr><td class="docs">
+(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double TOLERANCE 1.0e-6)</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defprotocol VectorProto
+  (to-vec [v])
   (applyf [v f])
   (magsq [v1])
   (mag [v1])
@@ -2896,8 +2898,11 @@ to mitigate approximation errors</p>
   (maxdim [v])
   (mindim [v])
   (base-from [v])
-  (sum [v1])  
+  (sum [v1])
+  (permute [v idxs])
+  (reciprocal [v])
   (interpolate [v1 v2 t] [v1 v2 t f])
+  (interpolatev [v1 v2 v] [v1 v2 v f])
   (is-zero? [v1])
   (is-near-zero? [v1])
   (heading [v1])
@@ -2907,14 +2912,72 @@ to mitigate approximation errors</p>
   (axis-rotate [v1 angle axis] [v1 angle axis pivot])
   (transform [v1 o vx vy] [v1 o vx vy vz])
   (to-polar [v1])
-  (from-polar [v1]))</pre></td></tr><tr><td class="docs"><p>transform -   "Map point to coordinate system defined by origin, vx and vy (as bases)"</p>
+  (from-polar [v1]))</pre></td></tr><tr><td class="docs"><p>transform - "Map point to coordinate system defined by origin, vx and vy (as bases)"</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(declare angle-between)
-(declare normalize)</pre></td></tr><tr><td class="docs">
+(declare normalize)</pre></td></tr><tr><td class="docs"><p>Helper function for reduce to find index for maximum/minimum value in vector.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- find-idx-reducer-fn 
+  [f]
+  #(let [[^double midx ^double curr v] %1]
+     (if (f %2 v)
+       [curr (inc curr) %2]
+       [midx (inc curr) v])))</pre></td></tr><tr><td class="docs"><p>Is your value less than TOLERANCE?</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- near-zero?
+  [v]
+  (&lt; (m/abs v) TOLERANCE))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(extend PersistentVector
+  VectorProto
+  {:to-vec identity
+   :applyf #(mapv %2 %1)
+   :magsq (fn [v] (reduce #(+ (double %1) (* (double %2) (double %2))) v))
+   :mag (comp m/sqrt magsq)
+   :dot #(reduce + (map * %1 %2))
+   :add #(mapv + %1 %2)
+   :sub #(mapv - %1 %2)
+   :mult (fn [v1 v] (map #(* (double %) ^double v) v1))
+   :emult #(mapv * %1 %2)
+   :div #(mult %1 (/ 1.0 (double %2)))
+   :abs #(mapv m/abs %)
+   :mx #(reduce max %)
+   :mn #(reduce min %)
+   :emx #(mapv max %1 %2)
+   :emn #(mapv min %1 %2)
+   :maxdim #(first (reduce (find-idx-reducer-fn &gt;) [0.0 0.0 (first %)] %))
+   :mindim #(first (reduce (find-idx-reducer-fn &lt;) [0.0 0.0 (first %)] %))
+   :sum #(reduce + %)
+   :permute #(mapv (fn [idx] (%1 idx)) %2)
+   :reciprocal #(mapv (fn [v] (/ 1.0 ^double v)) %)
+   :interpolate (fn
+                  ([v1 v2 t f]
+                   (mapv #(f %1 %2 t) v1 v2))
+                  ([v1 v2 t] (interpolate v1 v2 t m/lerp)))
+   :interpolatev (fn
+                   ([v1 v2 v f]
+                    (mapv #(f %1 %2 %3) v1 v2 v))
+                   ([v1 v2 v] (interpolatev v1 v2 v m/lerp)))
+   :is-zero? #(every? zero? %)
+   :is-near-zero? #(every? near-zero? %)})</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(deftype Vec2 [^double x ^double y]
   Object
   (toString [_] (str &quot;[&quot; x &quot;, &quot; y &quot;]&quot;))
+  (equals [_ v]
+    (and (instance? Vec2 v)
+         (let [^Vec2 v v]
+           (and (== x (.x v))
+                (== y (.y v))))))
+  Sequential
+  Seqable
+  (seq [_] (list x y))
+  Counted
+  (count [_] 2)
+  IFn
+  (invoke [_ id]
+    (case (int id)
+      0 x
+      1 y
+      nil))
   VectorProto
+  (to-vec [_] [x y])
   (applyf [_ f] (Vec2. (f x) (f y)))
   (magsq [_] (+ (* x x) (* y y)))
   (mag [_] (m/hypot x y))
@@ -2944,14 +3007,22 @@ to mitigate approximation errors</p>
     (if (&lt; x y) 0 1))
   (base-from [v]
     [v (perpendicular v)])
-  (sum [_] (+ x y)) 
+  (sum [_] (+ x y))
+  (permute [p [^long i1 ^long i2]]
+    (Vec2. (p i1) (p i2)))
+  (reciprocal [_] (Vec2. (/ 1.0 x) (/ 1.0 y)))
   (interpolate [_ v2 t f]
     (let [^Vec2 v2 v2] (Vec2. (f x (.x v2) t)
                               (f y (.y v2) t))))
   (interpolate [v1 v2 t] (interpolate v1 v2 t m/lerp))
+  (interpolatev [_ v2 v f]
+    (let [^Vec2 v2 v2
+          ^Vec2 v v]
+      (Vec2. (f x (.x v2) (.x v))
+             (f y (.y v2) (.y v)))))
+  (interpolatev [v1 v2 v] (interpolatev v1 v2 v m/lerp))
   (is-zero? [_] (and (zero? x) (zero? y)))
-  (is-near-zero? [_] (and (&lt; (m/abs x) TOLERANCE)
-                          (&lt; (m/abs y) TOLERANCE)))
+  (is-near-zero? [_] (and (near-zero? x) (near-zero? y)))
   (heading [_] (m/atan2 y x))
   (rotate [_ angle]
     (let [sa (m/sin angle)
@@ -2974,7 +3045,26 @@ to mitigate approximation errors</p>
 </td><td class="codes"><pre class="brush: clojure">(deftype Vec3 [^double x ^double y ^double z]
   Object
   (toString [_] (str &quot;[&quot; x &quot;, &quot; y &quot;, &quot; z &quot;]&quot;))
+  (equals [_ v]
+    (and (instance? Vec3 v)
+         (let [^Vec3 v v]
+           (and (== x (.x v))
+                (== y (.y v))
+                (== z (.z v))))))
+  Sequential
+  Seqable
+  (seq [_] (list x y z))
+  Counted
+  (count [_] 3)
+  IFn
+  (invoke [_ id]
+    (case (int id)
+      0 x
+      1 y
+      2 z
+      nil))
   VectorProto
+  (to-vec [_] [x y z])
   (applyf [_ f] (Vec3. (f x) (f y) (f z)))
   (magsq [_] (+ (* x x) (* y y) (* z z)))
   (mag [_] (m/hypot x y z))
@@ -3011,23 +3101,31 @@ to mitigate approximation errors</p>
                (div (Vec3. (- z) 0.0 x) (m/hypot x z))
                (div (Vec3. 0.0 z (- y)) (m/hypot y z)))]
       [v v2 (cross v v2)]))
-  (sum [_] (+ x y z)) 
+  (sum [_] (+ x y z))
+  (permute [p [^long i1 ^long i2 ^long i3]]
+    (Vec3. (p i1) (p i2) (p i3)))
+  (reciprocal [_] (Vec3. (/ 1.0 x) (/ 1.0 y) (/ 1.0 z)))
   (interpolate [_ v2 t f]
     (let [^Vec3 v2 v2] (Vec3. (f x (.x v2) t)
                               (f y (.y v2) t)
                               (f z (.z v2) t))))
   (interpolate [v1 v2 t] (interpolate v1 v2 t m/lerp))
+  (interpolatev [_ v2 v f]
+    (let [^Vec3 v2 v2
+          ^Vec3 v v]
+      (Vec3. (f x (.x v2) (.x v))
+             (f y (.y v2) (.y v))
+             (f z (.z v2) (.z v)))))
+  (interpolatev [v1 v2 v] (interpolatev v1 v2 v m/lerp))
   (is-zero? [_] (and (zero? x) (zero? y) (zero? z)))
-  (is-near-zero? [_] (and (&lt; (m/abs x) TOLERANCE)
-                          (&lt; (m/abs y) TOLERANCE)
-                          (&lt; (m/abs z) TOLERANCE)))
+  (is-near-zero? [_] (and (near-zero? x) (near-zero? y) (near-zero? z)))
   (heading [v1] (angle-between v1 (Vec3. 1 0 0)))
   (cross [_ v2]
-   (let [^Vec3 v2 v2
-         cx (- (* y (.z v2)) (* (.y v2) z))
-         cy (- (* z (.x v2)) (* (.z v2) x))
-         cz (- (* x (.y v2)) (* (.x v2) y))]
-     (Vec3. cx cy cz)))
+    (let [^Vec3 v2 v2
+          cx (- (* y (.z v2)) (* (.y v2) z))
+          cy (- (* z (.x v2)) (* (.z v2) x))
+          cz (- (* x (.y v2)) (* (.x v2) y))]
+      (Vec3. cx cy cz)))
   (perpendicular [v1 v2]
     (normalize (cross v1 v2)))
   (transform [_ o vx vy vz]
@@ -3110,7 +3208,28 @@ to mitigate approximation errors</p>
 </td><td class="codes"><pre class="brush: clojure">(deftype Vec4 [^double x ^double y ^double z ^double w]
   Object
   (toString [_] (str &quot;[&quot; x &quot;, &quot; y &quot;, &quot; z &quot;, &quot; w &quot;]&quot;))
+  (equals [_ v]
+    (and (instance? Vec4 v)
+         (let [^Vec4 v v]
+           (and (== x (.x v))
+                (== y (.y v))
+                (== z (.z v))
+                (== w (.w v))))))
+  Sequential
+  Seqable
+  (seq [_] (list x y z w))
+  Counted
+  (count [_] 4)
+  IFn
+  (invoke [_ id]
+    (case (int id)
+      0 x
+      1 y
+      2 z
+      3 w
+      nil))
   VectorProto
+  (to-vec [_] [x y z w])
   (applyf [_ f] (Vec4. (f x) (f y) (f z) (f w)))
   (magsq [_] (+ (* x x) (* y y) (* z z) (* w w)))
   (mag [v1] (m/sqrt (magsq v1)))
@@ -3134,20 +3253,35 @@ to mitigate approximation errors</p>
     (let [^Vec4 v v] (Vec4. (max (.x v) x) (max (.y v) y) (max (.z v) z) (max (.w v) w))))
   (emn [_ v]
     (let [^Vec4 v v] (Vec4. (min (.x v) x) (min (.y v) y) (min (.z v) z) (min (.w v) w))))
-  (sum [_] (+ x y z w)) 
+  (maxdim [_]
+    (max-key [x y z w] 0 1 2 3))
+  (mindim [_]
+    (min-key [x y z w] 0 1 2 3))
+  (sum [_] (+ x y z w))
+  (permute [p [^long i1 ^long i2 ^long i3 ^long i4]]
+    (Vec4. (p i1) (p i2) (p i3) (p i4)))
+  (reciprocal [_] (Vec4. (/ 1.0 x) (/ 1.0 y) (/ 1.0 z) (/ 1.0 w)))
   (interpolate [_ v2 t f]
     (let [^Vec4 v2 v2] (Vec4. (f x (.x v2) t)
                               (f y (.y v2) t)
                               (f z (.z v2) t)
                               (f w (.w v2) t))))
   (interpolate [v1 v2 t] (interpolate v1 v2 t m/lerp))
+  (interpolatev [_ v2 v f]
+    (let [^Vec4 v2 v2
+          ^Vec4 v v]
+      (Vec4. (f x (.x v2) (.x v))
+             (f y (.y v2) (.y v))
+             (f z (.z v2) (.z v))
+             (f w (.w v2) (.w v)))))
+  (interpolatev [v1 v2 v] (interpolatev v1 v2 v m/lerp))
   (is-zero? [_] (and (zero? x) (zero? y) (zero? z) (zero? w)))
-  (is-near-zero? [_] (and (&lt; (m/abs x) TOLERANCE)
-                          (&lt; (m/abs y) TOLERANCE)
-                          (&lt; (m/abs z) TOLERANCE)
-                          (&lt; (m/abs w) TOLERANCE)))
+  (is-near-zero? [_] (and (near-zero? x) (near-zero? y) (near-zero? z) (near-zero? w)))
   (heading [v1] (angle-between v1 (Vec4. 1 0 0 0))))</pre></td></tr><tr><td class="docs"><p>common functions</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Average / centroid of vectors</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn ediv
+  [v1 v2]
+  (emult v1 (reciprocal v2)))</pre></td></tr><tr><td class="docs"><p>Average / centroid of vectors</p>
 </td><td class="codes"><pre class="brush: clojure">(defn average-vectors
   [init vs]
   (div (reduce add init vs) (count vs)))</pre></td></tr><tr><td class="docs"><p>Euclidean distance between vectors</p>
@@ -3162,7 +3296,24 @@ to mitigate approximation errors</p>
   (sum (abs (sub v1 v2))))</pre></td></tr><tr><td class="docs"><p>Chebyshev distance between 2d vectors</p>
 </td><td class="codes"><pre class="brush: clojure">(defn dist-cheb
   [v1 v2]
-  (mx (abs (sub v1 v2))))</pre></td></tr><tr><td class="docs"><p>Normalize vector</p>
+  (mx (abs (sub v1 v2))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn dist-canberra
+  [v1 v2]
+  (let [num (abs (sub v1 v2))
+        denom (applyf (add (abs v1) (abs v2)) #(if (zero? ^double %) 0.0 (/ 1.0 ^double %)))]
+    (sum (emult num denom))))</pre></td></tr><tr><td class="docs"><p>Earth Mover's Distance</p>
+</td><td class="codes"><pre class="brush: clojure">(defn dist-emd
+  [v1 v2]
+  (first (reduce #(let [[^double s ^double l] %1
+                        [^double a ^double b] %2
+                        n (- (+ a l) b)]
+                    [(+ s (m/abs l)) n]) [0.0 0.0] (map vector v1 v2))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def distances {:euclid dist
+                :euclid-sq dist-sq
+                :abs dist-abs
+                :cheb dist-cheb
+                :canberra dist-canberra
+                :emd dist-emd})</pre></td></tr><tr><td class="docs"><p>Normalize vector</p>
 </td><td class="codes"><pre class="brush: clojure">(defn normalize
   [v]
   (div v (mag v)))</pre></td></tr><tr><td class="docs"><p>Create new vector with given length</p>
@@ -3183,7 +3334,15 @@ to mitigate approximation errors</p>
       (cond
         (&lt;= amt -1) m/PI
         (&gt;= amt 1) 0
-        :else (m/acos amt)))))</pre></td></tr><tr><td class="docs">
+        :else (m/acos amt)))))</pre></td></tr><tr><td class="docs"><p>Are vectors aligned (have the same direction)?</p>
+</td><td class="codes"><pre class="brush: clojure">(defn aligned?
+  [v1 v2]
+  (&lt; ^double (angle-between v1 v2) TOLERANCE))</pre></td></tr><tr><td class="docs"><p>flip normal</p>
+</td><td class="codes"><pre class="brush: clojure">(defn faceforward
+  [n v]
+  (if (neg? ^double (dot n v))
+    n
+    (sub n)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn generate-vec2
   ([f1 f2]
    (Vec2. (f1) (f2)))
@@ -3198,23 +3357,16 @@ to mitigate approximation errors</p>
   ([f1 f2 f3 f4]
    (Vec4. (f1) (f2) (f3) (f4)))
   ([f]
-   (Vec4. (f) (f) (f) (f))))</pre></td></tr><tr><td class="docs"><p>Are vectors aligned (have the same direction)?</p>
-</td><td class="codes"><pre class="brush: clojure">(defn aligned?
-  [v1 v2]
-  (&lt; ^double (angle-between v1 v2) TOLERANCE))</pre></td></tr><tr><td class="docs"><p>flip normal</p>
-</td><td class="codes"><pre class="brush: clojure">(defn faceforward
-  [n v]
-  (if (neg? ^double (dot n v))
-    n
-    (sub n)))</pre></td></tr><tr><td class="docs"><p>(perpendicular (Vec3. 1 2 0) (Vec3. 4 3 0))
-(perpendicular (Vec2. 1 0))</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>(transform (Vec3. 1 2 3) (Vec3. 1 2 3) (Vec3. 1 1 2) (Vec3. -1 1 2) (Vec3. 1 -5 1))</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>(transform (Vec2. 1 2) (Vec2. 1 2) (Vec2. 1 1) (Vec2. 1 -5))</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>(axis-rotate (Vec3. 1 2 3) PI (Vec3. 0 1 0))
-(axis-rotate (Vec3. 1 2 3) PI (Vec3. -1 1 1) (Vec3. 2 2 2))</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>(rotate (Vec2. 1 1) (/ PI 4))</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>(rotate (Vec3. 1 2 3) PI 0 0)</p>
-</td><td class="codes"></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
+   (Vec4. (f) (f) (f) (f))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn array-&gt;vec2
+  [^doubles a]
+  (Vec2. (aget a 0) (aget a 1)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn array-&gt;vec3
+  [^doubles a]
+  (Vec3. (aget a 0) (aget a 1) (aget a 2)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn array-&gt;vec4
+  [^doubles a]
+  (Vec4. (aget a 0) (aget a 1) (aget a 2) (aget a 3)))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
 SyntaxHighlighter.all();
 
 // hackity hack

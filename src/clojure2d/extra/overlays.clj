@@ -18,7 +18,7 @@
   [ch ^Pixels p1 ^Pixels p2 x y]
   (let [c1 (p/get-value p1 ch x y)
         c2 (p/get-value p2 ch (dec ^long x) y)]
-    (c/convert-and-blend add-compose c1 c2)))
+    (c/blend-values add-compose c1 c2)))
 
 (defn draw-lines
   ""

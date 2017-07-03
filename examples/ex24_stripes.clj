@@ -3,8 +3,10 @@
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
             [clojure2d.extra.glitch :as g]
-            [clojure2d.math.random :as r])
-  (:import [java.awt.event MouseEvent]))
+            [clojure2d.math.random :as r]
+            [clojure2d.math.vector :as v])
+  (:import [java.awt.event MouseEvent]
+           [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -26,7 +28,7 @@
                           angle (+ ^double %2 step2)
                           p2x (+ 300 (* 100 (m/cos angle)))
                           p2y (+ 300 (* 100 (m/sin angle)))]
-                      (conj %1 [p1x p1y] [p2x p2y]))
+                      (conj %1 (Vec2. p1x p1y) (Vec2. p2x p2y)))
                    []
                    (range 0 (+ step2 m/TWO_PI) step))]
     (set-background canvas 0 0 0)
@@ -35,7 +37,7 @@
 
 (defmethod mouse-event ["stripes" :mouse-moved] [^MouseEvent e]
   (reset! mouse-pos
-          [(int (m/cnorm (.getX e) 0 600 3 60))
+          [(int (m/cnorm (.getX e) 0 600 3 100))
            (int (m/cnorm (.getY e) 0 600 0 (count colors)))]))
 
 (def window (show-window canvas "stripes" 600 600 25 draw))

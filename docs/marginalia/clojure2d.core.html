@@ -2867,12 +2867,12 @@ net.brehaut.ClojureTools = (function (SH) {
 })(SyntaxHighlighter);
 </script><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript"></script><title>clojure2d -- Marginalia</title></head><body><table><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojure2d.core" name="clojure2d.core"><h1 class="project-name">clojure2d.core</h1><a class="toc-link" href="toc.html">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs"><h1>Namespace scope</h1>
 
-<p>This namespace provides functions which cover: diplaying windows with events, canvases, image files and session management.
+<p>This namespace provides functions which cover: diplaying windows, events, canvases, image files and session management.
 In brief:</p>
 
 <ul>
 <li>Image file read and write, backed by Java ImageIO API. You can read and write BMP, JPG and PNG files. I didn't test WBMP and GIF. Image itself is Java <code>BufferedImage</code> in integer ARGB mode. Each pixel is represented as 32bit unsigned integer and 8 bits per channel. See <code>clojure2d.pixels</code> namespace for pixels operations.</li>
-<li>Canvas with functions to draw on it, represented as vactor of Graphics2d, BufferedImage and quality settings wrapped in atom.</li>
+<li>Canvas with functions to draw on it, represented as Canvas type with Graphics2d, BufferedImage, quality settings, primitive classes and size</li>
 <li>Display (JFrame) with events handlers (multimethods) + associated autorefreshing canvas, and optionally Processiing style <code>draw</code> function with context management</li>
 <li>Session management: unique identifier generation, logging (different file per session) and unique, sequenced filename creation.</li>
 <li>Some general helper functions</li>
@@ -2880,12 +2880,14 @@ In brief:</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>JFrame, Java2D, file io and simple session management</p>
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.core
   (:require [clojure.java.io :refer :all]
-            [clojure2d.color :as c])  
-  (:import [java.awt.image BufferedImage BufferStrategy]
+            [clojure2d.color :as c]
+            [clojure2d.math.vector :as v])  
+  (:import [clojure2d.math.vector Vec2]
+           [java.awt.image BufferedImage BufferStrategy]
            [javax.swing ImageIcon]
            [javax.imageio ImageIO ImageWriter ImageWriteParam IIOImage]
            [java.awt Graphics2D Image RenderingHints GraphicsEnvironment 
-            Transparency BasicStroke Color Container Dimension Component Toolkit Canvas]
+            Transparency BasicStroke Color Container Dimension Component Toolkit Shape]
            [java.util Iterator]
            [java.awt.geom Line2D Line2D$Double
             Rectangle2D Rectangle2D$Double
@@ -2895,11 +2897,13 @@ In brief:</p>
             MouseEvent WindowAdapter WindowEvent ComponentEvent]
            [javax.swing JFrame SwingUtilities]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* true)</pre></td></tr><tr><td class="docs"><h2>Image</h2>
+(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><p>how many tasks we can run (one less than available cores)?</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^long available-cores (.availableProcessors (Runtime/getRuntime)))
+(def ^:const ^long available-tasks (inc available-cores))</pre></td></tr><tr><td class="docs"><h2>Image</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Let's start with setting dynamic variable which defines quality of the saved jpeg file. Values are from <code>0.0</code> to <code>1.0</code>.
 You can freely change this setting with <code>binding</code> macro. Default is 97% (0.97).</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:dynamic *jpeg-image-quality* 0.97)</pre></td></tr><tr><td class="docs"><h3>Load image</h3>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>To load image from the file, just call <code>(load-image "filename.jpg")</code>. Idea is stolen from Processing code. Loading is done via <code>ImageIcon</code> class and later converted to BufferedImage in ARGB mode.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>To load image from the file, just call <code>(load-image "filename.jpg")</code>. Idea is taken from Processing code. Loading is done via <code>ImageIcon</code> class and later converted to BufferedImage in ARGB mode.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Load image from file.</p>
 
 <ul>
@@ -2927,7 +2931,7 @@ You can freely change this setting with <code>binding</code> macro. Default is 9
 <li>call multimethod to prepare data and save in chosen format</li>
 </ul>
 
-<p>We have two factors here. First is whether file format accepts alpha channel (jpgs, bmps don't) and second is quality settings (for jpg only). In the first case we have to properly flatten the image with <code>flatten-image</code> function. In the second case we set quality attributes.</p>
+<p>We have two types here. First is whether file format accepts alpha channel (jpgs, bmps don't) and second is quality settings (for jpg only). In the first case we have to properly flatten the image with <code>flatten-image</code> function. In the second case we set quality attributes.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Extract extension from filename.</p>
 
 <ul>
@@ -2936,8 +2940,7 @@ You can freely change this setting with <code>binding</code> macro. Default is 9
 </ul>
 </td><td class="codes"><pre class="brush: clojure">(defn- file-extension-int
   [filename]
-  (let [[_ ext] (re-find #&quot;\.(\w+)$&quot; filename)]
-    ext))</pre></td></tr><tr><td class="docs"><p>Memoize above function (in case you'll be saving file very often).</p>
+  (second (re-find #&quot;\.(\w+)$&quot; filename)))</pre></td></tr><tr><td class="docs"><p>Memoize above function (in case you'll be saving file very often).</p>
 </td><td class="codes"><pre class="brush: clojure">(def file-extension (memoize file-extension-int))</pre></td></tr><tr><td class="docs"><p>Returns image writer of image type based on extension.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- ^ImageWriter get-image-writer
   [filename]
@@ -2957,27 +2960,29 @@ You can freely change this setting with <code>binding</code> macro. Default is 9
         arr (.getRGB img 0 0 w h nil 0 w)
         ^BufferedImage nimg (BufferedImage. w h BufferedImage/TYPE_INT_RGB)]
     (.setRGB nimg 0 0 w h arr 0 w)
-    nimg))</pre></td></tr><tr><td class="docs"><p>Save image to the file via writer with parameters</p>
+    nimg))</pre></td></tr><tr><td class="docs"><p>Save image to the file via writer with parameters. Returns image.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- do-save
   ([filename img ^ImageWriter writer]
    (do-save filename img writer (.getDefaultWriteParam writer)))
   ([filename ^BufferedImage img ^ImageWriter writer param]
    (with-open [os (output-stream filename)]
-     (.setOutput writer (ImageIO/createImageOutputStream os))
-     (.write writer nil (IIOImage. img nil nil) param)
-     (.dispose writer))))</pre></td></tr><tr><td class="docs"><p>Now we define multimethod which saves image. Multimethod is used here because some image types requires additional actions.</p>
+     (doto writer
+       (.setOutput (ImageIO/createImageOutputStream os))
+       (.write nil (IIOImage. img nil nil) param)
+       (.dispose)))
+   img))</pre></td></tr><tr><td class="docs"><p>Now we define multimethod which saves image. Multimethod is used here because some image types requires additional actions.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmulti save-file-type (fn [filename _ _] (keyword (file-extension filename))))</pre></td></tr><tr><td class="docs"><p>JPG requires flatten image and we must set the quality defined in <code>*jpeg-image-quality*</code> variable.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmethod save-file-type :jpg
   [filename img ^ImageWriter writer]
   (let [nimg (flatten-image img)
         ^ImageWriteParam param (.getDefaultWriteParam writer)]
-    (.setCompressionMode param ImageWriteParam/MODE_EXPLICIT)
-    (.setCompressionQuality param *jpeg-image-quality*)
+    (doto param
+      (.setCompressionMode ImageWriteParam/MODE_EXPLICIT)
+      (.setCompressionQuality *jpeg-image-quality*))
     (do-save filename nimg writer param)))</pre></td></tr><tr><td class="docs"><p>BMP also requires image flattening</p>
 </td><td class="codes"><pre class="brush: clojure">(defmethod save-file-type :bmp
   [filename img writer]
-  (let [nimg (flatten-image img)]
-    (do-save filename nimg writer)))</pre></td></tr><tr><td class="docs"><p>The rest file types are saved with alpha without special treatment.</p>
+  (do-save filename (flatten-image img) writer))</pre></td></tr><tr><td class="docs"><p>The rest file types are saved with alpha without special treatment.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmethod save-file-type :default
   [filename img writer]
   (do-save filename img writer))</pre></td></tr><tr><td class="docs"><p>Save image to the file.</p>
@@ -2993,7 +2998,7 @@ You can freely change this setting with <code>binding</code> macro. Default is 9
   (let [iwriter (get-image-writer filename)]
     (if-not (nil? iwriter)
       (save-file-type filename b iwriter)
-      (println (str &quot;can't save an image: &quot; filename)))))</pre></td></tr><tr><td class="docs"><h3>Addition functions</h3>
+      (println (str &quot;can't save an image: &quot; filename)))))</pre></td></tr><tr><td class="docs"><h3>Additional functions</h3>
 
 <p>Just an image resizer with bicubic interpolation. Native <code>Graphics2D</code> method is called.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Resize image</p>
@@ -3006,30 +3011,43 @@ You can freely change this setting with <code>binding</code> macro. Default is 9
   [img width height]
   (let [^BufferedImage target (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)
         ^Graphics2D g (.createGraphics target)]
-    (.setRenderingHint g RenderingHints/KEY_INTERPOLATION RenderingHints/VALUE_INTERPOLATION_BICUBIC)
-    (.setRenderingHint g RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON)
-    (.drawImage g img 0 0 width height nil)
-    (.dispose g)
+    (doto g
+      (.setRenderingHint RenderingHints/KEY_INTERPOLATION RenderingHints/VALUE_INTERPOLATION_BICUBIC)
+      (.setRenderingHint RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON)
+      (.drawImage img 0 0 width height nil)
+      (.dispose))
     target))</pre></td></tr><tr><td class="docs"><h2>Canvas</h2>
 
-<p>Canvas is an object you can draw on and which can be displayed in the window also saved. Technically it's an atom consisting vector of <code>Graphics2D</code> object which is internally used to draw on the image, image (<code>BufferedImage</code> object) and rendering quality hints. What is important: to draw on canvas you have to wrap your operations in <code>with-canvas</code> macro. <code>with-canvas</code> is responsible for creating and releasing <code>Graphics2D</code> object. Initially <code>Graphics2D</code> is set to <code>nil</code>.
+<p>Canvas is an object you can draw on and which can be displayed in the window. Technically it's a type cosisting of <code>Graphics2D</code> object which is internally used to draw on the image, image (<code>BufferedImage</code> object), rendering quality hints and singletons for primitives. What is important: to draw on canvas you have to wrap your operations in <code>with-canvas</code> macro. <code>with-canvas</code> is responsible for creating and releasing <code>Graphics2D</code> object. Initially <code>Graphics2D</code> is set to <code>nil</code>.
 Canvas should be accelerated by Java and your video card.
 Reminder: Drawing on canvas is single threaded.</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>First let's define three rendering quality options: <code>:low</code>, <code>:mid</code> and <code>:high</code>. Where <code>:low</code> is fastest but has poor quality and <code>:high</code> has best quality but may be slow. Rendering options are used when you create canvas.</p>
-</td><td class="codes"><pre class="brush: clojure">(def rendering-hints { :low {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF
-                             RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR
-                             RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
-                             RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED
-                             RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED
-                             RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF
-                             RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_OFF}
-                      :mid  {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON
-                             RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BILINEAR
-                             RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
-                             RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED
-                             RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED
-                             RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF
-                             RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON}
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Let's define protocol to equip Canvas and Window types with <code>get-image</code> function. <code>get-image</code> extracts image.</p>
+</td><td class="codes"><pre class="brush: clojure">(defprotocol ImageProto
+  (get-image [t]))</pre></td></tr><tr><td class="docs"><p>Canvas type. Use <code>get-image</code> to extract image (<code>BufferedImage</code>).</p>
+</td><td class="codes"><pre class="brush: clojure">(deftype Canvas [^Graphics2D graphics
+                 ^BufferedImage buffer
+                 ^Line2D line-obj
+                 ^Rectangle2D rect-obj
+                 ^Ellipse2D ellipse-obj
+                 hints
+                 ^long width
+                 ^long height]
+  ImageProto
+  (get-image [_] buffer))</pre></td></tr><tr><td class="docs"><p>Let's define three rendering quality options: <code>:low</code>, <code>:mid</code> and <code>:high</code>. Where <code>:low</code> is fastest but has poor quality and <code>:high</code> has best quality but may be slow. Rendering options are used when you create canvas.</p>
+</td><td class="codes"><pre class="brush: clojure">(def rendering-hints {:low {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF
+                            RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR
+                            RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
+                            RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED
+                            RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED
+                            RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF
+                            RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_OFF}
+                      :mid {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON
+                            RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BILINEAR
+                            RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
+                            RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED
+                            RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED
+                            RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF
+                            RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON}
                       :high {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON
                              RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC
                              RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY
@@ -3038,207 +3056,194 @@ Reminder: Drawing on canvas is single threaded.</p>
                              RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON
                              RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON}})</pre></td></tr><tr><td class="docs"><p>Following functions and macro are responsible for creating and releasing <code>Graphics2D</code> object for a canvas.
 You have to use <code>with-canvas</code> macro to draw on canvas. Internally it's a threading macro and accepts only list of methods which first parameter is canvas object.
-Please do not use <code>flush-graphics</code> and <code>make-graphics</code> functions directly. Use <code>with-canvas</code> macro instead. I do not check state of <code>Graphics2D</code> anywhere.</p>
+Please do not use <code>flush-graphics</code> and <code>make-graphics</code> functions directly. Use <code>with-canvas</code> macro instead. I do not check state of <code>Graphics2D</code> anywhere.
+There is one exception: <code>draw</code> function associated with Window is already wrapped in <code>with-canvas</code> and you can freely use canvas object inside.
+Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</code> object with set <code>Graphics2D</code>.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Dispose current <code>Graphics2D</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn flush-graphics
-  [canvas]
-  (let [[^Graphics2D g b h] @canvas]
-    (.dispose g)
-    (reset! canvas [nil b h])))</pre></td></tr><tr><td class="docs"><p>Create new <code>Graphics2D</code> object and set renedering hints</p>
+  [^Canvas canvas]
+  (.dispose ^Graphics2D (.graphics canvas)))</pre></td></tr><tr><td class="docs"><p>Create new <code>Graphics2D</code> object and set renedering hints</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-graphics
-  [canvas]
-  (let [[_ ^BufferedImage b ^RenderingHints h] @canvas
-        ^Graphics2D ng (.createGraphics b)]
-    (if h 
-      (.setRenderingHints ng h)
-      (.setRenderingHints ng (rendering-hints :high))  )
-    (reset! canvas [ng b h])))</pre></td></tr><tr><td class="docs"><p>Threading macro which takes care to create and destroy <code>Graphics2D</code> object for drawings on canvas. Macro returns canvas itself (with released <code>Graphics2d</code>.</p>
+  [^Canvas canvas]
+  (let [^Graphics2D ng (.createGraphics ^BufferedImage (.buffer canvas))]
+    (.setRenderingHints ng (or (.hints canvas) (rendering-hints :high)))
+    (Canvas. ng
+             (.buffer canvas)
+             (.line-obj canvas)
+             (.rect-obj canvas)
+             (.ellipse-obj canvas)
+             (.hints canvas)
+             (.width canvas)
+             (.height canvas))))</pre></td></tr><tr><td class="docs"><p>Threading macro which takes care to create and destroy <code>Graphics2D</code> object for drawings on canvas. Macro returns result of last call.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmacro with-canvas
-  [canvas &amp; body]
-  `(let [canvas# ~canvas]
-     (do 
-       (make-graphics canvas#)
-       (-&gt; canvas#
-           ~@body)
-       (flush-graphics canvas#)
-       canvas#)))</pre></td></tr><tr><td class="docs"><p>Next functions are canvas management functions: create, save, resize and set quality.</p>
+  [canvas &amp; body]  
+  `(let [newcanvas# (make-graphics ~canvas)
+         result# (-&gt; newcanvas#
+                     ~@body)]
+     (do
+       (flush-graphics newcanvas#)
+       result#)))</pre></td></tr><tr><td class="docs"><p>Next functions are canvas management functions: create, save, resize and set quality.</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(declare set-background)
 (declare set-stroke)
-(declare image)</pre></td></tr><tr><td class="docs"><p>Create and return canvas with <code>width</code>, <code>height</code> and quality hint name (keyword). Default hint is <code>:high</code></p>
+(declare image)</pre></td></tr><tr><td class="docs"><p>Create and return canvas with <code>width</code>, <code>height</code> and quality hint name (keyword). Default hint is <code>:high</code>.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn create-canvas
-  ([width height hints]
+  ([^long width ^long height hint]
    (let
        [^BufferedImage buffer (.. GraphicsEnvironment 
                                   (getLocalGraphicsEnvironment)
                                   (getDefaultScreenDevice)
                                   (getDefaultConfiguration)
-                                  (createCompatibleImage width height Transparency/TRANSLUCENT))
-        h (rendering-hints hints)
-        result (atom [nil buffer h])]
+                                  (createCompatibleImage width height Transparency/TRANSLUCENT))        
+        result (Canvas. nil
+                        buffer
+                        (Line2D$Double.)
+                        (Rectangle2D$Double.)
+                        (Ellipse2D$Double.)
+                        (rendering-hints (or (some #{hint} (keys rendering-hints)) :high))
+                        width height)]
      (with-canvas result
        (set-background Color/black)
        (set-stroke))))
   ([width height]
-   (create-canvas width height :high)))</pre></td></tr><tr><td class="docs"><p>alias</p>
+   (create-canvas width height :high)))</pre></td></tr><tr><td class="docs"><p>alias for create-canvas</p>
 </td><td class="codes"><pre class="brush: clojure">(def make-canvas create-canvas)</pre></td></tr><tr><td class="docs"><p>Resize canvas to new dimensions. Creates and returns new canvas.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn resize-canvas
-  [canvas width height]
-  (let [[_ b h] @canvas
-        ncanvas (create-canvas width height h)]
+  [^Canvas canvas width height]
+  (let [ncanvas (create-canvas width height (.hints canvas))]
     (with-canvas ncanvas
-      (image b))))</pre></td></tr><tr><td class="docs"><p>Change canvas quality</p>
-</td><td class="codes"><pre class="brush: clojure">(defn set-canvas-quality
-  [canvas hints]
-  (let [[g b] @canvas]
-    (reset! canvas [g b (rendering-hints hints)])))</pre></td></tr><tr><td class="docs"><p>Save canvas to the file</p>
+      (image (get-image canvas)))))</pre></td></tr><tr><td class="docs"><p>Save canvas to the file</p>
 </td><td class="codes"><pre class="brush: clojure">(defn save-canvas
-  [canvas filename]
-  (let [[_ b] @canvas]
-    (save-image b filename)))</pre></td></tr><tr><td class="docs"><h3>Drawing functions</h3>
+  [^Canvas canvas filename]
+  (save-image (get-image canvas) filename))</pre></td></tr><tr><td class="docs"><h3>Drawing functions</h3>
 
 <p>Here we have basic drawing functions. What you need to remember:</p>
 
 <ul>
 <li>Color is set globally for all figures (exception: <code>set-background</code>)</li>
-<li>Filled or stroke figures are determined by last parameter <code>stroke?</code>. When set to <code>true</code> draws figure outline, filled otherwise (default).</li>
+<li>Filled or stroke figures are determined by last parameter <code>stroke?</code>. When set to <code>true</code> draws figure outline, filled otherwise (default). Default is <code>false</code> (filled).</li>
 <li>Always use with <code>with-canvas</code> macro.</li>
 </ul>
 
 <p>All functions return canvas object</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Since drawing on the canvas is single threaded we can use internal mutable objects to draw things.</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^Line2D line-obj (Line2D$Double.))
-(def ^Rectangle2D rect-obj (Rectangle2D$Double.))
-(def ^Ellipse2D ellipse-obj (Ellipse2D$Double.))</pre></td></tr><tr><td class="docs"><p>Draw line from point <code>(x1,y1)</code> to <code>(x2,y2)</code></p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Draw line from point <code>(x1,y1)</code> to <code>(x2,y2)</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn line
-  [canvas x1 y1 x2 y2]
-  (.setLine line-obj x1 y1 x2 y2)
-  (let [[^Graphics2D g] @canvas]
-    (.draw g line-obj))
+  [^Canvas canvas x1 y1 x2 y2]
+  (let [^Line2D l (.line-obj canvas)]
+    (.setLine l x1 y1 x2 y2)
+    (.draw ^Graphics2D (.graphics canvas) l))
   canvas)</pre></td></tr><tr><td class="docs"><p>Draw point at <code>(x,y)</code> position</p>
 </td><td class="codes"><pre class="brush: clojure">(defn point
   [canvas ^double x ^double y]
   (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
   canvas)</pre></td></tr><tr><td class="docs"><p>Draw filled or stroked object.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- draw-fill-or-stroke
-  [^Graphics2D g obj stroke?]
+  [^Graphics2D g ^Shape obj stroke?]
   (if stroke?
     (.draw g obj)
     (.fill g obj)))</pre></td></tr><tr><td class="docs"><p>Draw rectangle with top-left corner at <code>(x,y)</code> position with width <code>w</code> and height <code>h</code>.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn rect
-  ([canvas x1 y1 w h stroke?]
-   (.setFrame rect-obj x1 y1 w h)
-   (draw-fill-or-stroke (@canvas 0) rect-obj stroke?)
+  ([^Canvas canvas x1 y1 w h stroke?]
+   (let [^Rectangle2D r (.rect-obj canvas)] 
+     (.setFrame r x1 y1 w h)
+     (draw-fill-or-stroke (.graphics canvas) r stroke?))
    canvas)
   ([canvas x1 y1 w h]
    (rect canvas x1 y1 w h false)))</pre></td></tr><tr><td class="docs"><p>Draw ellipse with middle at <code>(x,y)</code> position with width <code>w</code> and height <code>h</code>.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn ellipse
-  ([canvas x1 y1 w h stroke?]
-   (.setFrame ellipse-obj (- ^double x1 (/ ^double w 2.0)) (- ^double y1 (/ ^double h 2.0)) w h)
-   (draw-fill-or-stroke (@canvas 0) ellipse-obj stroke?)
+  ([^Canvas canvas x1 y1 w h stroke?]
+   (let [^Ellipse2D e (.ellipse_obj canvas)]
+     (.setFrame e (- ^double x1 (/ ^double w 2.0)) (- ^double y1 (/ ^double h 2.0)) w h)
+     (draw-fill-or-stroke (.graphics canvas) e stroke?))
    canvas)
   ([canvas x1 y1 w h]
    (ellipse canvas x1 y1 w h false)))</pre></td></tr><tr><td class="docs"><p>Draw triangle with corners at 3 positions.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn triangle
-  ([canvas x1 y1 x2 y2 x3 y3 stroke?]
-   (let [p (Path2D$Double.)]
+  ([^Canvas canvas x1 y1 x2 y2 x3 y3 stroke?]
+   (let [^Path2D p (Path2D$Double.)]
      (doto p
        (.moveTo x1 y1)
        (.lineTo x2 y2)
        (.lineTo x3 y3)
        (.closePath))
-     (draw-fill-or-stroke (@canvas 0) p stroke?))
+     (draw-fill-or-stroke (.graphics canvas) p stroke?))
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3]
    (triangle canvas x1 y2 x2 y2 x3 y3 false)))</pre></td></tr><tr><td class="docs"><p>Draw triangle strip. Implementation of <code>Processing</code> <code>STRIP</code> shape.</p>
 
-<p>  Input: list of vertices as vectors [x,y]</p>
+<p>  Input: list of vertices as Vec2 vectors</p>
 </td><td class="codes"><pre class="brush: clojure">(defn triangle-strip
   ([canvas vs stroke?]
    (when (&gt; (count vs) 2)
-     (loop [v1 (first vs)
-            v2 (second vs)
-            vss (next (next vs))]
+     (loop [^Vec2 v1 (first vs)
+            ^Vec2 v2 (second vs)
+            vss (nnext vs)]
        (when vss
-         (let [v3 (first vss)]
-           (triangle canvas (v2 0) (v2 1) (v3 0) (v3 1) (v1 0) (v1 1) stroke?)
+         (let [^Vec2 v3 (first vss)]
+           (triangle canvas (.x v2) (.y v2) (.x v3) (.y v3) (.x v1) (.y v1) stroke?)
            (recur v2 v3 (next vss))))))
    canvas)
   ([canvas vs]
    (triangle-strip canvas vs false)))</pre></td></tr><tr><td class="docs"><p>Draw quad with corners at 4 positions.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn quad
-  ([canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
-   (let [p (Path2D$Double.)]
+  ([^Canvas canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
+   (let [^Path2D p (Path2D$Double.)]
      (doto p
        (.moveTo x1 y1)
        (.lineTo x2 y2)
        (.lineTo x3 y3)
        (.lineTo x4 y4)
        (.closePath))
-     (draw-fill-or-stroke (@canvas 0) p stroke?))
+     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?))
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
    (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false)))</pre></td></tr><tr><td class="docs"><p>Set stroke (line) attributes like <code>cap</code>, <code>join</code> and size. Default <code>CAP_ROUND</code> and <code>JOIN_MITER</code> is used. Default size is <code>1.0</code>.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn set-stroke
-  ([canvas size cap join]
-   (let [[^Graphics2D g] @canvas]
-     (.setStroke g (BasicStroke. size cap join)))
+  ([^Canvas canvas size cap join]
+   (.setStroke ^Graphics2D (.graphics canvas) (BasicStroke. size cap join))
    canvas)
   ([canvas size]
    (set-stroke canvas size BasicStroke/CAP_ROUND BasicStroke/JOIN_MITER))
   ([canvas]
    (set-stroke canvas 1.0)))</pre></td></tr><tr><td class="docs"><p>Set color with valid java <code>Color</code> object. Use it when you're sure you pass <code>java.awt.Color</code>.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn set-awt-color
-  [canvas c]
-  (let [[^Graphics2D g] @canvas]
-    (.setColor g c)
-    canvas))</pre></td></tr><tr><td class="docs"><p>Set global color. You can pass:</p>
-
-<ul>
-<li>java.awt.Color object</li>
-<li>clojure2d.math.vector.Vec4 or Vec3 object</li>
-<li>individual r, g, b (and optional alpha) as integers from 0-255. They are converted to integer and clamped if necessary.</li>
-</ul>
-</td><td class="codes"><pre class="brush: clojure">(defn set-color
-  ([canvas c]
-   (set-awt-color canvas (c/make-color c)))
-  ([canvas r g b a]
-   (set-awt-color canvas (c/make-color r g b a)))
-  ([canvas r g b]
-   (set-awt-color canvas (c/make-color r g b))))</pre></td></tr><tr><td class="docs"><p>Set background color. Expects valid <code>Color</code> object.</p>
+  [^Canvas canvas ^java.awt.Color c]
+  (.setColor ^Graphics2D (.graphics canvas) c)
+  canvas)</pre></td></tr><tr><td class="docs"><p>Set background color. Expects valid <code>Color</code> object.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn set-awt-background
-  [canvas c]
-  (let [[^Graphics2D g ^BufferedImage b] @canvas
+  [^Canvas canvas c]
+  (let [^Graphics2D g (.graphics canvas)
         ^Color currc (.getColor g)] 
     (set-color canvas c)
-    (.fillRect g 0 0 (.getWidth b) (.getHeight b))
-    (.setColor g currc))
-  canvas)</pre></td></tr><tr><td class="docs"><p>Set background to the specified color. Current global color is restored. You can pass:</p>
+    (doto g
+      (.fillRect 0 0 (.width canvas) (.height canvas))
+      (.setColor currc)))
+  canvas)</pre></td></tr><tr><td class="docs"><p>Set color for primitive or background via passed function. You can use:</p>
 
 <ul>
 <li>java.awt.Color object</li>
 <li>clojure2d.math.vector.Vec4 or Vec3 object</li>
 <li>individual r, g, b (and optional alpha) as integers from 0-255. They are converted to integer and clamped if necessary.</li>
 </ul>
-</td><td class="codes"><pre class="brush: clojure">(defn set-background
-  ([canvas c]
-   (set-awt-background canvas (c/make-color c)))
-  ([canvas r g b a]
-   (set-awt-background canvas (c/make-color r g b a)))
-  ([canvas r g b]
-   (set-awt-background canvas (c/make-color r g b))))</pre></td></tr><tr><td class="docs"><p>Draw an image. You can specify position and size of the image. Default it's placed on whole canvas.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- set-color-with-fn
+  ([f canvas c]
+   (f canvas (c/make-awt-color c)))
+  ([f canvas r g b a]
+   (f canvas (c/make-awt-color r g b a)))
+  ([f canvas r g b]
+   (f canvas (c/make-awt-color r g b))))</pre></td></tr><tr><td class="docs"><p>Set color for primitive</p>
+</td><td class="codes"><pre class="brush: clojure">(def set-color (partial set-color-with-fn set-awt-color))</pre></td></tr><tr><td class="docs"><p>Set background color</p>
+</td><td class="codes"><pre class="brush: clojure">(def set-background (partial set-color-with-fn set-awt-background))</pre></td></tr><tr><td class="docs"><p>Draw an image. You can specify position and size of the image. Default it's placed on whole canvas.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn image
-  ([canvas ^BufferedImage img x y w h]
-   (let [[^Graphics2D g] @canvas]
-     (.drawImage g img x y w h nil)
-     canvas))
-  ([canvas img]
-   (let [[_ ^BufferedImage b] @canvas] 
-     (image canvas img 0 0 (.getWidth b) (.getHeight b)))))</pre></td></tr><tr><td class="docs"><h2>Display window</h2>
+  ([^Canvas canvas ^BufferedImage img x y w h]
+   (.drawImage ^Graphics2D (.graphics canvas) img x y w h nil)
+   canvas)
+  ([^Canvas canvas img]
+   (image canvas img 0 0 (.width canvas) (.height canvas))))</pre></td></tr><tr><td class="docs"><h2>Display window</h2>
 
 <p>You can find here a couple of functions which help to display your canvas and build interaction with user.
-Display window is just a Swing <code>JFrame</code> with <code>java.awt.Canvas</code> with periodically repainted bound canvas.
-What is important, window is not a canvas (like it is in Processing) so first you need to create canvas and then create window displaying it.
+Display window is just a Swing <code>JFrame</code> with <code>java.awt.Canvas</code> as panel.
+What is important, window is not a canvas (like it is in Processing) so first you need to create canvas object and then create window displaying it.
 You can create as many windows as you want. Just name them differently. You can also create window with different size than canvas. Canvas will be rescaled.
 Windows is not resizable and can't be set to a fullscreen mode (yet)</p>
 
@@ -3252,41 +3257,35 @@ Windows is not resizable and can't be set to a fullscreen mode (yet)</p>
 <li>optionally callback function which is called just before repainting the canvas (like <code>draw</code> in Processing)</li>
 </ul>
 
-<p><code>show-window</code> returns a vector containing</p>
+<p><code>show-window</code> returns a <code>Window</code> object containing</p>
 
 <ul>
 <li><code>JFrame</code> object</li>
-<li><code>is-display-running?</code> atom (see below)</li>
+<li><code>active?</code> atom (see below)</li>
 <li>buffer which is canvas packed into atom (to enable easy canvas replacement)</li>
-<li>map with all above + additional objects
-<ul><li><code>:frame</code> JFrame object</li>
-<li><code>:is-display-running?</code></li>
-<li><code>:buffer</code></li>
 <li><code>:panel</code> <code>java.awt.Canvas</code> object placed on JFrame (awt toolkit canvas)</li>
 <li><code>:fps</code></li>
 <li><code>:width</code></li>
 <li><code>:height</code></li>
-<li><code>:name</code> window name</li></ul></li>
+<li><code>:window-name</code> window name</li>
 </ul>
 
-<p><code>is-display-running?</code> atom is unique for each window and has value <code>true</code> when window is shown and set to <code>false</code> when window is closed with default close button.
-You can use this atom to control (and possibly stop) all activities which refers to related window. For example you may want to cancel all updating canvas processes when user closes window.</p>
-
-<p>See: examples/ex00_display.clj</p>
+<p><code>active?</code> atom is unique for each window and has value <code>true</code> when window is shown and set to <code>false</code> when window is closed with default close button.
+Use this information via <code>window-active?</code> function to control (and possibly stop) all activities which refers to related window. For example you may want to cancel all updating canvas processes when user closes window.</p>
 
 <h3>Callback function (aka `draw`)</h3>
 
-<p>This is function with three parameters which is called just before repainting canvas. You can use it to simulate Processing <code>draw</code> behaviour. Function should accept following parameters:</p>
+<p>You can define function with three parameters which is called just before repainting canvas. You can use it to simulate Processing <code>draw</code> behaviour. Function should accept following parameters:</p>
 
 <ul>
-<li>canvas - canvas to draw on, canvas bind to window will be passed here</li>
-<li>frame count - current number of calls, statring 0</li>
-<li>state - any state data you want to pass between calls, <code>nil</code> initially</li>
+<li>canvas - canvas to draw on, canvas bound to window will be passed here.</li>
+<li>frame count - current number of calls, starting 0</li>
+<li>state - any state you want to pass between calls, <code>nil</code> initially</li>
 </ul>
 
-<p>Function should return current state, which is subject to pass to function when called next time.</p>
+<p>Function should return current state, which will be passed to function when called next time.</p>
 
-<p>See: examples/ex02_draw.clj</p>
+<p>Note: calls to <code>draw</code> are wrapped in <code>with-canvas</code> already.</p>
 
 <h3>Events</h3>
 
@@ -3303,12 +3302,10 @@ You can use this atom to control (and possibly stop) all activities which refers
 This means you write different method for different key.
 As a function parameter you get <code>KeyEvent</code> object <a href="https://docs.oracle.com/javase/7/docs/api/java/awt/event/KeyEvent.html">java.awt.KeyEvent</a></p>
 
-<p>See: examples/ex01_events.clj</p>
-
 <h4>Mouse event</h4>
 
 <p>As as dispatch you use a vector containing window name as a String and mouse event type as a keyword
-As a function parameter you get <code>MouseEvent</code> object <a href="https://docs.oracle.com/javase/7/docs/api/java/awt/event/MouseEvent.html">java.awt.MouseEvent</a></p>
+As a parameter you get <code>MouseEvent</code> object <a href="https://docs.oracle.com/javase/7/docs/api/java/awt/event/MouseEvent.html">java.awt.MouseEvent</a></p>
 
 <p>Currently implemented types are:</p>
 
@@ -3320,16 +3317,18 @@ As a function parameter you get <code>MouseEvent</code> object <a href="https://
 </ul>
 
 <p>To get mouse position call <code>(.getX e)</code> and <code>(.getY e)</code> where <code>e</code> is MouseEvent object.</p>
-
-<p>See: examples/ex01_events.clj</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><h3>Events function</h3>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Close window frame</p>
-
-<p>Function used to close and dispose window. As a side effect <code>is-display-running?</code> atom is set to false.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn close-window
-  [^JFrame frame is-display-running?]
-  (reset! is-display-running? false)
-  (.dispose frame))</pre></td></tr><tr><td class="docs"><p>Next we have private method which extracts the name of your window (set when <code>show-window</code> is called).</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p><code>Window</code> type definition, equiped with <code>get-image</code> method returning bound canvas' image.</p>
+</td><td class="codes"><pre class="brush: clojure">(defrecord Window [^JFrame frame
+                   active?
+                   buffer
+                   ^java.awt.Canvas panel
+                   ^double fps
+                   ^long width
+                   ^long height
+                   window-name]
+  ImageProto
+  (get-image [_] (get-image @buffer)))</pre></td></tr><tr><td class="docs"><h3>Events function</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Private method which extracts the name of your window (set when <code>show-window</code> is called).</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Returns name of the component. Used to dispatch events.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- component-name
   [^ComponentEvent e]
@@ -3340,7 +3339,8 @@ As a function parameter you get <code>MouseEvent</code> object <a href="https://
 </td><td class="codes"><pre class="brush: clojure">(def mouse-event-map {MouseEvent/MOUSE_CLICKED  :mouse-clicked
                       MouseEvent/MOUSE_DRAGGED  :mouse-dragged
                       MouseEvent/MOUSE_PRESSED  :mouse-pressed
-                      MouseEvent/MOUSE_RELEASED :mouse-released})</pre></td></tr><tr><td class="docs"><p>Multimethod used to processed mouse events</p>
+                      MouseEvent/MOUSE_RELEASED :mouse-released
+                      MouseEvent/MOUSE_MOVED    :mouse-moved})</pre></td></tr><tr><td class="docs"><p>Multimethod used to processed mouse events</p>
 </td><td class="codes"><pre class="brush: clojure">(defmulti mouse-event (fn [^MouseEvent e] [(component-name e) (mouse-event-map (.getID e))]))</pre></td></tr><tr><td class="docs"><p>Do nothing on default</p>
 </td><td class="codes"><pre class="brush: clojure">(defmethod mouse-event :default [e])</pre></td></tr><tr><td class="docs"><p>Event adapter objects.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Key</p>
@@ -3349,25 +3349,32 @@ As a function parameter you get <code>MouseEvent</code> object <a href="https://
 </td><td class="codes"><pre class="brush: clojure">(def mouse-processor (proxy [MouseAdapter] []
                        (mouseClicked [^MouseEvent e] (mouse-event e))
                        (mousePressed [^MouseEvent e] (mouse-event e))
-                       (mouseReleased [^MouseEvent e] (mouse-event e))))</pre></td></tr><tr><td class="docs"><p>Mouse drag</p>
+                       (mouseReleased [^MouseEvent e] (mouse-event e))))</pre></td></tr><tr><td class="docs"><p>Mouse drag and move</p>
 </td><td class="codes"><pre class="brush: clojure">(def mouse-motion-processor (proxy [MouseMotionAdapter] []
-                              (mouseDragged [^MouseEvent e] (mouse-event e))))</pre></td></tr><tr><td class="docs"><h3>Frame machinery functions</h3>
+                              (mouseDragged [^MouseEvent e] (mouse-event e))
+                              (mouseMoved [^MouseEvent e] (mouse-event e))))</pre></td></tr><tr><td class="docs"><h3>Frame machinery functions</h3>
 
-<p>Window is JFrame with panel (as java.awt.Canvas object) which is used to draw canvas on it.</p>
+<p>Window is JFrame with panel (as java.awt.Canvas object) which is used to draw clojure2d canvas on it.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Create panel which displays canvas. Attach mouse events, give a name (same as window), set size etc.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- create-panel
   [buffer windowname width height]
-  (let [panel (Canvas.)]
+  (let [panel (java.awt.Canvas.)]
     (doto panel
       (.setName windowname)
       (.addMouseListener mouse-processor)
+      (.addKeyListener key-processor)
       (.addMouseMotionListener mouse-motion-processor)
       (.setIgnoreRepaint true)
-      (.setPreferredSize (Dimension. width height)))))</pre></td></tr><tr><td class="docs"><p>Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event.</p>
+      (.setPreferredSize (Dimension. width height)))))</pre></td></tr><tr><td class="docs"><p>Function used to close and dispose window. As a side effect <code>active?</code> atom is set to false.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Close window frame</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- close-window
+  [^JFrame frame active?]
+  (reset! active? false)
+  (.dispose frame))</pre></td></tr><tr><td class="docs"><p>Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- build-frame
-  [^JFrame frame ^Canvas panel is-display-running? buffer windowname width height]
+  [^JFrame frame ^java.awt.Canvas panel active? windowname width height]
   (let [closer (proxy [WindowAdapter] []
-                 (windowClosing [^WindowEvent e] (close-window frame is-display-running?)))]
+                 (windowClosing [^WindowEvent e] (close-window frame active?)))]
     (.add frame panel)
     (doto frame
       (.addKeyListener key-processor)
@@ -3390,12 +3397,14 @@ As a function parameter you get <code>MouseEvent</code> object <a href="https://
 </ul>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Draw buffer on panel using <code>BufferStrategy</code> object.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- repaint
-  [^Canvas panel buffer]
+  [^java.awt.Canvas panel ^Canvas canvas]
   (let [^BufferStrategy strategy (.getBufferStrategy panel)]
     (loop []
       (loop []
-        (let [^Graphics2D graphics-context (.getDrawGraphics strategy)]
-          (.drawImage graphics-context (@buffer 1) 0 0 (.getWidth panel) (.getHeight panel) nil)
+        (let [^Graphics2D graphics-context (.getDrawGraphics strategy)
+              ^BufferedImage b (.buffer canvas)]
+          (.setRenderingHints graphics-context (:mid rendering-hints))
+          (.drawImage graphics-context b 0 0 (.getWidth panel) (.getHeight panel) nil)
           (.dispose graphics-context))
         (when (.contentsRestored strategy) (recur)))
       (.show strategy)
@@ -3403,16 +3412,18 @@ As a function parameter you get <code>MouseEvent</code> object <a href="https://
     (.sync (Toolkit/getDefaultToolkit))))</pre></td></tr><tr><td class="docs"><p>Repaint canvas on window with set FPS.</p>
 
 <ul>
-<li>Input: frame, is-display-running? atom, function to run before repaint, canvas and sleep time.</li>
+<li>Input: frame, active? atom, function to run before repaint, canvas and sleep time.</li>
 </ul>
 </td><td class="codes"><pre class="brush: clojure">(defn- refresh-screen-task
-  [^Canvas panel is-display-running? draw-fun buffer stime]
+  [panel active? draw-fun buffer stime]  
   (loop [cnt (long 0)
          result nil]
-    (let [new-result (when draw-fun (draw-fun @buffer cnt result))]
+    (let [new-result (when draw-fun 
+                       (with-canvas @buffer
+                         (draw-fun cnt result)))]
       (Thread/sleep stime)
-      (repaint panel @buffer)
-      (when @is-display-running? (recur (inc cnt) new-result)))))</pre></td></tr><tr><td class="docs"><p>You may want to replace canvas to the other one on window. To make it pass result of <code>show-window</code> function and new canvas.
+      (repaint panel @buffer) 
+      (when @active? (recur (unchecked-inc cnt) new-result)))))</pre></td></tr><tr><td class="docs"><p>You may want to replace canvas to the other one. To make it pass result of <code>show-window</code> function and new canvas.
 Internally it just resets buffer atom for another canvas.
 See examples/ex01_events.clj to see how it works.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Replace canvas in window.</p>
@@ -3422,34 +3433,35 @@ See examples/ex01_events.clj to see how it works.</p>
 <li>Returns canvas</li>
 </ul>
 </td><td class="codes"><pre class="brush: clojure">(defn replace-canvas
-  [[_ _ buffer] canvas]
-  (reset! buffer canvas)
-  canvas)</pre></td></tr><tr><td class="docs"><p>Finally function which displays window. Function creates window's visibility status (<code>is-display-running?</code> atom), buffer as atomized canvas, creates frame, creates refreshing task (repainter) and shows window.</p>
+  [^Window window canvas]
+  (reset! (:buffer window) canvas))</pre></td></tr><tr><td class="docs"><p>Finally function which creates and displays window. Function creates window's visibility status (<code>active?</code> atom), buffer as atomized canvas, creates frame, creates refreshing task (repainter) and shows window.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Show window with width/height, name and required fps of refresh. Optionally pass callback function.</p>
 
 <ul>
 <li>Input: canvas, window name, width, height, frames per seconds, (optional) <code>draw</code> function.</li>
-<li>Returns vector with: <code>JFrame</code> object, visibility status atom, buffer atom (canvas packed into the atom). For convenience last element of the vector is a map with all used objects and passed parameters.</li>
+<li>Returns <code>Window</code> value</li>
 </ul>
 </td><td class="codes"><pre class="brush: clojure">(defn show-window
   ([canvas wname width height fps draw-fun]
-   (let [is-display-running? (atom true)
+   (let [active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
          panel (create-panel buffer wname width height)]
-     (SwingUtilities/invokeLater #(build-frame frame panel is-display-running? buffer wname width height))
-     (future (refresh-screen-task panel is-display-running? draw-fun buffer (/ 1000.0 fps)))
-     [frame is-display-running? buffer
-      {:frame frame
-       :is-display-running? is-display-running?
-       :buffer buffer
-       :panel panel
-       :fps fps
-       :width width
-       :height height
-       :name wname}]))
+     (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
+     (future (refresh-screen-task panel active? draw-fun buffer (/ 1000.0 ^double fps)))
+     (-&gt;Window frame
+               active?
+               buffer
+               panel
+               fps
+               width
+               height
+               wname)))
   ([canvas wname width height fps]
-   (show-window canvas wname width height fps nil)))</pre></td></tr><tr><td class="docs"><h2>Utility functions</h2>
+   (show-window canvas wname width height fps nil)))</pre></td></tr><tr><td class="docs"><p>Helper function, check if window is active</p>
+</td><td class="codes"><pre class="brush: clojure">(defn window-active?
+  [^Window window]
+  @(.active? window))</pre></td></tr><tr><td class="docs"><h2>Utility functions</h2>
 
 <p>Now we have a part with some utilities (I had no idea where to put them).</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Return hex value of given number, padded with leading zeroes if given length</p>
@@ -3475,24 +3487,22 @@ Use cases are:</p>
 </ul>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Create counter function, each call returns next number.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-counter
-  ([v]
+  ([^long v]
    (let [tick (atom (dec v))]
      #(swap! tick inc)))
   ([]
    (make-counter 0)))</pre></td></tr><tr><td class="docs"><p>Store date format in variable</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^java.text.SimpleDateFormat simple-date-format (java.text.SimpleDateFormat. &quot;yyyyMMddHHmmss&quot;))
-(def ^java.text.SimpleDateFormat simple-date-format-full (java.text.SimpleDateFormat. &quot;yyyy-MM-dd HH:mm:ss&quot;))</pre></td></tr><tr><td class="docs"><p>Create unique session name based on current time. Result is a vector with date and hash represented as hexadecimary number.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn make-session-name
-  []
-  (let [date (java.util.Date.)]
-    [(.format simple-date-format date) (to-hex (hash date))]))</pre></td></tr><tr><td class="docs"><p>Logging to file is turned off by default.</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:dynamic *log-to-file* false)</pre></td></tr><tr><td class="docs"><p>Following block defines session related functions. I encapsulates some common variables as atoms or agents. These are:</p>
+(def ^java.text.SimpleDateFormat simple-date-format-full (java.text.SimpleDateFormat. &quot;yyyy-MM-dd HH:mm:ss&quot;))</pre></td></tr><tr><td class="docs"><p>Following block defines session related functions.
+Session is a type of:</p>
 
 <ul>
-<li>session name which stores current date (formatted)</li>
-<li>file writer as agent used to log your events</li>
-<li>file counter - atom which stores current value of files saved under session</li>
+<li>logger - file writer</li>
+<li>name - session identifiers as vector with formatted current date and hash of this date</li>
+<li>counter - used to create sequence filenames for session</li>
 </ul>
+
+<p>Session is encapsulated in agent and is global for library</p>
 
 <p>Example:</p>
 
@@ -3506,63 +3516,70 @@ Use cases are:</p>
 <li><code>(get-session-name) =&gt; nil</code></li>
 <li><code>(make-session) =&gt; ["20170123235625" "CD8B7204"]</code></li>
 </ul>
-
-<p>It's not optimized to work parallely</p>
-</td><td class="codes"></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def session-name (atom nil))
-(def session-file (agent nil))
-(def session-cnt (atom nil))</pre></td></tr><tr><td class="docs"><p>Close current session.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn close-session
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Session values are packed into the type</p>
+</td><td class="codes"><pre class="brush: clojure">(defrecord SessionType [logger
+                        name
+                        counter])</pre></td></tr><tr><td class="docs"><p>Session is stored in agent</p>
+</td><td class="codes"><pre class="brush: clojure">(def session-agent (agent (SessionType. nil nil nil)))</pre></td></tr><tr><td class="docs"><p>Logging to file is turned off by default.</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:dynamic *log-to-file* false)</pre></td></tr><tr><td class="docs"><p>Close current session</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- close-session-fn
+  [^SessionType s]
+  (let [^java.io.Writer o (:logger s)]
+    (when-not (nil? o)
+      (.flush o)
+      (.close o)))
+  (SessionType. nil nil nil))</pre></td></tr><tr><td class="docs"><p>Create writer for logger</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- make-logger-fn
+  [session-name]
+  (let [fname (str &quot;log/&quot; (first session-name) &quot;.log&quot;)]
+    (make-parents fname) 
+    (let [^java.io.Writer no (writer fname :append true)]
+      (.write no (str &quot;Session id: &quot; (second session-name) (System/lineSeparator) (System/lineSeparator)))
+      no)))</pre></td></tr><tr><td class="docs"><p>Create unique session name based on current time. Result is a vector with date and hash represented as hexadecimary number.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- make-session-name
   []
-  (when-not (nil? @session-file)
-    (send session-file (fn [^java.io.Writer o]
-                         (.flush o)
-                         (.close o)
-                         nil)))
-  (reset! session-name nil)
-  (reset! session-cnt nil))</pre></td></tr><tr><td class="docs"><p>Create new session and log writer (if <code>log-to-file</code> set to true).</p>
+  (let [date (java.util.Date.)]
+    [(.format simple-date-format date) (to-hex (hash date))]))</pre></td></tr><tr><td class="docs"><p>Create session</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- make-session-fn 
+  [^SessionType s]
+  (close-session-fn s)
+  (let [nname (make-session-name)
+        writer (when *log-to-file* (make-logger-fn nname))]
+    (SessionType. writer nname (make-counter 0))))</pre></td></tr><tr><td class="docs"><p>Create session via agent</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-session
   []
-  (let [nname (make-session-name)]
-    (reset! session-name nname)
-    (when *log-to-file*
-      (let [fname (str &quot;log/&quot; (first nname) &quot;.log&quot;)]
-        (make-parents fname)
-        (send session-file (fn [^java.io.Writer o]
-                             (do
-                               (when-not (nil? o)
-                                 (.flush o)
-                                 (.close o))
-                               (let [^java.io.Writer no (writer fname :append true)]
-                                 (.write no (str &quot;Session id: &quot; (second nname) &quot;\n&quot;))
-                                 no))))))
-    (reset! session-cnt (make-counter 0))
-    nname))</pre></td></tr><tr><td class="docs"><p>Log message to the session log file.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn log
-  [message]
-  (when *log-to-file*
-    (if (nil? @session-file)
-      (do
-        (make-session)
-        (log message))
-      (let [to-log (str (.format simple-date-format-full (java.util.Date.)) &quot;: &quot; message &quot;\n&quot;)]
-        (send session-file (fn [^java.io.Writer o]
-                             (.write o to-log)
-                             (.flush o)
-                             o)))))
-  true)</pre></td></tr><tr><td class="docs"><p>Create sequenced filename with prefix (folder name) and optional suffix (eg. file extension).</p>
-</td><td class="codes"><pre class="brush: clojure">(defn next-filename
-  ([prefix]
-   (if (nil? @session-name)
-     (do
-       (make-session)
-       (next-filename prefix))
-     (str prefix (second @session-name) &quot;_&quot; (format &quot;%06d&quot; (@session-cnt)))))
-  ([prefix suffix]
-   (str (next-filename prefix) suffix)))</pre></td></tr><tr><td class="docs"><p>Returns current session name (time and hash)</p>
+  (send session-agent make-session-fn)
+  (await-for 1000 session-agent)
+  (:name @session-agent))</pre></td></tr><tr><td class="docs"><p>Close session via agent</p>
+</td><td class="codes"><pre class="brush: clojure">(defn close-session
+  []
+  (send session-agent close-session-fn)
+  (await-for 1000 session-agent))</pre></td></tr><tr><td class="docs"><p>Ensure that session is active (create one if not</p>
+</td><td class="codes"><pre class="brush: clojure">(defn ensure-session
+  []
+  (when (nil? (:name @session-agent))
+    (make-session)))</pre></td></tr><tr><td class="docs"><p>Get session name</p>
 </td><td class="codes"><pre class="brush: clojure">(defn get-session-name
   []
-  @session-name)</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
+  (:name @session-agent))</pre></td></tr><tr><td class="docs"><p>Create next unique filename based on session</p>
+</td><td class="codes"><pre class="brush: clojure">(defn next-filename
+  ([prefix]
+   (ensure-session)
+   (let [^SessionType s @session-agent]
+     (str prefix (second (:name s)) &quot;_&quot; (format &quot;%06d&quot; ((:counter s))))))
+  ([prefix suffix]
+   (str (next-filename prefix) suffix)))</pre></td></tr><tr><td class="docs"><p>Log message to file or console</p>
+</td><td class="codes"><pre class="brush: clojure">(defn log
+  [message]
+  (let [to-log (str (.format simple-date-format-full (java.util.Date.)) &quot;: &quot; message (System/lineSeparator))]
+    (ensure-session)
+    (if *log-to-file*
+      (send session-agent (fn [s]
+                            (let [^java.io.Writer o (or (:logger s) (make-logger-fn (:name s)))]
+                              (.write o to-log)
+                              (.flush o)
+                              (SessionType. o (:name s) (:counter s)))))
+      (println to-log))))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
 SyntaxHighlighter.all();
 
 // hackity hack

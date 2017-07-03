@@ -2865,76 +2865,91 @@ net.brehaut.ClojureTools = (function (SH) {
     build_tree: build_tree
   };
 })(SyntaxHighlighter);
-</script><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript"></script><title>clojure2d -- Marginalia</title></head><body><table><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojure2d.color" name="clojure2d.color"><h1 class="project-name">clojure2d.color</h1><a class="toc-link" href="toc.html">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
+</script><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript"></script><title>clojure2d -- Marginalia</title></head><body><table><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojure2d.color" name="clojure2d.color"><h1 class="project-name">clojure2d.color</h1><a class="toc-link" href="toc.html">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs"><h1>Namespace scope</h1>
+
+<p>Color management functions:</p>
+
+<ul>
+<li>Color is represented by Vec3, Vec4 or java.awt.Color</li>
+<li>Blending functions</li>
+<li>Color space converters</li>
+<li>Palette collections: 200 5-color palettes from colourlovers, paletton colors generator, Inigo Quilez palette generator</li>
+<li>Nearest color filter</li>
+</ul>
+
+<p>Generally color is represented by Vec4 containing R,G,B,A values from 0 to 255. Three conversion functions are defined by <code>ColorProto</code> which extends Vec3, Vec4 and java.awt.Color types.
+Functions are:</p>
+
+<ul>
+<li><code>to-color</code> to get Vec4 object</li>
+<li><code>to-awt-color</code> to get <code>java.awt.Color</code> object</li>
+<li><code>to-luma</code> to get brightness as <code>double</code></li>
+</ul>
+
+<p><code>Vec4</code> is clojure2d color representation.</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.color
   (:require [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
+            [clojure2d.math.random :as r]
             [clojure.xml :as xml]
             [clojure.java.io :as io])
   (:import [clojure2d.math.vector Vec4 Vec3]
            [java.awt Color]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* true)</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def ^:dynamic ^double *blend-threshold* 0.5)</pre></td></tr><tr><td class="docs">
+(set! *unchecked-math* true)</pre></td></tr><tr><td class="docs"><h2>Clamping functions</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>First define some clamping functions</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Clamp to 0-255 integer</p>
 </td><td class="codes"><pre class="brush: clojure">(defn clamp255
   [^double a]
-  (int (m/constrain a 0.0 255.0)))</pre></td></tr><tr><td class="docs">
+  (int (m/constrain a 0.0 255.0)))</pre></td></tr><tr><td class="docs"><p>Leave 8 bits from long. Wraps input to 0-255 integer</p>
 </td><td class="codes"><pre class="brush: clojure">(defn mod255
   ^long [^long a]
-  (bit-and 0xff a))</pre></td></tr><tr><td class="docs">
+  (bit-and 0xff a))</pre></td></tr><tr><td class="docs"><p>Clamp to 0.0-1.0</p>
 </td><td class="codes"><pre class="brush: clojure">(defn clamp1
   ^double [^double v]
-  (m/constrain v 0.0 1.0))</pre></td></tr><tr><td class="docs">
+  (m/constrain v 0.0 1.0))</pre></td></tr><tr><td class="docs"><p>Cut to 0.0-1.0</p>
 </td><td class="codes"><pre class="brush: clojure">(defn mod1
   ^double [^double v]
-  (m/abs (- v (m/rint v))))</pre></td></tr><tr><td class="docs"><p>get luma from color</p>
-</td><td class="codes"><pre class="brush: clojure">(defn get-luma
-  ^double [^Vec4 c]
-  (+ (* 0.2126 (.x c))
-     (* 0.7152 (.y c))
-     (* 0.0722 (.z c))))</pre></td></tr><tr><td class="docs"><p>get luma from color</p>
-</td><td class="codes"><pre class="brush: clojure">(defn get-luma3
-  ^double [^Vec3 c]
-  (+ (* 0.2126 (.x c))
-     (* 0.7152 (.y c))
-     (* 0.0722 (.z c))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(declare to-HSB)</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn get-hue
-  ^double [^Vec4 c]
-  (let [^Vec4 ret (to-HSB c)]
-    (.x ret)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn get-hue360
-  ^double [c]
-  (* 1.407843137254902 (get-hue c)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn to-color
-  [^Vec4 v]
-  (Color. ^int (clamp255 (.x v))
-          ^int (clamp255 (.y v))
-          ^int (clamp255 (.z v))
-          ^int (clamp255 (.w v))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn to-color3
-  [^Vec3 v]
-  (Color. ^int (clamp255 (.x v))
-          ^int (clamp255 (.y v))
-          ^int (clamp255 (.z v))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn from-color
-  [^Color c]
-  (Vec4. (.getRed c)
-         (.getGreen c)
-         (.getBlue c)
-         (.getAlpha c)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn from-color3
-  [^Color c]
-  (Vec3. (.getRed c)
-         (.getGreen c)
-         (.getBlue c)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn make-color
+  (m/frac v))</pre></td></tr><tr><td class="docs"><h2>Color representation</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Define <code>ColorProto</code> for representation conversions.</p>
+</td><td class="codes"><pre class="brush: clojure">(defprotocol ColorProto
+  (to-color [c])
+  (to-awt-color [c]) 
+  (to-luma [c]))</pre></td></tr><tr><td class="docs"><p>Local luma conversion function</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- to-luma-fn
+  ^double [^double r ^double g ^double b]
+  (+ (* 0.212671 r)
+     (* 0.715160 g)
+     (* 0.072169 b)))</pre></td></tr><tr><td class="docs"><p>Equip <code>Vec3</code>, <code>Vec4</code> and <code>java.awt.Color</code> types with <code>ColorProto</code> functions.</p>
+</td><td class="codes"><pre class="brush: clojure">(extend-protocol ColorProto
+  Vec3
+  (to-color [^Vec3 c]
+    (Vec4. (.x c) (.y c) (.z c) 255))
+  (to-awt-color [^Vec3 c]
+    (Color. ^int (clamp255 (.x c))
+            ^int (clamp255 (.y c))
+            ^int (clamp255 (.z c))))
+  (to-luma ^double [^Vec3 c] (to-luma-fn (.x c) (.y c) (.z c)))
+  Vec4
+  (to-color [c] c)
+  (to-awt-color [^Vec4 c]
+    (Color. ^int (clamp255 (.x c))
+            ^int (clamp255 (.y c))
+            ^int (clamp255 (.z c))
+            ^int (clamp255 (.w c))))
+  (to-luma ^double [^Vec4 c] (to-luma-fn (.x c) (.y c) (.z c)))
+  Color
+  (to-color [^Color c]
+    (Vec4. (.getRed c)
+           (.getGreen c)
+           (.getBlue c)
+           (.getAlpha c)))
+  (to-awt-color [c] c)
+  (to-luma ^double [^Color c] (to-luma-fn (.getRed c) (.getGreen c) (.getBlue c))))</pre></td></tr><tr><td class="docs"><p>Create java.awt.Color object. Use with <code>core/set-awt-color</code> or <code>core/set-awt-background</code>.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-awt-color
   ([c]
-   (if (instance? Vec4 c)
-     (to-color c)
-     (if (instance? Vec3 c)
-       (to-color3 c)
-       c)))
+   (to-awt-color c))
   ([r g b]
    (Color. ^int (clamp255 r)
            ^int (clamp255 g)
@@ -2943,89 +2958,125 @@ net.brehaut.ClojureTools = (function (SH) {
    (Color. ^int (clamp255 r)
            ^int (clamp255 g)
            ^int (clamp255 b)
-           ^int (clamp255 a))))</pre></td></tr><tr><td class="docs"><p>blending part, operate on range 0-1</p>
-</td><td class="codes"></td></tr><tr><td class="docs">
+           ^int (clamp255 a))))</pre></td></tr><tr><td class="docs"><p>Create Vec4 object as color representation. Use with <code>core/set-color</code> or <code>core/set-background</code>.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-color
+  ([c]
+   (to-color c))
+  ([r g b]
+   (Vec4. (clamp255 r)
+          (clamp255 g)
+          (clamp255 b)
+          255.0))
+  ([r g b a]
+   (Vec4. (clamp255 r)
+          (clamp255 g)
+          (clamp255 b)
+          (clamp255 a))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(declare to-HSB)</pre></td></tr><tr><td class="docs"><p>Get hue value from color (any representation). Based on HSB colorspace.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn get-hue
+  ^double [c]
+  (let [^Vec4 ret (to-HSB (to-color c))]
+    (.x ret)))</pre></td></tr><tr><td class="docs"><p>Set alpha channel and return <code>Vec4</code> representation.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn set-alpha
+  [c ^double a]
+  (let [^Vec4 v (to-color c)]
+    (Vec4. (.x v) (.y v) (.z v) a)))</pre></td></tr><tr><td class="docs"><h2>Blending / Composing</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Several color blending / composing functions. Used to compose two images (<code>Pixels</code>). See <code>core.pixels</code> namespace for filters.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Some blending functions require additional parameter. You can set it with following variable.</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:dynamic ^double *blend-threshold* 0.5)</pre></td></tr><tr><td class="docs"><p>Prepare look-up table for int->double conversion.</p>
 </td><td class="codes"><pre class="brush: clojure">(def r255 (double-array (map #(/ ^double % 255.0) (range 256))))</pre></td></tr><tr><td class="docs"><p>Blend colors functions</p>
-</td><td class="codes"></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn convert-and-blend
-  ^long [f ^long a ^long b]
-  (let [aa (aget ^doubles r255 a)
-        bb (aget ^doubles r255 b)]
-    (long (* 255.0 ^double (f aa bb)))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Blend channel values with blending function.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn blend-values
+  [f a b]
+  (let [aa (aget ^doubles r255 ^int a)
+        bb (aget ^doubles r255 ^int b)]
+    (* 255.0 ^double (f aa bb))))</pre></td></tr><tr><td class="docs"><p>Blend colors with blending function. Do not blend alpha on default.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn blend-colors
+  (^Vec4 [f c1 c2 alpha?]
+   (let [^Vec4 cc1 (to-color c1)
+         ^Vec4 cc2 (to-color c2)]
+     (Vec4. (blend-values f (.x cc1) (.x cc2))
+            (blend-values f (.y cc1) (.y cc2))
+            (blend-values f (.z cc1) (.z cc2))
+            (if alpha?
+              (blend-values f (.w cc1) (.w cc2))
+              (.w cc1)))))
+  (^Vec4 [f c1 c2] (blend-colors c1 c2 false)))</pre></td></tr><tr><td class="docs"><p>Plenty of blending functions. Bleding functions operate on 0.0-1.0 values and return new value in the same range.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Return first value only. Do nothing.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-none
-  ^double [a b] a)</pre></td></tr><tr><td class="docs">
+  ^double [a b] a)</pre></td></tr><tr><td class="docs"><p>Add</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-add
   ^double [^double a ^double b]
-  (clamp1 (+ a b)))</pre></td></tr><tr><td class="docs">
+  (clamp1 (+ a b)))</pre></td></tr><tr><td class="docs"><p>Modulus add</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-madd
   ^double [^double a ^double b]
-  (mod1 (+ a b)))</pre></td></tr><tr><td class="docs">
+  (mod1 (+ a b)))</pre></td></tr><tr><td class="docs"><p>Subtract</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-subtract
   ^double [^double a ^double b]
-  (clamp1 (- a b)))</pre></td></tr><tr><td class="docs">
+  (clamp1 (- a b)))</pre></td></tr><tr><td class="docs"><p>Modulus subtract</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-msubtract
   ^double [^double a ^double b]
-  (mod1 (- a b)))</pre></td></tr><tr><td class="docs">
+  (mod1 (- a b)))</pre></td></tr><tr><td class="docs"><p>Linear burn</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-linearburn
   ^double [^double a ^double b]
-  (clamp1 (- (+ a b) 1.0)))</pre></td></tr><tr><td class="docs">
+  (clamp1 (- (+ a b) 1.0)))</pre></td></tr><tr><td class="docs"><p>Modulus linear burn</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-mlinearburn
   ^double [^double a ^double b]
-  (mod1 (- (+ a b) 1.0)))</pre></td></tr><tr><td class="docs">
+  (mod1 (- (+ a b) 1.0)))</pre></td></tr><tr><td class="docs"><p>Darken</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-darken
   ^double [^double a ^double b]
-  (if (&gt; a b) b a))</pre></td></tr><tr><td class="docs">
+  (if (&gt; a b) b a))</pre></td></tr><tr><td class="docs"><p>Lighten</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-lighten
   ^double [^double a ^double b]
-  (if (&lt; a b) b a))</pre></td></tr><tr><td class="docs">
+  (if (&lt; a b) b a))</pre></td></tr><tr><td class="docs"><p>Multiply</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-multiply
   ^double [^double a ^double b]
-  (* a b))</pre></td></tr><tr><td class="docs">
+  (* a b))</pre></td></tr><tr><td class="docs"><p>Screen</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-screen
   ^double [^double a ^double b]
   (let [ra (- 1.0 a)
         rb (- 1.0 b)]
     (-&gt;&gt; ra
          (* rb)
-         (- 1.0))))</pre></td></tr><tr><td class="docs">
+         (- 1.0))))</pre></td></tr><tr><td class="docs"><p>Dodge</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-dodge
   ^double [^double a ^double b]
   (clamp1 (-&gt;&gt; b
                (- 1.0)
-               (/ a))))</pre></td></tr><tr><td class="docs">
+               (/ a))))</pre></td></tr><tr><td class="docs"><p>Modulus dodge</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-mdodge
   ^double [^double a ^double b]
   (mod1 (-&gt;&gt; b
                (- 1.0)
-               (/ a))))</pre></td></tr><tr><td class="docs">
+               (/ a))))</pre></td></tr><tr><td class="docs"><p>Burn</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-burn
   ^double [^double a ^double b]
   (clamp1 (-&gt;&gt; b
                (/ (- 1.0 a))
-               (- 1.0))))</pre></td></tr><tr><td class="docs">
+               (- 1.0))))</pre></td></tr><tr><td class="docs"><p>Modulus burn</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-mburn
   ^double [^double a ^double b]
   (mod1 (-&gt;&gt; b
              (/ (- 1.0 a))
-             (- 1.0))))</pre></td></tr><tr><td class="docs">
+             (- 1.0))))</pre></td></tr><tr><td class="docs"><p>Hard mix</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-hardmix
   ^double [^double a ^double b]
   (let [t (- 1.0 b)]
     (cond (&lt; a t) 0.0
           (&gt; a t) 1.0
-          :else a)))</pre></td></tr><tr><td class="docs">
+          :else a)))</pre></td></tr><tr><td class="docs"><p>Linear light</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-linearlight
   ^double [^double a ^double b]
   (clamp1 (-&gt; b
               (+ a)
               (+ a)
-              (- 1.0))))</pre></td></tr><tr><td class="docs">
+              (- 1.0))))</pre></td></tr><tr><td class="docs"><p>Modulus linear light</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-mlinearlight
   ^double [^double a ^double b]
   (mod1 (-&gt; b
             (+ a)
             (+ a)
-            (- 1.0))))</pre></td></tr><tr><td class="docs">
+            (- 1.0))))</pre></td></tr><tr><td class="docs"><p>Pegtop light</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-pegtoplight
   ^double [^double a ^double b]
   (let [ab (* a b)]
@@ -3033,7 +3084,7 @@ net.brehaut.ClojureTools = (function (SH) {
                  (- 1.0)
                  (* a a)
                  (+ ab)
-                 (+ ab)))))</pre></td></tr><tr><td class="docs">
+                 (+ ab)))))</pre></td></tr><tr><td class="docs"><p>Modulus pegtop light</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-mpegtoplight
   ^double [^double a ^double b]
   (let [ab (* a b)]
@@ -3041,78 +3092,78 @@ net.brehaut.ClojureTools = (function (SH) {
                (- 1.0)
                (* a a)
                (+ ab)
-               (+ ab)))))</pre></td></tr><tr><td class="docs">
+               (+ ab)))))</pre></td></tr><tr><td class="docs"><p>Difference</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-difference
   ^double [^double a ^double b]
-  (m/abs (- a b)))</pre></td></tr><tr><td class="docs">
+  (m/abs (- a b)))</pre></td></tr><tr><td class="docs"><p>Divide</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-divide
   ^double [^double a ^double b]
-  (clamp1 (/ a (+ b m/EPSILON))))</pre></td></tr><tr><td class="docs">
+  (clamp1 (/ a (+ b m/EPSILON))))</pre></td></tr><tr><td class="docs"><p>Modulus divide</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-mdivide
   ^double [^double a ^double b]
-  (mod1 (/ a (+ b m/EPSILON))))</pre></td></tr><tr><td class="docs">
+  (mod1 (/ a (+ b m/EPSILON))))</pre></td></tr><tr><td class="docs"><p>Bitwise or</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-or
   ^double [^double a ^double b]
   (let [aa (long (* a 255.0))
         bb (long (* b 255.0))]
-    (aget ^doubles r255 (bit-and 0xff (bit-or aa bb)))))</pre></td></tr><tr><td class="docs">
+    (aget ^doubles r255 (bit-and 0xff (bit-or aa bb)))))</pre></td></tr><tr><td class="docs"><p>Bitwise and</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-and
   ^double [^double a ^double b]
   (let [aa (long (* a 255.0))
         bb (long (* b 255.0))]
-    (aget ^doubles r255 (bit-and 0xff (bit-and aa bb)))))</pre></td></tr><tr><td class="docs">
+    (aget ^doubles r255 (bit-and 0xff (bit-and aa bb)))))</pre></td></tr><tr><td class="docs"><p>Bitwise xor</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-xor
   ^double [^double a ^double b]
   (let [aa (long (* a 255.0))
         bb (long (* b 255.0))]
-    (aget ^doubles r255 (bit-and 0xff (bit-xor aa bb)))))</pre></td></tr><tr><td class="docs">
+    (aget ^doubles r255 (bit-and 0xff (bit-xor aa bb)))))</pre></td></tr><tr><td class="docs"><p>Exclusion</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-exclusion
   ^double [^double a ^double b]
   (let [ab (* a b)]
-    (- (+ a b) (+ ab ab))))</pre></td></tr><tr><td class="docs">
+    (- (+ a b) (+ ab ab))))</pre></td></tr><tr><td class="docs"><p>Internal pinlight</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-pinlight-raw
   ^double [^double a ^double b]
   (let [c (- (+ a a) 1.0)]
     (cond (&lt; b c) c
           (and (&lt;= c b) (&lt; b (+ c 1.0))) b
-          :else (+ c 1.0))))</pre></td></tr><tr><td class="docs">
+          :else (+ c 1.0))))</pre></td></tr><tr><td class="docs"><p>Pinlight</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-pinlight
   ^double [a b]
-  (clamp1 (blend-pinlight-raw a b)))</pre></td></tr><tr><td class="docs">
+  (clamp1 (blend-pinlight-raw a b)))</pre></td></tr><tr><td class="docs"><p>Modulus pinlight</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-mpinlight
   ^double [a b]
-  (mod1 (blend-pinlight-raw a b)))</pre></td></tr><tr><td class="docs">
+  (mod1 (blend-pinlight-raw a b)))</pre></td></tr><tr><td class="docs"><p>Opacity (with <code>*blend-threshold*</code>)</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-opacity
   (^double [^double a ^double b ^double thr]
    (m/lerp a b thr))
   (^double [^double a ^double b]
-   (m/lerp a b *blend-threshold*)))</pre></td></tr><tr><td class="docs">
+   (m/lerp a b *blend-threshold*)))</pre></td></tr><tr><td class="docs"><p>Internal overlay (with <code>*blend-threshold*</code>)</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-overlay-raw
   (^double [^double a ^double b ^double thr]
    (if (&lt; a thr)
      (* 2.0 (* a b))
      (- 1.0 (* 2.0 (* (- 1.0 a) (- 1.0 b))))))
   (^double [a b]
-   (blend-overlay-raw a b *blend-threshold*)))</pre></td></tr><tr><td class="docs">
+   (blend-overlay-raw a b *blend-threshold*)))</pre></td></tr><tr><td class="docs"><p>Overlay</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-overlay
   ^double [a b]
-  (clamp1 (blend-overlay-raw a b)))</pre></td></tr><tr><td class="docs">
+  (clamp1 (blend-overlay-raw a b)))</pre></td></tr><tr><td class="docs"><p>Modulus overlay</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-moverlay
   ^double [a b]
-  (mod1 (blend-overlay-raw a b)))</pre></td></tr><tr><td class="docs">
+  (mod1 (blend-overlay-raw a b)))</pre></td></tr><tr><td class="docs"><p>Internal hardlight (with <code>*blend-threshold*</code>)</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-hardlight-raw
   (^double [^double a ^double b ^double thr]
    (if (&lt; b thr)
      (* 2.0 (* a b))
      (- 1.0 (* 2.0 (* (- 1.0 a) (- 1.0 b))))))
   (^double [a b]
-   (blend-hardlight-raw a b *blend-threshold*)))</pre></td></tr><tr><td class="docs">
+   (blend-hardlight-raw a b *blend-threshold*)))</pre></td></tr><tr><td class="docs"><p>Hardlight</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-hardlight
   ^double [a b]
-  (clamp1 (blend-hardlight-raw a b)))</pre></td></tr><tr><td class="docs">
+  (clamp1 (blend-hardlight-raw a b)))</pre></td></tr><tr><td class="docs"><p>Modulus hardlight</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-mhardlight
   ^double [a b]
-  (mod1 (blend-hardlight-raw a b)))</pre></td></tr><tr><td class="docs">
+  (mod1 (blend-hardlight-raw a b)))</pre></td></tr><tr><td class="docs"><p>Internal softlight (with <code>*blend-threshold*</code>)</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-softlight-raw
   (^double [^double a ^double b ^double thr]
    (if (&lt; a thr)
@@ -3127,13 +3178,13 @@ net.brehaut.ClojureTools = (function (SH) {
          (* (- (+ a a) 1.0))
          (+ b))))
   (^double [a b]
-   (blend-softlight-raw a b *blend-threshold*)))</pre></td></tr><tr><td class="docs">
+   (blend-softlight-raw a b *blend-threshold*)))</pre></td></tr><tr><td class="docs"><p>Softlight</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-softlight
   ^double [a b]
-  (clamp1 (blend-softlight-raw a b)))</pre></td></tr><tr><td class="docs">
+  (clamp1 (blend-softlight-raw a b)))</pre></td></tr><tr><td class="docs"><p>Modulus softlight</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-msoftlight
   ^double [a b]
-  (mod1 (blend-softlight-raw a b)))</pre></td></tr><tr><td class="docs">
+  (mod1 (blend-softlight-raw a b)))</pre></td></tr><tr><td class="docs"><p>Internal vividlight (with <code>*blend-threshold*</code>)</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-vividlight-raw
   (^double [^double a ^double b ^double thr]
    (if (&lt; a thr)
@@ -3144,23 +3195,23 @@ net.brehaut.ClojureTools = (function (SH) {
           (+ m/EPSILON)
           (/ b))))
   (^double [a b]
-   (blend-vividlight-raw a b *blend-threshold*)))</pre></td></tr><tr><td class="docs">
+   (blend-vividlight-raw a b *blend-threshold*)))</pre></td></tr><tr><td class="docs"><p>Vividlight</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-vividlight
   ^double [a b]
-  (clamp1 (blend-vividlight-raw a b)))</pre></td></tr><tr><td class="docs">
+  (clamp1 (blend-vividlight-raw a b)))</pre></td></tr><tr><td class="docs"><p>Modulus vividlight</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-mvividlight
   ^double [a b]
-  (mod1 (blend-vividlight-raw a b)))</pre></td></tr><tr><td class="docs">
+  (mod1 (blend-vividlight-raw a b)))</pre></td></tr><tr><td class="docs"><p>Dark thresholded (with <code>*blend-threshold*</code>)</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-darkthreshold
   (^double [^double a ^double b ^double thr]
    (if (&lt; a thr) a b))
   (^double [a b]
-   (blend-darkthreshold a b *blend-threshold*)))</pre></td></tr><tr><td class="docs">
+   (blend-darkthreshold a b *blend-threshold*)))</pre></td></tr><tr><td class="docs"><p>Light thresholded (with <code>*blend-threshold*</code>)</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-lightthreshold
   (^double [^double a ^double b ^double thr]
    (if (&gt; a thr) a b))
   (^double [a b]
-   (blend-lightthreshold a b *blend-threshold*)))</pre></td></tr><tr><td class="docs">
+   (blend-lightthreshold a b *blend-threshold*)))</pre></td></tr><tr><td class="docs"><p>List of all blend functions stored in <code>blends</code> map</p>
 </td><td class="codes"><pre class="brush: clojure">(def blends {:none blend-none
              :add blend-add
              :madd blend-madd
@@ -3200,10 +3251,10 @@ net.brehaut.ClojureTools = (function (SH) {
              :vividlight blend-vividlight
              :mvividlight blend-mvividlight
              :darkthreshold blend-darkthreshold
-             :lightthreshold blend-lightthreshold})</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def blends-names (keys blends))</pre></td></tr><tr><td class="docs"><p>Colorspace functions</p>
+             :lightthreshold blend-lightthreshold})</pre></td></tr><tr><td class="docs"><p>All names as list</p>
+</td><td class="codes"><pre class="brush: clojure">(def blends-names (keys blends))</pre></td></tr><tr><td class="docs"><h2>Colorspace functions</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>to remove, check ranges</p>
-</td><td class="codes"><pre class="brush: clojure">(defn test-colors
+</td><td class="codes"><pre class="brush: clojure">(defn- test-colors
   [f]
   (loop [cc (int 0)
          mnr (double Integer/MAX_VALUE)
@@ -3224,7 +3275,7 @@ net.brehaut.ClojureTools = (function (SH) {
           nmxb (if (&gt; (.z res) mxb) (.z res) mxb)]
       (if (&lt; cc 0x1000000)
         (recur (inc cc) (double nmnr) (double nmxr) (double nmng) (double nmxg) (double nmnb) (double nmxb))
-        [nmnr nmxr nmng nmxg nmnb nmxb]))))</pre></td></tr><tr><td class="docs"><p>CMY</p>
+        [nmnr nmxr nmng nmxg nmnb nmxb]))))</pre></td></tr><tr><td class="docs"><h3>CMY</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>RGB -> CMY</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-CMY
   [^Vec4 c]
@@ -3232,7 +3283,7 @@ net.brehaut.ClojureTools = (function (SH) {
          (- 255 (.y c))
          (- 255 (.z c))
          (.w c)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def from-CMY to-CMY)</pre></td></tr><tr><td class="docs"><p>OHTA</p>
+</td><td class="codes"><pre class="brush: clojure">(def from-CMY to-CMY)</pre></td></tr><tr><td class="docs"><h3>OHTA</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>RGB -> OHTA, normalized</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-OHTA
   [^Vec4 c]
@@ -3249,8 +3300,8 @@ net.brehaut.ClojureTools = (function (SH) {
         r (clamp255 (+ i1 i2 i3))
         g (clamp255 (- i1 i3 i3))
         b (clamp255 (- (+ i1 i3) i2))]
-    (Vec4. r g b (.w c))))</pre></td></tr><tr><td class="docs"><p>XYZ</p>
-</td><td class="codes"></td></tr><tr><td class="docs">
+    (Vec4. r g b (.w c))))</pre></td></tr><tr><td class="docs"><h3>XYZ</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Gamma correction</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- xyz-correct
   ^double [^double v]
   (if (&gt; v 0.04045)
@@ -3258,16 +3309,19 @@ net.brehaut.ClojureTools = (function (SH) {
     (/ v 12.92)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double xyz-xmax 0.9504716671128306)
 (def ^:const ^double xyz-ymax 0.9999570331323426)
-(def ^:const ^double xyz-zmax 1.0889782052041752)</pre></td></tr><tr><td class="docs">
+(def ^:const ^double xyz-zmax 1.0889782052041752)</pre></td></tr><tr><td class="docs"><p>Pure RGB->XYZ conversion without corrections.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn to-XYZ-raw
+  ^Vec3 [^Vec3 c]
+  (Vec3. (+ (* (.x c) 0.41239558896741421610) (* (.y c) 0.35758343076371481710) (* (.z c) 0.18049264738170157350))
+         (+ (* (.x c) 0.21258623078559555160) (* (.y c) 0.71517030370341084990) (* (.z c) 0.07220049864333622685))
+         (+ (* (.x c) 0.01929721549174694484) (* (.y c) 0.11918386458084853180) (* (.z c) 0.95049712513157976600))))</pre></td></tr><tr><td class="docs"><p>RGB->XYZ with corrections</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- to-XYZ-
   [^Vec4 c]
   (let [r (xyz-correct (/ (.x c) 255.0))
         g (xyz-correct (/ (.y c) 255.0))
         b (xyz-correct (/ (.z c) 255.0))
-        x (+ (* r 0.41239558896741421610) (* g 0.35758343076371481710) (* b 0.18049264738170157350))
-        y (+ (* r 0.21258623078559555160) (* g 0.71517030370341084990) (* b 0.07220049864333622685))
-        z (+ (* r 0.01929721549174694484) (* g 0.11918386458084853180) (* b 0.95049712513157976600))]
-    (Vec4. x y z (.w c))))</pre></td></tr><tr><td class="docs">
+        ^Vec3 xyz-raw (to-XYZ-raw (Vec3. r g b))]
+    (Vec4. (.x xyz-raw) (.y xyz-raw) (.z xyz-raw) (.w c))))</pre></td></tr><tr><td class="docs"><p>Normlized RGB->XYZ</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-XYZ
   [c]
   (let [^Vec4 cc (to-XYZ- c)]
@@ -3275,31 +3329,34 @@ net.brehaut.ClojureTools = (function (SH) {
            (clamp255 (m/norm (.y cc) 0.0 xyz-ymax 0.0 255.0))
            (clamp255 (m/norm (.z cc) 0.0 xyz-zmax 0.0 255.0))
            (.w cc))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double xyz-f (/ 1.0 2.4))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double xyz-f (/ 1.0 2.4))</pre></td></tr><tr><td class="docs"><p>Gamma correction</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- xyz-decorrect
   ^double [^double v]
   (if (&gt; v 0.0031308)
     (- (* 1.055 (m/pow v xyz-f)) 0.055)
-    (* v 12.92)))</pre></td></tr><tr><td class="docs">
+    (* v 12.92)))</pre></td></tr><tr><td class="docs"><p>Pure XYZ->RGB conversion.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn from-XYZ-raw
+  ^Vec3 [^Vec3 v]
+  (Vec3. (+ (* (.x v)  3.2406) (* (.y v) -1.5372) (* (.z v) -0.4986))
+         (+ (* (.x v) -0.9689) (* (.y v)  1.8758) (* (.z v)  0.0415))
+         (+ (* (.x v)  0.0557) (* (.y v) -0.2040) (* (.z v)  1.0570))))</pre></td></tr><tr><td class="docs"><p>XYZ->RGB conversion with corrections</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- from-XYZ-
   [^Vec4 c]
-  (let [x (.x c)
-        y (.y c)
-        z (.z c)
-        r (xyz-decorrect (+ (* x  3.2406) (* y -1.5372) (* z -0.4986)))
-        g (xyz-decorrect (+ (* x -0.9689) (* y  1.8758) (* z  0.0415)))
-        b (xyz-decorrect (+ (* x  0.0557) (* y -0.2040) (* z  1.0570)))]
+  (let [^Vec3 rgb-raw (from-XYZ-raw (Vec3. (.x c) (.y c) (.z c)))
+        r (xyz-decorrect (.x rgb-raw))
+        g (xyz-decorrect (.y rgb-raw))
+        b (xyz-decorrect (.z rgb-raw))]
     (Vec4. (* 255.0 r)
            (* 255.0 g)
            (* 255.0 b)
-           (.w c))))</pre></td></tr><tr><td class="docs">
+           (.w c))))</pre></td></tr><tr><td class="docs"><p>XYZ->RGB normalized</p>
 </td><td class="codes"><pre class="brush: clojure">(defn from-XYZ
   [^Vec4 c]
   (let [x (m/norm (.x c) 0.0 255.0 0.0 xyz-xmax)
         y (m/norm (.y c) 0.0 255.0 0.0 xyz-ymax)
         z (m/norm (.z c) 0.0 255.0 0.0 xyz-zmax)
         ^Vec4 rgb (from-XYZ- (Vec4. x y z (.w c)))]
-    (v/applyf rgb clamp255)))</pre></td></tr><tr><td class="docs"><p>LUV</p>
+    (v/applyf rgb clamp255)))</pre></td></tr><tr><td class="docs"><h3>LUV</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double D65X 0.950456)
 (def ^:const ^double D65Z 1.088754)
@@ -3307,12 +3364,12 @@ net.brehaut.ClojureTools = (function (SH) {
 (def ^:const ^double CIEK (/ 24389.0 27.0))
 (def ^:const ^double OneThird (/ 1.0 3.0))
 (def ^:const ^double D65FX-4 (/ (* 4.0 D65X) (+ D65X 15 (* 3.0 D65Z))))
-(def ^:const ^double D65FY-9 (/ 9.0 (+ D65X 15 (* 3.0 D65Z))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn perceptible-reciprocal
+(def ^:const ^double D65FY-9 (/ 9.0 (+ D65X 15 (* 3.0 D65Z))))</pre></td></tr><tr><td class="docs"><p>LUV reciprocal</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- perceptible-reciprocal
   ^double [^double x]
   (if (&gt;= (m/abs x) m/EPSILON)
     (/ 1.0 x)
-    (/ (m/sgn x) m/EPSILON)))</pre></td></tr><tr><td class="docs">
+    (/ (m/sgn x) m/EPSILON)))</pre></td></tr><tr><td class="docs"><p>RGB->LUV normalized</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-LUV
   [^Vec4 c]
   (let [^Vec4 xyz (to-XYZ- c)
@@ -3330,7 +3387,7 @@ net.brehaut.ClojureTools = (function (SH) {
            (clamp255 (m/norm u 0.1438470144487729 0.8730615053231279 0.0 255.0))
            (clamp255 (m/norm v 0.022447496915761492 0.944255184334379 0.0 255.0))
            (.w c))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double CIEK2Epsilon (* CIEK CIEEpsilon))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double CIEK2Epsilon (* CIEK CIEEpsilon))</pre></td></tr><tr><td class="docs"><p>LUV->RGB normalized</p>
 </td><td class="codes"><pre class="brush: clojure">(defn from-LUV
   [^Vec4 c]
   (let [L (* 100.0 ^double (m/norm (.x c) 0 255 0.0 0.9999833859065517))
@@ -3349,12 +3406,13 @@ net.brehaut.ClojureTools = (function (SH) {
         X (/ (+ Y5 (* Y (- (/ (* 39.0 L) (+ v (* L13 D65FY-9))) 5.0))) (+ L13u OneThird))
         Z (- (* X L13u) Y5)
         ^Vec4 rgb (from-XYZ- (Vec4. X Y Z (.w c)))]
-    (v/applyf rgb clamp255)))</pre></td></tr><tr><td class="docs">
+    (v/applyf rgb clamp255)))</pre></td></tr><tr><td class="docs"><h3>LAB</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>LAB correction</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- to-lab-correct
   ^double [^double v]
   (if (&gt; v CIEEpsilon)
     (m/pow v OneThird)
-    (/ (+ 16.0 (* v CIEK)) 116.0)))</pre></td></tr><tr><td class="docs">
+    (/ (+ 16.0 (* v CIEK)) 116.0)))</pre></td></tr><tr><td class="docs"><p>RGB->LAB normalized</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-LAB
   [^Vec4 c]
   (let [^Vec4 xyz (to-XYZ- c)
@@ -3370,13 +3428,13 @@ net.brehaut.ClojureTools = (function (SH) {
     (Vec4. (clamp255 (m/norm L 0.0 0.9999833859065517 0.0 255.0))
            (clamp255 (m/norm a 0.16203039020156618 0.8853278445843099 0.0 255.0))
            (clamp255 (m/norm b 0.07698923890750631 0.8705163895243013 0.0 255.0)) 
-           (.w c))))</pre></td></tr><tr><td class="docs">
+           (.w c))))</pre></td></tr><tr><td class="docs"><p>LAB correction</p>
 </td><td class="codes"><pre class="brush: clojure">(defn from-lab-correct
   ^double [^double v]
   (let [v3 (* v v v)]
     (if (&gt; v3 CIEEpsilon)
       v3
-      (/ (- (* 116.0 v) 16.0) CIEK))))</pre></td></tr><tr><td class="docs">
+      (/ (- (* 116.0 v) 16.0) CIEK))))</pre></td></tr><tr><td class="docs"><p>LAB->RGB normalized</p>
 </td><td class="codes"><pre class="brush: clojure">(defn from-LAB
   [^Vec4 c]
   (let [L (* 100.0 ^double (m/norm (.x c) 0.0 255.0 0.0 0.9999833859065517))
@@ -3390,7 +3448,8 @@ net.brehaut.ClojureTools = (function (SH) {
             y3
             (/ L CIEK))
         ^Vec4 rgb (from-XYZ- (Vec4. x y z (.w c)))]
-    (v/applyf rgb clamp255)))</pre></td></tr><tr><td class="docs">
+    (v/applyf rgb clamp255)))</pre></td></tr><tr><td class="docs"><h3>YXy (xyY)</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>RGB->YXY</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-YXY
   [^Vec4 c]
   (let [^Vec4 xyz (to-XYZ- c)
@@ -3398,7 +3457,7 @@ net.brehaut.ClojureTools = (function (SH) {
         Y (m/norm (.y xyz) 0.0 0.9999570331323426 0.0 255.0)
         x (m/norm (/ (.x xyz) d) 0.150011724420108 0.6400884809339611 0.0 255.0)
         y (m/norm (/ (.y xyz) d) 0.060007548576610774 0.6000064972148145 0.0 255.0)]
-    (v/applyf (Vec4. Y x y (.w c)) clamp255)))</pre></td></tr><tr><td class="docs">
+    (v/applyf (Vec4. Y x y (.w c)) clamp255)))</pre></td></tr><tr><td class="docs"><p>YXY->RGB</p>
 </td><td class="codes"><pre class="brush: clojure">(defn from-YXY
   [^Vec4 c]
   (let [^double Y (m/norm (.x c) 0.0 255.0 0.0 0.9999570331323426)
@@ -3408,7 +3467,8 @@ net.brehaut.ClojureTools = (function (SH) {
         X (* x Yy)
         Z (* (- 1.0 x y) Yy)
         ^Vec4 rgb (from-XYZ- (Vec4. X Y Z (.w c)))]
-    (v/applyf rgb clamp255)))</pre></td></tr><tr><td class="docs">
+    (v/applyf rgb clamp255)))</pre></td></tr><tr><td class="docs"><h3>HCL</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>RGB->HCL</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-HCL
   [^Vec4 c]
   (let [mx (max (.x c) (.y c) (.z c))
@@ -3419,7 +3479,7 @@ net.brehaut.ClojureTools = (function (SH) {
                                     (.y c) (+ 2.0 (/ (- (.z c) (.x c)) chr))
                                     (.z c) (+ 4.0 (/ (- (.x c) (.y c)) chr))))) 6.0))
         luma (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))]
-    (v/applyf (Vec4. h chr luma (.w c)) clamp255)))</pre></td></tr><tr><td class="docs">
+    (v/applyf (Vec4. h chr luma (.w c)) clamp255)))</pre></td></tr><tr><td class="docs"><p>HCL->RGB</p>
 </td><td class="codes"><pre class="brush: clojure">(defn from-HCL
   [^Vec4 c]
   (let [h (* 6.0 (/ (.x c) 255.0))
@@ -3437,7 +3497,8 @@ net.brehaut.ClojureTools = (function (SH) {
         ^double g (rgb 1)
         ^double b (rgb 2)
         m (- l (* 0.298839 r) (* 0.586811 g) (* 0.114350 b))]
-    (v/applyf (Vec4. (+ r m) (+ g m) (+  m) (.w c)) clamp255)))</pre></td></tr><tr><td class="docs">
+    (v/applyf (Vec4. (+ r m) (+ g m) (+  m) (.w c)) clamp255)))</pre></td></tr><tr><td class="docs"><h3>HSB</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>RGB->HSB</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-HSB
   [^Vec4 c]
   (let [mn (min (.x c) (.y c) (.z c))
@@ -3451,33 +3512,33 @@ net.brehaut.ClojureTools = (function (SH) {
                                              (.y c) (+ 2.0 (/ (- (.z c) (.x c)) delta))
                                              (.z c) (+ 4.0 (/ (- (.x c) (.y c)) delta)))) 6.0))]
                       [(* 255.0 (if (neg? h) (inc h) h)) s mx]))]
-    (v/applyf (Vec4. h s b (.w c)) clamp255)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(m/remainder 123.01 22.1)</pre></td></tr><tr><td class="docs">
+    (v/applyf (Vec4. h s b (.w c)) clamp255)))</pre></td></tr><tr><td class="docs"><p>HSB->RGB</p>
 </td><td class="codes"><pre class="brush: clojure">(defn from-HSB
   [^Vec4 c]
   (if (zero? (.y c)) (Vec4. (.z c) (.z c) (.z c) (.w c))
-    (let [h (/ (.x c) 255.0)
-          s (/ (.y c) 255.0)
-          b (/ (.z c) 255.0)
-          h (* 6.0 (- h (m/floor h)))
-          f (- h (m/floor h))
-          p (* b (- 1.0 s))
-          q (* b (- 1.0 (* s f)))
-          t (* b (- 1.0 (* s (- 1.0 f))))
-          rgb (condp == (int h)
-                0 [b t p]
-                1 [q b p]
-                2 [p b t]
-                3 [p q b]
-                4 [t p b]
-                5 [b p q])
-          ^double r (rgb 0)
-          ^double g (rgb 1)
-          ^double b (rgb 2)]
-      (v/applyf (Vec4. (* 255.0 r) (* 255.0 g) (* 255.0 b) (.w c)) clamp255))))</pre></td></tr><tr><td class="docs">
+      (let [h (/ (.x c) 255.0)
+            s (/ (.y c) 255.0)
+            b (/ (.z c) 255.0)
+            h (* 6.0 (- h (m/floor h)))
+            f (- h (m/floor h))
+            p (* b (- 1.0 s))
+            q (* b (- 1.0 (* s f)))
+            t (* b (- 1.0 (* s (- 1.0 f))))
+            rgb (condp == (int h)
+                  0 [b t p]
+                  1 [q b p]
+                  2 [p b t]
+                  3 [p q b]
+                  4 [t p b]
+                  5 [b p q])
+            ^double r (rgb 0)
+            ^double g (rgb 1)
+            ^double b (rgb 2)]
+        (v/applyf (Vec4. (* 255.0 r) (* 255.0 g) (* 255.0 b) (.w c)) clamp255))))</pre></td></tr><tr><td class="docs"><h3>HSI</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double to-hsi-const (-&gt; 180.0
                                       (/ m/PI)
-                                      (/ 360.0)))</pre></td></tr><tr><td class="docs">
+                                      (/ 360.0)))</pre></td></tr><tr><td class="docs"><p>RGB->HSI</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-HSI
   [^Vec4 c]
   (let [i (/ (+ (.x c) (.y c) (.z c)) 3.0)]
@@ -3495,7 +3556,7 @@ net.brehaut.ClojureTools = (function (SH) {
                  .y
                  (* (m/cos (* h from-hsi-const)))
                  (/ (m/cos (* (- 60.0 h) from-hsi-const)))
-                 inc)))</pre></td></tr><tr><td class="docs">
+                 inc)))</pre></td></tr><tr><td class="docs"><p>HSI->RGB</p>
 </td><td class="codes"><pre class="brush: clojure">(defn from-HSI
   [^Vec4 c]
   (let [^Vec4 cc (v/div c 255.0)
@@ -3515,7 +3576,8 @@ net.brehaut.ClojureTools = (function (SH) {
                           b (from-hsi-helper cc (- h 240.0))
                           r (- (* 3.0 (.z cc)) g b)]
                       [r g b]))]
-    (v/applyf (v/mult (Vec4. (rgb 0) (rgb 1) (rgb 2) (.w cc)) 255.0) clamp255)))</pre></td></tr><tr><td class="docs">
+    (v/applyf (v/mult (Vec4. (rgb 0) (rgb 1) (rgb 2) (.w cc)) 255.0) clamp255)))</pre></td></tr><tr><td class="docs"><h3>HWB</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>RGB->HWB</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-HWB
   [^Vec4 c]
   (let [w (min (.x c) (.y c) (.z c))
@@ -3530,7 +3592,7 @@ net.brehaut.ClojureTools = (function (SH) {
                                 (.y c) 5.0
                                 (.z c) 1.0)]
                 (m/norm (/ (- p (/ f (- v w))) 6.0) 0.0 1.0 1.0 255.0)))]
-    (v/applyf (Vec4. h w (- 255.0 v) (.w c)) clamp255)))</pre></td></tr><tr><td class="docs">
+    (v/applyf (Vec4. h w (- 255.0 v) (.w c)) clamp255)))</pre></td></tr><tr><td class="docs"><p>HWB->RGB</p>
 </td><td class="codes"><pre class="brush: clojure">(defn from-HWB
   [^Vec4 c]
   (if (&lt; (.x c) 1.0) 
@@ -3551,10 +3613,8 @@ net.brehaut.ClojureTools = (function (SH) {
                 4 [n w v]
                 5 [v w n]
                 6 [v n w])]
-      (v/applyf (Vec4. (* 255.0 ^double (rgb 0)) (* 255.0 ^double (rgb 1)) (* 255.0 ^double (rgb 2)) (.w c)) clamp255))))</pre></td></tr><tr><td class="docs"><p>RGB -> YPbPr, normalized</p>
-
-<p>YPbPr
-Luma + channel differences</p>
+      (v/applyf (Vec4. (* 255.0 ^double (rgb 0)) (* 255.0 ^double (rgb 1)) (* 255.0 ^double (rgb 2)) (.w c)) clamp255))))</pre></td></tr><tr><td class="docs"><h3>YPbPr</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>RGB -> YPbPr, normalized</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-YPbPr
   [^Vec4 c]
   (let [y (+ (* 0.2126 (.x c))
@@ -3568,8 +3628,8 @@ Luma + channel differences</p>
   (let [b (+ (.x c) ^double (m/norm (.y c) 0.0 255.0 -237.0 237.0))
         r (+ (.x c) ^double (m/norm (.z c) 0.0 255.0 -201.0 201.0))
         g (/ (- (.x c) (* 0.2126 r) (* 0.0722 b)) 0.7152)]
-    (v/applyf (Vec4. r g b (.w c)) clamp255)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"></td></tr><tr><td class="docs">
+    (v/applyf (Vec4. r g b (.w c)) clamp255)))</pre></td></tr><tr><td class="docs"><h3>YDbDr</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>RGB->YDbDr</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-YDbDr
   [^Vec4 c]
   (let [Y (+ (* 0.299 (.x c)) (* 0.587 (.y c)) (* 0.114 (.z c)))
@@ -3578,7 +3638,7 @@ Luma + channel differences</p>
     (v/applyf (Vec4. Y
                      (m/norm Db -339.91499999999996 339.91499999999996 0.0 255.0)
                      (m/norm Dr -339.91499999999996 339.915 0.0 255.0)
-                     (.w c)) clamp255)))</pre></td></tr><tr><td class="docs">
+                     (.w c)) clamp255)))</pre></td></tr><tr><td class="docs"><p>YDbDr->RGB</p>
 </td><td class="codes"><pre class="brush: clojure">(defn from-YDbDr
   [^Vec4 c]
   (let [Y (.x c)
@@ -3587,13 +3647,15 @@ Luma + channel differences</p>
         r (+ Y (* 9.2303716147657e-05 Db) (* -0.52591263066186533 Dr))
         g (+ Y (* -0.12913289889050927 Db) (* 0.26789932820759876 Dr))
         b (+ Y (* 0.66467905997895482 Db) (* -7.9202543533108e-05 Dr))]
-    (v/applyf (Vec4. r g b (.w c)) clamp255)))</pre></td></tr><tr><td class="docs"><p>JPEG version</p>
+    (v/applyf (Vec4. r g b (.w c)) clamp255)))</pre></td></tr><tr><td class="docs"><h3>YCbCr</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>JPEG version</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>RGB->YCbCr</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-YCbCr
   [^Vec4 c]
   (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
         Cb (+ 127.5 (* -0.168736 (.x c)) (* -0.331264 (.y c)) (* 0.5 (.z c)))
         Cr (+ 127.5 (* 0.5 (.x c)) (* -0.418688 (.y c)) (* -0.081312 (.z c)))]
-    (v/applyf (Vec4. Y Cb Cr (.w c)) clamp255)))</pre></td></tr><tr><td class="docs">
+    (v/applyf (Vec4. Y Cb Cr (.w c)) clamp255)))</pre></td></tr><tr><td class="docs"><p>YCbCr->RGB</p>
 </td><td class="codes"><pre class="brush: clojure">(defn from-YCbCr
   [^Vec4 c]
   (let [Cb (- (.y c) 127.5)
@@ -3601,7 +3663,8 @@ Luma + channel differences</p>
         r (+ (* 0.99999999999914679361 (.x c)) (* -1.2188941887145875e-06 Cb) (* 1.4019995886561440468 Cr))
         g (+ (* 0.99999975910502514331 (.x c)) (* -0.34413567816504303521 Cb) (* -0.71413649331646789076 Cr))
         b (+ (* 1.00000124040004623180 (.x c)) (* 1.77200006607230409200 Cb) (* 2.1453384174593273e-06 Cr))]
-    (v/applyf (Vec4. r g b (.w c)) clamp255)))</pre></td></tr><tr><td class="docs">
+    (v/applyf (Vec4. r g b (.w c)) clamp255)))</pre></td></tr><tr><td class="docs"><h3>YUV</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>RGB->YUV</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-YUV
   [^Vec4 c]
   (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
@@ -3610,7 +3673,7 @@ Luma + channel differences</p>
     (v/applyf (Vec4. Y 
                      (m/norm U -111.17999999999999 111.17999999999999 0.0 255.0)
                      (m/norm V -156.82500000000002 156.825 0.0 255.0)
-                     (.w c)) clamp255)))</pre></td></tr><tr><td class="docs">
+                     (.w c)) clamp255)))</pre></td></tr><tr><td class="docs"><p>YUV->RGB</p>
 </td><td class="codes"><pre class="brush: clojure">(defn from-YUV
   [^Vec4 c]
   (let [Y (.x c)
@@ -3619,7 +3682,8 @@ Luma + channel differences</p>
         r (+ Y (* -3.945707070708279e-05 U) (* 1.1398279671717170825 V))
         g (+ Y (* -0.3946101641414141437 U) (* -0.5805003156565656797 V))
         b (+ Y (* 2.0319996843434342537 U) (* -4.813762626262513e-04 V))]
-    (v/applyf (Vec4. r g b (.w c)) clamp255)))</pre></td></tr><tr><td class="docs">
+    (v/applyf (Vec4. r g b (.w c)) clamp255)))</pre></td></tr><tr><td class="docs"><h3>YIQ</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>RGB->YIQ</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-YIQ
   [^Vec4 c]
   (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
@@ -3628,7 +3692,7 @@ Luma + channel differences</p>
     (v/applyf (Vec4. Y 
                      (m/norm I -151.90758 151.90758 0.0 255.0)
                      (m/norm Q -133.260705 133.260705 0.0 255.0)
-                     (.w c)) clamp255)))</pre></td></tr><tr><td class="docs">
+                     (.w c)) clamp255)))</pre></td></tr><tr><td class="docs"><p>YIQ->RGB</p>
 </td><td class="codes"><pre class="brush: clojure">(defn from-YIQ
   [^Vec4 c]
   (let [Y (.x c)
@@ -3637,7 +3701,7 @@ Luma + channel differences</p>
         r (+ Y (* +0.9562957197589482261 I) (* 0.6210244164652610754 Q))
         g (+ Y (* -0.2721220993185104464 I) (* -0.6473805968256950427 Q))
         b (+ Y (* -1.1069890167364901945 I) (* 1.7046149983646481374 Q))]
-    (v/applyf (Vec4. r g b (.w c)) clamp255)))</pre></td></tr><tr><td class="docs">
+    (v/applyf (Vec4. r g b (.w c)) clamp255)))</pre></td></tr><tr><td class="docs"><p>List of all color spaces with functions</p>
 </td><td class="codes"><pre class="brush: clojure">(def colorspaces {:CMY   [to-CMY from-CMY]
                   :OHTA  [to-OHTA from-OHTA]
                   :XYZ   [to-XYZ from-XYZ]
@@ -3652,28 +3716,29 @@ Luma + channel differences</p>
                   :YDbDr [to-YDbDr from-YDbDr]
                   :YCbCr [to-YCbCr from-YCbCr]
                   :YUV   [to-YUV from-YUV]
-                  :YIQ   [to-YIQ from-YIQ]})</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def colorspaces-names (keys colorspaces))</pre></td></tr><tr><td class="docs"><p>return colorspace converter by keyword (RGB -> ...)</p>
+                  :YIQ   [to-YIQ from-YIQ]})</pre></td></tr><tr><td class="docs"><p>List of color spaces names</p>
+</td><td class="codes"><pre class="brush: clojure">(def colorspaces-names (keys colorspaces))</pre></td></tr><tr><td class="docs"><p>Return colorspace converter by keyword (RGB -> ...)</p>
 </td><td class="codes"><pre class="brush: clojure">(defn to-cs
   [cs]
-  ((cs colorspaces) 0))</pre></td></tr><tr><td class="docs"><p>return colorspace converter by keyword (... -> RGB)</p>
+  ((cs colorspaces) 0))</pre></td></tr><tr><td class="docs"><p>Return colorspace converter by keyword (... -> RGB)</p>
 </td><td class="codes"><pre class="brush: clojure">(defn from-cs
   [cs]
-  ((cs colorspaces) 1))</pre></td></tr><tr><td class="docs"><p>read 200 palettes from colourlovers</p>
-</td><td class="codes"></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn- hex-to-vec
+  ((cs colorspaces) 1))</pre></td></tr><tr><td class="docs"><h2>Palettes</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Convert hexadecimal color representation to color</p>
+</td><td class="codes"><pre class="brush: clojure">(defn hex-to-vec
   [s]
   (let [x (Long/parseLong s 16)
         x1 (bit-and 0xff (bit-shift-right x 16))
         x2 (bit-and 0xff (bit-shift-right x 8))
         x3 (bit-and 0xff x)]
-    (Vec4. x1 x2 x3 255)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn- hex-to-vecs
+    (Vec4. x1 x2 x3 255)))</pre></td></tr><tr><td class="docs"><p>Convert list of hexadecimal strings into list of colors.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn hex-to-vecs
   [xs]
-  (vec (map hex-to-vec xs)))</pre></td></tr><tr><td class="docs">
+  (mapv hex-to-vec xs))</pre></td></tr><tr><td class="docs"><h3>Colourlovers</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Read and parse 200 palettes from http://www.colourlovers.com/</p>
 </td><td class="codes"><pre class="brush: clojure">(def palettes
-  (let [p1 (xml/parse (io/file (io/resource &quot;colourlovers1.xml&quot;)))
-        p2 (xml/parse (io/file (io/resource &quot;colourlovers2.xml&quot;)))
+  (let [p1 (xml/parse (java.io.ByteArrayInputStream. (.getBytes ^String (slurp (io/resource &quot;colourlovers1.xml&quot;)))))
+        p2 (xml/parse (java.io.ByteArrayInputStream. (.getBytes ^String (slurp (io/resource &quot;colourlovers2.xml&quot;)))))
         f (fn [xml-in] (map (fn [x] (map #((:content %) 0) (-&gt;&gt; x
                                                                 ((:content xml-in))
                                                                 :content
@@ -3682,8 +3747,9 @@ Luma + channel differences</p>
                                                                 :content))) (range 100)))
         l1 (f p1)
         l2 (f p2)]
-    (vec (map hex-to-vecs (concat l1 l2)))))</pre></td></tr><tr><td class="docs">
+    (mapv hex-to-vecs (concat l1 l2))))</pre></td></tr><tr><td class="docs"><h3>Inigo Quilez</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>http://iquilezles.org/www/articles/palettes/palettes.htm</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Create palette generator function with given parametrization</p>
 </td><td class="codes"><pre class="brush: clojure">(defn create-palette-fn
   [a b c d]
   (fn [t]
@@ -3696,15 +3762,24 @@ Luma + channel differences</p>
                        (v/add a))]
       (-&gt; (Vec4. (.x cc) (.y cc) (.z cc) 1.0)
           (v/mult 255)
-          (v/applyf clamp255)))))</pre></td></tr><tr><td class="docs">
+          (v/applyf clamp255)))))</pre></td></tr><tr><td class="docs"><p>Create palette with cosinus generator. Input parameter: number of colors.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-random-palette
   [^long num]
-  (let [a (v/generate-vec3 (partial m/drand 0.3 0.7))
+  (let [a (v/generate-vec3 (partial r/drand 0.3 0.7))
         b (v/sub (Vec3. 1.0 1.0 1.1) a)
-        c (v/generate-vec3 (partial m/drand 2))
-        d (v/generate-vec3 m/drand)
+        c (v/generate-vec3 (partial r/drand 2))
+        d (v/generate-vec3 r/drand)
         f (create-palette-fn a b c d)]
-    (vec (map f (range 0.0 1.0 (/ 1.0 num))))))</pre></td></tr><tr><td class="docs"><p>paletton palettes</p>
+    (mapv f (range 0.0 1.0 (/ 1.0 num)))))</pre></td></tr><tr><td class="docs"><h3>Paletton</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Here you can find reimplementation of http://paletton.com palette generator.
+You can create palette based on <code>hue</code> value with following options:</p>
+
+<ul>
+<li>Palette type, one from <code>:monochromatic</code>, <code>:triad</code>, <code>:tetrad</code></li>
+<li>Paletton presets, check <code>paletton-presets-names</code> value</li>
+<li>Complementary color</li>
+<li>Angle between colors for <code>:triad</code> and <code>:tetrad</code></li>
+</ul>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def paletton-base-data
   (let [s (fn ^double [^double e ^double t ^double n] (if (== n -1.0) e
@@ -3721,7 +3796,10 @@ Luma + channel differences</p>
             :b (:rg paletton-base-values)
             :f (fn ^double [^double e]
                  (if (== e 0.0) -1.0
-                       (* 0.5 (m/tan (* m/HALF_PI (/ (- 120.0 e) 120.0))))))
+                     (* 0.5 (m/tan (* m/HALF_PI (/ (- 120.0 e) 120.0))))))
+            :fi (fn ^double [^double e]
+                  (if (== e -1.0) 0.0
+                      (- 120.0 (* 2.0 (/ (* (m/atan (/ e 0.5)) 120.0) m/PI)))))
             :g s
             :rgb (fn [e n r] (Vec4. e n r 255.0))}
      180.0 {:a (:rg paletton-base-values)
@@ -3729,6 +3807,9 @@ Luma + channel differences</p>
             :f (fn ^double [^double e]
                  (if (== e 180.0) -1.0
                      (* 0.5 (m/tan (* m/HALF_PI (/ (- e 120.0) 60.0))))))
+            :fi (fn ^double [^double e]
+                  (if (== e -1.0) 180.0
+                      (+ 120.0 (* 2.0 (/ (* (m/atan (/ e 0.5)) 60.0) m/PI)))))
             :g i
             :rgb (fn [e n r] (Vec4. n e r 255.0))}
      210.0 {:a (:g paletton-base-values)
@@ -3736,6 +3817,9 @@ Luma + channel differences</p>
             :f (fn ^double [^double e]
                  (if (== e 180.0) -1.0
                      (* 0.75 (m/tan (* m/HALF_PI (/ (- 210.0 e) 30.0))))))
+            :fi (fn ^double [^double e]
+                  (if (== e -1.0) 180.0
+                      (- 210 (* 2.0 (/ (* (m/atan (/ e 0.75)) 30.0) m/PI)))))
             :g s
             :rgb (fn [e n r] (Vec4. r e n 255.0))}
      255.0 {:a (:gb paletton-base-values)
@@ -3743,6 +3827,9 @@ Luma + channel differences</p>
             :f (fn ^double [^double e]
                  (if (== e 255.0) -1.0
                      (* 1.33 (m/tan (* m/HALF_PI (/ (- e 210.0) 45.0))))))
+            :fi (fn ^double [^double e]
+                  (if (== e -1.0) 255.0
+                      (+ 210.0 (* 2.0 (/ (* (m/atan (/ e 1.33)) 45.0) m/PI)))))
             :g i
             :rgb (fn [e n r] (Vec4. r n e 255.0))}
      315.0 {:a (:b paletton-base-values)
@@ -3750,6 +3837,9 @@ Luma + channel differences</p>
             :f (fn ^double [^double e]
                  (if (== e 255.0) -1.0
                      (* 1.33 (m/tan (* m/HALF_PI (/ (- 315.0 e) 60.0))))))
+            :fi (fn ^double [^double e]
+                  (if (== e -1.0) 255.0
+                      (- 315.0 (* 2.0 (/ (* (m/atan (/ e 1.33)) 60.0) m/PI)))))
             :g s
             :rgb (fn [e n r] (Vec4. n r e 255.0))}
      360.0 {:a (:br paletton-base-values)
@@ -3757,16 +3847,19 @@ Luma + channel differences</p>
             :f (fn ^double [^double e]
                  (if (== e 0.0) -1.0
                      (* 1.33 (m/tan (* m/HALF_PI (/ (- e 315.0) 45.0))))))
+            :fi (fn ^double [^double e]
+                  (if (== e -1.0) 0.0
+                      (+ 315.0 (* 2.0 (/ (* (m/atan (/ e 1.33)) 45.0) m/PI)))))
             :g i
-            :rgb (fn [e n r] (Vec4. e r n 255.0))}}))</pre></td></tr><tr><td class="docs">
+            :rgb (fn [e n r] (Vec4. e r n 255.0))}}))</pre></td></tr><tr><td class="docs"><p>Paletton version of HSV to RGB converter</p>
 </td><td class="codes"><pre class="brush: clojure">(defn paletton-hsv-to-rgb
   [^double hue ^double ks ^double kv]
   (let [ks (m/constrain ks 0.0 2.0)
         kv (m/constrain kv 0.0 2.0)
         ^double h (mod hue 360.0)
         upd (fn ^double [^double e ^double t] (if (&lt;= t 1.0)
-                        (* e t)
-                        (+ e (* (- 1.0 e) (dec t)))))
+                                                (* e t)
+                                                (+ e (* (- 1.0 e) (dec t)))))
         {:keys [a b f g rgb]} (second (first (filter #(&lt; h ^double (% 0)) paletton-base-data)))
         av (second a)
         bv (second b)
@@ -3779,7 +3872,30 @@ Luma + channel differences</p>
         b (* r (- 1.0 s))
         g (if (== n -1.0) b
               (/ (+ r (* n b)) (inc n)))]
-    (rgb r g b)))</pre></td></tr><tr><td class="docs">
+    (rgb r g b)))</pre></td></tr><tr><td class="docs"><p>Take paletton HUE from RGB</p>
+</td><td class="codes"><pre class="brush: clojure">(defn paletton-rgb-to-hue
+  (^double [^double r ^double g ^double b]
+   (if (== r g b)
+     0.0
+     (let [f (max r g b)
+           p (min r g b)
+           [l i] (if (== f r)
+                   (if (== p b)
+                     [g (:fi (paletton-base-data 120.0))]
+                     [b (:fi (paletton-base-data 360.0))])
+                   (if (== f g)
+                     (if (== p r)
+                       [b (:fi (paletton-base-data 210.0))]
+                       [r (:fi (paletton-base-data 180.0))])
+                     (if (== p r)
+                       [g (:fi (paletton-base-data 255.0))]
+                       [r (:fi (paletton-base-data 315.0))])))
+                                        ;d (/ (- f p) f) ;; saturation
+                                        ;v (/ f 255.0)   ;; value
+           s (i (if (== l p) -1.0
+                    (/ (- f l) (- l p))))]
+       s)))
+  ([^Vec4 c] (paletton-rgb-to-hue (.x c) (.y c) (.z c))))</pre></td></tr><tr><td class="docs"><p>List of paletton presets</p>
 </td><td class="codes"><pre class="brush: clojure">(def paletton-presets
   {:pale-light [[0.24649 1.78676] [0.09956 1.95603] [0.17209 1.88583] [0.32122 1.65929] [0.39549 1.50186]]
    :pastels-bright [[0.65667 1.86024] [0.04738 1.99142] [0.39536 1.89478] [0.90297 1.85419] [1.86422 1.8314]]
@@ -3804,12 +3920,20 @@ Luma + channel differences</p>
    :almost-gray-darker [[0.07336 0.36815] [0.18061 0.50026] [0.09777 0.314] [0.12238 0.25831] [0.14388 0.1883]]
    :almost-gray-mid [[0.07291 0.59958] [0.19602 0.74092] [0.10876 0.5366] [0.15632 0.48229] [0.20323 0.42268]]
    :almost-gray-lighter [[0.06074 0.82834] [0.14546 0.97794] [0.10798 0.76459] [0.15939 0.68697] [0.22171 0.62926]]
-   :almost-gray-light [[0.03501 1.59439] [0.23204 1.10483] [0.14935 1.33784] [0.07371 1.04897] [0.09635 0.91368]]})</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def paletton-presets-names (keys paletton-presets))</pre></td></tr><tr><td class="docs">
+   :almost-gray-light [[0.03501 1.59439] [0.23204 1.10483] [0.14935 1.33784] [0.07371 1.04897] [0.09635 0.91368]]})</pre></td></tr><tr><td class="docs"><p>List of preset names</p>
+</td><td class="codes"><pre class="brush: clojure">(def paletton-presets-names (keys paletton-presets))</pre></td></tr><tr><td class="docs"><p>Create monochromatic palette from hue and preset.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-monochromatic-palette
   [hue preset]
-  (vec (map (fn [[ks kv]] (paletton-hsv-to-rgb hue ks kv)) preset)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defmulti paletton-palette (fn [m hue &amp; conf] m))</pre></td></tr><tr><td class="docs">
+  (mapv (fn [[ks kv]] (paletton-hsv-to-rgb hue ks kv)) preset))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmulti paletton-palette (fn [m hue &amp; conf] m))</pre></td></tr><tr><td class="docs"><p>Following methods can be used to create paletton palettes.
+As a dispatch use one of the types <code>:monochromatic</code>, <code>:triad</code> or <code>:tetrad</code>.
+Parameters are <code>hue</code> value and configuration.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p><code>:monochromatic</code> configuration</p>
+
+<ul>
+<li><code>:compl</code> - use complementary color? (true/false)</li>
+<li><code>:preset</code> - what preset to use (one from <code>paletton-preset-names</code>)</li>
+</ul>
 </td><td class="codes"><pre class="brush: clojure">(defmethod paletton-palette :monochromatic [_ hue &amp; conf]
   (let [{compl :compl 
          preset :preset
@@ -3817,7 +3941,14 @@ Luma + channel differences</p>
               preset :full}} (first conf)
         ppreset (if (keyword? preset) (paletton-presets preset) preset)
         p (make-monochromatic-palette hue ppreset)]
-    (if compl (vec (concat p (make-monochromatic-palette (+ ^double hue 180.0) ppreset))) p)))</pre></td></tr><tr><td class="docs">
+    (if compl (vec (concat p (make-monochromatic-palette (+ ^double hue 180.0) ppreset))) p)))</pre></td></tr><tr><td class="docs"><p><code>:triad</code> configuration</p>
+
+<ul>
+<li><code>:compl</code> - use complementary color? (true/false)</li>
+<li><code>:preset</code> - what preset to use (one from <code>paletton-preset-names</code>)</li>
+<li><code>:angle</code> - angle between main hue and two additional</li>
+<li><code>:adj</code> - use adjacent version of triad (true/false)</li>
+</ul>
 </td><td class="codes"><pre class="brush: clojure">(defmethod paletton-palette :triad [_ hue &amp; conf]
   (let [{compl :compl
          preset :preset
@@ -3835,7 +3966,12 @@ Luma + channel differences</p>
         p2 (make-monochromatic-palette hue1 ppreset)
         p3 (make-monochromatic-palette hue2 ppreset)
         p (vec (concat p1 p2 p3))]
-    (if compl (vec (concat p (make-monochromatic-palette chue ppreset))) p)))</pre></td></tr><tr><td class="docs">
+    (if compl (vec (concat p (make-monochromatic-palette chue ppreset))) p)))</pre></td></tr><tr><td class="docs"><p><code>:triad</code> configuration</p>
+
+<ul>
+<li><code>:preset</code> - what preset to use (one from <code>paletton-preset-names</code>)</li>
+<li><code>:angle</code> - angle between main hue and additional color</li>
+</ul>
 </td><td class="codes"><pre class="brush: clojure">(defmethod paletton-palette :tetrad [_ hue &amp; conf]
   (let [{preset :preset
          angle :angle
@@ -3843,8 +3979,8 @@ Luma + channel differences</p>
               angle 30.0}} (first conf)
         p1 (paletton-palette :monochromatic hue {:preset preset :compl true})
         p2 (paletton-palette :monochromatic (+ ^double angle ^double hue) {:preset preset :compl true})]
-    (vec (concat p1 p2))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"></td></tr><tr><td class="docs">
+    (vec (concat p1 p2))))</pre></td></tr><tr><td class="docs"><h2>Additional functions</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Find nearest color from a set. Input: distance function (default euclidean), list of target colors and source color.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn nearest-color
   ([f xf c]
    (let [s (count xf)]
@@ -3859,15 +3995,14 @@ Luma + channel differences</p>
                   (if (&lt; dist currdist) dist currdist)))
          currc))))
   ([xf c]
-   (nearest-color v/dist xf c)))</pre></td></tr><tr><td class="docs">
+   (nearest-color v/dist xf c)))</pre></td></tr><tr><td class="docs"><p>Define reduce color filter to use on <code>Pixels</code>.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-reduce-color-filter
   ([]
    (partial nearest-color (rand-nth palettes)))
   ([pal]
    (partial nearest-color pal))
   ([f pal]
-   (partial nearest-color f pal)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
+   (partial nearest-color f pal)))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
 SyntaxHighlighter.all();
 
 // hackity hack

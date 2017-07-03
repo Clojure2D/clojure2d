@@ -2867,7 +2867,8 @@ net.brehaut.ClojureTools = (function (SH) {
 })(SyntaxHighlighter);
 </script><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript"></script><title>clojure2d -- Marginalia</title></head><body><table><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojure2d.math.joise" name="clojure2d.math.joise"><h1 class="project-name">clojure2d.math.joise</h1><a class="toc-link" href="toc.html">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.math.joise
-  (:require [clojure2d.math :refer :all])
+  (:require [clojure2d.math :refer :all]
+            [clojure2d.math.random :refer :all])
   (:import [com.sudoplay.joise.module Module SourcedModule ScalarParameter
             ModuleBasisFunction ModuleBasisFunction$BasisType ModuleBasisFunction$InterpolationType
             ModuleCellular ModuleCellGen
@@ -3007,8 +3008,6 @@ net.brehaut.ClojureTools = (function (SH) {
   []
   (let [type (rand-nth (keys fractal-type))
         b [(make-random-basis-module)
-           (make-random-cell-module)
-           (make-random-basis-module)
            (make-random-cell-module)]
         l (drand 1 3)
         f (drand 1 3)]

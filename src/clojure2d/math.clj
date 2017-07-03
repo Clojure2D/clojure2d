@@ -6,7 +6,6 @@
 ;; * Functions based on FastMath wrapped in Clojure functions (trigonometry, powers/logartihms/roots, rounding)
 ;; * Additional math functions (signum, constrain, interpolation)
 ;; * Statistics
-;; * Noise and random
 
 (ns clojure2d.math
   "Math functions"
@@ -318,7 +317,7 @@
   (mlerp start stop (* t t (- 3.0 (* 2.0 t)))))
 
 (defn quad-interpolation
-  ""
+  "quad interpolation"
   ^double [^double start ^double stop ^double t]
   (mlerp start stop (let [t' (* 2.0 t)]
                       (if (< t' 1.0)

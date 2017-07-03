@@ -1,10 +1,10 @@
 ;; # Namespace scope
 ;;
-;; This namespace provides functions which cover: diplaying windows with events, canvases, image files and session management.
+;; This namespace provides functions which cover: diplaying windows, events, canvases, image files and session management.
 ;; In brief:
 ;;
 ;; * Image file read and write, backed by Java ImageIO API. You can read and write BMP, JPG and PNG files. I didn't test WBMP and GIF. Image itself is Java `BufferedImage` in integer ARGB mode. Each pixel is represented as 32bit unsigned integer and 8 bits per channel. See `clojure2d.pixels` namespace for pixels operations.
-;; * Canvas with functions to draw on it, represented as vactor of Graphics2d, BufferedImage and quality settings wrapped in atom.
+;; * Canvas with functions to draw on it, represented as Canvas type with Graphics2d, BufferedImage, quality settings, primitive classes and size
 ;; * Display (JFrame) with events handlers (multimethods) + associated autorefreshing canvas, and optionally Processiing style `draw` function with context management
 ;; * Session management: unique identifier generation, logging (different file per session) and unique, sequenced filename creation.
 ;; * Some general helper functions
@@ -12,8 +12,10 @@
 (ns clojure2d.core
   "JFrame, Java2D, file io and simple session management"
   (:require [clojure.java.io :refer :all]
-            [clojure2d.color :as c])  
-  (:import [java.awt.image BufferedImage BufferStrategy]
+            [clojure2d.color :as c]
+            [clojure2d.math.vector :as v])  
+  (:import [clojure2d.math.vector Vec2]
+           [java.awt.image BufferedImage BufferStrategy]
            [javax.swing ImageIcon]
            [javax.imageio ImageIO ImageWriter ImageWriteParam IIOImage]
            [java.awt Graphics2D Image RenderingHints GraphicsEnvironment 
@@ -42,7 +44,7 @@
 
 ;; ### Load image
 
-;; To load image from the file, just call `(load-image "filename.jpg")`. Idea is stolen from Processing code. Loading is done via `ImageIcon` class and later converted to BufferedImage in ARGB mode.
+;; To load image from the file, just call `(load-image "filename.jpg")`. Idea is taken from Processing code. Loading is done via `ImageIcon` class and later converted to BufferedImage in ARGB mode.
 
 (defn load-image 
   "Load image from file.
@@ -70,7 +72,7 @@
 ;; * extract file extension and create image writer object
 ;; * call multimethod to prepare data and save in chosen format
 ;;
-;; We have two factors here. First is whether file format accepts alpha channel (jpgs, bmps don't) and second is quality settings (for jpg only). In the first case we have to properly flatten the image with `flatten-image` function. In the second case we set quality attributes.
+;; We have two types here. First is whether file format accepts alpha channel (jpgs, bmps don't) and second is quality settings (for jpg only). In the first case we have to properly flatten the image with `flatten-image` function. In the second case we set quality attributes.
 
 (defn- file-extension-int
   "Extract extension from filename.
@@ -105,7 +107,7 @@
     nimg))
 
 (defn- do-save
-  "Save image to the file via writer with parameters"
+  "Save image to the file via writer with parameters. Returns image."
   ([filename img ^ImageWriter writer]
    (do-save filename img writer (.getDefaultWriteParam writer)))
   ([filename ^BufferedImage img ^ImageWriter writer param]
@@ -113,7 +115,8 @@
      (doto writer
        (.setOutput (ImageIO/createImageOutputStream os))
        (.write nil (IIOImage. img nil nil) param)
-       (.dispose)))))
+       (.dispose)))
+   img))
 
 ;; Now we define multimethod which saves image. Multimethod is used here because some image types requires additional actions.
 (defmulti save-file-type (fn [filename _ _] (keyword (file-extension filename))))
@@ -131,8 +134,7 @@
 ;; BMP also requires image flattening
 (defmethod save-file-type :bmp
   [filename img writer]
-  (let [nimg (flatten-image img)]
-    (do-save filename nimg writer)))
+  (do-save filename (flatten-image img) writer))
 
 ;; The rest file types are saved with alpha without special treatment.
 (defmethod save-file-type :default
@@ -152,7 +154,7 @@
       (save-file-type filename b iwriter)
       (println (str "can't save an image: " filename)))))
 
-;; ### Addition functions
+;; ### Additional functions
 ;;
 ;; Just an image resizer with bicubic interpolation. Native `Graphics2D` method is called.
 
@@ -173,13 +175,15 @@
 
 ;; ## Canvas
 ;;
-;; Canvas is an object you can draw on and which can be displayed in the window also saved. Technically it's a type cosisting of `Graphics2D` object which is internally used to draw on the image, image (`BufferedImage` object), rendering quality hints and singletons for primitives. What is important: to draw on canvas you have to wrap your operations in `with-canvas` macro. `with-canvas` is responsible for creating and releasing `Graphics2D` object. Initially `Graphics2D` is set to `nil`.
+;; Canvas is an object you can draw on and which can be displayed in the window. Technically it's a type cosisting of `Graphics2D` object which is internally used to draw on the image, image (`BufferedImage` object), rendering quality hints and singletons for primitives. What is important: to draw on canvas you have to wrap your operations in `with-canvas` macro. `with-canvas` is responsible for creating and releasing `Graphics2D` object. Initially `Graphics2D` is set to `nil`.
 ;; Canvas should be accelerated by Java and your video card.
 ;; Reminder: Drawing on canvas is single threaded.
 
+;; Let's define protocol to equip Canvas and Window types with `get-image` function. `get-image` extracts image.
 (defprotocol ImageProto
   (get-image [t]))
 
+;; Canvas type. Use `get-image` to extract image (`BufferedImage`).
 (deftype Canvas [^Graphics2D graphics
                  ^BufferedImage buffer
                  ^Line2D line-obj
@@ -191,7 +195,7 @@
   ImageProto
   (get-image [_] buffer))
 
-;; First let's define three rendering quality options: `:low`, `:mid` and `:high`. Where `:low` is fastest but has poor quality and `:high` has best quality but may be slow. Rendering options are used when you create canvas.
+;; Let's define three rendering quality options: `:low`, `:mid` and `:high`. Where `:low` is fastest but has poor quality and `:high` has best quality but may be slow. Rendering options are used when you create canvas.
 (def rendering-hints {:low {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF
                             RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR
                             RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
@@ -217,7 +221,8 @@
 ;; Following functions and macro are responsible for creating and releasing `Graphics2D` object for a canvas.
 ;; You have to use `with-canvas` macro to draw on canvas. Internally it's a threading macro and accepts only list of methods which first parameter is canvas object.
 ;; Please do not use `flush-graphics` and `make-graphics` functions directly. Use `with-canvas` macro instead. I do not check state of `Graphics2D` anywhere.
-;; There is one exception: your `draw` function is already wrapped in `with-canvas` and you can freely use canvas object inside.
+;; There is one exception: `draw` function associated with Window is already wrapped in `with-canvas` and you can freely use canvas object inside.
+;; Another note: `with-canvas` creates it's own copy of `Canvas` object with set `Graphics2D`.
 
 (defn flush-graphics
   "Dispose current `Graphics2D`"
@@ -255,7 +260,7 @@
 (declare image)
 
 (defn create-canvas
-  "Create and return canvas with `width`, `height` and quality hint name (keyword). Default hint is `:high`"
+  "Create and return canvas with `width`, `height` and quality hint name (keyword). Default hint is `:high`."
   ([^long width ^long height hint]
    (let
        [^BufferedImage buffer (.. GraphicsEnvironment 
@@ -276,7 +281,7 @@
   ([width height]
    (create-canvas width height :high)))
 
-;; alias
+;; alias for create-canvas
 (def make-canvas create-canvas)
 
 (defn resize-canvas
@@ -284,30 +289,22 @@
   [^Canvas canvas width height]
   (let [ncanvas (create-canvas width height (.hints canvas))]
     (with-canvas ncanvas
-      (image (.buffer canvas)))))
-
-(comment defn set-canvas-quality
-         "Change canvas quality"
-         [canvas hints]
-         (let [[g b] @canvas]
-           (reset! canvas [g b (rendering-hints hints)])))
+      (image (get-image canvas)))))
 
 (defn save-canvas
   "Save canvas to the file"
   [^Canvas canvas filename]
-  (save-image (.buffer canvas) filename))
+  (save-image (get-image canvas) filename))
 
 ;; ### Drawing functions
 ;;
 ;; Here we have basic drawing functions. What you need to remember:
 ;;
 ;; * Color is set globally for all figures (exception: `set-background`)
-;; * Filled or stroke figures are determined by last parameter `stroke?`. When set to `true` draws figure outline, filled otherwise (default).
+;; * Filled or stroke figures are determined by last parameter `stroke?`. When set to `true` draws figure outline, filled otherwise (default). Default is `false` (filled).
 ;; * Always use with `with-canvas` macro.
 ;; 
 ;; All functions return canvas object
-
-;; Since drawing on the canvas is single threaded we can use internal mutable objects to draw things.
 
 (defn line
   "Draw line from point `(x1,y1)` to `(x2,y2)`"
@@ -335,7 +332,7 @@
   ([^Canvas canvas x1 y1 w h stroke?]
    (let [^Rectangle2D r (.rect-obj canvas)] 
      (.setFrame r x1 y1 w h)
-     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) r stroke?))
+     (draw-fill-or-stroke (.graphics canvas) r stroke?))
    canvas)
   ([canvas x1 y1 w h]
    (rect canvas x1 y1 w h false)))
@@ -345,7 +342,7 @@
   ([^Canvas canvas x1 y1 w h stroke?]
    (let [^Ellipse2D e (.ellipse_obj canvas)]
      (.setFrame e (- ^double x1 (/ ^double w 2.0)) (- ^double y1 (/ ^double h 2.0)) w h)
-     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) e stroke?))
+     (draw-fill-or-stroke (.graphics canvas) e stroke?))
    canvas)
   ([canvas x1 y1 w h]
    (ellipse canvas x1 y1 w h false)))
@@ -359,7 +356,7 @@
        (.lineTo x2 y2)
        (.lineTo x3 y3)
        (.closePath))
-     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?))
+     (draw-fill-or-stroke (.graphics canvas) p stroke?))
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3]
    (triangle canvas x1 y2 x2 y2 x3 y3 false)))
@@ -367,15 +364,15 @@
 (defn triangle-strip
   "Draw triangle strip. Implementation of `Processing` `STRIP` shape.
 
-  Input: list of vertices as vectors [x,y]"
+  Input: list of vertices as Vec2 vectors"
   ([canvas vs stroke?]
    (when (> (count vs) 2)
-     (loop [v1 (first vs)
-            v2 (second vs)
+     (loop [^Vec2 v1 (first vs)
+            ^Vec2 v2 (second vs)
             vss (nnext vs)]
        (when vss
-         (let [v3 (first vss)]
-           (triangle canvas (v2 0) (v2 1) (v3 0) (v3 1) (v1 0) (v1 1) stroke?)
+         (let [^Vec2 v3 (first vss)]
+           (triangle canvas (.x v2) (.y v2) (.x v3) (.y v3) (.x v1) (.y v1) stroke?)
            (recur v2 v3 (next vss))))))
    canvas)
   ([canvas vs]
@@ -412,19 +409,6 @@
   (.setColor ^Graphics2D (.graphics canvas) c)
   canvas)
 
-(defn set-color
-  "Set global color. You can pass:
-
-  * java.awt.Color object
-  * clojure2d.math.vector.Vec4 or Vec3 object
-  * individual r, g, b (and optional alpha) as integers from 0-255. They are converted to integer and clamped if necessary."
-  ([canvas c]
-   (set-awt-color canvas (c/make-awt-color c)))
-  ([canvas r g b a]
-   (set-awt-color canvas (c/make-awt-color r g b a)))
-  ([canvas r g b]
-   (set-awt-color canvas (c/make-awt-color r g b))))
-  
 (defn set-awt-background
   "Set background color. Expects valid `Color` object."
   [^Canvas canvas c]
@@ -436,18 +420,24 @@
       (.setColor currc)))
   canvas)
 
-(defn set-background
-  "Set background to the specified color. Current global color is restored. You can pass:
+(defn- set-color-with-fn
+  "Set color for primitive or background via passed function. You can use:
 
   * java.awt.Color object
   * clojure2d.math.vector.Vec4 or Vec3 object
   * individual r, g, b (and optional alpha) as integers from 0-255. They are converted to integer and clamped if necessary."
-  ([canvas c]
-   (set-awt-background canvas (c/make-awt-color c)))
-  ([canvas r g b a]
-   (set-awt-background canvas (c/make-awt-color r g b a)))
-  ([canvas r g b]
-   (set-awt-background canvas (c/make-awt-color r g b))))
+  ([f canvas c]
+   (f canvas (c/make-awt-color c)))
+  ([f canvas r g b a]
+   (f canvas (c/make-awt-color r g b a)))
+  ([f canvas r g b]
+   (f canvas (c/make-awt-color r g b))))
+
+;; Set color for primitive
+(def set-color (partial set-color-with-fn set-awt-color))
+
+;; Set background color
+(def set-background (partial set-color-with-fn set-awt-background))
 
 (defn image
   "Draw an image. You can specify position and size of the image. Default it's placed on whole canvas."
@@ -460,8 +450,8 @@
 ;; ## Display window
 ;;
 ;; You can find here a couple of functions which help to display your canvas and build interaction with user.
-;; Display window is just a Swing `JFrame` with `java.awt.Canvas` with periodically repainted bound canvas.
-;; What is important, window is not a canvas (like it is in Processing) so first you need to create canvas and then create window displaying it.
+;; Display window is just a Swing `JFrame` with `java.awt.Canvas` as panel.
+;; What is important, window is not a canvas (like it is in Processing) so first you need to create canvas object and then create window displaying it.
 ;; You can create as many windows as you want. Just name them differently. You can also create window with different size than canvas. Canvas will be rescaled.
 ;; Windows is not resizable and can't be set to a fullscreen mode (yet)
 ;; 
@@ -473,39 +463,31 @@
 ;; * canvas refresh rate as frames per second (ex. 25)
 ;; * optionally callback function which is called just before repainting the canvas (like `draw` in Processing)
 ;;
-;; `show-window` returns a vector containing
+;; `show-window` returns a `Window` object containing
 ;;
 ;; * `JFrame` object
-;; * `is-display-running?` atom (see below)
+;; * `active?` atom (see below)
 ;; *  buffer which is canvas packed into atom (to enable easy canvas replacement)
-;; *  map with all above + additional objects
-;;    *  `:frame` JFrame object
-;;    *  `:is-display-running?`
-;;    *  `:buffer`
-;;    *  `:panel` `java.awt.Canvas` object placed on JFrame (awt toolkit canvas)
-;;    *  `:fps`
-;;    *  `:width`
-;;    *  `:height`
-;;    *  `:name` window name
+;; *  `:panel` `java.awt.Canvas` object placed on JFrame (awt toolkit canvas)
+;; *  `:fps`
+;; *  `:width`
+;; *  `:height`
+;; *  `:window-name` window name
 ;;
-;; `is-display-running?` atom is unique for each window and has value `true` when window is shown and set to `false` when window is closed with default close button.
-;; You can use this atom to control (and possibly stop) all activities which refers to related window. For example you may want to cancel all updating canvas processes when user closes window.
-;;
-;; See: examples/ex00_display.clj
+;; `active?` atom is unique for each window and has value `true` when window is shown and set to `false` when window is closed with default close button.
+;; Use this information via `window-active?` function to control (and possibly stop) all activities which refers to related window. For example you may want to cancel all updating canvas processes when user closes window.
 ;;
 ;; ### Callback function (aka `draw`)
 ;;
-;; This is function with three parameters which is called just before repainting canvas. You can use it to simulate Processing `draw` behaviour. Function should accept following parameters:
+;; You can define function with three parameters which is called just before repainting canvas. You can use it to simulate Processing `draw` behaviour. Function should accept following parameters:
 ;;
-;; * canvas - canvas to draw on, canvas bind to window will be passed here
-;; * frame count - current number of calls, statring 0
-;; * state - any state data you want to pass between calls, `nil` initially
+;; * canvas - canvas to draw on, canvas bound to window will be passed here.
+;; * frame count - current number of calls, starting 0
+;; * state - any state you want to pass between calls, `nil` initially
 ;;
-;; Function should return current state, which is subject to pass to function when called next time.
+;; Function should return current state, which will be passed to function when called next time.
 ;;
-;; Note: calls to `draw` is wrapped in `with-canvas` already.
-;;
-;; See: examples/ex02_draw.clj
+;; Note: calls to `draw` are wrapped in `with-canvas` already.
 ;;
 ;; ### Events
 ;;
@@ -520,12 +502,10 @@
 ;; This means you write different method for different key.
 ;; As a function parameter you get `KeyEvent` object [java.awt.KeyEvent](https://docs.oracle.com/javase/7/docs/api/java/awt/event/KeyEvent.html)
 ;;
-;; See: examples/ex01_events.clj
-;;
 ;; #### Mouse event
 ;;
 ;; As as dispatch you use a vector containing window name as a String and mouse event type as a keyword
-;; As a function parameter you get `MouseEvent` object [java.awt.MouseEvent](https://docs.oracle.com/javase/7/docs/api/java/awt/event/MouseEvent.html)
+;; As a parameter you get `MouseEvent` object [java.awt.MouseEvent](https://docs.oracle.com/javase/7/docs/api/java/awt/event/MouseEvent.html)
 ;;
 ;; Currently implemented types are:
 ;;
@@ -535,9 +515,8 @@
 ;; * `:mouse-released`
 ;;
 ;; To get mouse position call `(.getX e)` and `(.getY e)` where `e` is MouseEvent object.
-;; 
-;; See: examples/ex01_events.clj
 
+;; `Window` type definition, equiped with `get-image` method returning bound canvas' image.
 (defrecord Window [^JFrame frame
                    active?
                    buffer
@@ -595,7 +574,7 @@
 
 ;; ### Frame machinery functions
 ;;
-;; Window is JFrame with panel (as java.awt.Canvas object) which is used to draw canvas on it.
+;; Window is JFrame with panel (as java.awt.Canvas object) which is used to draw clojure2d canvas on it.
 
 (defn- create-panel
   "Create panel which displays canvas. Attach mouse events, give a name (same as window), set size etc."
@@ -610,6 +589,7 @@
       (.setPreferredSize (Dimension. width height)))))
 
 ;; Function used to close and dispose window. As a side effect `active?` atom is set to false.
+
 (defn- close-window
   "Close window frame"
   [^JFrame frame active?]
@@ -672,7 +652,7 @@
       (repaint panel @buffer) 
       (when @active? (recur (unchecked-inc cnt) new-result)))))
 
-;; You may want to replace canvas to the other one on window. To make it pass result of `show-window` function and new canvas.
+;; You may want to replace canvas to the other one. To make it pass result of `show-window` function and new canvas.
 ;; Internally it just resets buffer atom for another canvas.
 ;; See examples/ex01_events.clj to see how it works.
 
@@ -684,13 +664,13 @@
   [^Window window canvas]
   (reset! (:buffer window) canvas))
 
-;; Finally function which displays window. Function creates window's visibility status (`active?` atom), buffer as atomized canvas, creates frame, creates refreshing task (repainter) and shows window.
+;; Finally function which creates and displays window. Function creates window's visibility status (`active?` atom), buffer as atomized canvas, creates frame, creates refreshing task (repainter) and shows window.
 
 (defn show-window
   "Show window with width/height, name and required fps of refresh. Optionally pass callback function.
 
   * Input: canvas, window name, width, height, frames per seconds, (optional) `draw` function.
-  * Returns vector with: `JFrame` object, visibility status atom, buffer atom (canvas packed into the atom). For convenience last element of the vector is a map with all used objects and passed parameters."
+  * Returns `Window` value"
   ([canvas wname width height fps draw-fun]
    (let [active? (atom true)
          buffer (atom canvas)
@@ -774,10 +754,12 @@
 ;; * `(get-session-name) => nil`
 ;; * `(make-session) => ["20170123235625" "CD8B7204"]`
 
+;; Session values are packed into the type
 (defrecord SessionType [logger
                         name
                         counter])
 
+;; Session is stored in agent
 (def session-agent (agent (SessionType. nil nil nil)))
 
 ;; Logging to file is turned off by default.

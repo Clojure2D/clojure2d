@@ -1,3 +1,25 @@
+;; # Namespace scope
+;;
+;; Color management functions:
+;;
+;; * Color is represented by Vec3, Vec4 or java.awt.Color
+;; * Blending functions
+;; * Color space converters
+;; * Palette collections: 200 5-color palettes from colourlovers, paletton colors generator, Inigo Quilez palette generator
+;; * Nearest color filter
+;;
+;; Generally color is represented by Vec4 containing R,G,B,A values from 0 to 255. Three conversion functions are defined by `ColorProto` which extends Vec3, Vec4 and java.awt.Color types.
+;; Functions are:
+;;
+;; * `to-color` to get Vec4 object
+;; * `to-awt-color` to get `java.awt.Color` object
+;; * `to-luma` to get brightness as `double`
+;;
+;; `Vec4` is clojure2d color representation.
+;;
+;;
+
+
 (ns clojure2d.color
   (:require [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
@@ -10,45 +32,55 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-(def ^:dynamic ^double *blend-threshold* 0.5)
+;; ## Clamping functions
+
+;; First define some clamping functions
 
 (defn clamp255
-  ""
+  "Clamp to 0-255 integer"
   [^double a]
   (int (m/constrain a 0.0 255.0)))
 
 (defn mod255
-  ""
+  "Leave 8 bits from long. Wraps input to 0-255 integer"
   ^long [^long a]
   (bit-and 0xff a))
 
 (defn clamp1
-  ""
+  "Clamp to 0.0-1.0"
   ^double [^double v]
   (m/constrain v 0.0 1.0))
 
 (defn mod1
-  ""
+  "Cut to 0.0-1.0"
   ^double [^double v]
-  (m/abs (- v (m/rint v))))
+  (m/frac v))
 
+;; ## Color representation
+
+;; Define `ColorProto` for representation conversions.
 (defprotocol ColorProto
   (to-color [c])
   (to-awt-color [c]) 
-  (to-luma [c])  )
+  (to-luma [c]))
 
+(defn- to-luma-fn
+  "Local luma conversion function"
+  ^double [^double r ^double g ^double b]
+  (+ (* 0.212671 r)
+     (* 0.715160 g)
+     (* 0.072169 b)))
+
+;; Equip `Vec3`, `Vec4` and `java.awt.Color` types with `ColorProto` functions.
 (extend-protocol ColorProto
   Vec3
-  (to-color ^Vec4 [^Vec3 c]
+  (to-color [^Vec3 c]
     (Vec4. (.x c) (.y c) (.z c) 255))
   (to-awt-color [^Vec3 c]
     (Color. ^int (clamp255 (.x c))
             ^int (clamp255 (.y c))
             ^int (clamp255 (.z c))))
-  (to-luma ^double [^Vec3 c]
-    (+ (* 0.212671 (.x c))
-       (* 0.715160 (.y c))
-       (* 0.072169 (.z c))))
+  (to-luma ^double [^Vec3 c] (to-luma-fn (.x c) (.y c) (.z c)))
   Vec4
   (to-color [c] c)
   (to-awt-color [^Vec4 c]
@@ -56,10 +88,7 @@
             ^int (clamp255 (.y c))
             ^int (clamp255 (.z c))
             ^int (clamp255 (.w c))))
-  (to-luma ^double [^Vec4 c]
-    (+ (* 0.212671 (.x c))
-       (* 0.715160 (.y c))
-       (* 0.072169 (.z c))))
+  (to-luma ^double [^Vec4 c] (to-luma-fn (.x c) (.y c) (.z c)))
   Color
   (to-color [^Color c]
     (Vec4. (.getRed c)
@@ -67,13 +96,10 @@
            (.getBlue c)
            (.getAlpha c)))
   (to-awt-color [c] c)
-  (to-luma ^double [^Color c]
-    (+ (* 0.212671 (.getRed c))
-       (* 0.715160 (.getGreen c))
-       (* 0.072169 (.getBlue c)))))
+  (to-luma ^double [^Color c] (to-luma-fn (.getRed c) (.getGreen c) (.getBlue c))))
 
 (defn make-awt-color
-  "Create java.awt.Color object"
+  "Create java.awt.Color object. Use with `core/set-awt-color` or `core/set-awt-background`."
   ([c]
    (to-awt-color c))
   ([r g b]
@@ -87,7 +113,7 @@
            ^int (clamp255 a))))
 
 (defn make-color
-  "Create Vec4 object as color representation"
+  "Create Vec4 object as color representation. Use with `core/set-color` or `core/set-background`."
   ([c]
    (to-color c))
   ([r g b]
@@ -104,81 +130,102 @@
 (declare to-HSB)
 
 (defn get-hue
-  ""
+  "Get hue value from color (any representation). Based on HSB colorspace."
   ^double [c]
   (let [^Vec4 ret (to-HSB (to-color c))]
     (.x ret)))
 
 (defn set-alpha
-  "Set alpha channel"
+  "Set alpha channel and return `Vec4` representation."
   [c ^double a]
   (let [^Vec4 v (to-color c)]
     (Vec4. (.x v) (.y v) (.z v) a)))
 
-;; blending part, operate on range 0-1
+;; ## Blending / Composing
 
+;; Several color blending / composing functions. Used to compose two images (`Pixels`). See `core.pixels` namespace for filters.
+
+;; Some blending functions require additional parameter. You can set it with following variable.
+(def ^:dynamic ^double *blend-threshold* 0.5)
+
+;; Prepare look-up table for int->double conversion.
 (def r255 (double-array (map #(/ ^double % 255.0) (range 256))))
 
-;;; Blend colors functions
+;; Blend colors functions
 
-(defn convert-and-blend
-  ""
-  ^long [f ^long a ^long b]
-  (let [aa (aget ^doubles r255 a)
-        bb (aget ^doubles r255 b)]
-    (long (* 255.0 ^double (f aa bb)))))
+(defn blend-values
+  "Blend channel values with blending function."
+  [f a b]
+  (let [aa (aget ^doubles r255 ^int a)
+        bb (aget ^doubles r255 ^int b)]
+    (* 255.0 ^double (f aa bb))))
+
+(defn blend-colors
+  "Blend colors with blending function. Do not blend alpha on default."
+  (^Vec4 [f c1 c2 alpha?]
+   (let [^Vec4 cc1 (to-color c1)
+         ^Vec4 cc2 (to-color c2)]
+     (Vec4. (blend-values f (.x cc1) (.x cc2))
+            (blend-values f (.y cc1) (.y cc2))
+            (blend-values f (.z cc1) (.z cc2))
+            (if alpha?
+              (blend-values f (.w cc1) (.w cc2))
+              (.w cc1)))))
+  (^Vec4 [f c1 c2] (blend-colors c1 c2 false)))
+
+;; Plenty of blending functions. Bleding functions operate on 0.0-1.0 values and return new value in the same range.
 
 (defn blend-none
-  ""
+  "Return first value only. Do nothing."
   ^double [a b] a)
 
 (defn blend-add
-  ""
+  "Add"
   ^double [^double a ^double b]
   (clamp1 (+ a b)))
 
 (defn blend-madd
-  ""
+  "Modulus add"
   ^double [^double a ^double b]
   (mod1 (+ a b)))
 
 (defn blend-subtract
-  ""
+  "Subtract"
   ^double [^double a ^double b]
   (clamp1 (- a b)))
 
 (defn blend-msubtract
-  ""
+  "Modulus subtract"
   ^double [^double a ^double b]
   (mod1 (- a b)))
 
 (defn blend-linearburn
-  ""
+  "Linear burn"
   ^double [^double a ^double b]
   (clamp1 (- (+ a b) 1.0)))
 
 (defn blend-mlinearburn
-  ""
+  "Modulus linear burn"
   ^double [^double a ^double b]
   (mod1 (- (+ a b) 1.0)))
 
 (defn blend-darken
-  ""
+  "Darken"
   ^double [^double a ^double b]
   (if (> a b) b a))
 
 (defn blend-lighten
-  ""
+  "Lighten"
   ^double [^double a ^double b]
   (if (< a b) b a))
 
 (defn blend-multiply
-  ""
+  "Multiply"
   ^double [^double a ^double b]
   (* a b))
 
 (defn blend-screen
-  ""
+  "Screen"
   ^double [^double a ^double b]
   (let [ra (- 1.0 a)
         rb (- 1.0 b)]
@@ -187,35 +234,35 @@
          (- 1.0))))
 
 (defn blend-dodge
-  ""
+  "Dodge"
   ^double [^double a ^double b]
   (clamp1 (->> b
                (- 1.0)
                (/ a))))
 
 (defn blend-mdodge
-  ""
+  "Modulus dodge"
   ^double [^double a ^double b]
   (mod1 (->> b
                (- 1.0)
                (/ a))))
 
 (defn blend-burn
-  ""
+  "Burn"
   ^double [^double a ^double b]
   (clamp1 (->> b
                (/ (- 1.0 a))
                (- 1.0))))
 
 (defn blend-mburn
-  ""
+  "Modulus burn"
   ^double [^double a ^double b]
   (mod1 (->> b
              (/ (- 1.0 a))
              (- 1.0))))
 
 (defn blend-hardmix
-  ""
+  "Hard mix"
   ^double [^double a ^double b]
   (let [t (- 1.0 b)]
     (cond (< a t) 0.0
@@ -223,7 +270,7 @@
           :else a)))
 
 (defn blend-linearlight
-  ""
+  "Linear light"
   ^double [^double a ^double b]
   (clamp1 (-> b
               (+ a)
@@ -231,7 +278,7 @@
               (- 1.0))))
 
 (defn blend-mlinearlight
-  ""
+  "Modulus linear light"
   ^double [^double a ^double b]
   (mod1 (-> b
             (+ a)
@@ -239,7 +286,7 @@
             (- 1.0))))
 
 (defn blend-pegtoplight
-  ""
+  "Pegtop light"
   ^double [^double a ^double b]
   (let [ab (* a b)]
     (clamp1 (->> b
@@ -249,7 +296,7 @@
                  (+ ab)))))
 
 (defn blend-mpegtoplight
-  ""
+  "Modulus pegtop light"
   ^double [^double a ^double b]
   (let [ab (* a b)]
     (mod1 (->> b
@@ -259,49 +306,49 @@
                (+ ab)))))
 
 (defn blend-difference
-  ""
+  "Difference"
   ^double [^double a ^double b]
   (m/abs (- a b)))
 
 (defn blend-divide
-  ""
+  "Divide"
   ^double [^double a ^double b]
   (clamp1 (/ a (+ b m/EPSILON))))
 
 (defn blend-mdivide
-  ""
+  "Modulus divide"
   ^double [^double a ^double b]
   (mod1 (/ a (+ b m/EPSILON))))
 
 (defn blend-or
-  ""
+  "Bitwise or"
   ^double [^double a ^double b]
   (let [aa (long (* a 255.0))
         bb (long (* b 255.0))]
     (aget ^doubles r255 (bit-and 0xff (bit-or aa bb)))))
 
 (defn blend-and
-  ""
+  "Bitwise and"
   ^double [^double a ^double b]
   (let [aa (long (* a 255.0))
         bb (long (* b 255.0))]
     (aget ^doubles r255 (bit-and 0xff (bit-and aa bb)))))
 
 (defn blend-xor
-  ""
+  "Bitwise xor"
   ^double [^double a ^double b]
   (let [aa (long (* a 255.0))
         bb (long (* b 255.0))]
     (aget ^doubles r255 (bit-and 0xff (bit-xor aa bb)))))
 
 (defn blend-exclusion
-  ""
+  "Exclusion"
   ^double [^double a ^double b]
   (let [ab (* a b)]
     (- (+ a b) (+ ab ab))))
 
 (defn blend-pinlight-raw
-  ""
+  "Internal pinlight"
   ^double [^double a ^double b]
   (let [c (- (+ a a) 1.0)]
     (cond (< b c) c
@@ -309,24 +356,24 @@
           :else (+ c 1.0))))
 
 (defn blend-pinlight
-  ""
+  "Pinlight"
   ^double [a b]
   (clamp1 (blend-pinlight-raw a b)))
 
 (defn blend-mpinlight
-  ""
+  "Modulus pinlight"
   ^double [a b]
   (mod1 (blend-pinlight-raw a b)))
 
 (defn blend-opacity
-  ""
+  "Opacity (with `*blend-threshold*`)"
   (^double [^double a ^double b ^double thr]
    (m/lerp a b thr))
   (^double [^double a ^double b]
    (m/lerp a b *blend-threshold*)))
 
 (defn blend-overlay-raw
-  ""
+  "Internal overlay (with `*blend-threshold*`)"
   (^double [^double a ^double b ^double thr]
    (if (< a thr)
      (* 2.0 (* a b))
@@ -335,17 +382,17 @@
    (blend-overlay-raw a b *blend-threshold*)))
 
 (defn blend-overlay
-  ""
+  "Overlay"
   ^double [a b]
   (clamp1 (blend-overlay-raw a b)))
 
 (defn blend-moverlay
-  ""
+  "Modulus overlay"
   ^double [a b]
   (mod1 (blend-overlay-raw a b)))
 
 (defn blend-hardlight-raw
-  ""
+  "Internal hardlight (with `*blend-threshold*`)"
   (^double [^double a ^double b ^double thr]
    (if (< b thr)
      (* 2.0 (* a b))
@@ -354,17 +401,17 @@
    (blend-hardlight-raw a b *blend-threshold*)))
 
 (defn blend-hardlight
-  ""
+  "Hardlight"
   ^double [a b]
   (clamp1 (blend-hardlight-raw a b)))
 
 (defn blend-mhardlight
-  ""
+  "Modulus hardlight"
   ^double [a b]
   (mod1 (blend-hardlight-raw a b)))
 
 (defn blend-softlight-raw
-  ""
+  "Internal softlight (with `*blend-threshold*`)"
   (^double [^double a ^double b ^double thr]
    (if (< a thr)
      (->> b
@@ -381,17 +428,17 @@
    (blend-softlight-raw a b *blend-threshold*)))
 
 (defn blend-softlight
-  ""
+  "Softlight"
   ^double [a b]
   (clamp1 (blend-softlight-raw a b)))
 
 (defn blend-msoftlight
-  ""
+  "Modulus softlight"
   ^double [a b]
   (mod1 (blend-softlight-raw a b)))
 
 (defn blend-vividlight-raw
-  ""
+  "Internal vividlight (with `*blend-threshold*`)"
   (^double [^double a ^double b ^double thr]
    (if (< a thr)
      (- 1.0 (/ (- 1.0 b) (+ (+ a a) m/EPSILON)))
@@ -404,29 +451,30 @@
    (blend-vividlight-raw a b *blend-threshold*)))
 
 (defn blend-vividlight
-  ""
+  "Vividlight"
   ^double [a b]
   (clamp1 (blend-vividlight-raw a b)))
 
 (defn blend-mvividlight
-  ""
+  "Modulus vividlight"
   ^double [a b]
   (mod1 (blend-vividlight-raw a b)))
 
 (defn blend-darkthreshold
-  ""
+  "Dark thresholded (with `*blend-threshold*`)"
   (^double [^double a ^double b ^double thr]
    (if (< a thr) a b))
   (^double [a b]
    (blend-darkthreshold a b *blend-threshold*)))
 
 (defn blend-lightthreshold
-  ""
+  "Light thresholded (with `*blend-threshold*`)"
   (^double [^double a ^double b ^double thr]
    (if (> a thr) a b))
   (^double [a b]
    (blend-lightthreshold a b *blend-threshold*)))
 
+;; List of all blend functions stored in `blends` map
 (def blends {:none blend-none
              :add blend-add
              :madd blend-madd
@@ -468,9 +516,10 @@
              :darkthreshold blend-darkthreshold
              :lightthreshold blend-lightthreshold})
 
+;; All names as list
 (def blends-names (keys blends))
 
-;;; Colorspace functions
+;; ## Colorspace functions
 
 (defn- test-colors
   "to remove, check ranges"
@@ -497,7 +546,7 @@
         [nmnr nmxr nmng nmxg nmnb nmxb]))))
 
 
-;; CMY
+;; ### CMY
 
 (defn to-CMY
   "RGB -> CMY"
@@ -509,7 +558,7 @@
 
 (def from-CMY to-CMY)
 
-;; OHTA
+;; ### OHTA
 
 (defn to-OHTA
   "RGB -> OHTA, normalized"
@@ -532,10 +581,10 @@
         b (clamp255 (- (+ i1 i3) i2))]
     (Vec4. r g b (.w c))))
 
-;; XYZ
+;; ### XYZ
 
 (defn- xyz-correct
-  ""
+  "Gamma correction"
   ^double [^double v]
   (if (> v 0.04045)
     (m/pow (/ (+ 0.055 v) 1.055) 2.4)
@@ -546,14 +595,14 @@
 (def ^:const ^double xyz-zmax 1.0889782052041752)
 
 (defn to-XYZ-raw
-  ""
+  "Pure RGB->XYZ conversion without corrections."
   ^Vec3 [^Vec3 c]
   (Vec3. (+ (* (.x c) 0.41239558896741421610) (* (.y c) 0.35758343076371481710) (* (.z c) 0.18049264738170157350))
          (+ (* (.x c) 0.21258623078559555160) (* (.y c) 0.71517030370341084990) (* (.z c) 0.07220049864333622685))
          (+ (* (.x c) 0.01929721549174694484) (* (.y c) 0.11918386458084853180) (* (.z c) 0.95049712513157976600))))
 
 (defn- to-XYZ-
-  ""
+  "RGB->XYZ with corrections"
   [^Vec4 c]
   (let [r (xyz-correct (/ (.x c) 255.0))
         g (xyz-correct (/ (.y c) 255.0))
@@ -562,7 +611,7 @@
     (Vec4. (.x xyz-raw) (.y xyz-raw) (.z xyz-raw) (.w c))))
 
 (defn to-XYZ
-  ""
+  "Normlized RGB->XYZ"
   [c]
   (let [^Vec4 cc (to-XYZ- c)]
     (Vec4. (clamp255 (m/norm (.x cc) 0.0 xyz-xmax 0.0 255.0))
@@ -573,21 +622,21 @@
 (def ^:const ^double xyz-f (/ 1.0 2.4))
 
 (defn- xyz-decorrect
-  ""
+  "Gamma correction"
   ^double [^double v]
   (if (> v 0.0031308)
     (- (* 1.055 (m/pow v xyz-f)) 0.055)
     (* v 12.92)))
 
 (defn from-XYZ-raw
-  ""
+  "Pure XYZ->RGB conversion."
   ^Vec3 [^Vec3 v]
   (Vec3. (+ (* (.x v)  3.2406) (* (.y v) -1.5372) (* (.z v) -0.4986))
          (+ (* (.x v) -0.9689) (* (.y v)  1.8758) (* (.z v)  0.0415))
          (+ (* (.x v)  0.0557) (* (.y v) -0.2040) (* (.z v)  1.0570))))
 
 (defn- from-XYZ-
-  ""
+  "XYZ->RGB conversion with corrections"
   [^Vec4 c]
   (let [^Vec3 rgb-raw (from-XYZ-raw (Vec3. (.x c) (.y c) (.z c)))
         r (xyz-decorrect (.x rgb-raw))
@@ -599,7 +648,7 @@
            (.w c))))
 
 (defn from-XYZ
-  ""
+  "XYZ->RGB normalized"
   [^Vec4 c]
   (let [x (m/norm (.x c) 0.0 255.0 0.0 xyz-xmax)
         y (m/norm (.y c) 0.0 255.0 0.0 xyz-ymax)
@@ -607,7 +656,7 @@
         ^Vec4 rgb (from-XYZ- (Vec4. x y z (.w c)))]
     (v/applyf rgb clamp255)))
 
-;; LUV
+;; ### LUV
 
 (def ^:const ^double D65X 0.950456)
 (def ^:const ^double D65Z 1.088754)
@@ -617,15 +666,15 @@
 (def ^:const ^double D65FX-4 (/ (* 4.0 D65X) (+ D65X 15 (* 3.0 D65Z))))
 (def ^:const ^double D65FY-9 (/ 9.0 (+ D65X 15 (* 3.0 D65Z))))
 
-(defn perceptible-reciprocal
-  ""
+(defn- perceptible-reciprocal
+  "LUV reciprocal"
   ^double [^double x]
   (if (>= (m/abs x) m/EPSILON)
     (/ 1.0 x)
     (/ (m/sgn x) m/EPSILON)))
 
 (defn to-LUV
-  ""
+  "RGB->LUV normalized"
   [^Vec4 c]
   (let [^Vec4 xyz (to-XYZ- c)
         L (if (> (.y xyz) CIEEpsilon)
@@ -646,7 +695,7 @@
 (def ^:const ^double CIEK2Epsilon (* CIEK CIEEpsilon))
 
 (defn from-LUV
-  ""
+  "LUV->RGB normalized"
   [^Vec4 c]
   (let [L (* 100.0 ^double (m/norm (.x c) 0 255 0.0 0.9999833859065517))
         u (- (* 354.0 ^double (m/norm (.y c) 0 255 0.1438470144487729 0.8730615053231279)) 134.0)
@@ -666,15 +715,17 @@
         ^Vec4 rgb (from-XYZ- (Vec4. X Y Z (.w c)))]
     (v/applyf rgb clamp255)))
 
+;; ### LAB
+
 (defn- to-lab-correct
-  ""
+  "LAB correction"
   ^double [^double v]
   (if (> v CIEEpsilon)
     (m/pow v OneThird)
     (/ (+ 16.0 (* v CIEK)) 116.0)))
 
 (defn to-LAB
-  ""
+  "RGB->LAB normalized"
   [^Vec4 c]
   (let [^Vec4 xyz (to-XYZ- c)
         x (/ (.x xyz) D65X)
@@ -692,7 +743,7 @@
            (.w c))))
 
 (defn from-lab-correct
-  ""
+  "LAB correction"
   ^double [^double v]
   (let [v3 (* v v v)]
     (if (> v3 CIEEpsilon)
@@ -700,7 +751,7 @@
       (/ (- (* 116.0 v) 16.0) CIEK))))
 
 (defn from-LAB
-  ""
+  "LAB->RGB normalized"
   [^Vec4 c]
   (let [L (* 100.0 ^double (m/norm (.x c) 0.0 255.0 0.0 0.9999833859065517))
         ^double a (m/norm (.y c) 0.0 255.0 0.16203039020156618 0.8853278445843099)
@@ -715,8 +766,10 @@
         ^Vec4 rgb (from-XYZ- (Vec4. x y z (.w c)))]
     (v/applyf rgb clamp255)))
 
+;; ### YXy (xyY)
+
 (defn to-YXY
-  ""
+  "RGB->YXY"
   [^Vec4 c]
   (let [^Vec4 xyz (to-XYZ- c)
         d (+ (.x xyz) (.y xyz) (.z xyz))
@@ -726,7 +779,7 @@
     (v/applyf (Vec4. Y x y (.w c)) clamp255)))
 
 (defn from-YXY
-  ""
+  "YXY->RGB"
   [^Vec4 c]
   (let [^double Y (m/norm (.x c) 0.0 255.0 0.0 0.9999570331323426)
         ^double x (m/norm (.y c) 0.0 255.0 0.150011724420108 0.6400884809339611)
@@ -737,8 +790,10 @@
         ^Vec4 rgb (from-XYZ- (Vec4. X Y Z (.w c)))]
     (v/applyf rgb clamp255)))
 
+;; ### HCL
+
 (defn to-HCL
-  ""
+  "RGB->HCL"
   [^Vec4 c]
   (let [mx (max (.x c) (.y c) (.z c))
         chr (- mx (min (.x c) (.y c) (.z c)))
@@ -751,7 +806,7 @@
     (v/applyf (Vec4. h chr luma (.w c)) clamp255)))
 
 (defn from-HCL
-  ""
+  "HCL->RGB"
   [^Vec4 c]
   (let [h (* 6.0 (/ (.x c) 255.0))
         chr (.y c)
@@ -770,8 +825,10 @@
         m (- l (* 0.298839 r) (* 0.586811 g) (* 0.114350 b))]
     (v/applyf (Vec4. (+ r m) (+ g m) (+  m) (.w c)) clamp255)))
 
+;; ### HSB
+
 (defn to-HSB
-  ""
+  "RGB->HSB"
   [^Vec4 c]
   (let [mn (min (.x c) (.y c) (.z c))
         mx (max (.x c) (.y c) (.z c))
@@ -787,7 +844,7 @@
     (v/applyf (Vec4. h s b (.w c)) clamp255)))
 
 (defn from-HSB
-  ""
+  "HSB->RGB"
   [^Vec4 c]
   (if (zero? (.y c)) (Vec4. (.z c) (.z c) (.z c) (.w c))
       (let [h (/ (.x c) 255.0)
@@ -810,13 +867,14 @@
             ^double b (rgb 2)]
         (v/applyf (Vec4. (* 255.0 r) (* 255.0 g) (* 255.0 b) (.w c)) clamp255))))
 
+;; ### HSI
 
 (def ^:const ^double to-hsi-const (-> 180.0
                                       (/ m/PI)
                                       (/ 360.0)))
 
 (defn to-HSI
-  ""
+  "RGB->HSI"
   [^Vec4 c]
   (let [i (/ (+ (.x c) (.y c) (.z c)) 3.0)]
     (if (zero? i) (Vec4. 0.0 0.0 0.0 (.w c))
@@ -839,7 +897,7 @@
                  inc)))
 
 (defn from-HSI
-  ""
+  "HSI->RGB"
   [^Vec4 c]
   (let [^Vec4 cc (v/div c 255.0)
         h (* 360.0 (.x cc))
@@ -860,8 +918,10 @@
                       [r g b]))]
     (v/applyf (v/mult (Vec4. (rgb 0) (rgb 1) (rgb 2) (.w cc)) 255.0) clamp255)))
 
+;; ### HWB
+
 (defn to-HWB
-  ""
+  "RGB->HWB"
   [^Vec4 c]
   (let [w (min (.x c) (.y c) (.z c))
         v (max (.x c) (.y c) (.z c))
@@ -878,7 +938,7 @@
     (v/applyf (Vec4. h w (- 255.0 v) (.w c)) clamp255)))
 
 (defn from-HWB
-  ""
+  "HWB->RGB"
   [^Vec4 c]
   (if (< (.x c) 1.0) 
     (let [v (- 255.0 (.z c))]
@@ -900,9 +960,8 @@
                 6 [v n w])]
       (v/applyf (Vec4. (* 255.0 ^double (rgb 0)) (* 255.0 ^double (rgb 1)) (* 255.0 ^double (rgb 2)) (.w c)) clamp255))))
 
+;; ### YPbPr
 
-;; YPbPr
-;; Luma + channel differences
 (defn to-YPbPr
   "RGB -> YPbPr, normalized"
   [^Vec4 c]
@@ -921,10 +980,10 @@
         g (/ (- (.x c) (* 0.2126 r) (* 0.0722 b)) 0.7152)]
     (v/applyf (Vec4. r g b (.w c)) clamp255)))
 
-;; 
+;; ### YDbDr
 
 (defn to-YDbDr
-  ""
+  "RGB->YDbDr"
   [^Vec4 c]
   (let [Y (+ (* 0.299 (.x c)) (* 0.587 (.y c)) (* 0.114 (.z c)))
         Db (+ (* -0.45 (.x c)) (* -0.883 (.y c)) (* 1.333 (.z c)))
@@ -935,7 +994,7 @@
                      (.w c)) clamp255)))
 
 (defn from-YDbDr
-  ""
+  "YDbDr->RGB"
   [^Vec4 c]
   (let [Y (.x c)
         ^double Db (m/norm (.y c) 0.0 255.0 -339.91499999999996 339.91499999999996)
@@ -945,9 +1004,12 @@
         b (+ Y (* 0.66467905997895482 Db) (* -7.9202543533108e-05 Dr))]
     (v/applyf (Vec4. r g b (.w c)) clamp255)))
 
+;; ### YCbCr
+
 ;; JPEG version
+
 (defn to-YCbCr
-  ""
+  "RGB->YCbCr"
   [^Vec4 c]
   (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
         Cb (+ 127.5 (* -0.168736 (.x c)) (* -0.331264 (.y c)) (* 0.5 (.z c)))
@@ -955,7 +1017,7 @@
     (v/applyf (Vec4. Y Cb Cr (.w c)) clamp255)))
 
 (defn from-YCbCr
-  ""
+  "YCbCr->RGB"
   [^Vec4 c]
   (let [Cb (- (.y c) 127.5)
         Cr (- (.z c) 127.5)
@@ -964,8 +1026,10 @@
         b (+ (* 1.00000124040004623180 (.x c)) (* 1.77200006607230409200 Cb) (* 2.1453384174593273e-06 Cr))]
     (v/applyf (Vec4. r g b (.w c)) clamp255)))
 
+;; ### YUV
+
 (defn to-YUV
-  ""
+  "RGB->YUV"
   [^Vec4 c]
   (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
         U (+ (* -0.147 (.x c)) (* -0.289 (.y c)) (* 0.436 (.z c)))
@@ -976,7 +1040,7 @@
                      (.w c)) clamp255)))
 
 (defn from-YUV
-  ""
+  "YUV->RGB"
   [^Vec4 c]
   (let [Y (.x c)
         ^double U (m/norm (.y c) 0.0 255.0 -111.17999999999999 111.17999999999999)
@@ -986,9 +1050,10 @@
         b (+ Y (* 2.0319996843434342537 U) (* -4.813762626262513e-04 V))]
     (v/applyf (Vec4. r g b (.w c)) clamp255)))
 
+;; ### YIQ
 
 (defn to-YIQ
-  ""
+  "RGB->YIQ"
   [^Vec4 c]
   (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
         I (+ (* 0.595716 (.x c)) (* -0.274453 (.y c)) (* -0.321263 (.z c)))
@@ -999,7 +1064,7 @@
                      (.w c)) clamp255)))
 
 (defn from-YIQ
-  ""
+  "YIQ->RGB"
   [^Vec4 c]
   (let [Y (.x c)
         ^double I (m/norm (.y c) 0.0 255.0 -151.90758 151.90758)
@@ -1009,7 +1074,7 @@
         b (+ Y (* -1.1069890167364901945 I) (* 1.7046149983646481374 Q))]
     (v/applyf (Vec4. r g b (.w c)) clamp255)))
 
-
+;; List of all color spaces with functions
 (def colorspaces {:CMY   [to-CMY from-CMY]
                   :OHTA  [to-OHTA from-OHTA]
                   :XYZ   [to-XYZ from-XYZ]
@@ -1026,24 +1091,23 @@
                   :YUV   [to-YUV from-YUV]
                   :YIQ   [to-YIQ from-YIQ]})
 
+;; List of color spaces names
 (def colorspaces-names (keys colorspaces))
 
 (defn to-cs
-  "return colorspace converter by keyword (RGB -> ...)"
+  "Return colorspace converter by keyword (RGB -> ...)"
   [cs]
   ((cs colorspaces) 0))
 
 (defn from-cs
-  "return colorspace converter by keyword (... -> RGB)"
+  "Return colorspace converter by keyword (... -> RGB)"
   [cs]
   ((cs colorspaces) 1))
 
-
-;;;; read 200 palettes from colourlovers
-;;
+;; ## Palettes
 
 (defn hex-to-vec
-  ""
+  "Convert hexadecimal color representation to color"
   [s]
   (let [x (Long/parseLong s 16)
         x1 (bit-and 0xff (bit-shift-right x 16))
@@ -1052,10 +1116,13 @@
     (Vec4. x1 x2 x3 255)))
 
 (defn hex-to-vecs
-  ""
+  "Convert list of hexadecimal strings into list of colors."
   [xs]
   (mapv hex-to-vec xs))
 
+;; ### Colourlovers
+
+;; Read and parse 200 palettes from http://www.colourlovers.com/
 (def palettes
   (let [p1 (xml/parse (java.io.ByteArrayInputStream. (.getBytes ^String (slurp (io/resource "colourlovers1.xml")))))
         p2 (xml/parse (java.io.ByteArrayInputStream. (.getBytes ^String (slurp (io/resource "colourlovers2.xml")))))
@@ -1069,11 +1136,12 @@
         l2 (f p2)]
     (mapv hex-to-vecs (concat l1 l2))))
 
-;; 
+;; ### Inigo Quilez
 
 ;; http://iquilezles.org/www/articles/palettes/palettes.htm
+
 (defn create-palette-fn
-  ""
+  "Create palette generator function with given parametrization"
   [a b c d]
   (fn [t]
     (let [^Vec3 cc (-> (->> t
@@ -1088,7 +1156,7 @@
           (v/applyf clamp255)))))
 
 (defn make-random-palette
-  ""
+  "Create palette with cosinus generator. Input parameter: number of colors."
   [^long num]
   (let [a (v/generate-vec3 (partial r/drand 0.3 0.7))
         b (v/sub (Vec3. 1.0 1.0 1.1) a)
@@ -1097,7 +1165,15 @@
         f (create-palette-fn a b c d)]
     (mapv f (range 0.0 1.0 (/ 1.0 num)))))
 
-;; paletton palettes
+;; ### Paletton
+
+;; Here you can find reimplementation of http://paletton.com palette generator.
+;; You can create palette based on `hue` value with following options:
+;;
+;; * Palette type, one from `:monochromatic`, `:triad`, `:tetrad`
+;; * Paletton presets, check `paletton-presets-names` value
+;; * Complementary color
+;; * Angle between colors for `:triad` and `:tetrad`
 
 (def paletton-base-data
   (let [s (fn ^double [^double e ^double t ^double n] (if (== n -1.0) e
@@ -1174,7 +1250,7 @@
             :rgb (fn [e n r] (Vec4. e r n 255.0))}}))
 
 (defn paletton-hsv-to-rgb
-  ""
+  "Paletton version of HSV to RGB converter"
   [^double hue ^double ks ^double kv]
   (let [ks (m/constrain ks 0.0 2.0)
         kv (m/constrain kv 0.0 2.0)
@@ -1197,7 +1273,7 @@
     (rgb r g b)))
 
 (defn paletton-rgb-to-hue
-  ""
+  "Take paletton HUE from RGB"
   (^double [^double r ^double g ^double b]
    (if (== r g b)
      0.0
@@ -1221,6 +1297,7 @@
        s)))
   ([^Vec4 c] (paletton-rgb-to-hue (.x c) (.y c) (.z c))))
 
+;; List of paletton presets
 (def paletton-presets
   {:pale-light [[0.24649 1.78676] [0.09956 1.95603] [0.17209 1.88583] [0.32122 1.65929] [0.39549 1.50186]]
    :pastels-bright [[0.65667 1.86024] [0.04738 1.99142] [0.39536 1.89478] [0.90297 1.85419] [1.86422 1.8314]]
@@ -1247,15 +1324,24 @@
    :almost-gray-lighter [[0.06074 0.82834] [0.14546 0.97794] [0.10798 0.76459] [0.15939 0.68697] [0.22171 0.62926]]
    :almost-gray-light [[0.03501 1.59439] [0.23204 1.10483] [0.14935 1.33784] [0.07371 1.04897] [0.09635 0.91368]]})
 
+;; List of preset names
 (def paletton-presets-names (keys paletton-presets))
 
 (defn make-monochromatic-palette
-  ""
+  "Create monochromatic palette from hue and preset."
   [hue preset]
   (mapv (fn [[ks kv]] (paletton-hsv-to-rgb hue ks kv)) preset))
 
 (defmulti paletton-palette (fn [m hue & conf] m))
 
+;; Following methods can be used to create paletton palettes.
+;; As a dispatch use one of the types `:monochromatic`, `:triad` or `:tetrad`.
+;; Parameters are `hue` value and configuration.
+
+;; `:monochromatic` configuration
+;;
+;; * `:compl` - use complementary color? (true/false)
+;; * `:preset` - what preset to use (one from `paletton-preset-names`)
 (defmethod paletton-palette :monochromatic [_ hue & conf]
   (let [{compl :compl 
          preset :preset
@@ -1265,6 +1351,12 @@
         p (make-monochromatic-palette hue ppreset)]
     (if compl (vec (concat p (make-monochromatic-palette (+ ^double hue 180.0) ppreset))) p)))
 
+;; `:triad` configuration
+;;
+;; * `:compl` - use complementary color? (true/false)
+;; * `:preset` - what preset to use (one from `paletton-preset-names`)
+;; * `:angle` - angle between main hue and two additional
+;; * `:adj` - use adjacent version of triad (true/false)
 (defmethod paletton-palette :triad [_ hue & conf]
   (let [{compl :compl
          preset :preset
@@ -1284,6 +1376,10 @@
         p (vec (concat p1 p2 p3))]
     (if compl (vec (concat p (make-monochromatic-palette chue ppreset))) p)))
 
+;; `:triad` configuration
+;;
+;; * `:preset` - what preset to use (one from `paletton-preset-names`)
+;; * `:angle` - angle between main hue and additional color
 (defmethod paletton-palette :tetrad [_ hue & conf]
   (let [{preset :preset
          angle :angle
@@ -1293,10 +1389,10 @@
         p2 (paletton-palette :monochromatic (+ ^double angle ^double hue) {:preset preset :compl true})]
     (vec (concat p1 p2))))
 
-;;
+;; ## Additional functions
 
 (defn nearest-color
-  ""
+  "Find nearest color from a set. Input: distance function (default euclidean), list of target colors and source color."
   ([f xf c]
    (let [s (count xf)]
      (loop [i (int 0)
@@ -1313,12 +1409,10 @@
    (nearest-color v/dist xf c)))
 
 (defn make-reduce-color-filter
-  ""
+  "Define reduce color filter to use on `Pixels`."
   ([]
    (partial nearest-color (rand-nth palettes)))
   ([pal]
    (partial nearest-color pal))
   ([f pal]
    (partial nearest-color f pal)))
-
-;; 

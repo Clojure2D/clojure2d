@@ -2872,150 +2872,130 @@ net.brehaut.ClojureTools = (function (SH) {
   (:import [clojure2d.math.vector Vec2]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(deftype Complex [^double real ^double imag]
-  Object
-  (toString [_] (str &quot;[&quot; real &quot;, &quot; imag &quot;]&quot;)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def ^:const I (Complex. 0.0 1.0))
-(def ^:const I- (Complex. 0.0 -1.0))
-(def ^:const ONE (Complex. 1.0 0.0))
-(def ^:const TWO (Complex. 2.0 0.0))
-(def ^:const ZERO (Complex. 0.0 0.0))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn ^Vec2 to-vec2
-  [^Complex z]
-  (Vec2. (.real z) (.imag z)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn ^Complex from-vec2
-  [^Vec2 v]
-  (Complex. (.x v) (.y v)))</pre></td></tr><tr><td class="docs"><p>Absolute value of complex number</p>
-</td><td class="codes"><pre class="brush: clojure">(defn abs
-  ^double [^Complex z]
-  (m/hypot (.real z) (.imag z)))</pre></td></tr><tr><td class="docs"><p>Add complex</p>
-</td><td class="codes"><pre class="brush: clojure">(defn add
-  [^Complex z1 ^Complex z2]
-  (Complex. (+ (.real z1) (.real z2)) (+ (.imag z1) (.imag z2))))</pre></td></tr><tr><td class="docs"><p>Add complex</p>
-</td><td class="codes"><pre class="brush: clojure">(defn sub
-  [^Complex z1 ^Complex z2]
-  (Complex. (- (.real z1) (.real z2)) (- (.imag z1) (.imag z2))))</pre></td></tr><tr><td class="docs"><p>Conjugate</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const I (Vec2. 0.0 1.0))
+(def ^:const I- (Vec2. 0.0 -1.0))
+(def ^:const ONE (Vec2. 1.0 0.0))
+(def ^:const TWO (Vec2. 2.0 0.0))
+(def ^:const ZERO (Vec2. 0.0 0.0))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def abs v/mag)
+(def add v/add)
+(def sub v/sub)
+(def arg v/heading)</pre></td></tr><tr><td class="docs"><p>Conjugate</p>
 </td><td class="codes"><pre class="brush: clojure">(defn conjugate
-  [^Complex z]
-  (Complex. (.real z) (- (.imag z))))</pre></td></tr><tr><td class="docs"><p>Divide two complex numbers</p>
+  [^Vec2 z]
+  (Vec2. (.x z) (- (.y z))))</pre></td></tr><tr><td class="docs"><p>Divide two complex numbers</p>
 </td><td class="codes"><pre class="brush: clojure">(defn div
-  [^Complex z1 ^Complex z2]
-  (let [a (.real z1)
-        b (.imag z1)
-        c (.real z2)
-        d (.imag z2)
+  [^Vec2 z1 ^Vec2 z2]
+  (let [a (.x z1)
+        b (.y z1)
+        c (.x z2)
+        d (.y z2)
         den (+ (* c c) (* d d))]
     (if (zero? den)
       ZERO
-      (Complex. (/ (+ (* a c) (* b d)) den)
-                (/ (- (* b c) (* a d)) den)))))</pre></td></tr><tr><td class="docs"><p>1/z</p>
+      (Vec2. (/ (+ (* a c) (* b d)) den)
+             (/ (- (* b c) (* a d)) den)))))</pre></td></tr><tr><td class="docs"><p>1/z</p>
 </td><td class="codes"><pre class="brush: clojure">(defn reciprocal
-  [^Complex z]
-  (div ONE z))</pre></td></tr><tr><td class="docs"><p>Do both complex numbers equals?</p>
-</td><td class="codes"><pre class="brush: clojure">(defn equals?
-  [^Complex z1 ^Complex z2]
-  (and (= (.real z1) (.real z2)) (= (.imag z1) (.imag z2))))</pre></td></tr><tr><td class="docs"><p>Multiply complex</p>
+  [^Vec2 z]
+  (div ONE z))</pre></td></tr><tr><td class="docs"><p>Multiply complex</p>
 </td><td class="codes"><pre class="brush: clojure">(defn mult
-  [^Complex z1 ^Complex z2]
-  (let [a (.real z1)
-        b (.imag z1)
-        c (.real z2)
-        d (.imag z2)]
-    (Complex. (- (* a c) (* b d))
-              (+ (* a d) (* b c)))))</pre></td></tr><tr><td class="docs"><p>Negate complex</p>
+  [^Vec2 z1 ^Vec2 z2]
+  (let [a (.x z1)
+        b (.y z1)
+        c (.x z2)
+        d (.y z2)]
+    (Vec2. (- (* a c) (* b d))
+           (+ (* a d) (* b c)))))</pre></td></tr><tr><td class="docs"><p>Negate complex</p>
 </td><td class="codes"><pre class="brush: clojure">(defn neg
-  [^Complex z]
-  (Complex. (- (.real z)) (- (.imag z))))</pre></td></tr><tr><td class="docs"><p>Sqrt of complex number</p>
+  [^Vec2 z]
+  (Vec2. (- (.x z)) (- (.y z))))</pre></td></tr><tr><td class="docs"><p>Sqrt of complex number</p>
 </td><td class="codes"><pre class="brush: clojure">(defn sqrt
-  [^Complex z]
-  (let [x (.real z)
-        y (.imag z)
-        l (abs z)
+  [^Vec2 z]
+  (let [x (.x z)
+        y (.y z)
+        ^double l (abs z)
         xx (m/sqrt (+ l x))
         yy (* (m/signum y) (m/sqrt (- l x)))]
-    (Complex. (* m/SQRT2_2 xx) (* m/SQRT2_2 yy))))</pre></td></tr><tr><td class="docs"><p>Sqrt(1-z^2)</p>
+    (Vec2. (* m/SQRT2_2 xx) (* m/SQRT2_2 yy))))</pre></td></tr><tr><td class="docs"><p>Sqrt(1-z^2)</p>
 </td><td class="codes"><pre class="brush: clojure">(defn sqrt1z
-  [^Complex z]
+  [^Vec2 z]
   (-&gt;&gt; z
        (mult z)
        (sub ONE)
        (sqrt)))</pre></td></tr><tr><td class="docs"><p>cos</p>
 </td><td class="codes"><pre class="brush: clojure">(defn cos
-  [^Complex z]
-  (let [x (.real z)
-        y (.imag z)]
-    (Complex. (* (m/cos x) (m/cosh y))
-              (* (- (m/sin x)) (m/sinh y)))))</pre></td></tr><tr><td class="docs"><p>sin</p>
+  [^Vec2 z]
+  (let [x (.x z)
+        y (.y z)]
+    (Vec2. (* (m/cos x) (m/cosh y))
+           (* (- (m/sin x)) (m/sinh y)))))</pre></td></tr><tr><td class="docs"><p>sin</p>
 </td><td class="codes"><pre class="brush: clojure">(defn sin
-  [^Complex z]
-  (let [x (.real z)
-        y (.imag z)]
-    (Complex. (* (m/sin x) (m/cosh y))
-              (* (m/cos x) (m/sinh y)))))</pre></td></tr><tr><td class="docs"><p>cosh</p>
+  [^Vec2 z]
+  (let [x (.x z)
+        y (.y z)]
+    (Vec2. (* (m/sin x) (m/cosh y))
+           (* (m/cos x) (m/sinh y)))))</pre></td></tr><tr><td class="docs"><p>cosh</p>
 </td><td class="codes"><pre class="brush: clojure">(defn cosh
-  [^Complex z]
-  (let [x (.real z)
-        y (.imag z)]
-    (Complex. (* (m/cosh x) (m/cos y))
-              (* (m/sinh x) (m/sin y)))))</pre></td></tr><tr><td class="docs"><p>sinh</p>
+  [^Vec2 z]
+  (let [x (.x z)
+        y (.y z)]
+    (Vec2. (* (m/cosh x) (m/cos y))
+           (* (m/sinh x) (m/sin y)))))</pre></td></tr><tr><td class="docs"><p>sinh</p>
 </td><td class="codes"><pre class="brush: clojure">(defn sinh
-  [^Complex z]
-  (let [x (.real z)
-        y (.imag z)]
-    (Complex. (* (m/sinh x) (m/cos y))
-              (* (m/cosh x) (m/sin y)))))</pre></td></tr><tr><td class="docs"><p>tan</p>
+  [^Vec2 z]
+  (let [x (.x z)
+        y (.y z)]
+    (Vec2. (* (m/sinh x) (m/cos y))
+           (* (m/cosh x) (m/sin y)))))</pre></td></tr><tr><td class="docs"><p>tan</p>
 </td><td class="codes"><pre class="brush: clojure">(defn tan
-  [^Complex z]
-  (let [aa (* 2 (.real z))
-        bb (* 2 (.imag z))
+  [^Vec2 z]
+  (let [aa (* 2 (.x z))
+        bb (* 2 (.y z))
         cc (+ (m/cos aa) (m/cosh bb))]
-    (Complex. (/ (m/sin aa) cc)
-              (/ (m/sinh bb) cc))))</pre></td></tr><tr><td class="docs"><p>tanh</p>
+    (Vec2. (/ (m/sin aa) cc)
+           (/ (m/sinh bb) cc))))</pre></td></tr><tr><td class="docs"><p>tanh</p>
 </td><td class="codes"><pre class="brush: clojure">(defn tanh
-  [^Complex z]
-  (let [aa (* 2 (.real z))
-        bb (* 2 (.imag z))
+  [^Vec2 z]
+  (let [aa (* 2 (.x z))
+        bb (* 2 (.y z))
         cc (+ (m/cosh aa) (m/cos bb))]
-    (Complex. (/ (m/sinh aa) cc)
-              (/ (m/sin bb) cc))))</pre></td></tr><tr><td class="docs"><p>exp</p>
+    (Vec2. (/ (m/sinh aa) cc)
+           (/ (m/sin bb) cc))))</pre></td></tr><tr><td class="docs"><p>exp</p>
 </td><td class="codes"><pre class="brush: clojure">(defn exp
-  [^Complex z]
-  (let [e (m/exp (.real z))
-        y (.imag z)]
-    (Complex. (* e (m/cos y))
-              (* e (m/sin y)))))</pre></td></tr><tr><td class="docs"><p>log</p>
+  [^Vec2 z]
+  (let [e (m/exp (.x z))
+        y (.y z)]
+    (Vec2. (* e (m/cos y))
+           (* e (m/sin y)))))</pre></td></tr><tr><td class="docs"><p>log</p>
 </td><td class="codes"><pre class="brush: clojure">(defn log
-  [^Complex z]
-  (Complex. (m/log (abs z))
-            (m/atan2 (.imag z) (.real z))))</pre></td></tr><tr><td class="docs"><p>acos</p>
+  [^Vec2 z]
+  (Vec2. (m/log (abs z))
+         (m/atan2 (.y z) (.x z))))</pre></td></tr><tr><td class="docs"><p>acos</p>
 </td><td class="codes"><pre class="brush: clojure">(defn acos
-  [^Complex z]
+  [^Vec2 z]
   (-&gt;&gt; (sqrt1z z)
        (mult I)
        (add z)
        (log)
        (mult I-)))</pre></td></tr><tr><td class="docs"><p>asin</p>
 </td><td class="codes"><pre class="brush: clojure">(defn asin
-  [^Complex z]
+  [^Vec2 z]
   (-&gt;&gt; (sqrt1z z)
        (add (mult I z))
        (log)
        (mult I-)))</pre></td></tr><tr><td class="docs"><p>atan</p>
 </td><td class="codes"><pre class="brush: clojure">(defn atan
-  [^Complex z]
+  [^Vec2 z]
   (-&gt;&gt; (sub I z)
        (div (add I z))
        (log)
        (mult (div I TWO ))))</pre></td></tr><tr><td class="docs"><p>power</p>
 </td><td class="codes"><pre class="brush: clojure">(defn pow
-  [^Complex z1 ^Complex z2]
+  [^Vec2 z1 ^Vec2 z2]
   (-&gt;&gt; z1
        (log)
        (mult z2)
-       (exp)))</pre></td></tr><tr><td class="docs"><p>argument</p>
-</td><td class="codes"><pre class="brush: clojure">(defn arg
-  ^double [^Complex z]
-  (m/atan2 (.imag z) (.real z)))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
+       (exp)))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
 SyntaxHighlighter.all();
 
 // hackity hack
