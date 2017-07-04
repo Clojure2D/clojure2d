@@ -37,8 +37,8 @@
   (j/make-noise (j/make-fractal {:type (rand-nth (keys j/fractal-type))
                                  :lacunarity (r/drand 1.0 3.0)
                                  :frequency (r/drand 1.0 3.0)
-                                 :octaves [[1 (j/make-random-basis-module)]
-                                           [1 (j/make-random-basis-module)]]})))
+                                 :octaves [(j/make-random-basis-module)
+                                           (j/make-random-basis-module)]})))
 
 
 (defn make-random-config

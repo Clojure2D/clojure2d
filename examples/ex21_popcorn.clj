@@ -58,8 +58,8 @@
         params {:type type
                 :lacunarity l
                 :frequency f
-                :octaves [[1 ((rand-nth b))]
-                          [1 ((rand-nth b))]]}]
+                :octaves [((rand-nth b))
+                          ((rand-nth b))]}]
     (j/make-noise (j/make-fractal params))))
 
 (defn get-noise

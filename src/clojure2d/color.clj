@@ -1376,7 +1376,7 @@
         p (vec (concat p1 p2 p3))]
     (if compl (vec (concat p (make-monochromatic-palette chue ppreset))) p)))
 
-;; `:triad` configuration
+;; `:tetrad` configuration
 ;;
 ;; * `:preset` - what preset to use (one from `paletton-preset-names`)
 ;; * `:angle` - angle between main hue and additional color

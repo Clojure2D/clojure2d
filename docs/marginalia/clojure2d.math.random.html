@@ -2865,7 +2865,17 @@ net.brehaut.ClojureTools = (function (SH) {
     build_tree: build_tree
   };
 })(SyntaxHighlighter);
-</script><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript"></script><title>clojure2d -- Marginalia</title></head><body><table><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojure2d.math.random" name="clojure2d.math.random"><h1 class="project-name">clojure2d.math.random</h1><a class="toc-link" href="toc.html">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
+</script><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript"></script><title>clojure2d -- Marginalia</title></head><body><table><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojure2d.math.random" name="clojure2d.math.random"><h1 class="project-name">clojure2d.math.random</h1><a class="toc-link" href="toc.html">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs"><h1>Namespace scope</h1>
+
+<p>Namespaces defines:</p>
+
+<ul>
+<li>random functions based on various RNG + default bindings based on default Java RNG</li>
+<li>int, long, float, double, gaussian and boolean random functions</li>
+<li>basic perlin noise (see <code>joise</code> namespace for several more noise functions)</li>
+<li>discrete noise function</li>
+</ul>
+</td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.math.random
   (:require [clojure2d.math :refer :all]
             [clojure2d.math.vector :as v])

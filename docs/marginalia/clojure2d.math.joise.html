@@ -2865,7 +2865,24 @@ net.brehaut.ClojureTools = (function (SH) {
     build_tree: build_tree
   };
 })(SyntaxHighlighter);
-</script><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript"></script><title>clojure2d -- Marginalia</title></head><body><table><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojure2d.math.joise" name="clojure2d.math.joise"><h1 class="project-name">clojure2d.math.joise</h1><a class="toc-link" href="toc.html">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
+</script><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript"></script><title>clojure2d -- Marginalia</title></head><body><table><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojure2d.math.joise" name="clojure2d.math.joise"><h1 class="project-name">clojure2d.math.joise</h1><a class="toc-link" href="toc.html">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs"><h1>Namespace scope</h1>
+
+<p>Joise noise library bindings
+https://github.com/SudoPlayGames/Joise</p>
+
+<p>There are three group of noises:</p>
+
+<ul>
+<li>Basis (one octave) noise. 4 types with 4 interpolations.</li>
+<li>Cell noise. Based on 4 coefficients.</li>
+<li>Fractal noise. Combination of above in given number of octaves. 6 types.</li>
+</ul>
+
+<p>General concept in Joise is Module. Module returns value from [0.0,1.0] range from 1d,2d,3d,4d and 6d spaces.
+To make noise function based on module call <code>make-noise</code>.</p>
+
+<p>See <code>examples/ex04_noise.clj</code> for examples.</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.math.joise
   (:require [clojure2d.math :refer :all]
             [clojure2d.math.random :refer :all])
@@ -2877,7 +2894,7 @@ net.brehaut.ClojureTools = (function (SH) {
             ModuleTriangle ModuleSawtooth
             ModuleScaleDomain]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* true)</pre></td></tr><tr><td class="docs">
+(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><h2>Noise creators</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Get noise from Joise Module class</p>
 </td><td class="codes"><pre class="brush: clojure">(defn get-noise-fn
   ([^Module m x]
@@ -2892,7 +2909,10 @@ net.brehaut.ClojureTools = (function (SH) {
    (.get m x y z w u v)))</pre></td></tr><tr><td class="docs"><p>Returns noise function based on module</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-noise 
   [module]
-  (partial get-noise-fn module))</pre></td></tr><tr><td class="docs"><p>Autocorrect module to desired range, (0,1) default</p>
+  (partial get-noise-fn module))</pre></td></tr><tr><td class="docs"><h2>Autocorrect</h2>
+
+<p>Noise autocorrection function calculates scaling factor. The main reason is that usually noise doesn't return values from [0,1] range. To make it more accurate use <code>auto-correct</code> which returns scaled version of passed module.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Autocorrect module to desired range, (0,1) default. Function calculate scaling factor based on number of samples.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn auto-correct
   ([^Module m samples mn mx]
    (let [^ModuleAutoCorrect ac (ModuleAutoCorrect. mn mx)]
@@ -2904,22 +2924,39 @@ net.brehaut.ClojureTools = (function (SH) {
   ([^Module m]
    (auto-correct m 10000 0.0 1.0))
   ([^Module m samples]
-   (auto-correct m samples 0.0 1.0)))</pre></td></tr><tr><td class="docs">
+   (auto-correct m samples 0.0 1.0)))</pre></td></tr><tr><td class="docs"><h2>Basis</h2>
+
+<p>To make basis module call <code>make-basis</code>. Configuration is a map:</p>
+
+<ul>
+<li>:type - basis type</li>
+<li>:interpolation</li>
+<li>:seed - type long</li>
+</ul>
+
+<p>Default is {:type :gradval :interpolation :cubic} and random seed. List of types and interpolations below.</p>
+
+<p>You can create:</p>
+
+<ul>
+<li>Random configuration with <code>make-random-basis-conf</code></li>
+<li>Random basis module with <code>make-random-basis-module</code> (autocorrected)</li>
+<li>Random basis noise function with <code>make-random-basis-noise</code></li>
+</ul>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>List of basis types</p>
 </td><td class="codes"><pre class="brush: clojure">(def basis-type {:value ModuleBasisFunction$BasisType/VALUE
                  :gradient ModuleBasisFunction$BasisType/GRADIENT
                  :gradval ModuleBasisFunction$BasisType/GRADVAL
-                 :simplex ModuleBasisFunction$BasisType/SIMPLEX})</pre></td></tr><tr><td class="docs">
+                 :simplex ModuleBasisFunction$BasisType/SIMPLEX})</pre></td></tr><tr><td class="docs"><p>List of interpolations</p>
 </td><td class="codes"><pre class="brush: clojure">(def interpolation-type {:none ModuleBasisFunction$InterpolationType/NONE
                          :linear ModuleBasisFunction$InterpolationType/LINEAR
                          :cubic ModuleBasisFunction$InterpolationType/CUBIC
-                         :quintic ModuleBasisFunction$InterpolationType/QUINTIC})</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def default-basis-params {:type :gradval
-                           :interpolation :cubic})</pre></td></tr><tr><td class="docs"><p>Create noise basis module</p>
-
-<p><img src="../results/ex00/0000.jpg" alt="nn" /></p>
+                         :quintic ModuleBasisFunction$InterpolationType/QUINTIC})</pre></td></tr><tr><td class="docs"><p>Create noise basis module</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-basis
   [&amp; m]
-  (let [params (merge default-basis-params {:seed (lrand)} (apply merge m))
+  (let [params (merge  {:type :gradval
+                        :interpolation :cubic
+                        :seed (lrand)} (apply merge m))
         typ (:type params)
         ^ModuleBasisFunction fun (ModuleBasisFunction. (typ basis-type)
                                                        ((:interpolation params) interpolation-type)
@@ -2936,20 +2973,36 @@ net.brehaut.ClojureTools = (function (SH) {
           (.setScaleV simplex-scale)
           (.setSource fun))
         scale)
-      fun)))</pre></td></tr><tr><td class="docs">
+      fun)))</pre></td></tr><tr><td class="docs"><p>Create random configuration for basis noise</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-random-basis-conf
   []
-  (let [t (rand-nth (keys basis-type))
-        i (rand-nth (keys interpolation-type))]
-    [t i]))</pre></td></tr><tr><td class="docs">
+  {:type (rand-nth (keys basis-type))
+   :interpolation (rand-nth (keys interpolation-type))
+   :seed (lrand)})</pre></td></tr><tr><td class="docs"><p>Create module from random config.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-random-basis-module
   []
-  (let [[t i] (make-random-basis-conf)]
-    (auto-correct (make-basis {:type t
-                               :interpolation i}) 100)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn make-random-basis
+  (auto-correct (make-basis (make-random-basis-conf)) 100))</pre></td></tr><tr><td class="docs"><p>Create basis noise function.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-random-basis-noise
   []
-  (make-noise (make-random-basis-module)))</pre></td></tr><tr><td class="docs"><p>Create cellular module with 4 coefficients</p>
+  (make-noise (make-random-basis-module)))</pre></td></tr><tr><td class="docs"><h2>Cells</h2>
+
+<p>To make cell module call <code>make-cell</code>. Configuration is a map:</p>
+
+<ul>
+<li>:coeffs - vector with four doubles [a b c d] as cell coefficients</li>
+<li>:seed - type long</li>
+</ul>
+
+<p>Default is {:coeffs [1 0 0 0]} and random seed.</p>
+
+<p>You can create:</p>
+
+<ul>
+<li>Random configuration with <code>make-random-cell-conf</code></li>
+<li>Random basis module with <code>make-random-cell-module</code> (autocorrected)</li>
+<li>Random basis noise function with <code>make-random-cell-noise</code></li>
+</ul>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Create cellular module with 4 coefficients</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-cell
   [&amp; m]
   (let [params (merge {:coeffs [1 0 0 0] :seed (lrand)} (apply merge m))
@@ -2959,39 +3012,53 @@ net.brehaut.ClojureTools = (function (SH) {
     (.setSeed cg (:seed params))
     (.setCoefficients cell f1 f2 f3 f4)
     (.setCellularSource cell cg)
-    cell))</pre></td></tr><tr><td class="docs">
+    cell))</pre></td></tr><tr><td class="docs"><p>Create random configuration for cell module.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-random-cell-conf
   []
-  [(drand -5 5) (drand -5 5) (drand -5 5) (drand -5 5)])</pre></td></tr><tr><td class="docs">
+  {:coeffs [(drand -5 5) (drand -5 5) (drand -5 5) (drand -5 5)]
+   :seed (lrand)})</pre></td></tr><tr><td class="docs"><p>Create random cell module. Autocorrected.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-random-cell-module
   []
-  (auto-correct (make-cell {:coeffs (make-random-cell-conf)}) 100))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn make-random-cell
+  (auto-correct (make-cell (make-random-cell-conf)) 100))</pre></td></tr><tr><td class="docs"><p>Create cell noise function</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-random-cell-noise
   []
-  (make-noise (make-random-cell-module)))</pre></td></tr><tr><td class="docs">
+  (make-noise (make-random-cell-module)))</pre></td></tr><tr><td class="docs"><h2>Fractal noise</h2>
+
+<p>To make fractal module call <code>make-fractal</code> (autocorrected). Configuration is a map:</p>
+
+<ul>
+<li>:type - fractal type, see list below</li>
+<li>:lacunarity - scaling factor for next octave</li>
+<li>:frequency - base saling factor</li>
+<li>:octaves - list of modules used for octaves (basis or cell)</li>
+</ul>
+
+<p>Default is {:type :fbm :lacunarity 2.0 :frequencty 2.0} and 4 basis modules</p>
+
+<p>You can create:</p>
+
+<ul>
+<li>Random configuration with <code>make-random-fractal-conf</code></li>
+<li>Random basis module with <code>make-random-fractal-module</code></li>
+<li>Random basis noise function with <code>make-random-fractal-noise</code></li>
+</ul>
+</td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def fractal-type {:fbm ModuleFractal$FractalType/FBM
                    :ridgemulti ModuleFractal$FractalType/RIDGEMULTI
                    :billow ModuleFractal$FractalType/BILLOW
                    :multi ModuleFractal$FractalType/MULTI
                    :hybridmulti ModuleFractal$FractalType/HYBRIDMULTI
-                   :decarpentierswiss ModuleFractal$FractalType/DECARPENTIERSWISS})</pre></td></tr><tr><td class="docs"><p>Prepare list of octaves</p>
-</td><td class="codes"><pre class="brush: clojure">(defn process-octaves
-  [xs]
-  (loop [lxs xs
-         result []]
-    (if-not (seq lxs)
-      (mapcat identity result)
-      (let [[no module] (first lxs)]
-        (recur (rest lxs)
-               (conj result (repeat no module)))))))</pre></td></tr><tr><td class="docs"><p>Create fractal with octaves</p>
+                   :decarpentierswiss ModuleFractal$FractalType/DECARPENTIERSWISS})</pre></td></tr><tr><td class="docs"><p>Create fractal with octaves</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-fractal
   [&amp; m]
   (let [params (merge {:type :fbm
                        :lacunarity 2.0
                        :frequency 2.0
-                       :octaves [[2 (make-basis)]
-                                 [2 (make-basis)]]} (apply merge m))
-        octaves (process-octaves (:octaves params))
+                       :octaves [(make-basis)
+                                 (make-basis)
+                                 (make-basis)
+                                 (make-basis)]} (apply merge m))
+        octaves (:octaves params)
         ^ModuleFractal fract (ModuleFractal.)]
     (doto fract
       (.setNumOctaves (count octaves))
@@ -3003,7 +3070,7 @@ net.brehaut.ClojureTools = (function (SH) {
       (when (seq xs)
         (.overrideSource fract idx (first xs))
         (recur (rest xs) (inc idx))))
-    (auto-correct fract 100)))</pre></td></tr><tr><td class="docs">
+    (auto-correct fract 100)))</pre></td></tr><tr><td class="docs"><p>Create random fractal configuration</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-random-fractal-conf
   []
   (let [type (rand-nth (keys fractal-type))
@@ -3014,15 +3081,18 @@ net.brehaut.ClojureTools = (function (SH) {
     {:type type
      :lacunarity l
      :frequency f
-     :octaves [[1 (rand-nth b)]
-               [1 (rand-nth b)]
-               [1 (rand-nth b)]]}))</pre></td></tr><tr><td class="docs">
+     :octaves [(rand-nth b)
+               (rand-nth b)
+               (rand-nth b)]}))</pre></td></tr><tr><td class="docs"><p>Create random fractal module</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-random-fractal-module
   []
-  (make-fractal (make-random-fractal-conf)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn make-random-fractal
+  (make-fractal (make-random-fractal-conf)))</pre></td></tr><tr><td class="docs"><p>Create random fractal noise</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-random-fractal-noise
   []
-  (make-noise (make-random-fractal-module)))</pre></td></tr><tr><td class="docs">
+  (make-noise (make-random-fractal-module)))</pre></td></tr><tr><td class="docs"><h2>Perlin noise</h2>
+
+<p>Joise version of Perlin noise</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def perlin-noise (make-noise (make-fractal)))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
 SyntaxHighlighter.all();
 

@@ -6,7 +6,7 @@
             [clojure2d.color :as c]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 (def canvas (create-canvas 200 200))
 
@@ -67,13 +67,12 @@
 
 ;; combined / fractal / slow!
 
-
-;saving: results/ex04/91DA588E.jpg
-;saving: results/ex04/54F7EC04.jpg
-;saving: results/ex04/08A1FD78.jpg
-;saving: results/ex04/9B37E417.jpg
-;saving: results/ex04/9973D635.jpg
-;saving: results/ex04/2991271E.jpg
+;;saving: results/ex04/91DA588E.jpg
+;;saving: results/ex04/54F7EC04.jpg
+;;saving: results/ex04/08A1FD78.jpg
+;;saving: results/ex04/9B37E417.jpg
+;;saving: results/ex04/9973D635.jpg
+;;saving: results/ex04/2991271E.jpg
 (let [type (rand-nth (keys j/fractal-type))
       b [j/make-random-basis-module
          j/make-random-cell-module]
@@ -82,8 +81,8 @@
       params {:type type
               :lacunarity l
               :frequency f
-              :octaves [[1 ((rand-nth b))]
-                        [1 ((rand-nth b))]
-                        [1 ((rand-nth b))]]}]
+              :octaves [((rand-nth b))
+                        ((rand-nth b))
+                        ((rand-nth b))]}]
   (draw-noise (j/make-noise (j/make-fractal params)))
   [type l f])

@@ -1,3 +1,8 @@
+;; # Namespace scope
+;;
+;; Functions to manipulate Vec2 as Complex numbers.
+;; Implementation based on Apache Commons Math
+
 (ns clojure2d.math.complex
   (:require [clojure2d.math :as m]
             [clojure2d.math.vector :as v])
@@ -170,4 +175,3 @@
        (log)
        (mult z2)
        (exp)))
-

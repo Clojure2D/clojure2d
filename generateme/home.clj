@@ -12,9 +12,9 @@
             [clojure.pprint :refer [pprint]])
   (:import [net.jafama FastMath]))
 
-(def p1 (p/load-pixels "generateme/tskrender2.png"))
+(def p1 (p/load-pixels "generateme/oo/a2.png"))
 
-(def p2 (p/load-pixels "generateme/adrian/ares3.png"))
+(def p2 (p/load-pixels "generateme/oo/a1.jpg"))
 
 (def p3 (p/load-pixels "generateme/ooo/ooo.jpg"))
 
@@ -23,7 +23,7 @@
 
 (def canvas (core/create-canvas (.w p1) (.h p1)))
 
-(def scale 0.3)
+(def scale 0.83)
 
 (def windows (core/show-window canvas "glitch" (* scale (.w p1)) (* scale (.h p1)) 10))
 
@@ -31,9 +31,9 @@
       b2 (g/blend-machine)]
   (println b)
   (println b2)
-  (p/set-canvas-pixels canvas (p/filter-channels p/normalize-filter false 
-                                                 (p/filter-channels p/normalize-filter false
-                                                                    (g/blend-machine p4 p1 b)))))
+  (p/set-canvas-pixels! canvas (p/filter-channels p/normalize-filter false 
+                                                  (p/filter-channels p/normalize-filter false
+                                                                     (g/blend-machine p2 p1 b)))))
 
 (quick-bench (p/filter-channels p/dilate-filter false p1))
 
@@ -41,13 +41,13 @@
   (core/image (o/render-rgb-scanlines (@canvas 1))))
 
 (core/with-canvas canvas
-  (core/image (->> (@canvas 1)
+  (core/image (->> (core/get-image canvas)
                    (o/render-noise noise-overlay)
                    (o/render-spots spots-overlay))))
 
 (core/close-session)
 
-(core/save-canvas canvas (core/next-filename "generateme/adrian/tskrender" ".png"))
+(core/save-canvas canvas (core/next-filename "generateme/oo/aaa" ".png"))
 
 (p/set-canvas-pixels canvas p5)
 
@@ -61,7 +61,7 @@
 (do
   (def palette (g/color-reducer-machine))
   (println palette)
-  (p/set-canvas-pixels canvas (g/color-reducer-machine palette p5)))
+  (p/set-canvas-pixels! canvas (g/color-reducer-machine palette p4)))
 
 
 ;; slitscan
@@ -97,7 +97,7 @@
                                                             :bits 8
                                                             :coding :none
                                                             :signed true})]
-        (p/set-canvas-pixels canvas (p/filter-channels p/normalize nil (p/filter-colors c/from-LUV resp)))))
+        (p/set-canvas-pixels! canvas (p/filter-channels p/normalize nil (p/filter-colors c/from-LUV resp)))))
 
 ;; fold
 

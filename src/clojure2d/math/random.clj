@@ -1,3 +1,12 @@
+;; # Namespace scope
+;;
+;; Namespaces defines:
+;;
+;; * random functions based on various RNG + default bindings based on default Java RNG
+;; * int, long, float, double, gaussian and boolean random functions
+;; * basic perlin noise (see `joise` namespace for several more noise functions)
+;; * discrete noise function
+
 (ns clojure2d.math.random
   (:require [clojure2d.math :refer :all]
             [clojure2d.math.vector :as v])
