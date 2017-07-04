@@ -19,6 +19,8 @@ Clojure2D is a lightweight library supporting generative coding or glitching. It
 
 [Marginalia - In progress!](https://clojure2d.github.io/clojure2d/docs/marginalia/toc.html)
 
+[Codox - In progress!](https://clojure2d.github.io/clojure2d/docs/codox/)
+
 ## Motivation
 
 This project is the answer to personal needs to optimize my own workflow for generative or glitch creations. I've been producing a lot of Processing code and started to suffer from limitations of working in 'write sketch and run' mode. Too much copy&paste between sketches, zillions of folders, zillions of processed images. And one day I fell in love with FP. This code is the answer.
