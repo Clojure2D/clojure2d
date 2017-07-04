@@ -403,22 +403,7 @@
   ([canvas]
    (set-stroke canvas 1.0)))
 
-(defn set-awt-color
-  "Set color with valid java `Color` object. Use it when you're sure you pass `java.awt.Color`."
-  [^Canvas canvas ^java.awt.Color c]
-  (.setColor ^Graphics2D (.graphics canvas) c)
-  canvas)
-
-(defn set-awt-background
-  "Set background color. Expects valid `Color` object."
-  [^Canvas canvas c]
-  (let [^Graphics2D g (.graphics canvas)
-        ^Color currc (.getColor g)] 
-    (set-color canvas c)
-    (doto g
-      (.fillRect 0 0 (.width canvas) (.height canvas))
-      (.setColor currc)))
-  canvas)
+;; ### Color
 
 (defn- set-color-with-fn
   "Set color for primitive or background via passed function. You can use:
@@ -432,6 +417,23 @@
    (f canvas (c/make-awt-color r g b a)))
   ([f canvas r g b]
    (f canvas (c/make-awt-color r g b))))
+
+(defn set-awt-color
+  "Set color with valid java `Color` object. Use it when you're sure you pass `java.awt.Color`."
+  [^Canvas canvas ^java.awt.Color c]
+  (.setColor ^Graphics2D (.graphics canvas) c)
+  canvas)
+
+(defn set-awt-background
+  "Set background color. Expects valid `Color` object."
+  [^Canvas canvas c]
+  (let [^Graphics2D g (.graphics canvas)
+        ^Color currc (.getColor g)] 
+    (set-color-with-fn set-awt-color canvas c)
+    (doto g
+      (.fillRect 0 0 (.width canvas) (.height canvas))
+      (.setColor currc)))
+  canvas)
 
 ;; Set color for primitive
 (def set-color (partial set-color-with-fn set-awt-color))
@@ -760,19 +762,19 @@
                         counter])
 
 ;; Session is stored in agent
-(def session-agent (agent (SessionType. nil nil nil)))
+(def session-agent (agent (map->SessionType {})))
 
 ;; Logging to file is turned off by default.
 (def ^:dynamic *log-to-file* false)
 
 (defn- close-session-fn
   "Close current session"
-  [^SessionType s]
+  [s]
   (let [^java.io.Writer o (:logger s)]
     (when-not (nil? o)
       (.flush o)
       (.close o)))
-  (SessionType. nil nil nil))
+  (map->SessionType {}))
 
 (defn- make-logger-fn
   "Create writer for logger"
@@ -795,7 +797,7 @@
   (close-session-fn s)
   (let [nname (make-session-name)
         writer (when *log-to-file* (make-logger-fn nname))]
-    (SessionType. writer nname (make-counter 0))))
+    (->SessionType writer nname (make-counter 0))))
 
 (defn make-session
   "Create session via agent"
@@ -825,7 +827,7 @@
   "Create next unique filename based on session"
   ([prefix]
    (ensure-session)
-   (let [^SessionType s @session-agent]
+   (let [s @session-agent]
      (str prefix (second (:name s)) "_" (format "%06d" ((:counter s))))))
   ([prefix suffix]
    (str (next-filename prefix) suffix)))
@@ -840,5 +842,5 @@
                             (let [^java.io.Writer o (or (:logger s) (make-logger-fn (:name s)))]
                               (.write o to-log)
                               (.flush o)
-                              (SessionType. o (:name s) (:counter s)))))
+                              (->SessionType o (:name s) (:counter s)))))
       (println to-log))))
