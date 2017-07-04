@@ -1,3 +1,22 @@
+;; # Namespace scope
+;;
+;; Pixels represent raw color data take from image or canvas.
+;; `pixels` namespace consist of:
+;;
+;; * Pixels type definition with set of mutating functions
+;; * Parallel filter processors
+;; * Filters
+;; * BinPixels to support log-density (bin based) rendering process.
+;;
+;; Pixels are stored in `ints` array as separeted channels in one of two layouts: planar (default) and interleaved.
+;; To operate on pixels you have several methods:
+;;
+;; * whole channel, channel value or color getters and setters for specified position and/or channel
+;; * creators - rom and to: file, image, canvas
+;; * layout converters
+;; * parallel processors for filtering colors or channels; composition of `pixels`
+;; * filters: `dilate`, `erode`, `box-blur`, `gaussian-blur`, `posterize`, `threshold`, `quantile`, `tint`, `normalize`, `equalize`, `negate`.
+
 (ns clojure2d.pixels
   (:require [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
@@ -12,25 +31,43 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
-;; :zero, :edge :wrap or channel value 0-255
+;; `*pixels-edge*` describe what is the value of pixel when accessing from outside the image.
+;; Possible values are:
+;;
+;; * `:zero` - set `0` 
+;; * `:edge` - value from the edge of the image (left, right, top, bottom or corners)
+;; * `:wrap` - wrap around image
+;; * or channel value 0-255 - set specific value
+;;
 (def ^:dynamic *pixels-edge* :edge)
 
-(defprotocol PixelsProto
-  (get-value [pixels ch idx] [pixels ch x y])
-  (get-color [pixels idx] [pixels x y])
-  (set-value [pixels ch idx v] [pixels ch x y v])
-  (set-color [pixels idx v] [pixels x y v])
-  (idx->pos [pixels idx])
-  (get-channel [pixels ch])
-  (set-channel [pixels ch v]))
+;; ## Pixels type
 
-(deftype Pixels [^ints p ^long w ^long h planar ^long size pos]
+(defprotocol PixelsProto
+  "Functions for accessing and setting channel values or colors."
+  (get-value [pixels ch idx] [pixels ch x y] "get channel value by index or position")
+  (get-color [pixels idx] [pixels x y] "get color by index or position")
+  (set-value [pixels ch idx v] [pixels ch x y v] "set channel value by index or position")
+  (set-color [pixels idx v] [pixels x y v] "set color value by index or position")
+  (idx->pos [pixels idx] "convert index to position")
+  (get-channel [pixels ch] "return whole `ints` array with chosen channel")
+  (set-channel [pixels ch v] "set whole channel (as `ints` array)"))
+
+;; Pixels type contains:
+;;
+;; * p - color channel values as `ints`
+;; * w - width
+;; * h - height
+;; * planar? - is it planar layout? Note: some filters work only on planar layout
+;; * size - channel size
+;; * pos - function returning actual position in `p` array from channel and index
+(deftype Pixels [^ints p ^long w ^long h planar? ^long size pos]
   PixelsProto
 
   (get-channel [_ ch]
     (let [^ints res (int-array size)
           off (* ^long ch size)]
-      (if planar
+      (if planar?
         (System/arraycopy p off res 0 size)
         (dotimes [idx size]
           (aset res idx (aget p (+ ^long ch (bit-shift-left idx 2))))))
@@ -38,7 +75,7 @@
 
   (set-channel [_ ch v]
     (let [off (* ^long ch size)]
-      (when planar
+      (when planar?
         (System/arraycopy ^ints v 0 p off size)))) 
   ;; TODO: implement mutating copy of array into interleaved version of pixels
 
@@ -82,8 +119,7 @@
   (set-value [pixels ch x y v]
     (set-value pixels ch (+ ^long x (* ^long y w)) v))
 
-  (set-color [_ idx v]
-    ""
+  (set-color [_ idx v] 
     (let [^Vec4 v v]
       (aset ^ints p ^long (pos 0 idx) (int (.x v)))
       (aset ^ints p ^long (pos 1 idx) (int (.y v)))
@@ -100,49 +136,49 @@
       (Vec2. x y)))
   
   Object
-  (toString [_] (str "pixels (" w ", " h "), " (if planar "planar" "interleaved"))))
+  (toString [_] (str "pixels (" w ", " h "), " (if planar? "planar" "interleaved"))))
 
-;; operate on pixels
+;; ## Pixels creators
 
-(defn make-value-selector
-  ""
-  [planar ^long size]
-  (if planar
+(defn- make-value-selector
+  "Create function which returns position in internal `Pixels` array for given index. Based on layout."
+  [planar? ^long size]
+  (if planar?
     (fn ^long [^long ch ^long idx]
       (+ idx (* ch size)))
     (fn ^long [^long ch ^long idx]
       (+ ch (bit-shift-left idx 2)))))
 
 (defn make-pixels
-  "Pixels constructors, sets valid channel value selector (pos) depending on layout"
-  ([^ints a ^long w ^long h planar]
+  "Create empty `Pixels` in given layout, sets valid channel value selector (pos) depending on layout"
+  ([^ints a ^long w ^long h planar?]
    (let [size (* w h)
-         pos (make-value-selector planar size)]
-     (Pixels. a w h planar size pos)))
+         pos (make-value-selector planar? size)]
+     (Pixels. a w h planar? size pos)))
   ([w h]
    (make-pixels w h true))
-  ([^long w ^long h planar]
-   (make-pixels (int-array (* 4 w h)) w h planar)))
+  ([^long w ^long h planar?]
+   (make-pixels (int-array (* 4 w h)) w h planar?)))
 
 (defn replace-pixels
-  ""
-  ([^Pixels p ^ints a planar]
-   (Pixels. a (.w p) (.h p) planar (.size p) (make-value-selector planar (.size p))))
+  "Create new `Pixels` for given raw `ints` pixels"
+  ([^Pixels p ^ints a planar?]
+   (Pixels. a (.w p) (.h p) planar? (.size p) (make-value-selector planar? (.size p))))
   ([^Pixels p a]
-   (replace-pixels p a (.planar p))))
+   (replace-pixels p a (.planar? p))))
 
 (defn clone-pixels
-  "Clone Pixels"
+  "Clone Pixels, returns new object"
   [^Pixels p]
   (let [len (alength ^ints (.p p))
         res (int-array len)]
     (System/arraycopy (.p p) 0 ^ints res 0 len)
     (replace-pixels p res)))
 
-;; interleaved/planar
+;; ## Layout converters
 
 (defn to-planar
-  "Convert interleaved (native) layout of pixels to planar"
+  "Convert interleaved (Java2d native) layout of pixels to planar"
   [^Pixels p]
   (let [f (fn ^long [^long x]
             (let [q (quot x (.size p))
@@ -159,10 +195,10 @@
               (+ q (* (.size p) r))))]
     (replace-pixels p (amap ^ints (.p p) idx ret (int (aget ^ints (.p p) (int (f idx))))) false)))
 
-;; load and save
+;; ## Pixels converters
 
-(defn  get-image-pixels
-  "take pixels from the buffered image"
+(defn get-image-pixels
+  "Create Pixels from image, convert to planar layout on default"
   ([^BufferedImage b x y w h planar?]
    (let [size (* 4 ^long w ^long h)
          ^ints p (.. b
@@ -180,9 +216,9 @@
    (get-image-pixels b true)))
 
 (defn set-image-pixels!
-  ""
+  "Set pixels to image, mutating it"
   ([^BufferedImage b x y ^Pixels pin]
-   (let [^Pixels p (if (.planar pin) (from-planar pin) pin)] 
+   (let [^Pixels p (if (.planar? pin) (from-planar pin) pin)] 
      (.. b
          (getRaster)
          (setPixels ^int x ^int y (int (.w p)) (int (.h p)) ^ints (.p p))))
@@ -191,17 +227,13 @@
    (set-image-pixels! b 0 0 p)))
 
 (defn image-from-pixels
-  ""
+  "Create image from given pixels."
   [^Pixels p]
   (let [^BufferedImage bimg (BufferedImage. (.w p) (.h p) BufferedImage/TYPE_INT_ARGB)]
     (set-image-pixels! bimg p)))
 
-;;
-
-;; taking and putting pixel array (as ints)
-
 (defn get-canvas-pixels
-  ""
+  "Get pixels from canvas"
   ([^Canvas canvas x y w h planar?]
    (get-image-pixels (.buffer canvas) x y w h planar?))
   ([^Canvas canvas x y w h]
@@ -212,13 +244,11 @@
    (get-image-pixels (.buffer canvas) planar?)))
 
 (defn set-canvas-pixels!
-  ""
+  "Set pixels to canvas"
   ([^Canvas canvas p x y]
    (set-image-pixels! (.buffer canvas) x y p))
   ([^Canvas canvas p]
    (set-image-pixels! (.buffer canvas) p)))
-
-;;
 
 (defn load-pixels
   "Load pixels from file"
@@ -231,11 +261,12 @@
   (core/save-image (image-from-pixels p) n)
   p)
 
-
-;; processors
+;; ## Processors
+;;
+;; Following functions are used to filter pixels in parallel way. You can filter channel values with selected filter or you can filter whole colors. It's done in parallel way using as many cores you have. Processor are immutable (which can lead to memory issues).
 
 (defn filter-colors
-  ""
+  "Filter pixels color-wise with given function. Filtering function should accept and return color as `Vec4`. You can use color space conversion functions defined in `color` namespace."
   [f ^Pixels p]
   (let [^Pixels target (clone-pixels p)
         pre-step (max 40000 ^long (/ (.size p) core/available-tasks))
@@ -246,26 +277,28 @@
                #(future (let [end (min (+ ^long % step) (.size p))]
                           (loop [idx (int %)]
                             (when (< idx end)
-                              (set-color target idx (f (get-color p idx)))
+                              (set-color target idx ^Vec4 (f (get-color p idx)))
                               (recur (unchecked-inc idx))))))
                parts))]
     (dorun (map deref ftrs))
     target))
 
 (defn filter-channel
-  "Filter one channel, write result into target. Works only on planar"
+  "Filter one channel, write result into target. Works only on planar.
+   Passed function should accept and return `int`."
   [f ^long ch ^Pixels target ^Pixels p]
   (let [size (.size target)
         start (* ch size)
         stop (* (inc ch) size)]
     (loop [idx (int start)]
       (when (< idx stop)
-        (aset ^ints (.p target) idx (int (f (aget ^ints (.p p) idx))))
+        (aset ^ints (.p target) idx ^int (f (aget ^ints (.p p) idx)))
         (recur (unchecked-inc idx))))
     true))
 
 (defn filter-channel-xy
-  "Filter one channel, write result into target. Works on planar/interleaved"
+  "Filter one channel, write result into target. Works on planar/interleaved.
+   Function parameters are: channel, pixels, x and y position."
   [f ch ^Pixels target p]
   (dotimes [y (.h target)]
     (dotimes [x (.w target)]
@@ -273,7 +306,9 @@
   true)
 
 (defn filter-channels
-  "Filter channels parallelly"
+  "Filter channels parallelly with filtering function. Build filtering function from `filter-channel` or `filter-channel-xy` helpers as with filter aplied partially. Filtering function parameters are: channel, target and source pixels.
+
+  You can pass one filter for all channels, separately for channels, you can skip alpha channel, or select channels individually (just pass `nil`). All channels are processed in 4 future threads."
   ([f0 f1 f2 f3 p]
    (let [target (clone-pixels p)
          ch0 (future (if f0 (f0 0 target p) false))
@@ -290,27 +325,27 @@
      (filter-channels f f f nil p))))
 
 (defn blend-channel
-  "Blend one channel, write result into target. Works only on planar"
+  "Blend one channel, write result into target. Works only on planar. Blending function should accept two `int` values (as channel values) and return `int`. If you want to use blending functions which are predefined in `color` namespace use `compose-channels` filter. This is "
   [f ch ^Pixels target ^Pixels p1 ^Pixels p2]
   (let [size (.size target)
         start (int (* ^long ch size))
         stop (int (* (inc ^long ch) size))]
     (loop [idx start]
       (when (< idx stop)
-        (aset ^ints (.p target) idx (int (c/blend-values f (aget ^ints (.p p1) idx) (aget ^ints (.p p2) idx))))
+        (aset ^ints (.p target) idx ^int (f (aget ^ints (.p p1) idx) (aget ^ints (.p p2) idx)))
         (recur (unchecked-inc idx))))
     true))
 
 (defn blend-channel-xy
-  "Blend one channel, write result into target. Works on planar/interleaved"
+  "Blend one channel, write result into target. Works on planar/interleaved. Blending function should accept channel, target and two source `pixels`."
   [f ch ^Pixels target p1 p2]
   (dotimes [y (.h target)]
-   (dotimes [x (.w target)]
-    (set-value target ch x y (f ch p1 p2 x y))))
+    (dotimes [x (.w target)]
+      (set-value target ch x y (f ch p1 p2 x y))))
   true)
 
 (defn blend-channels
-  "Blend channels parallelly"
+  "Blend channels parallelly. Similar to `filter-channels`. Bleding function should accept: channel, target and two source pixels"
   ([f0 f1 f2 f3 p1 p2]
    (let [target (clone-pixels p1)
          ch0 (future (if f0 (f0 0 target p1 p2) false))
@@ -326,20 +361,20 @@
      (blend-channels f f f f p1 p2)
      (blend-channels f f f nil p1 p2))))
 
-;; compose channels
+;; ## Compose channels filter
 
 (defn make-compose-f
-  ""
+  "Create compose blending function"
   [n]
   (cond 
-    (keyword? n) (partial blend-channel (n c/blends))
+    (keyword? n) (partial blend-channel (partial c/blend-values (n c/blends)))
     (nil? n) nil
-    :else (partial blend-channel n)))
+    :else (partial blend-channel (partial c/blend-values n))))
 
 (def make-compose (memoize make-compose-f))
 
 (defn compose-channels
-  "Compose channels with blending functions"
+  "Compose channels with blending functions. You can give blending method name as keyword defined in `blends-names` variable from `color` namespace. Or it can be blending function which accepts 2 doubles from 0.0 to 1.0 and returns double (0.0 - 1.0). Behaviour is similar to `filter-channels` or `blend-channels` method."
   ([n1 n2 n3 n4 p1 p2]
    (blend-channels (make-compose n1) (make-compose n2) (make-compose n3) (make-compose n4) p1 p2))
   ([n p1 p2]
@@ -349,10 +384,12 @@
      (compose-channels n n n n p1 p2)
      (compose-channels n n n nil p1 p2))))
 
-;; convolution
+;; ## Filters
+
+;; ### Value accessors
 
 (defn get-3x3
-  ""
+  "Return 9 channel values around given position."
   [ch ^Pixels p ^long x ^long y]
   [(get-value p ch (dec x) (dec y))
    (get-value p ch x  (dec y))
@@ -365,7 +402,7 @@
    (get-value p ch (inc x) (inc y))])
 
 (defn get-cross-f
-  ""
+  "Return value from 5 (cross) values using binary functions."
   [f ch ^Pixels p x y]
   (f ^int (get-value p ch x (dec ^long y))
      (f ^int (get-value p ch (dec ^long x) y)
@@ -373,14 +410,12 @@
            (f ^int (get-value p ch (inc ^long x) y)
               ^int (get-value p ch x (inc ^long y)))))))
 
+;; Create dilate and erode filters
 (def dilate-filter (partial filter-channel-xy (partial get-cross-f max)))
 (def erode-filter (partial filter-channel-xy (partial get-cross-f min)))
 
-;; gaussian blur done
-;; http://blog.ivank.net/fastest-gaussian-blur.html
-
-(defn make-aget-2d
-  ""
+(defn- make-aget-2d
+  "2d `ints` array getter with `:edge` boundary."
   [^ints array ^long w ^long h]
   (fn local-aget-2d ^long [^long x ^long y]
     (if (or (neg? x)
@@ -390,8 +425,12 @@
       (local-aget-2d (m/iconstrain x 0 (dec w)) (m/iconstrain y 0 (dec h)))
       (aget array (+ x (* y w))))))
 
+;; ### Blurs
+
+;; Algorithm based on http://blog.ivank.net/fastest-gaussian-blur.html
+
 (defn box-blur-v
-  ""
+  "Vertical pass for blur."
   [^long r ^long w ^long h ^ints in]
   (if (zero? r) in
       (let [aget-2d (make-aget-2d in w h)
@@ -412,7 +451,7 @@
         target)))
 
 (defn box-blur-h
-  ""
+  "Horizontal pass for blur."
   [^long r ^long w ^long h ^ints in]
   (if (zero? r) in
       (let [aget-2d (make-aget-2d in w h)
@@ -434,7 +473,7 @@
         target)))
 
 (defn box-blur
-  ""
+  "Box blur two passes for given radius."
   [r ch ^Pixels target ^Pixels p]
   (let [buf (get-channel p ch)
         result (box-blur-v r (.w p) (.h p) (box-blur-h r (.w p) (.h p) buf))]
@@ -442,21 +481,23 @@
   nil)
 
 (defn make-radius-blur
-  ""
+  "Create blur with given blur filter and radius"
   ([f radius]
    (partial f radius))
   ([f]
    (make-radius-blur f 2)))
 
+;; Box blur creator
 (def make-box-blur (partial make-radius-blur box-blur))
 
+;; Create 4 box blurs for radiuses 1,2,3 and 5
 (def box-blur-1 (make-box-blur 1))
 (def box-blur-2 (make-box-blur 2))
 (def box-blur-3 (make-box-blur 3))
 (def box-blur-5 (make-box-blur 5))
 
 (defn radius-for-gauss
-  ""
+  "Calculate radius for gaussian blur."
   [^double sigma ^long n]
   (let [sigma* (* 12 sigma sigma)
         w-ideal (-> sigma*
@@ -474,7 +515,7 @@
 (def radius-for-gauss-memo (memoize radius-for-gauss))
 
 (defn gauss-blur
-  "Proceed with Gaussian Blur on channel, save result to target"
+  "Proceed with Gaussian Blur on channel, save result to target for given radius"
   [r ch ^Pixels target ^Pixels p]
   (let [bxs (radius-for-gauss-memo r 3)
         buf (get-channel p ch)
@@ -488,17 +529,19 @@
     (set-channel target ch res)
     nil))
 
+;; Gaussian blur creator
 (def make-gaussian-blur (partial make-radius-blur gauss-blur))
 
+;; Create 4 gaussian blurs for radiuses: 1,2,3 and 5
 (def gaussian-blur-1 (make-gaussian-blur 1))
 (def gaussian-blur-2 (make-gaussian-blur 2))
 (def gaussian-blur-3 (make-gaussian-blur 3))
 (def gaussian-blur-5 (make-gaussian-blur 5))
 
-;; posterize done
+;; ### Posterize
 
 (defn posterize-levels-fun
-  ""
+  "Calculate levels"
   [^long numlev]
   (let [f (fn ^long [^long idx] (-> idx
                                     (* numlev)
@@ -511,12 +554,12 @@
 (def posterize-levels (memoize posterize-levels-fun))
 
 (defn posterize-pixel
-  ""
+  "Posterize one pixel"
   [levels v]
   (aget ^ints levels (int v)))
 
 (defn make-posterize
-  ""
+  "Create posterize filter"
   ([^long numlev]
    (let [nl (m/iconstrain numlev 2 255)
          ^ints levels (posterize-levels nl)]
@@ -524,30 +567,32 @@
   ([]
    (make-posterize 6)))
 
+;; Create 3 posterize filters for: 4, 8 and 16 channel values.
 (def posterize-4 (make-posterize 4))
 (def posterize-8 (make-posterize 8))
 (def posterize-16 (make-posterize 16))
 
-;; threshold
+;; ### Threshold
 
 (defn threshold-pixel
-  ""
+  "Threshold one pixel."
   ^long [^long thr ^long v]
   (if (< v thr) 255 0))
 
 (defn make-threshold
-  ""
+  "Create threshold filter for given value."
   ([^double thr]
    (let [t (long (* 256 thr))]
      (partial filter-channel (partial threshold-pixel t))))
   ([]
    (make-threshold 0.5)))
 
+;; Create 3 threshold filters for 0.25, 0.5 and 0.75 threshold values.
 (def threshold-25 (make-threshold 0.25))
 (def threshold-50 (make-threshold))
 (def threshold-75 (make-threshold 0.75))
 
-;; Median and Quantile filters
+;; ### Median and Quantile filters
 
 (defn quantile
   "Fast quantile on 9 values"
@@ -556,32 +601,33 @@
     (vss n)))
 
 (defn make-quantile-filter
-  ""
+  "Create quantile filter for values from 0 to 8"
   [^long v]
   (let [q (m/iconstrain v 0 8)]
     (partial filter-channel-xy (comp (partial quantile q) get-3x3))))
 
+;; Create median filter int terms of quantile filter.
 (def median-filter (make-quantile-filter 4))
 
-;; Tint
+;; ### Tint
 
-(defn calc-tint
-  ""
+(defn- calc-tint
+  "Calculate tint"
   ^long [^long a ^long b]
   (bit-shift-right (bit-and 0xff00 (* a b)) 8))
 
 (defn make-tint-map
-  ""
+  "Create tint lookup tables."
   [r g b a]
   (vec (map #(amap ^ints (int-array 256) idx ret ^long (calc-tint idx %)) [r g b a])))
 
 (defn make-tinter
-  ""
+  "Lookup wrapper"
   [^ints a]
-  (fn [v] (aget ^ints a (int v))))
+  (fn [v] (aget ^ints a ^int v)))
 
 (defn make-tint-filter
-  ""
+  "Create tint filter"
   ([r g b a]
    (let [tm (make-tint-map r g b a)]
      (fn [ch target p]
@@ -589,6 +635,8 @@
          (filter-channel tinter ch target p)))))
   ([r g b]
    (make-tint-filter r g b 256)))
+
+;; ### Normalize
 
 (defn normalize
   "Normalize channel values to whole (0-255) range"
@@ -607,10 +655,13 @@
         mxd (double mx)]
     (filter-channel #(* 255.0 (m/norm % mnd mxd)) ch target p)))
 
+;; create an alias
 (def normalize-filter normalize)
 
+;; ### Equalize histogram
+
 (defn- equalize-make-histogram
-  ""
+  "Create histogram"
   [ch ^Pixels p]
   (let [^doubles hist (double-array 256 0.0)
         sz (.size p)
@@ -623,7 +674,7 @@
         hist))))
 
 (defn- equalize-make-lookup
-  ""
+  "Make lookup table based on histogram."
   [^doubles hist]
   (let [^ints lookup (int-array 256 0)]
     (loop [currmn Integer/MAX_VALUE
@@ -641,24 +692,39 @@
         lookup))))
 
 (defn equalize-filter
-  "Equalize histogram"
+  "Equalize histogram filter"
   [ch target p]
   (let [^ints lookup (equalize-make-lookup (equalize-make-histogram ch p))]
     (filter-channel #(aget ^ints lookup ^int %) ch target p)))
+
+;; ### Negate
 
 (defn negate-filter
   ""
   [ch target p]
   (filter-channel #(- 255 ^int %) ch target p))
 
-
-;;;;;;;;;;; Accumulator Bins for pixels - in progress
+;; ## Log-density rendering
+;;
+;; This is a helper type to support log-density rendering where each pixel is represented by "bin". Each bin counts number of hits which is later converted to valid colour. Each color channe (red, green and blue) has its own bin.
+;; Log-density rendering gives smooth output and was developed for fractal flames rendering. See: http://flam3.com/flame_draves.pdf
+;; After rendering `BinPixels` can be converted to `Pixels` using given configuration. You can treat it as RAW photo development.
+;; Configuration is a map of values:
+;;
+;; * alpha-gamma - gamma for transparency (default: 2.0)
+;; * color-gamma - gamma for color (default: 1.1)
+;; * intensity - color intensity (default: 0.8)
+;; * saturation - default: 1.0
+;; * brightness - default: 1.0
+;;
+;; You can pass also background color for your render. Default is fully transparent black.
 
 (defprotocol BinPixelsProto
-  (add-at-position [binpixels p s ch1 ch2 ch3]) ;; p - position, s - scale/value, ch1-ch3 - values
-  (add-pixel-bilinear [binpixels x y ch1 ch2 ch3])
-  (add-pixel-simple [binpixels x y ch1 ch2 ch3] [binpixels x y v ch1 ch2 ch3])
-  (to-pixels [binpixels background config] [binpixels background] [binpixels]))
+  "BinPixel functions"
+  (add-at-position [binpixels p s ch1 ch2 ch3] "add given ch values multiplied by scale for the position p")
+  (add-pixel-bilinear [binpixels x y ch1 ch2 ch3] "add channel values to position x,y in bilinear mode (4 bins affected)")
+  (add-pixel-simple [binpixels x y ch1 ch2 ch3] [binpixels x y s ch1 ch2 ch3] "add channel values to position x,y in linear mode (optionally with scale")
+  (to-pixels [binpixels background config] [binpixels background] [binpixels] "render to pixels"))
 
 (deftype BinPixels [^doubles bins ;; general sum of hits
                     ^doubles ch1 ;; sum of color values, channel1 (red)
@@ -678,12 +744,12 @@
       (aset ch2 p (+ (aget ch2 p) (* s ^double v2)))
       (aset ch3 p (+ (aget ch3 p) (* s ^double v3)))))
   
-  (add-pixel-simple [t x y v v1 v2 v3]
+  (add-pixel-simple [t x y s v1 v2 v3]
     (let [ivx (long (fnormx x))
           ivy (long (fnormy y))
           p (+ ivx (* ivy sizex+))]
       (when (and (< -1 ivx sizex) (< -1 ivy sizey)) 
-        (add-at-position t p v v1 v2 v3)))
+        (add-at-position t p s v1 v2 v3)))
     t)
   
   (add-pixel-simple [t x y v1 v2 v3]
@@ -749,7 +815,7 @@
   (to-pixels [t] (to-pixels t (Vec4. 0.0 0.0 0.0 0.0) {})))
 
 (defn make-binpixels 
-  "Create BinPixels type"
+  "Create BinPixels object"
   ^BinPixels [[^double rminx ^double rmaxx ^double rminy ^double rmaxy] ^long sizex ^long sizey]
   (let [sizex+ (inc sizex)
         sizey+ (inc sizey)
@@ -763,7 +829,7 @@
     (BinPixels. bins ch1 ch2 ch3 sizex sizey sizex+ fnormx fnormy)))
 
 (defn merge-binpixels
-  "Add two binpixels and recalculate min/max. Be sure a and b are equal. Use this function to merge results created in separated threads"
+  "Paralelly merge two binpixels and recalculate min/max. Be sure a and b are equal. Use this function to merge results created in separated threads"
   ^BinPixels [^BinPixels a ^BinPixels b]
   (let [ch1 (future (amap ^doubles (.ch1 a) idx ret (+ (aget ^doubles (.ch1 a) idx) (aget ^doubles (.ch1 b) idx))))
         ch2 (future (amap ^doubles (.ch2 a) idx ret (+ (aget ^doubles (.ch2 a) idx) (aget ^doubles (.ch2 b) idx))))

@@ -13,7 +13,9 @@
   "JFrame, Java2D, file io and simple session management"
   (:require [clojure.java.io :refer :all]
             [clojure2d.color :as c]
-            [clojure2d.math.vector :as v])  
+            [clojure2d.math.vector :as v]
+            [clojure2d.math :as m]
+            [clojure2d.math.random :as r])  
   (:import [clojure2d.math.vector Vec2]
            [java.awt.image BufferedImage BufferStrategy]
            [javax.swing ImageIcon]
@@ -180,8 +182,8 @@
 ;; Reminder: Drawing on canvas is single threaded.
 
 ;; Let's define protocol to equip Canvas and Window types with `get-image` function. `get-image` extracts image.
-(defprotocol ImageProto
-  (get-image [t]))
+(defprotocol ImageProto 
+  (get-image [t] "Return BufferedImage"))
 
 ;; Canvas type. Use `get-image` to extract image (`BufferedImage`).
 (deftype Canvas [^Graphics2D graphics
@@ -191,7 +193,8 @@
                  ^Ellipse2D ellipse-obj
                  hints
                  ^long width
-                 ^long height]
+                 ^long height
+                 transform-stack]
   ImageProto
   (get-image [_] buffer))
 
@@ -241,7 +244,8 @@
              (.ellipse-obj canvas)
              (.hints canvas)
              (.width canvas)
-             (.height canvas))))
+             (.height canvas)
+             (atom []))))
 
 (defmacro with-canvas
   "Threading macro which takes care to create and destroy `Graphics2D` object for drawings on canvas. Macro returns result of last call."
@@ -274,7 +278,8 @@
                         (Rectangle2D$Double.)
                         (Ellipse2D$Double.)
                         (rendering-hints (or (some #{hint} (keys rendering-hints)) :high))
-                        width height)]
+                        width height
+                        nil)]
      (with-canvas result
        (set-background Color/black)
        (set-stroke))))
@@ -378,6 +383,21 @@
   ([canvas vs]
    (triangle-strip canvas vs false)))
 
+(defn path
+  "Draw path from lines. Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines)."
+  ([^Canvas canvas vs close? stroke?]
+   (when-not (empty? vs)
+     (let [^Path2D p (Path2D$Double.)
+           ^Vec2 m (first vs)]
+       (.moveTo p (.x m) (.y m))
+       (doseq [^Vec2 v (next vs)]
+         (.lineTo p (.x v) (.y v)))
+       (when (or (not stroke?) close?) (.closePath p))
+       (draw-fill-or-stroke (.graphics canvas) p stroke?)))
+   canvas)
+  ([canvas vs close?] (path canvas vs close? true))
+  ([canvas vs] (path canvas vs false true)))
+
 (defn quad
   "Draw quad with corners at 4 positions."
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
@@ -388,7 +408,7 @@
        (.lineTo x3 y3)
        (.lineTo x4 y4)
        (.closePath))
-     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?))
+     (draw-fill-or-stroke (.graphics canvas) p stroke?))
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
    (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false)))
@@ -448,6 +468,59 @@
    canvas)
   ([^Canvas canvas img]
    (image canvas img 0 0 (.width canvas) (.height canvas))))
+
+;; ### Transformations
+;;
+;; You can transform your working area with couple of functions on canvas. They act exactly the same as in Processing. Transformation context is bound to canvas wrapped to `with-canvas` macro. Each `with-canvas` cleans all transformations.
+;; Transformations are concatenated.
+
+(defn scale
+  "Scale canvas"
+  ([^Canvas canvas ^double scalex ^double scaley]
+   (.scale ^Graphics2D (.graphics canvas) scalex scaley)
+   canvas)
+  ([canvas s] (scale canvas s s)))
+
+(defn translate
+  "Translate origin"
+  [^Canvas canvas ^double tx ^double ty]
+  (.translate ^Graphics2D (.graphics canvas) tx ty)
+  canvas)
+
+(defn rotate
+  "Rotate canvas"
+  [^Canvas canvas ^double angle]
+  (.rotate ^Graphics2D (.graphics canvas) angle)
+  canvas)
+
+(defn shear
+  "Shear canvas"
+  ([^Canvas canvas ^double sx ^double sy]
+   (.shear ^Graphics2D (.graphics canvas) sx sy)
+   canvas)
+  ([canvas s] (shear canvas s s)))
+
+(defn push-matrix
+  "Remember current transformation state"
+  [^Canvas canvas]
+  (swap! (.transform-stack canvas) conj (.getTransform ^Graphics2D (.graphics canvas)))
+  canvas)
+
+(defn pop-matrix
+  "Restore saved transformation state"
+  [^Canvas canvas]
+  (when-not (empty? @(.transform-stack canvas))
+    (let [v (peek @(.transform-stack canvas))]
+      (swap! (.transform-stack canvas) pop)
+      (.setTransform ^Graphics2D (.graphics canvas) v)))
+  canvas)
+
+(defn reset-matrix
+  "Reset transformation and clean stack."
+  [^Canvas canvas]
+  (.setTransform ^Graphics2D (.graphics canvas) (java.awt.geom.AffineTransform.))
+  (reset! (.transform-stack canvas) [])
+  canvas)
 
 ;; ## Display window
 ;;

@@ -75,7 +75,7 @@ This is main namespace with functions in three groups:
 * display and event operations (JFrame wrapper)
 * session handling (logger + unique, sequential filename generator)
 
-### clojure2d.pixels
+### clojure2d.pixels [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.pixels.html)
 
 Pixels type as a representation of channel values of the image plus operations on pixels.
 Defines also:

@@ -2881,7 +2881,9 @@ In brief:</p>
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.core
   (:require [clojure.java.io :refer :all]
             [clojure2d.color :as c]
-            [clojure2d.math.vector :as v])  
+            [clojure2d.math.vector :as v]
+            [clojure2d.math :as m]
+            [clojure2d.math.random :as r])  
   (:import [clojure2d.math.vector Vec2]
            [java.awt.image BufferedImage BufferStrategy]
            [javax.swing ImageIcon]
@@ -3022,8 +3024,8 @@ You can freely change this setting with <code>binding</code> macro. Default is 9
 Canvas should be accelerated by Java and your video card.
 Reminder: Drawing on canvas is single threaded.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Let's define protocol to equip Canvas and Window types with <code>get-image</code> function. <code>get-image</code> extracts image.</p>
-</td><td class="codes"><pre class="brush: clojure">(defprotocol ImageProto
-  (get-image [t]))</pre></td></tr><tr><td class="docs"><p>Canvas type. Use <code>get-image</code> to extract image (<code>BufferedImage</code>).</p>
+</td><td class="codes"><pre class="brush: clojure">(defprotocol ImageProto 
+  (get-image [t] &quot;Return BufferedImage&quot;))</pre></td></tr><tr><td class="docs"><p>Canvas type. Use <code>get-image</code> to extract image (<code>BufferedImage</code>).</p>
 </td><td class="codes"><pre class="brush: clojure">(deftype Canvas [^Graphics2D graphics
                  ^BufferedImage buffer
                  ^Line2D line-obj
@@ -3031,7 +3033,8 @@ Reminder: Drawing on canvas is single threaded.</p>
                  ^Ellipse2D ellipse-obj
                  hints
                  ^long width
-                 ^long height]
+                 ^long height
+                 transform-stack]
   ImageProto
   (get-image [_] buffer))</pre></td></tr><tr><td class="docs"><p>Let's define three rendering quality options: <code>:low</code>, <code>:mid</code> and <code>:high</code>. Where <code>:low</code> is fastest but has poor quality and <code>:high</code> has best quality but may be slow. Rendering options are used when you create canvas.</p>
 </td><td class="codes"><pre class="brush: clojure">(def rendering-hints {:low {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF
@@ -3074,7 +3077,8 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
              (.ellipse-obj canvas)
              (.hints canvas)
              (.width canvas)
-             (.height canvas))))</pre></td></tr><tr><td class="docs"><p>Threading macro which takes care to create and destroy <code>Graphics2D</code> object for drawings on canvas. Macro returns result of last call.</p>
+             (.height canvas)
+             (atom []))))</pre></td></tr><tr><td class="docs"><p>Threading macro which takes care to create and destroy <code>Graphics2D</code> object for drawings on canvas. Macro returns result of last call.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmacro with-canvas
   [canvas &amp; body]  
   `(let [newcanvas# (make-graphics ~canvas)
@@ -3101,7 +3105,8 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
                         (Rectangle2D$Double.)
                         (Ellipse2D$Double.)
                         (rendering-hints (or (some #{hint} (keys rendering-hints)) :high))
-                        width height)]
+                        width height
+                        nil)]
      (with-canvas result
        (set-background Color/black)
        (set-stroke))))
@@ -3184,7 +3189,20 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
            (recur v2 v3 (next vss))))))
    canvas)
   ([canvas vs]
-   (triangle-strip canvas vs false)))</pre></td></tr><tr><td class="docs"><p>Draw quad with corners at 4 positions.</p>
+   (triangle-strip canvas vs false)))</pre></td></tr><tr><td class="docs"><p>Draw path from lines. Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).</p>
+</td><td class="codes"><pre class="brush: clojure">(defn path
+  ([^Canvas canvas vs close? stroke?]
+   (when-not (empty? vs)
+     (let [^Path2D p (Path2D$Double.)
+           ^Vec2 m (first vs)]
+       (.moveTo p (.x m) (.y m))
+       (doseq [^Vec2 v (next vs)]
+         (.lineTo p (.x v) (.y v)))
+       (when (or (not stroke?) close?) (.closePath p))
+       (draw-fill-or-stroke (.graphics canvas) p stroke?)))
+   canvas)
+  ([canvas vs close?] (path canvas vs close? true))
+  ([canvas vs] (path canvas vs false true)))</pre></td></tr><tr><td class="docs"><p>Draw quad with corners at 4 positions.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn quad
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
    (let [^Path2D p (Path2D$Double.)]
@@ -3194,7 +3212,7 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
        (.lineTo x3 y3)
        (.lineTo x4 y4)
        (.closePath))
-     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?))
+     (draw-fill-or-stroke (.graphics canvas) p stroke?))
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
    (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false)))</pre></td></tr><tr><td class="docs"><p>Set stroke (line) attributes like <code>cap</code>, <code>join</code> and size. Default <code>CAP_ROUND</code> and <code>JOIN_MITER</code> is used. Default size is <code>1.0</code>.</p>
@@ -3205,20 +3223,8 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
   ([canvas size]
    (set-stroke canvas size BasicStroke/CAP_ROUND BasicStroke/JOIN_MITER))
   ([canvas]
-   (set-stroke canvas 1.0)))</pre></td></tr><tr><td class="docs"><p>Set color with valid java <code>Color</code> object. Use it when you're sure you pass <code>java.awt.Color</code>.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn set-awt-color
-  [^Canvas canvas ^java.awt.Color c]
-  (.setColor ^Graphics2D (.graphics canvas) c)
-  canvas)</pre></td></tr><tr><td class="docs"><p>Set background color. Expects valid <code>Color</code> object.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn set-awt-background
-  [^Canvas canvas c]
-  (let [^Graphics2D g (.graphics canvas)
-        ^Color currc (.getColor g)] 
-    (set-color canvas c)
-    (doto g
-      (.fillRect 0 0 (.width canvas) (.height canvas))
-      (.setColor currc)))
-  canvas)</pre></td></tr><tr><td class="docs"><p>Set color for primitive or background via passed function. You can use:</p>
+   (set-stroke canvas 1.0)))</pre></td></tr><tr><td class="docs"><h3>Color</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Set color for primitive or background via passed function. You can use:</p>
 
 <ul>
 <li>java.awt.Color object</li>
@@ -3231,7 +3237,20 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
   ([f canvas r g b a]
    (f canvas (c/make-awt-color r g b a)))
   ([f canvas r g b]
-   (f canvas (c/make-awt-color r g b))))</pre></td></tr><tr><td class="docs"><p>Set color for primitive</p>
+   (f canvas (c/make-awt-color r g b))))</pre></td></tr><tr><td class="docs"><p>Set color with valid java <code>Color</code> object. Use it when you're sure you pass <code>java.awt.Color</code>.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn set-awt-color
+  [^Canvas canvas ^java.awt.Color c]
+  (.setColor ^Graphics2D (.graphics canvas) c)
+  canvas)</pre></td></tr><tr><td class="docs"><p>Set background color. Expects valid <code>Color</code> object.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn set-awt-background
+  [^Canvas canvas c]
+  (let [^Graphics2D g (.graphics canvas)
+        ^Color currc (.getColor g)] 
+    (set-color-with-fn set-awt-color canvas c)
+    (doto g
+      (.fillRect 0 0 (.width canvas) (.height canvas))
+      (.setColor currc)))
+  canvas)</pre></td></tr><tr><td class="docs"><p>Set color for primitive</p>
 </td><td class="codes"><pre class="brush: clojure">(def set-color (partial set-color-with-fn set-awt-color))</pre></td></tr><tr><td class="docs"><p>Set background color</p>
 </td><td class="codes"><pre class="brush: clojure">(def set-background (partial set-color-with-fn set-awt-background))</pre></td></tr><tr><td class="docs"><p>Draw an image. You can specify position and size of the image. Default it's placed on whole canvas.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn image
@@ -3239,7 +3258,45 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
    (.drawImage ^Graphics2D (.graphics canvas) img x y w h nil)
    canvas)
   ([^Canvas canvas img]
-   (image canvas img 0 0 (.width canvas) (.height canvas))))</pre></td></tr><tr><td class="docs"><h2>Display window</h2>
+   (image canvas img 0 0 (.width canvas) (.height canvas))))</pre></td></tr><tr><td class="docs"><h3>Transformations</h3>
+
+<p>You can transform your working area with couple of functions on canvas. They act exactly the same as in Processing. Transformation context is bound to canvas wrapped to <code>with-canvas</code> macro. Each <code>with-canvas</code> cleans all transformations.
+Transformations are concatenated.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Scale canvas</p>
+</td><td class="codes"><pre class="brush: clojure">(defn scale
+  ([^Canvas canvas ^double scalex ^double scaley]
+   (.scale ^Graphics2D (.graphics canvas) scalex scaley)
+   canvas)
+  ([canvas s] (scale canvas s s)))</pre></td></tr><tr><td class="docs"><p>Translate origin</p>
+</td><td class="codes"><pre class="brush: clojure">(defn translate
+  [^Canvas canvas ^double tx ^double ty]
+  (.translate ^Graphics2D (.graphics canvas) tx ty)
+  canvas)</pre></td></tr><tr><td class="docs"><p>Rotate canvas</p>
+</td><td class="codes"><pre class="brush: clojure">(defn rotate
+  [^Canvas canvas ^double angle]
+  (.rotate ^Graphics2D (.graphics canvas) angle)
+  canvas)</pre></td></tr><tr><td class="docs"><p>Shear canvas</p>
+</td><td class="codes"><pre class="brush: clojure">(defn shear
+  ([^Canvas canvas ^double sx ^double sy]
+   (.shear ^Graphics2D (.graphics canvas) sx sy)
+   canvas)
+  ([canvas s] (shear canvas s s)))</pre></td></tr><tr><td class="docs"><p>Remember current transformation state</p>
+</td><td class="codes"><pre class="brush: clojure">(defn push-matrix
+  [^Canvas canvas]
+  (swap! (.transform-stack canvas) conj (.getTransform ^Graphics2D (.graphics canvas)))
+  canvas)</pre></td></tr><tr><td class="docs"><p>Restore saved transformation state</p>
+</td><td class="codes"><pre class="brush: clojure">(defn pop-matrix
+  [^Canvas canvas]
+  (when-not (empty? @(.transform-stack canvas))
+    (let [v (peek @(.transform-stack canvas))]
+      (swap! (.transform-stack canvas) pop)
+      (.setTransform ^Graphics2D (.graphics canvas) v)))
+  canvas)</pre></td></tr><tr><td class="docs"><p>Reset transformation and clean stack.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn reset-matrix
+  [^Canvas canvas]
+  (.setTransform ^Graphics2D (.graphics canvas) (java.awt.geom.AffineTransform.))
+  (reset! (.transform-stack canvas) [])
+  canvas)</pre></td></tr><tr><td class="docs"><h2>Display window</h2>
 
 <p>You can find here a couple of functions which help to display your canvas and build interaction with user.
 Display window is just a Swing <code>JFrame</code> with <code>java.awt.Canvas</code> as panel.
@@ -3520,15 +3577,15 @@ Session is a type of:</p>
 </td><td class="codes"><pre class="brush: clojure">(defrecord SessionType [logger
                         name
                         counter])</pre></td></tr><tr><td class="docs"><p>Session is stored in agent</p>
-</td><td class="codes"><pre class="brush: clojure">(def session-agent (agent (SessionType. nil nil nil)))</pre></td></tr><tr><td class="docs"><p>Logging to file is turned off by default.</p>
+</td><td class="codes"><pre class="brush: clojure">(def session-agent (agent (map-&gt;SessionType {})))</pre></td></tr><tr><td class="docs"><p>Logging to file is turned off by default.</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:dynamic *log-to-file* false)</pre></td></tr><tr><td class="docs"><p>Close current session</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- close-session-fn
-  [^SessionType s]
+  [s]
   (let [^java.io.Writer o (:logger s)]
     (when-not (nil? o)
       (.flush o)
       (.close o)))
-  (SessionType. nil nil nil))</pre></td></tr><tr><td class="docs"><p>Create writer for logger</p>
+  (map-&gt;SessionType {}))</pre></td></tr><tr><td class="docs"><p>Create writer for logger</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- make-logger-fn
   [session-name]
   (let [fname (str &quot;log/&quot; (first session-name) &quot;.log&quot;)]
@@ -3545,7 +3602,7 @@ Session is a type of:</p>
   (close-session-fn s)
   (let [nname (make-session-name)
         writer (when *log-to-file* (make-logger-fn nname))]
-    (SessionType. writer nname (make-counter 0))))</pre></td></tr><tr><td class="docs"><p>Create session via agent</p>
+    (-&gt;SessionType writer nname (make-counter 0))))</pre></td></tr><tr><td class="docs"><p>Create session via agent</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-session
   []
   (send session-agent make-session-fn)
@@ -3565,7 +3622,7 @@ Session is a type of:</p>
 </td><td class="codes"><pre class="brush: clojure">(defn next-filename
   ([prefix]
    (ensure-session)
-   (let [^SessionType s @session-agent]
+   (let [s @session-agent]
      (str prefix (second (:name s)) &quot;_&quot; (format &quot;%06d&quot; ((:counter s))))))
   ([prefix suffix]
    (str (next-filename prefix) suffix)))</pre></td></tr><tr><td class="docs"><p>Log message to file or console</p>
@@ -3578,7 +3635,7 @@ Session is a type of:</p>
                             (let [^java.io.Writer o (or (:logger s) (make-logger-fn (:name s)))]
                               (.write o to-log)
                               (.flush o)
-                              (SessionType. o (:name s) (:counter s)))))
+                              (-&gt;SessionType o (:name s) (:counter s)))))
       (println to-log))))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
 SyntaxHighlighter.all();
 

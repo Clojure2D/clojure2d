@@ -2,14 +2,19 @@
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
 ## 0.0.3 - 2017-07-02
+### Added
+
+- Canvas transformations
+
 ### Changed
 
 - Canvas as a type
 - Window as a type (record)
 - Helper functions to check if window is visible
 - Helper function to get image from canvas and window
-- Color simplification (awt vs vec4)
+- Color manimulations refactored (awt vs vec4)
 - Complex type is Vec2 now
+- Session management refactored
 
 ## 0.0.2 - 2017-04-14
 ### Added
