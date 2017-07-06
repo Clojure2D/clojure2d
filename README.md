@@ -101,7 +101,7 @@ Defines also:
 Additionally in following namespaces:
 
 * clojure2d.math.complex - Complex (Vec2) operations (code taken from Apache Commons Math) [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.math.complex.html)
-* clojure2d.math.vector - Vec2, Vec3 and Vec4 types and operations on vectors 
+* clojure2d.math.vector - Vec2, Vec3 and Vec4 types and operations on vectors [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.math.vector.html)
 * clojure2d.math.joise - Joise library bindings (basic (simplex/perlin/value), cell (voronoi) and fractal noise + combinations) [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.math.joise.html)
 * clojure2d.math.random - Random functions and perlin noise from flow-noise library [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.math.random.html)
 

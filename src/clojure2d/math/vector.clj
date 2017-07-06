@@ -5,9 +5,8 @@
 ;;
 ;; Concept for API is taken from [Proceessing](https://github.com/processing/processing/blob/master/core/src/processing/core/PVector.java) and [openFrameworks](https://github.com/openframeworks/openFrameworks/tree/master/libs/openFrameworks/math)
 ;;
+;; All vectors are equipped with Counted (`count`), Sequential, Sequable (`seq`) and IFn protocols. Additionally Clojure vector is equipped with defined here `VectorProto`.
 
-;; Tolerance for vector comparison used in `is-near-zero?` and `aligned?` functions
-;; to mitigate approximation errors
 (ns clojure2d.math.vector
   (:require [clojure2d.math :as m])
   (:import [clojure.lang Counted Sequential Seqable IFn PersistentVector]))
@@ -15,44 +14,46 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
+;; Tolerance (epsilon), used in `is-near-zero?` fn
 (def ^:const ^double TOLERANCE 1.0e-6)
 
-(defprotocol VectorProto
-  (to-vec [v])
-  (applyf [v f])
-  (magsq [v1])
-  (mag [v1])
-  (dot [v1 v2])
-  (add [v1] [v1 v2])
-  (sub [v1] [v1 v2])
-  (mult [v1 v])
-  (emult [v1 v])
-  (div [v1 v])
-  (abs [v1])
-  (mx [v1])
-  (mn [v1])
-  (emx [v1 v2])
-  (emn [v1 v2])
-  (maxdim [v])
-  (mindim [v])
-  (base-from [v])
-  (sum [v1])
-  (permute [v idxs])
-  (reciprocal [v])
-  (interpolate [v1 v2 t] [v1 v2 t f])
-  (interpolatev [v1 v2 v] [v1 v2 v f])
-  (is-zero? [v1])
-  (is-near-zero? [v1])
-  (heading [v1])
-  (cross [v1 v2])
-  (rotate [v1 angle] [v1 anglex angley anglez])
-  (perpendicular [v1] [v1 v2])
-  (axis-rotate [v1 angle axis] [v1 angle axis pivot])
-  (transform [v1 o vx vy] [v1 o vx vy vz])
-  (to-polar [v1])
-  (from-polar [v1]))
+;; ## Vector definitions
 
-;; transform - "Map point to coordinate system defined by origin, vx and vy (as bases)"
+(defprotocol VectorProto
+  "Vector operations"
+  (to-vec [v] "Convert to Clojure vector")
+  (applyf [v f] "Apply function to all vector values (map)")
+  (magsq [v1] "length squared")
+  (mag [v1] "length")
+  (dot [v1 v2] "dot product of two vectors")
+  (add [v1] [v1 v2] "sum of two vectors")
+  (sub [v1] [v1 v2] "difference of two vectors")
+  (mult [v1 v] "multiply vector with value")
+  (emult [v1 v] "multiply vectors element by element")
+  (div [v1 v] "divide vector with value")
+  (abs [v1] "absolute value of vector elements")
+  (mx [v1] "maximum value of vector elements")
+  (mn [v1] "minimum value of vector elements")
+  (emx [v1 v2] "create vector with maximum values of coordinates")
+  (emn [v1 v2] "create vector with minimum values of coordinates")
+  (maxdim [v] "dimension/position of maximum value")
+  (mindim [v] "dimension/position of minimum value")
+  (base-from [v] "return list of perpendicular vectors (basis)")
+  (sum [v1] "sum of elements")
+  (permute [v idxs] "permute vector elements")
+  (reciprocal [v] "reciprocal of elements")
+  (interpolate [v1 v2 t] [v1 v2 t f] "interpolate vectors with value `t`; optionally set interpolation fn")
+  (einterpolate [v1 v2 v] [v1 v2 v f] "interpolate vectors elementwise; optionally set interpolation fn")
+  (is-zero? [v1] "is vector zero?")
+  (is-near-zero? [v1] "is vector almost zero? (all elements are less than `TOLERANCE`)")
+  (heading [v1] "vector angle in polar coordinates")
+  (cross [v1 v2] "cross product")
+  (rotate [v1 angle] [v1 anglex angley anglez] "rotate vector")
+  (perpendicular [v1] [v1 v2] "find perpendicular vector")
+  (axis-rotate [v1 angle axis] [v1 angle axis pivot] "rotate around axis")
+  (transform [v1 o vx vy] [v1 o vx vy vz] "transform vector; map point to coordinate system defined by origin, vx and vy (as bases)")
+  (to-polar [v1] "to polar coordinates")
+  (from-polar [v1] "from polar coordinates"))
 
 (declare angle-between)
 (declare normalize)
@@ -70,6 +71,7 @@
   [v]
   (< (m/abs v) TOLERANCE))
 
+;; Add `VectorProto` to Clojure vector using map/reduce terms.
 (extend PersistentVector
   VectorProto
   {:to-vec identity
@@ -96,13 +98,14 @@
                   ([v1 v2 t f]
                    (mapv #(f %1 %2 t) v1 v2))
                   ([v1 v2 t] (interpolate v1 v2 t m/lerp)))
-   :interpolatev (fn
+   :einterpolate (fn
                    ([v1 v2 v f]
                     (mapv #(f %1 %2 %3) v1 v2 v))
-                   ([v1 v2 v] (interpolatev v1 v2 v m/lerp)))
+                   ([v1 v2 v] (einterpolate v1 v2 v m/lerp)))
    :is-zero? #(every? zero? %)
    :is-near-zero? #(every? near-zero? %)})
 
+;; Create Vec2 and add all necessary protocols
 (deftype Vec2 [^double x ^double y]
   Object
   (toString [_] (str "[" x ", " y "]"))
@@ -161,12 +164,12 @@
     (let [^Vec2 v2 v2] (Vec2. (f x (.x v2) t)
                               (f y (.y v2) t))))
   (interpolate [v1 v2 t] (interpolate v1 v2 t m/lerp))
-  (interpolatev [_ v2 v f]
+  (einterpolate [_ v2 v f]
     (let [^Vec2 v2 v2
           ^Vec2 v v]
       (Vec2. (f x (.x v2) (.x v))
              (f y (.y v2) (.y v)))))
-  (interpolatev [v1 v2 v] (interpolatev v1 v2 v m/lerp))
+  (einterpolate [v1 v2 v] (einterpolate v1 v2 v m/lerp))
   (is-zero? [_] (and (zero? x) (zero? y)))
   (is-near-zero? [_] (and (near-zero? x) (near-zero? y)))
   (heading [_] (m/atan2 y x))
@@ -189,6 +192,7 @@
     (Vec2. (* x (m/cos y))
            (* x (m/sin y)))))
 
+;; Create Vec3 and add all necessary protocols
 (deftype Vec3 [^double x ^double y ^double z]
   Object
   (toString [_] (str "[" x ", " y ", " z "]"))
@@ -257,13 +261,13 @@
                               (f y (.y v2) t)
                               (f z (.z v2) t))))
   (interpolate [v1 v2 t] (interpolate v1 v2 t m/lerp))
-  (interpolatev [_ v2 v f]
+  (einterpolate [_ v2 v f]
     (let [^Vec3 v2 v2
           ^Vec3 v v]
       (Vec3. (f x (.x v2) (.x v))
              (f y (.y v2) (.y v))
              (f z (.z v2) (.z v)))))
-  (interpolatev [v1 v2 v] (interpolatev v1 v2 v m/lerp))
+  (einterpolate [v1 v2 v] (einterpolate v1 v2 v m/lerp))
   (is-zero? [_] (and (zero? x) (zero? y) (zero? z)))
   (is-near-zero? [_] (and (near-zero? x) (near-zero? y) (near-zero? z)))
   (heading [v1] (angle-between v1 (Vec3. 1 0 0)))
@@ -353,6 +357,7 @@
              (* x st sp)
              (* x ct)))))
 
+;; Create Vec4 and add all necessary protocols
 (deftype Vec4 [^double x ^double y ^double z ^double w]
   Object
   (toString [_] (str "[" x ", " y ", " z ", " w "]"))
@@ -415,29 +420,30 @@
                               (f z (.z v2) t)
                               (f w (.w v2) t))))
   (interpolate [v1 v2 t] (interpolate v1 v2 t m/lerp))
-  (interpolatev [_ v2 v f]
+  (einterpolate [_ v2 v f]
     (let [^Vec4 v2 v2
           ^Vec4 v v]
       (Vec4. (f x (.x v2) (.x v))
              (f y (.y v2) (.y v))
              (f z (.z v2) (.z v))
              (f w (.w v2) (.w v)))))
-  (interpolatev [v1 v2 v] (interpolatev v1 v2 v m/lerp))
+  (einterpolate [v1 v2 v] (einterpolate v1 v2 v m/lerp))
   (is-zero? [_] (and (zero? x) (zero? y) (zero? z) (zero? w)))
   (is-near-zero? [_] (and (near-zero? x) (near-zero? y) (near-zero? z) (near-zero? w)))
   (heading [v1] (angle-between v1 (Vec4. 1 0 0 0))))
 
-;; common functions
+;; ## Common vector functions
 
 (defn ediv
-  ""
+  "Elementwise division"
   [v1 v2]
   (emult v1 (reciprocal v2)))
 
 (defn average-vectors
-  "Average / centroid of vectors"
-  [init vs]
-  (div (reduce add init vs) (count vs)))
+  "Average / centroid of vectors. Input: initial vector (optional), list of vectors"
+  ([init vs]
+   (div (reduce add init vs) (count vs)))
+  ([vs] (average-vectors (first vs) (rest vs))))
 
 (defn dist
   "Euclidean distance between vectors"
@@ -460,7 +466,7 @@
   (mx (abs (sub v1 v2))))
 
 (defn dist-canberra
-  ""
+  "Canberra distance"
   [v1 v2]
   (let [num (abs (sub v1 v2))
         denom (applyf (add (abs v1) (abs v2)) #(if (zero? ^double %) 0.0 (/ 1.0 ^double %)))]
@@ -474,6 +480,7 @@
                         n (- (+ a l) b)]
                     [(+ s (m/abs l)) n]) [0.0 0.0] (map vector v1 v2))))
 
+;; List of distance fn
 (def distances {:euclid dist
                 :euclid-sq dist-sq
                 :abs dist-abs
@@ -516,44 +523,44 @@
   (< ^double (angle-between v1 v2) TOLERANCE))
 
 (defn faceforward
-  "flip normal"
+  "Flip normal"
   [n v]
   (if (neg? ^double (dot n v))
     n
     (sub n)))
 
 (defn generate-vec2
-  ""
+  "Generate Vec2 with fn(s)"
   ([f1 f2]
    (Vec2. (f1) (f2)))
   ([f]
    (Vec2. (f) (f))))
 
 (defn generate-vec3
-  ""
+  "Generate Vec3 with fn(s)"
   ([f1 f2 f3]
    (Vec3. (f1) (f2) (f3)))
   ([f]
    (Vec3. (f) (f) (f))))
 
 (defn generate-vec4
-  ""
+  "Generate Vec4 with fn(s)"
   ([f1 f2 f3 f4]
    (Vec4. (f1) (f2) (f3) (f4)))
   ([f]
    (Vec4. (f) (f) (f) (f))))
 
 (defn array->vec2
-  ""
+  "Doubles array to Vec2"
   [^doubles a]
   (Vec2. (aget a 0) (aget a 1)))
 
 (defn array->vec3
-  ""
+  "Doubles array to Vec3"
   [^doubles a]
   (Vec3. (aget a 0) (aget a 1) (aget a 2)))
 
 (defn array->vec4
-  ""
+  "Doubles array to Vec4"
   [^doubles a]
   (Vec4. (aget a 0) (aget a 1) (aget a 2) (aget a 3)))

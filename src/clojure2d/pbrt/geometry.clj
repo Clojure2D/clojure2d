@@ -35,7 +35,7 @@
   (area [b]
     (let [^Vec2 d (diagonal ^Bounds2 b)]
       (* (.x d) (.y d))))
-  (lerp [_ v] (v/interpolatev pmin pmax v))
+  (lerp [_ v] (v/einterpolate pmin pmax v))
   (offset [_ v]
     (let [^Vec2 o (v/sub v pmin)]
       (Vec2. (if (> (.x pmax) (.x pmin)) (/ (.x o) (- (.x pmax) (.x pmin))) (.x o))
@@ -95,7 +95,7 @@
   (volume [b]
     (let [^Vec3 d (diagonal ^Bounds3 b)]
       (* (.x d) (.y d) (.z d))))
-  (lerp [_ v] (v/interpolatev pmin pmax v))
+  (lerp [_ v] (v/einterpolate pmin pmax v))
   (offset [_ v]
     (let [^Vec3 o (v/sub v pmin)]
       (Vec3. (if (> (.x pmax) (.x pmin)) (/ (.x o) (- (.x pmax) (.x pmin))) (.x o))
