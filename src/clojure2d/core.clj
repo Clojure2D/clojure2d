@@ -301,6 +301,58 @@
   [^Canvas canvas filename]
   (save-image (get-image canvas) filename))
 
+;; ### Transformations
+;;
+;; You can transform your working area with couple of functions on canvas. They act exactly the same as in Processing. Transformation context is bound to canvas wrapped to `with-canvas` macro. Each `with-canvas` cleans all transformations.
+;; Transformations are concatenated.
+
+(defn scale
+  "Scale canvas"
+  ([^Canvas canvas ^double scalex ^double scaley]
+   (.scale ^Graphics2D (.graphics canvas) scalex scaley)
+   canvas)
+  ([canvas s] (scale canvas s s)))
+
+(defn translate
+  "Translate origin"
+  [^Canvas canvas ^double tx ^double ty]
+  (.translate ^Graphics2D (.graphics canvas) tx ty)
+  canvas)
+
+(defn rotate
+  "Rotate canvas"
+  [^Canvas canvas ^double angle]
+  (.rotate ^Graphics2D (.graphics canvas) angle)
+  canvas)
+
+(defn shear
+  "Shear canvas"
+  ([^Canvas canvas ^double sx ^double sy]
+   (.shear ^Graphics2D (.graphics canvas) sx sy)
+   canvas)
+  ([canvas s] (shear canvas s s)))
+
+(defn push-matrix
+  "Remember current transformation state"
+  [^Canvas canvas]
+  (swap! (.transform-stack canvas) conj (.getTransform ^Graphics2D (.graphics canvas)))
+  canvas)
+
+(defn pop-matrix
+  "Restore saved transformation state"
+  [^Canvas canvas]
+  (when-not (empty? @(.transform-stack canvas))
+    (let [v (peek @(.transform-stack canvas))]
+      (swap! (.transform-stack canvas) pop)
+      (.setTransform ^Graphics2D (.graphics canvas) v)))
+  canvas)
+
+(defn reset-matrix
+  "Reset transformation"
+  [^Canvas canvas]
+  (.setTransform ^Graphics2D (.graphics canvas) (java.awt.geom.AffineTransform.))
+  canvas)
+
 ;; ### Drawing functions
 ;;
 ;; Here we have basic drawing functions. What you need to remember:
@@ -448,11 +500,14 @@
   "Set background color. Expects valid `Color` object."
   [^Canvas canvas c]
   (let [^Graphics2D g (.graphics canvas)
-        ^Color currc (.getColor g)] 
+        ^Color currc (.getColor g)]
+    (push-matrix canvas)
+    (reset-matrix canvas)
     (set-color-with-fn set-awt-color canvas c)
     (doto g
       (.fillRect 0 0 (.width canvas) (.height canvas))
-      (.setColor currc)))
+      (.setColor currc))
+    (pop-matrix canvas))
   canvas)
 
 ;; Set color for primitive
@@ -468,59 +523,6 @@
    canvas)
   ([^Canvas canvas img]
    (image canvas img 0 0 (.width canvas) (.height canvas))))
-
-;; ### Transformations
-;;
-;; You can transform your working area with couple of functions on canvas. They act exactly the same as in Processing. Transformation context is bound to canvas wrapped to `with-canvas` macro. Each `with-canvas` cleans all transformations.
-;; Transformations are concatenated.
-
-(defn scale
-  "Scale canvas"
-  ([^Canvas canvas ^double scalex ^double scaley]
-   (.scale ^Graphics2D (.graphics canvas) scalex scaley)
-   canvas)
-  ([canvas s] (scale canvas s s)))
-
-(defn translate
-  "Translate origin"
-  [^Canvas canvas ^double tx ^double ty]
-  (.translate ^Graphics2D (.graphics canvas) tx ty)
-  canvas)
-
-(defn rotate
-  "Rotate canvas"
-  [^Canvas canvas ^double angle]
-  (.rotate ^Graphics2D (.graphics canvas) angle)
-  canvas)
-
-(defn shear
-  "Shear canvas"
-  ([^Canvas canvas ^double sx ^double sy]
-   (.shear ^Graphics2D (.graphics canvas) sx sy)
-   canvas)
-  ([canvas s] (shear canvas s s)))
-
-(defn push-matrix
-  "Remember current transformation state"
-  [^Canvas canvas]
-  (swap! (.transform-stack canvas) conj (.getTransform ^Graphics2D (.graphics canvas)))
-  canvas)
-
-(defn pop-matrix
-  "Restore saved transformation state"
-  [^Canvas canvas]
-  (when-not (empty? @(.transform-stack canvas))
-    (let [v (peek @(.transform-stack canvas))]
-      (swap! (.transform-stack canvas) pop)
-      (.setTransform ^Graphics2D (.graphics canvas) v)))
-  canvas)
-
-(defn reset-matrix
-  "Reset transformation and clean stack."
-  [^Canvas canvas]
-  (.setTransform ^Graphics2D (.graphics canvas) (java.awt.geom.AffineTransform.))
-  (reset! (.transform-stack canvas) [])
-  canvas)
 
 ;; ## Display window
 ;;

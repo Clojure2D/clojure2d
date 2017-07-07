@@ -110,7 +110,7 @@ Additionally in following namespaces:
 This is namespace for common generative/glitch specific libraries:
 
 * signal - signal processing, wave generators, effects and filters (sonification enabler)
-* overlays - 3 overlays (noise, spots and rgb scanlines) to finish your images
+* overlays - 3 overlays (noise, spots and rgb scanlines) to finish your images [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.extra.overlays.html)
 * segmentation - segment Pixels into rectangles
 * variariations - vector field functions / variations taken from fractal flames world
 * glitch - glitching filters

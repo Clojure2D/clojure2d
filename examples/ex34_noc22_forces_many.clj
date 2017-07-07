@@ -20,9 +20,10 @@
 
 (defn make-mover
   "Create Mover"
-  ([] (->Mover (Vec2. 30.0 30.0)
-               (Vec2. (r/drand -1.0 1.0) (r/drand -1.0 1.0))
-               (r/drand 0.2 2.0))))
+  []
+  (->Mover (Vec2. 30.0 30.0)
+           (Vec2. (r/drand -1.0 1.0) (r/drand -1.0 1.0))
+           (r/drand 0.2 2.0)))
 
 (defn apply-force
   "Apply force"
