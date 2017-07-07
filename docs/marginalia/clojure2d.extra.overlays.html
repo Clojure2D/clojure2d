@@ -2865,7 +2865,20 @@ net.brehaut.ClojureTools = (function (SH) {
     build_tree: build_tree
   };
 })(SyntaxHighlighter);
-</script><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript"></script><title>clojure2d -- Marginalia</title></head><body><table><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojure2d.extra.overlays" name="clojure2d.extra.overlays"><h1 class="project-name">clojure2d.extra.overlays</h1><a class="toc-link" href="toc.html">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
+</script><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript"></script><title>clojure2d -- Marginalia</title></head><body><table><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojure2d.extra.overlays" name="clojure2d.extra.overlays"><h1 class="project-name">clojure2d.extra.overlays</h1><a class="toc-link" href="toc.html">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs"><h1>Namespace scope</h1>
+
+<p>Three overlays to give more analog view of the images.</p>
+
+<ul>
+<li><code>render-rgb-scanlines</code> - adds rgb tv scan lines slightly bluring image</li>
+<li><code>make-noise</code> and <code>render-noise</code> - create and add white noise layer</li>
+<li><code>make-spots</code> and <code>render-spots</code> - create and add small spots</li>
+</ul>
+
+<p>All functions operate on image type.</p>
+
+<p>See example 12 for usage</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.extra.overlays
   (:require [clojure2d.core :as core]
             [clojure2d.pixels :as p]
@@ -2876,13 +2889,14 @@ net.brehaut.ClojureTools = (function (SH) {
            [java.awt Color]
            [clojure2d.pixels Pixels]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* true)</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def add-compose (:add c/blends))</pre></td></tr><tr><td class="docs">
+(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><h2>RGB scanlines</h2>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def add-compose (:add c/blends))</pre></td></tr><tr><td class="docs"><p>Slightly shift channels</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- blend-shift-and-add-f
   [ch ^Pixels p1 ^Pixels p2 x y]
   (let [c1 (p/get-value p1 ch x y)
         c2 (p/get-value p2 ch (dec ^long x) y)]
-    (c/blend-values add-compose c1 c2)))</pre></td></tr><tr><td class="docs">
+    (c/blend-values add-compose c1 c2)))</pre></td></tr><tr><td class="docs"><p>Draw rgb lines</p>
 </td><td class="codes"><pre class="brush: clojure">(defn draw-lines
   [canvas ^long w ^long h]
   (dorun 
@@ -2896,24 +2910,27 @@ net.brehaut.ClojureTools = (function (SH) {
        (core/set-color canvas 0 0 (r/irand 180 200) 42)
        (core/line canvas 0 y++ w y++))))
   canvas)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def tinter1 (partial p/filter-channels (p/make-tint-filter 255 142 25)))
+(def tinter2 (partial p/filter-channels (p/make-tint-filter 46 142 255)))</pre></td></tr><tr><td class="docs"><p>Blurs and renders rgb stripes on the image, returns new image. Scale parameter (default 1.6) controls amount of blur. Resulting image is sligtly lighter and desaturated. Correct with normalize filter if necessary.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn render-rgb-scanlines
-  [^BufferedImage p]
-  (let [w (.getWidth p)
-        h (.getHeight p)
-        tinter1 (partial p/filter-channels (p/make-tint-filter 255 142 25))
-        tinter2 (partial p/filter-channels (p/make-tint-filter 46 142 255))
-        ^Pixels rimg (-&gt; p
-                         (core/resize-image (int (/ w 1.6)) (int (/ h 1.6)))
-                         (core/resize-image w h)
-                         (p/get-image-pixels))
-        ^Pixels l1 (tinter1 rimg)
-        ^Pixels l2 (tinter2 rimg)
-        canvas (core/with-canvas (core/create-canvas w h)
-                 (core/image (p/image-from-pixels l1))
-                 (draw-lines w h))]
-    (let [^Pixels l1 (p/get-canvas-pixels canvas)]
-      (p/image-from-pixels (p/blend-channels (partial p/blend-channel-xy blend-shift-and-add-f) l1 l2)))))</pre></td></tr><tr><td class="docs"><p>noise canvas</p>
-</td><td class="codes"></td></tr><tr><td class="docs">
+  ([^BufferedImage p ^double scale]
+   (let [w (.getWidth p)
+         h (.getHeight p)
+         ^Pixels rimg (-&gt; p
+                          (core/resize-image (int (/ w scale)) (int (/ h scale)))
+                          (core/resize-image w h)
+                          (p/get-image-pixels))
+         ^Pixels l1 (tinter1 rimg)
+         ^Pixels l2 (tinter2 rimg)
+         canvas (core/with-canvas (core/create-canvas w h)
+                  (core/image (p/image-from-pixels l1))
+                  (draw-lines w h))]
+     (let [^Pixels l1 (p/get-canvas-pixels canvas)]
+       (p/image-from-pixels (p/blend-channels (partial p/blend-channel-xy blend-shift-and-add-f) l1 l2)))))
+  ([p] (render-rgb-scanlines p 1.6)))</pre></td></tr><tr><td class="docs"><h2>Noise</h2>
+
+<p>To apply noise overlay you have to perform two steps: first one is creating overlay with <code>make-noise</code> and then apply on image with <code>render-noise</code>. This way you can reuse overlay several times.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Create noise image with set alpha channel (first parameter).</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-noise
   [alpha w h]
   (let [fc (fn [v] 
@@ -2922,7 +2939,7 @@ net.brehaut.ClojureTools = (function (SH) {
         ^Pixels p (p/filter-channels (partial p/filter-channel fc) nil nil (partial p/filter-channel fa) (p/make-pixels w h))]
     (p/set-channel p 1 (p/get-channel p 0))
     (p/set-channel p 2 (p/get-channel p 0))
-    (p/image-from-pixels p)))</pre></td></tr><tr><td class="docs">
+    (p/image-from-pixels p)))</pre></td></tr><tr><td class="docs"><p>Render noise on image</p>
 </td><td class="codes"><pre class="brush: clojure">(defn render-noise
   ([noise ^BufferedImage img]
    (let [w (.getWidth img)
@@ -2932,10 +2949,12 @@ net.brehaut.ClojureTools = (function (SH) {
                   (core/image noise))]
      (core/get-image canvas)))
   ([^BufferedImage img]
-   (render-noise (make-noise 80 (.getWidth img) (.getHeight img)) img)))</pre></td></tr><tr><td class="docs"><p>spots</p>
-</td><td class="codes"></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn spots
-  [^double alpha ^double basecolor ^long w ^long h]
+   (render-noise (make-noise 80 (.getWidth img) (.getHeight img)) img)))</pre></td></tr><tr><td class="docs"><h2>Spots</h2>
+
+<p>Similar to noise. First you have to create spots with <code>make-spots</code> and then you can apply them to the image. <code>make-spots</code> creates list of ovelays with provided intensities.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Create transparent image with spots with set alpha and intensity</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- spots
+  [^double alpha ^double intensity ^long w ^long h]
   (let [size (* 4 w h)
         limita (int (min 5.0 (* 1.0e-5 (/ size 4.0))))
         limitb (int (min 6.0 (* 6.0e-5 (/ size 4.0))))
@@ -2949,7 +2968,7 @@ net.brehaut.ClojureTools = (function (SH) {
                                        ^int n (range (- j ^int (r/irand 6)) (+ j ^int (r/irand 1 6)))]
                                    (let [bc (-&gt; ^double (r/grand)
                                                 (* 40.0)
-                                                (+ basecolor)
+                                                (+ intensity)
                                                 (int))
                                          a (-&gt; ^double (r/grand)
                                                (* 30.0)
@@ -2965,19 +2984,20 @@ net.brehaut.ClojureTools = (function (SH) {
       (let [res (p/filter-channels p/dilate-filter nil nil p/dilate-filter p)]
         (p/set-channel res 1 (p/get-channel res 0))
         (p/set-channel res 2 (p/get-channel res 1))
-        (p/image-from-pixels res)))))</pre></td></tr><tr><td class="docs">
+        (p/image-from-pixels res)))))</pre></td></tr><tr><td class="docs"><p>Create vector of spotted overlays. Input: spots transparency (default 80), list of intensities (int values from 0 to 255, default [60 120]) and size of overlay.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-spots
-  [alpha vcolors w h]
-  (doall (map #(spots alpha % w h) vcolors)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn apply-images
+  ([alpha intensities w h]
+   (mapv #(spots alpha % w h) intensities))
+  ([w h] (make-spots 80 [60 120] w h)))</pre></td></tr><tr><td class="docs"><p>Add all spotted overlays to image.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- apply-images
   [canvas img spots]
   (core/image canvas img)
   (doseq [^BufferedImage s spots]
     (core/image canvas s))
-  canvas)</pre></td></tr><tr><td class="docs">
+  canvas)</pre></td></tr><tr><td class="docs"><p>Render spots on image. Returns image.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn render-spots
-  ([alpha vcolors ^BufferedImage img]
-   (let [spots (make-spots alpha vcolors (.getWidth img) (.getHeight img))]
+  ([alpha intensities ^BufferedImage img]
+   (let [spots (make-spots alpha intensities (.getWidth img) (.getHeight img))]
      (render-spots spots img)))
   ([spots ^BufferedImage img]
    (let [w (.getWidth img)

@@ -3120,7 +3120,44 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
       (image (get-image canvas)))))</pre></td></tr><tr><td class="docs"><p>Save canvas to the file</p>
 </td><td class="codes"><pre class="brush: clojure">(defn save-canvas
   [^Canvas canvas filename]
-  (save-image (get-image canvas) filename))</pre></td></tr><tr><td class="docs"><h3>Drawing functions</h3>
+  (save-image (get-image canvas) filename))</pre></td></tr><tr><td class="docs"><h3>Transformations</h3>
+
+<p>You can transform your working area with couple of functions on canvas. They act exactly the same as in Processing. Transformation context is bound to canvas wrapped to <code>with-canvas</code> macro. Each <code>with-canvas</code> cleans all transformations.
+Transformations are concatenated.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Scale canvas</p>
+</td><td class="codes"><pre class="brush: clojure">(defn scale
+  ([^Canvas canvas ^double scalex ^double scaley]
+   (.scale ^Graphics2D (.graphics canvas) scalex scaley)
+   canvas)
+  ([canvas s] (scale canvas s s)))</pre></td></tr><tr><td class="docs"><p>Translate origin</p>
+</td><td class="codes"><pre class="brush: clojure">(defn translate
+  [^Canvas canvas ^double tx ^double ty]
+  (.translate ^Graphics2D (.graphics canvas) tx ty)
+  canvas)</pre></td></tr><tr><td class="docs"><p>Rotate canvas</p>
+</td><td class="codes"><pre class="brush: clojure">(defn rotate
+  [^Canvas canvas ^double angle]
+  (.rotate ^Graphics2D (.graphics canvas) angle)
+  canvas)</pre></td></tr><tr><td class="docs"><p>Shear canvas</p>
+</td><td class="codes"><pre class="brush: clojure">(defn shear
+  ([^Canvas canvas ^double sx ^double sy]
+   (.shear ^Graphics2D (.graphics canvas) sx sy)
+   canvas)
+  ([canvas s] (shear canvas s s)))</pre></td></tr><tr><td class="docs"><p>Remember current transformation state</p>
+</td><td class="codes"><pre class="brush: clojure">(defn push-matrix
+  [^Canvas canvas]
+  (swap! (.transform-stack canvas) conj (.getTransform ^Graphics2D (.graphics canvas)))
+  canvas)</pre></td></tr><tr><td class="docs"><p>Restore saved transformation state</p>
+</td><td class="codes"><pre class="brush: clojure">(defn pop-matrix
+  [^Canvas canvas]
+  (when-not (empty? @(.transform-stack canvas))
+    (let [v (peek @(.transform-stack canvas))]
+      (swap! (.transform-stack canvas) pop)
+      (.setTransform ^Graphics2D (.graphics canvas) v)))
+  canvas)</pre></td></tr><tr><td class="docs"><p>Reset transformation</p>
+</td><td class="codes"><pre class="brush: clojure">(defn reset-matrix
+  [^Canvas canvas]
+  (.setTransform ^Graphics2D (.graphics canvas) (java.awt.geom.AffineTransform.))
+  canvas)</pre></td></tr><tr><td class="docs"><h3>Drawing functions</h3>
 
 <p>Here we have basic drawing functions. What you need to remember:</p>
 
@@ -3245,11 +3282,14 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
 </td><td class="codes"><pre class="brush: clojure">(defn set-awt-background
   [^Canvas canvas c]
   (let [^Graphics2D g (.graphics canvas)
-        ^Color currc (.getColor g)] 
+        ^Color currc (.getColor g)]
+    (push-matrix canvas)
+    (reset-matrix canvas)
     (set-color-with-fn set-awt-color canvas c)
     (doto g
       (.fillRect 0 0 (.width canvas) (.height canvas))
-      (.setColor currc)))
+      (.setColor currc))
+    (pop-matrix canvas))
   canvas)</pre></td></tr><tr><td class="docs"><p>Set color for primitive</p>
 </td><td class="codes"><pre class="brush: clojure">(def set-color (partial set-color-with-fn set-awt-color))</pre></td></tr><tr><td class="docs"><p>Set background color</p>
 </td><td class="codes"><pre class="brush: clojure">(def set-background (partial set-color-with-fn set-awt-background))</pre></td></tr><tr><td class="docs"><p>Draw an image. You can specify position and size of the image. Default it's placed on whole canvas.</p>
@@ -3258,45 +3298,7 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
    (.drawImage ^Graphics2D (.graphics canvas) img x y w h nil)
    canvas)
   ([^Canvas canvas img]
-   (image canvas img 0 0 (.width canvas) (.height canvas))))</pre></td></tr><tr><td class="docs"><h3>Transformations</h3>
-
-<p>You can transform your working area with couple of functions on canvas. They act exactly the same as in Processing. Transformation context is bound to canvas wrapped to <code>with-canvas</code> macro. Each <code>with-canvas</code> cleans all transformations.
-Transformations are concatenated.</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Scale canvas</p>
-</td><td class="codes"><pre class="brush: clojure">(defn scale
-  ([^Canvas canvas ^double scalex ^double scaley]
-   (.scale ^Graphics2D (.graphics canvas) scalex scaley)
-   canvas)
-  ([canvas s] (scale canvas s s)))</pre></td></tr><tr><td class="docs"><p>Translate origin</p>
-</td><td class="codes"><pre class="brush: clojure">(defn translate
-  [^Canvas canvas ^double tx ^double ty]
-  (.translate ^Graphics2D (.graphics canvas) tx ty)
-  canvas)</pre></td></tr><tr><td class="docs"><p>Rotate canvas</p>
-</td><td class="codes"><pre class="brush: clojure">(defn rotate
-  [^Canvas canvas ^double angle]
-  (.rotate ^Graphics2D (.graphics canvas) angle)
-  canvas)</pre></td></tr><tr><td class="docs"><p>Shear canvas</p>
-</td><td class="codes"><pre class="brush: clojure">(defn shear
-  ([^Canvas canvas ^double sx ^double sy]
-   (.shear ^Graphics2D (.graphics canvas) sx sy)
-   canvas)
-  ([canvas s] (shear canvas s s)))</pre></td></tr><tr><td class="docs"><p>Remember current transformation state</p>
-</td><td class="codes"><pre class="brush: clojure">(defn push-matrix
-  [^Canvas canvas]
-  (swap! (.transform-stack canvas) conj (.getTransform ^Graphics2D (.graphics canvas)))
-  canvas)</pre></td></tr><tr><td class="docs"><p>Restore saved transformation state</p>
-</td><td class="codes"><pre class="brush: clojure">(defn pop-matrix
-  [^Canvas canvas]
-  (when-not (empty? @(.transform-stack canvas))
-    (let [v (peek @(.transform-stack canvas))]
-      (swap! (.transform-stack canvas) pop)
-      (.setTransform ^Graphics2D (.graphics canvas) v)))
-  canvas)</pre></td></tr><tr><td class="docs"><p>Reset transformation and clean stack.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn reset-matrix
-  [^Canvas canvas]
-  (.setTransform ^Graphics2D (.graphics canvas) (java.awt.geom.AffineTransform.))
-  (reset! (.transform-stack canvas) [])
-  canvas)</pre></td></tr><tr><td class="docs"><h2>Display window</h2>
+   (image canvas img 0 0 (.width canvas) (.height canvas))))</pre></td></tr><tr><td class="docs"><h2>Display window</h2>
 
 <p>You can find here a couple of functions which help to display your canvas and build interaction with user.
 Display window is just a Swing <code>JFrame</code> with <code>java.awt.Canvas</code> as panel.
