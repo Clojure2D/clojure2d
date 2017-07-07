@@ -22,8 +22,7 @@
   "Create Mover"
   ([] (->Mover (Vec2. 30.0 30.0)
                (Vec2. (r/drand -1.0 1.0) (r/drand -1.0 1.0))
-               (r/drand 0.2 2.0)))
-  ([p v m] (->Mover p v m)))
+               (r/drand 0.2 2.0))))
 
 (defn apply-force
   "Apply force"
@@ -41,18 +40,18 @@
 
 (defn move-mover
   "Move mover"
-  [^Mover m]
+  [m]
   (let [acc (-> (Vec2. 0.0 0.0)
                 (apply-force wind (:mass m))
                 (apply-force gravity (:mass m)))
         vel (v/add (:velocity m) acc)
         pos (v/add (:position m) vel)
         [new-vel new-pos] (check-edges vel pos)]
-    (Mover. new-pos new-vel (:mass m))))
+    (->Mover new-pos new-vel (:mass m))))
 
 (defn draw-and-move
   "Draw mover, move and return new one."
-  [canvas ^Mover m]
+  [canvas m]
   (let [size (* 48.0 ^double (:mass m))]
     (set-color canvas 127 127 127 127)
     (ellipse canvas (.x ^Vec2 (:position m)) (.y ^Vec2 (:position m)) size size false)
