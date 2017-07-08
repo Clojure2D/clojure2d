@@ -74,4 +74,3 @@
 (p/set-canvas-pixels! canvas (p/compose-channels (rand-nth c/blends-names) (rand-nth c/blends-names) (rand-nth c/blends-names) nil 
                                                  (p/load-pixels "results/ex11/erode.jpg")
                                                  (p/load-pixels "results/ex11/boxblur23.jpg")))
-

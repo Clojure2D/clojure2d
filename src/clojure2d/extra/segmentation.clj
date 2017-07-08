@@ -1,4 +1,8 @@
-;; segment pixels into squares of similar values
+;; ## Namespace scope
+;;
+;; Segment pixels into squares. Segmentation is based on similarity of channel values.
+;;
+;; See example 13
 
 (ns clojure2d.extra.segmentation
   (:require [clojure2d.core :as core]
@@ -8,9 +12,9 @@
   (:import [clojure2d.pixels Pixels]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
-(defn calc-stdev
+(defn- calc-stdev
   "Calculate standard deviation of selection 10% of random channel values"
   ([^Pixels pixels ch sx sy w h]
    (let [^int sx sx
@@ -30,8 +34,8 @@
            (recur newA newQ (inc k))
            (m/sqrt (/ Q (dec limit)))))))))
 
-(defn segment-pixels-divide
-  ""
+(defn segment-pixels
+  "Decompose channel into segments where mins is minimum size of segment, maxs is maximum size, thr is accuracy (minimum std dev of pixel values to make decision about subdivision."
   [^Pixels p ch mins maxs thr]
   (let [ww (bit-shift-left 1 ^long (m/high-2-exp (.w p)))
         hh (bit-shift-left 1 ^long (m/high-2-exp (.h p)))

@@ -56,7 +56,7 @@
   (let [size (* 48.0 ^double (:mass m))]
     (set-color canvas 127 127 127 127)
     (ellipse canvas (.x ^Vec2 (:position m)) (.y ^Vec2 (:position m)) size size false)
-    (set-stroke canvas 1.0)
+    (set-stroke canvas 1.2)
     (set-color canvas 0 0 0)
     (ellipse canvas (.x ^Vec2 (:position m)) (.y ^Vec2 (:position m)) size size true)
     (move-mover m)))

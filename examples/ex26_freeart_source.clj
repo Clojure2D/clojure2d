@@ -102,7 +102,7 @@
 
 ;; decompose images into segments
 (binding [p/*pixels-edge* :wrap] ;;;; change!
-  (def segments (mapv #(es/segment-pixels-divide % 0 8 128 18.0) images))) ;;;; change!
+  (def segments (mapv #(es/segment-pixels % 0 8 128 18.0) images))) ;;;; change!
 
 ;; This code generates frame
 ;; Input:

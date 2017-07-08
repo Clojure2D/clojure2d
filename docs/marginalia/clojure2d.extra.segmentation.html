@@ -2865,7 +2865,11 @@ net.brehaut.ClojureTools = (function (SH) {
     build_tree: build_tree
   };
 })(SyntaxHighlighter);
-</script><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript"></script><title>clojure2d -- Marginalia</title></head><body><table><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojure2d.extra.segmentation" name="clojure2d.extra.segmentation"><h1 class="project-name">clojure2d.extra.segmentation</h1><a class="toc-link" href="toc.html">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs"><p>segment pixels into squares of similar values</p>
+</script><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript"></script><title>clojure2d -- Marginalia</title></head><body><table><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojure2d.extra.segmentation" name="clojure2d.extra.segmentation"><h1 class="project-name">clojure2d.extra.segmentation</h1><a class="toc-link" href="toc.html">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs"><h2>Namespace scope</h2>
+
+<p>Segment pixels into squares. Segmentation is based on similarity of channel values.</p>
+
+<p>See example 13</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.extra.segmentation
   (:require [clojure2d.core :as core]
@@ -2874,8 +2878,8 @@ net.brehaut.ClojureTools = (function (SH) {
             [clojure2d.pixels :as p])
   (:import [clojure2d.pixels Pixels]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* true)</pre></td></tr><tr><td class="docs"><p>Calculate standard deviation of selection 10% of random channel values</p>
-</td><td class="codes"><pre class="brush: clojure">(defn calc-stdev
+(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><p>Calculate standard deviation of selection 10% of random channel values</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- calc-stdev
   ([^Pixels pixels ch sx sy w h]
    (let [^int sx sx
          ^int sy sy
@@ -2892,8 +2896,8 @@ net.brehaut.ClojureTools = (function (SH) {
              newQ (+ Q (* (- xk A) (- xk newA)) )]
          (if (&lt; k limit)
            (recur newA newQ (inc k))
-           (m/sqrt (/ Q (dec limit)))))))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn segment-pixels-divide
+           (m/sqrt (/ Q (dec limit)))))))))</pre></td></tr><tr><td class="docs"><p>Decompose channel into segments where mins is minimum size of segment, maxs is maximum size, thr is accuracy (minimum std dev of pixel values to make decision about subdivision.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn segment-pixels
   [^Pixels p ch mins maxs thr]
   (let [ww (bit-shift-left 1 ^long (m/high-2-exp (.w p)))
         hh (bit-shift-left 1 ^long (m/high-2-exp (.h p)))
