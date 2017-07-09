@@ -27,7 +27,9 @@
             [clojure2d.color :as c]
             [clojure.java.io :refer :all]
             [clojure2d.math.joise :as j]
-            [clojure2d.math.vector :as v])
+            [clojure2d.math.vector :as v]
+            [criterium.core :as bench]
+            [clojure2d.math.random :as r])
   (:import [clojure2d.pixels Pixels]
            [clojure2d.math.vector Vec2 Vec3]))
 
@@ -296,7 +298,9 @@
 ;; state management functions and transducer operations
 ;; minimizing destructuring as much as possible...
 
-(deftype StateWithS [^double sample state]) ; sample and effect state, StateWithF or vector of StateWithF
+(deftype StateWithS [^double sample state]
+  Object
+  (toString [_] (str sample))) ; sample and effect state, StateWithF or vector of StateWithF
 (deftype StateWithF [f state]) ; effect and its state
 
 (defn- next-effect
@@ -383,6 +387,53 @@
 (def make-effects-filter (partial make-filter-fn apply-effects))
 (def make-effect-filter (partial make-filter-fn apply-effect))
 
+;;; test
+
+(deftype EffectList [sample effect state next]
+  Object
+  (toString [_] (str sample)))
+
+(defn single-pass
+  ""
+  [^EffectList e sample]
+  (if (nil? (.next e))
+    (let [^StateWithS r ((.effect e) sample (.state e))]
+      (EffectList. (.sample r) (.effect e) (.state r) nil))
+    (let [^EffectList prev (single-pass (.next e) sample)]
+      (let [^StateWithS r ((.effect e) (.sample prev) (.state e))]
+        (EffectList. (.sample r) (.effect e) (.state r) prev)))))
+
+(defn make-effect-list
+  ""
+  [init f]
+  (EffectList. 0.0 f init nil))
+
+(defn compose-effects
+  ""
+  [^EffectList e & es]
+  (if (nil? es)
+    e
+    (EffectList. (.sample e) (.effect e) (.state e) (apply compose-effects es))))
+
+;; (def lp1 (make-effect :simple-lowpass {:rate 44100 :cutoff 10000}))
+;; (def lp2 (make-effect :simple-lowpass {:rate 44100 :cutoff 5000}))
+;; (def lp3 (make-effect :simple-lowpass {:rate 44100 :cutoff 2000}))
+;; (def dj (make-effect :dj-eq {:lo (r/drand -5 5) :mid (r/drand -5 5) :hi (r/drand -5 5) :peak_bw 1.3 :shelf_slope 1.5 :rate (r/irand 4000 100000)}))
+
+;; (def lll1 lp1)
+;; (def lll2 (create-state [lp1 lp2 lp3]))
+
+;; (def lll3 (compose-effects lp1 lp2 lp3))
+
+;; (bench/quick-bench (call lll1 (r/drand -1.0 1.0)))
+
+;; (single-pass lll1 1.0)
+;; (process-effects-one-pass 1.0 lll2)
+
+;; (bench/quick-bench (single-pass lll1 (r/drand -1.0 1.0)))
+;; (bench/quick-bench (process-effects-one-pass (r/drand -1.0 1.0) lll2))
+
+
 ;;; multimethod - effect creators
 
 (defmulti make-effect (fn [m conf] m))
@@ -400,23 +451,20 @@
     (/ tinterval (+ tau tinterval))))
 
 (defmethod make-effect :simple-lowpass [_ conf]
-  (let [alpha (calc-filter-alpha (:rate conf) (:cutoff conf))]
-    (fn
-      ([^double sample ^double prev]
-       (let [s1 (* sample alpha)
-             s2 (- prev (* prev alpha))
-             nprev (+ s1 s2)]
-         (StateWithS. nprev nprev)))
-      ([] 0.0))))
+  (let [alpha (calc-filter-alpha (:rate conf) (:cutoff conf))] 
+    (make-effect-list 0.0 (fn
+                            ([^double sample ^double prev]
+                             (let [s1 (* sample alpha)
+                                   s2 (- prev (* prev alpha))
+                                   nprev (+ s1 s2)]
+                               (StateWithS. nprev nprev)))))))
 
 (defmethod make-effect :simple-highpass [_ conf]
   (let [lpfilter (make-effect :simple-lowpass conf)]
-    (fn
-      ([^double sample state]
-       (let [^StateWithS res (lpfilter sample state)]
-         (StateWithS. (- sample (.sample res)) (.state res))))
-      ([]
-       (lpfilter)))))
+    (make-effect-list lpfilter (fn
+                                 ([^double sample lp]
+                                  (let [^EffectList res (single-pass lpfilter sample)]
+                                    (StateWithS. (- sample (.sample res)) res)))))))
 
 ;; BIQUAD FILTERS
 
