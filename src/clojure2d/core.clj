@@ -181,9 +181,18 @@
 ;; Canvas should be accelerated by Java and your video card.
 ;; Reminder: Drawing on canvas is single threaded.
 
-;; Let's define protocol to equip Canvas and Window types with `get-image` function. `get-image` extracts image.
+;; Let's define protocol to equip Canvas and Window types (or any type with image inside) with `get-image` function. `get-image` extracts image. Additionally define width/height getters.
 (defprotocol ImageProto 
-  (get-image [t] "Return BufferedImage"))
+  (get-image [t] "Return BufferedImage")
+  (width [t])
+  (height [t]))
+
+;; Add ImageProto functions to BufferedImage
+(extend BufferedImage
+  ImageProto
+  {:get-image identity
+   :width (fn [^BufferedImage i] (.getWidth i))
+   :height (fn [^BufferedImage i] (.getHeight i))})
 
 ;; Canvas type. Use `get-image` to extract image (`BufferedImage`).
 (deftype Canvas [^Graphics2D graphics
@@ -192,11 +201,13 @@
                  ^Rectangle2D rect-obj
                  ^Ellipse2D ellipse-obj
                  hints
-                 ^long width
-                 ^long height
+                 ^long w
+                 ^long h
                  transform-stack]
   ImageProto
-  (get-image [_] buffer))
+  (get-image [_] buffer)
+  (width [_] w)
+  (height [_] h))
 
 ;; Let's define three rendering quality options: `:low`, `:mid` and `:high`. Where `:low` is fastest but has poor quality and `:high` has best quality but may be slow. Rendering options are used when you create canvas.
 (def rendering-hints {:low {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF
@@ -243,8 +254,8 @@
              (.rect-obj canvas)
              (.ellipse-obj canvas)
              (.hints canvas)
-             (.width canvas)
-             (.height canvas)
+             (.w canvas)
+             (.h canvas)
              (atom []))))
 
 (defmacro with-canvas
@@ -505,7 +516,7 @@
     (reset-matrix canvas)
     (set-color-with-fn set-awt-color canvas c)
     (doto g
-      (.fillRect 0 0 (.width canvas) (.height canvas))
+      (.fillRect 0 0 (.w canvas) (.h canvas))
       (.setColor currc))
     (pop-matrix canvas))
   canvas)
@@ -522,7 +533,7 @@
    (.drawImage ^Graphics2D (.graphics canvas) img x y w h nil)
    canvas)
   ([^Canvas canvas img]
-   (image canvas img 0 0 (.width canvas) (.height canvas))))
+   (image canvas img 0 0 (.w canvas) (.h canvas))))
 
 ;; ## Display window
 ;;
@@ -599,11 +610,13 @@
                    buffer
                    ^java.awt.Canvas panel
                    ^double fps
-                   ^long width
-                   ^long height
+                   ^long w
+                   ^long h
                    window-name]
   ImageProto
-  (get-image [_] (get-image @buffer)))
+  (get-image [_] (get-image @buffer))
+  (width [_] w)
+  (height [_] w))
 
 ;; ### Events function
 

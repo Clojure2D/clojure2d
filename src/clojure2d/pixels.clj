@@ -43,6 +43,8 @@
 
 ;; ## Pixels type
 
+(declare image-from-pixels)
+
 (defprotocol PixelsProto
   "Functions for accessing and setting channel values or colors."
   (get-value [pixels ch idx] [pixels ch x y] "get channel value by index or position")
@@ -61,7 +63,13 @@
 ;; * planar? - is it planar layout? Note: some filters work only on planar layout
 ;; * size - channel size
 ;; * pos - function returning actual position in `p` array from channel and index
+;;
+;; Pixels type implements also `ImageProto` from core namespace
 (deftype Pixels [^ints p ^long w ^long h planar? ^long size pos]
+  core/ImageProto
+  (get-image [t] (image-from-pixels t))
+  (width [_] w)
+  (height [_] h)
   PixelsProto
 
   (get-channel [_ ch]
@@ -812,7 +820,11 @@
                   (set-color p (+ x row) (v/interpolate background color alpha)))))))) ;; store!
       p))
   (to-pixels [t background] (to-pixels t background {}))
-  (to-pixels [t] (to-pixels t (Vec4. 0.0 0.0 0.0 0.0) {})))
+  (to-pixels [t] (to-pixels t (Vec4. 0.0 0.0 0.0 0.0) {}))
+  core/ImageProto
+  (get-image [t] (core/get-image (to-pixels t)))
+  (width [_] sizex)
+  (height [_] sizey))
 
 (defn make-binpixels 
   "Create BinPixels object"

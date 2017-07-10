@@ -27,7 +27,7 @@
     (rect canvas x (+ 300.0 (* 300.0 ^double (f (/ x 600.0)))) 1 1)))
 
 ;; run several times
-(let [lst (into [] (map #(s/make-wave (rand-nth s/waves) (f %) (a %) (r/drand 1)) (range 1 5)))]
+(let [lst (into [] (map #(s/make-wave (rand-nth s/oscillators) (f %) (a %) (r/drand 1)) (range 1 5)))]
   (with-canvas canvas
     (set-color (java.awt.Color/white))
     (set-background java.awt.Color/black)
@@ -47,7 +47,7 @@
 
 ;; try several times
 (let [num 7
-      wvs (repeatedly num #(rand-nth s/waves))
+      wvs (repeatedly num #(rand-nth s/oscillators))
       phases (repeatedly num #(r/drand 1.0))
       phasemult (repeatedly num #(r/drand -3.0 3.0))
       octaves (repeatedly num #(r/irand num))]
@@ -66,6 +66,6 @@
 ;; open in Audacity as RAW 16 bit signed, mono, big-endian, 44100Hz
 (let [num 10
       amp (* 1.5 (/ 1.0 num))
-      lst (into [] (map #(s/make-wave (rand-nth s/waves) (* 150 ^long %) amp (r/drand 1)) (range 1 (inc num))))
+      lst (into [] (map #(s/make-wave (rand-nth s/oscillators) (* 150 ^long %) amp (r/drand 1)) (range 1 (inc num))))
       f (s/make-sum-wave lst)]
   (s/save-signal (s/make-signal-from-wave f 44100 10) "results/ex18/wave.raw"))

@@ -9,30 +9,34 @@
   (:import [clojure2d.pixels Pixels]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 ;; load image
 (def ^Pixels p (p/load-pixels "results/test.jpg"))
 
-(def canvas (make-canvas (.w p) (.h p)))
-(def window (show-window canvas "Signal" (.w p) (.h p) 15))
+(def canvas (make-canvas (width p) (height p)))
+(def window (show-window canvas "Signal" (width p) (height p) 15))
 
 (defmethod key-pressed ["Signal" \space] [_]
   (save-canvas canvas (next-filename "results/ex16/" ".jpg")))
 
 ;; dj-eq
-(def effect1 (make-effect :dj-eq {:lo -10 :mid 10 :hi -10 :peak_bw 1.3 :shelf_slope 1.5 :rate 44100}))
+(def effect1 (make-effect :dj-eq {:lo -10 :mid 10 :hi -10 :peak-bw 1.3 :shelf-slope 1.5 :rate 44100}))
 
 ;; lowpass
 (def effect2 (make-effect :simple-lowpass {:rate 44100 :cutoff 1000}))
 
+;; 3 x lowpass
+(def effect3 (compose-effects effect2 effect2 effect2))
+
 ;; filter with dj-eq
-(time (p/set-canvas-pixels! canvas (p/filter-channels p/normalize (p/filter-channels (make-effect-filter effect1 {:coding :alaw-rev} {:coding :ulaw}) p))))
+(time (p/set-canvas-pixels! canvas (p/filter-channels p/normalize (p/filter-channels (make-effects-filter effect1 {:coding :alaw-rev} {:coding :ulaw}) p))))
 
 ;; filter with 3 lowpass
-(time (p/set-canvas-pixels! canvas (p/filter-channels (make-effects-filter [effect2 effect2 effect2] {:signed true} {:signed true}) p)))
+(time (p/set-canvas-pixels! canvas (p/filter-channels (make-effects-filter effect3 {:signed true} {:signed true}) p)))
+
 ;; filter with all in YPbPr colorspace
-(time (let [filter (make-effects-filter [effect1 effect2])
+(time (let [filter (make-effects-filter (compose-effects effect1 effect2))
             res (->> p
                      (p/filter-colors c/to-YPbPr)
                      (p/filter-channels filter)
@@ -41,7 +45,7 @@
                      (p/filter-colors c/from-YPbPr))]
         (p/set-canvas-pixels! canvas res)))
 
-(time (let [filter (make-effect-filter (make-effect :divider {:denominator 2}))
+(time (let [filter (make-effects-filter (make-effect :divider {:denominator 2}))
             res (->> p
                      (p/filter-colors c/to-OHTA)
                      (p/filter-channels p/normalize)
@@ -59,7 +63,7 @@
                                       :signed true
                                       :channels [2 0 1]
                                       :bits 16})
-            res (apply-effect effect in)
+            res (apply-effects effect in)
             resp (signal-to-pixels (p/clone-pixels p) res {:layout :interleaved
                                                            :coding :alaw-rev
                                                            :signed true
@@ -69,7 +73,7 @@
 
 ;; fm filter
 
-(time (let [effect (make-effect-filter (make-effect :fm {:quant 10 :omega (* m/TWO_PI 0.00225857) :phase 0.00822}) (.w p))
+(time (let [effect (make-effects-filter (make-effect :fm {:quant 10 :omega (* m/TWO_PI 0.00225857) :phase 0.00822}) (width p))
             res (p/filter-channels effect nil p)]
         (p/set-canvas-pixels! canvas res)))
 
