@@ -14,11 +14,10 @@
 
 ;; define canvas, window
 (def canvas (create-canvas 600 600))
-(def ^:const ^long fps 50)
-(def windows (show-window canvas "Double pendulum" 600 600 fps))
+(def window (show-window canvas "Double pendulum"))
 
 ;; canvas is refreshed externally by integrator, let's define frame rate
-(def ^:const ^double time-delay (/ 1000.0 fps))
+(def ^:const ^double time-delay (/ 1000.0 ^double (:fps window)))
 
 ;; pendulum settings
 (def ^:const ^double len 0.6) ; length of first rod, second has length (- 1.0 len)
@@ -75,7 +74,7 @@
 
   ;; run integration
   (evolver {:t simulation-time
-            :dt (* speed (/ 1.0 fps))
+            :dt (* speed (/ 1.0 ^double (:fps window)))
             :l1 len1
             :l2 len2
             :m1 mass1

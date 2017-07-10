@@ -16,7 +16,7 @@
 
 (def canvas (create-canvas w h))
 
-(def window (show-window canvas "raymarching2" w h 15))
+(def window (show-window canvas "raymarching2" 15 nil))
 
 (defmethod key-pressed ["raymarching2" \space] [_]
   (save-canvas canvas "results/ex23/scene.jpg"))

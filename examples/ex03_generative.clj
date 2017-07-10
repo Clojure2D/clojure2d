@@ -33,6 +33,6 @@
 
 (defn example-03
   []
-  (show-window (create-canvas 600 600) "clojure-canvas" 600 600 60 #(draw %1 %2 %3)))
+  (show-window (create-canvas 600 600) "clojure-canvas" #(draw %1 %2 %3)))
 
 (example-03)

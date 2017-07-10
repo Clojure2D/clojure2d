@@ -43,4 +43,4 @@
           (ellipse canvas x y 2 2))))
     (+ a s)))
 
-(def window (show-window canvas "Wind blows" 500 500 25 draw))
+(def window (show-window canvas "Wind blows" 30 draw))

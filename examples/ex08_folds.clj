@@ -27,7 +27,7 @@
 (def ^:const ^long w- (dec w))
 (def ^:const ^long h- (dec h))
 
-(def ^:const ^double scale 0.7)
+(def ^:const ^double fscale 0.7)
 
 (def s60 (make-spots 60 [60 120 180] w h))
 (def n60 (make-noise 60 w h))
@@ -45,7 +45,7 @@
     (loop [y y1]
       (loop [x x1]
         
-        (let [^Vec2 vv (v/mult (v/applyf (v/mult (field (Vec2. x y)) scale) m/sin) 2.7)
+        (let [^Vec2 vv (v/mult (v/applyf (v/mult (field (Vec2. x y)) fscale) m/sin) 2.7)
               xx (m/norm (+ (.x vv) ^double (r/grand 0.0012)) x1- x2+ 0.0 w)
               yy (m/norm (+ (.y vv) ^double (r/grand 0.0012)) y1- y2+ 0.0 h)]
           (point canvas xx yy))
@@ -69,7 +69,7 @@
   ""
   []
   (let [canvas (create-canvas w h)
-        window (show-window canvas "folds" w h 25)]
+        window (show-window canvas "folds" 15 nil)]
 
     (defmethod key-pressed ["folds" \space] [_]
       (save-canvas canvas (next-filename "results/ex08/" ".jpg")))

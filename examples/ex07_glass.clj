@@ -39,7 +39,7 @@
   ""
   []
   (let [canvas (create-canvas 800 800)
-        window (show-window canvas "glass" 800 800 25)]
+        window (show-window canvas "glass" 15 nil)]
 
     (defmethod key-pressed ["glass" \space] [_]
       (save-canvas canvas (next-filename "results/ex07/" ".jpg")))

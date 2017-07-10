@@ -15,7 +15,7 @@
 (def ^Pixels img (p/load-pixels "results/test.jpg"))
 
 (def canvas (make-canvas (width img) (height img)))
-(def window (show-window canvas "Colors" (width img) (height img) 15))
+(def window (show-window canvas "Colors" 15 nil))
 
 (defmethod key-pressed ["Colors" \space] [_]
   (save-canvas canvas (next-filename "results/ex20/" ".jpg")))

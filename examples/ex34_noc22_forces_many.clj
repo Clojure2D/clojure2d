@@ -33,8 +33,8 @@
 (defn check-edges
   "Check window boundaries"
   [^Vec2 velocity ^Vec2 pos]
-  (let [mx (if-not (< -0.01 (.x pos) w) -1.0 1.0)
-        my (if-not (< -0.01 (.y pos) h) -1.0 1.0)]
+  (let [mx (if (< -0.01 (.x pos) w) 1.0 -1.0)
+        my (if (< -0.01 (.y pos) h) 1.0 -1.0)]
     [(v/emult velocity (Vec2. mx my))
      (Vec2. (m/constrain (.x pos) 0 w)
             (m/constrain (.y pos) 0 h))]))
@@ -68,5 +68,5 @@
   (let [m (or last-m (repeatedly number-of-movers make-mover))]
     (mapv (partial draw-and-move canvas) m)))
 
-(def window (show-window (make-canvas w h) "NOC_2_2_forces_many" w h 30 draw))
+(def window (show-window (make-canvas w h) "NOC_2_2_forces_many" draw))
 

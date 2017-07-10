@@ -17,7 +17,7 @@
 (def ^Pixels img (p/load-pixels "results/test.jpg"))
 
 (def canvas (core/make-canvas (core/width img) (core/height img)))
-(def window (core/show-window canvas "Segmentation" (core/width img) (core/height img) 15))
+(def window (core/show-window canvas "Segmentation" 15 nil))
 
 (defmethod core/key-pressed ["Segmentation" \space] [_]
   (core/save-canvas canvas (core/next-filename "results/ex13/" ".jpg")))

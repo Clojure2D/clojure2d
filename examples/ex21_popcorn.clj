@@ -73,7 +73,7 @@
   []
   (binding [*skip-random-variations* true]
     (let [canvas (create-canvas w h)
-          window (show-window canvas "popcorn" w h 25)
+          window (show-window canvas "popcorn")
           field-config (make-random-configuration)
           field (make-combination field-config)
           vrand (Vec2. (r/drand -1 1) (r/drand -1 1))

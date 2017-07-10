@@ -12,7 +12,7 @@
 
 (def canvas (create-canvas 600 600))
 
-(def display (show-window canvas "waves" 600 600 25))
+(def display (show-window canvas "waves"))
 
 (defmethod key-pressed ["waves" \space] [_]
   (save-canvas canvas (next-filename "results/ex18/" ".jpg")))

@@ -52,7 +52,7 @@
   []
   (binding [*skip-random-variations* true]
     (let [canvas (create-canvas w h)
-          window (show-window canvas "curvature2" w h 25)
+          window (show-window canvas "curvature2" 15 nil)
           noise (n/make-random-fractal-noise)
           field-config (make-random-configuration)
           field (make-combination field-config)

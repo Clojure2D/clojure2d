@@ -39,4 +39,4 @@
           [(int (m/cnorm (get-x e) 0 600 3 100))
            (int (m/cnorm (get-y e) 0 600 0 (count colors)))]))
 
-(def window (show-window canvas "stripes" 600 600 25 draw))
+(def window (show-window canvas "stripes" draw))

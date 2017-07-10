@@ -43,4 +43,4 @@
 
     d))
 
-(def window (show-window canvas "Interpolations" 600 500 25 #(draw %1 %2 %3)))
+(def window (show-window canvas "Interpolations" #(draw %1 %2 %3)))

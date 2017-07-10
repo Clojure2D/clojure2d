@@ -81,7 +81,7 @@
   ""
   [n]
   (let [canvas (create-canvas SIZE SIZE)]
-    (show-window canvas "metaballs" SIZE SIZE 25 (partial draw-balls n)))
+    (show-window canvas "metaballs" (partial draw-balls n)))
   :done)
 
 (example-14 (r/irand 2 6))

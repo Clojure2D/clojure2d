@@ -17,7 +17,7 @@
 (def ^:const ^int bh (/ (- h hh) 2))
 
 (def canvas (make-canvas w h))
-(def window (show-window canvas "Palettes" w h 15))
+(def window (show-window canvas "Palettes" 15 nil))
 
 (defn draw-palette
   ""

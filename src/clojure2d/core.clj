@@ -768,7 +768,7 @@
 (defn show-window
   "Show window with width/height, name and required fps of refresh. Optionally pass callback function.
 
-  * Input: canvas, window name, width, height, frames per seconds, (optional) `draw` function.
+  * Input: canvas, window name, width (defalut: canvas width), height (default: canvas height), frames per seconds (default: 60), (optional) `draw` function.
   * Returns `Window` value"
   ([canvas wname width height fps draw-fun]
    (let [active? (atom true)
@@ -786,7 +786,13 @@
                height
                wname)))
   ([canvas wname width height fps]
-   (show-window canvas wname width height fps nil)))
+   (show-window canvas wname width height fps nil))
+  ([canvas wname]
+   (show-window canvas wname nil))
+  ([canvas wname draw-fn]
+   (show-window canvas wname 60 draw-fn))
+  ([canvas wname fps draw-fn]
+   (show-window canvas wname (width canvas) (height canvas) fps draw-fn)))
 
 (defn window-active?
   "Helper function, check if window is active"

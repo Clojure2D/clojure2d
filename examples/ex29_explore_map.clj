@@ -10,7 +10,7 @@
 (set! *unchecked-math* :warn-on-boxed)
 
 (def canvas (create-canvas 600 600))
-(def window (show-window canvas "Explore map" 600 600 25))
+(def window (show-window canvas "Explore map"))
 
 (defmethod key-pressed ["Explore map" \space] [_]
   (binding [*jpeg-image-quality* 0.9]
