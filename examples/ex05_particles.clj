@@ -11,8 +11,8 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
-(def ^:const ^long width 1200)
-(def ^:const ^long height 1200)
+(def ^:const ^long w 1200)
+(def ^:const ^long h 1200)
 
 (def ^:const ^double point-step 15.0)
 (def ^:const ^double rscale 25.0)
@@ -23,13 +23,13 @@
 (defn make-particle
   ""
   []
-  (Vec2. (r/drand width) (r/drand height)))
+  (Vec2. (r/drand w) (r/drand h)))
 
 (defn move-particle
   ""
   [^Vec2 vrand line? fun noise canvas ^Vec2 in]
-  (let [xx (m/norm (.x in) 0 width -2 2)
-        yy (m/norm (.y in) 0 height -2 2)
+  (let [xx (m/norm (.x in) 0 w -2 2)
+        yy (m/norm (.y in) 0 h -2 2)
         ^Vec2 vr (v/add vrand (Vec2. xx yy))
         ^Vec2 v (v/div (fun vr) rscale)
         ^double n (noise (.x v) (.y v))
@@ -37,7 +37,7 @@
         nx (+ (.x in) (* point-step (m/qcos ang)))
         ny (+ (.y in) (* point-step (m/qsin ang))) 
         col (m/cnorm (m/sqrt n) 0 1 100 240)]
-    (if (and (<= 80 ny (- height 81)) (<= 80 nx (- width 81)))
+    (if (and (<= 80 ny (- h 81)) (<= 80 nx (- w 81)))
       (do
         (set-color canvas col col col alpha)
         
@@ -51,9 +51,9 @@
 (defn example-05
   []
   (binding [*skip-random-variations* true]
-    (let [canvas (create-canvas width height)
-          window (show-window canvas "particles" width height 25)
-          noise (n/make-random-fractal)
+    (let [canvas (create-canvas w h)
+          window (show-window canvas "particles" w h 25)
+          noise (n/make-random-fractal-noise)
           field-config (make-random-configuration)
           field (make-combination field-config)
           vrand (Vec2. (r/drand -1 1) (r/drand -1 1))

@@ -11,8 +11,8 @@
 
 (def ^Pixels img (p/load-pixels "results/test.jpg"))
 
-(def canvas (make-canvas (.w img) (.h img)))
-(def window (show-window canvas "Colorspace" (.w img) (.h img) 15))
+(def canvas (make-canvas (width img) (height img)))
+(def window (show-window canvas "Colorspace" (width img) (height img) 15))
 
 (defmethod key-pressed ["Colorspace" \space] [_]
   (save-canvas canvas (next-filename "results/ex15/" ".jpg")))

@@ -5,11 +5,10 @@
 (ns examples.ex01-events
   "Process window events"
   (:require [clojure2d.core :refer :all]
-            [clojure2d.math :as m])
-  (:import [java.awt.event MouseEvent]))
+            [clojure2d.math :as m]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 ;; In this example you can see how to create event methods for different windows
 ;;
@@ -38,10 +37,10 @@
     (defmethod key-pressed [name2 \space] [_]
       (println (str "Window: " name2)))
 
-    (defmethod mouse-event [name1 :mouse-pressed] [^MouseEvent e]
+    (defmethod mouse-event [name1 :mouse-pressed] [e]
       (let [canvas (make-canvas 1 1)
-            x (.getX e)
-            y (.getY e)
+            x (get-x e)
+            y (get-y e)
             cr (m/cnorm x 0 399 0 255)
             cg (m/cnorm y 0 399 0 255)]
         (with-canvas canvas

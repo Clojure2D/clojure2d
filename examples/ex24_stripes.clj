@@ -5,8 +5,7 @@
             [clojure2d.extra.glitch :as g]
             [clojure2d.math.random :as r]
             [clojure2d.math.vector :as v])
-  (:import [java.awt.event MouseEvent]
-           [clojure2d.math.vector Vec2]))
+  (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -35,9 +34,9 @@
     (set-color canvas (colors col))
     (triangle-strip canvas vs)))
 
-(defmethod mouse-event ["stripes" :mouse-moved] [^MouseEvent e]
+(defmethod mouse-event ["stripes" :mouse-moved] [e]
   (reset! mouse-pos
-          [(int (m/cnorm (.getX e) 0 600 3 100))
-           (int (m/cnorm (.getY e) 0 600 0 (count colors)))]))
+          [(int (m/cnorm (get-x e) 0 600 3 100))
+           (int (m/cnorm (get-y e) 0 600 0 (count colors)))]))
 
 (def window (show-window canvas "stripes" 600 600 25 draw))

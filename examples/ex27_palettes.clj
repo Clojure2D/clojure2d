@@ -5,19 +5,19 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
-(def ^:const ^int width 800)
-(def ^:const ^int height 400)
+(def ^:const ^int w 800)
+(def ^:const ^int h 400)
 
-(def ^:const ^int halfw (int (/ width 2)))
-(def ^:const ^int halfh (int (/ height 2)))
+(def ^:const ^int halfw (int (/ w 2)))
+(def ^:const ^int halfh (int (/ h 2)))
 
-(def ^:const ^int ww (int (* 0.8 width)))
-(def ^:const ^int hh (int (* 0.8 height)))
-(def ^:const ^int bw (/ (- width ww) 2))
-(def ^:const ^int bh (/ (- height hh) 2))
+(def ^:const ^int ww (int (* 0.8 w)))
+(def ^:const ^int hh (int (* 0.8 h)))
+(def ^:const ^int bw (/ (- w ww) 2))
+(def ^:const ^int bh (/ (- h hh) 2))
 
-(def canvas (make-canvas width height))
-(def window (show-window canvas "Palettes" width height 15))
+(def canvas (make-canvas w h))
+(def window (show-window canvas "Palettes" w h 15))
 
 (defn draw-palette
   ""
@@ -40,9 +40,9 @@
     
     (with-canvas canvas
       (set-color 20 20 20)
-      (rect 0 0 width halfh)
+      (rect 0 0 w halfh)
       (set-color 235 235 235)
-      (rect 0 halfh width halfh)
+      (rect 0 halfh w halfh)
       (draw-palette values box-size))
 
     fpalette))

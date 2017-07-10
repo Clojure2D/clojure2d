@@ -14,8 +14,8 @@
 
 (def ^Pixels img (p/load-pixels "results/test.jpg"))
 
-(def canvas (make-canvas (.w img) (.h img)))
-(def window (show-window canvas "Glitch" (.w img) (.h img) 15))
+(def canvas (make-canvas (width img) (height img)))
+(def window (show-window canvas "Glitch" (width img) (height img) 15))
 
 (defmethod key-pressed ["Glitch" \space] [_]
   (save-canvas canvas (next-filename "results/ex19/" ".jpg")))

@@ -620,6 +620,15 @@
 
 ;; ### Events function
 
+(defprotocol XYProto
+  (get-x [_])
+  (get-y [_]))
+
+(extend MouseEvent
+  XYProto
+  {:get-x #(.getX ^MouseEvent %1)
+   :get-y #(.getY ^MouseEvent %1)})
+
 ;; Private method which extracts the name of your window (set when `show-window` is called).
 
 (defn- component-name

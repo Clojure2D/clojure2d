@@ -13,8 +13,8 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-(def ^:const ^long width 800)
-(def ^:const ^long height 800)
+(def ^:const ^long w 800)
+(def ^:const ^long h 800)
 (def ^:const ^long border 200)
 
 (def ^:const ^double point-step 1.0)
@@ -25,15 +25,15 @@
 (defn make-particle
   ""
   []
-  (Vec3. (r/drand border (- width border)) (r/drand border (- height border)) (r/drand m/TWO_PI)))
+  (Vec3. (r/drand border (- w border)) (r/drand border (- h border)) (r/drand m/TWO_PI)))
 
 (defn move-particle
   ""
   [^Vec2 vshift fun noise canvas ^Vec3 in]
   (let [nx (+ (.x in) (* point-step (m/qcos (.z in))))
         ny (+ (.y in) (* point-step (m/qsin (.z in))))
-        xx (m/norm nx 0 width -1 1)
-        yy (m/norm ny 0 height -1 1)
+        xx (m/norm nx 0 w -1 1)
+        yy (m/norm ny 0 h -1 1)
         ^Vec2 v (fun (v/mult (Vec2. xx yy) coord-scale))
         ^Vec2 vv (v/add v vshift)
         angle (+ (.z in) (* angle-scale ^double (m/norm (noise (.x vv) (.y vv)) 0 1 -1 1)))]
@@ -45,9 +45,9 @@
 (defn example-09
   []
   (binding [*skip-random-variations* true]
-    (let [canvas (create-canvas width height)
-          window (show-window canvas "curvature" width height 25)
-          noise (n/make-random-fractal)
+    (let [canvas (create-canvas w h)
+          window (show-window canvas "curvature" w h 25)
+          noise (n/make-random-fractal-noise)
           field-config (make-random-configuration)
           field (make-combination field-config)
           vshift (Vec2. (r/drand -3 3) (r/drand -3 3))

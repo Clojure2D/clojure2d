@@ -4,10 +4,11 @@
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
             [clojure2d.math.random :as r]
-            [clojure2d.extra.signal :as s]))
+            [clojure2d.extra.signal :as s]
+            [clojure2d.color :as c]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 (def canvas (create-canvas 600 600))
 
@@ -38,10 +39,11 @@
   ""
   [canvas y f]
   (dotimes [x 600]
-    (let [v (-> (f (m/norm x 0 600 0.0 1.0))
-                (m/cnorm -1.0 1.0 0.0 0.999)
-                (float))
-          c (java.awt.Color. v (float (m/sq v)) (float (m/sqrt v)))]
+    (let [^double v (-> (f (m/norm x 0 600 0.0 1.0)) 
+                        (m/cnorm -1.0 1.0 0.0 1.0))
+          v1 (* 255.0 (m/sq v))
+          v2 (* 255.0 (m/sqrt v))
+          c (c/make-color (* 255.0 v) v1 v2)]
       (set-color canvas c)
       (rect canvas x y 1 1))))
 

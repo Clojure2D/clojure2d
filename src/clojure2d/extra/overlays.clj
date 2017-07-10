@@ -55,8 +55,8 @@
 (defn render-rgb-scanlines
   "Blurs and renders rgb stripes on the image, returns new image. Scale parameter (default 1.6) controls amount of blur. Resulting image is sligtly lighter and desaturated. Correct with normalize filter if necessary."
   ([^BufferedImage p ^double scale]
-   (let [w (.getWidth p)
-         h (.getHeight p)
+   (let [^int w (core/width p)
+         ^int h (core/height p)
          ^Pixels rimg (-> p
                           (core/resize-image (int (/ w scale)) (int (/ h scale)))
                           (core/resize-image w h)
@@ -89,14 +89,14 @@
 (defn render-noise
   "Render noise on image"
   ([noise ^BufferedImage img]
-   (let [w (.getWidth img)
-         h (.getHeight img)
+   (let [w (core/width img)
+         h (core/height img)
          canvas (core/with-canvas (core/create-canvas w h)
                   (core/image img)
                   (core/image noise))]
      (core/get-image canvas)))
   ([^BufferedImage img]
-   (render-noise (make-noise 80 (.getWidth img) (.getHeight img)) img)))
+   (render-noise (make-noise 80 (core/width img) (core/height img)) img)))
 
 ;; ## Spots
 ;;
@@ -153,11 +153,12 @@
 (defn render-spots
   "Render spots on image. Returns image."
   ([alpha intensities ^BufferedImage img]
-   (let [spots (make-spots alpha intensities (.getWidth img) (.getHeight img))]
+   (let [spots (make-spots alpha intensities (core/width img) (core/height img))]
      (render-spots spots img)))
   ([spots ^BufferedImage img]
-   (let [w (.getWidth img)
-         h (.getHeight img)
+   (let [w (core/width img)
+         h (core/height img)
          canvas (core/with-canvas (core/create-canvas w h)
                   (apply-images img spots))]     
      (core/get-image canvas))))
+

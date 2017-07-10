@@ -12,8 +12,8 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-(def ^:const ^long width 900)
-(def ^:const ^long height 900)
+(def ^:const ^long w 900)
+(def ^:const ^long h 900)
 
 (def ^:const ^double point-step 0.02) ; 0.01 - 2.0
 (def ^:const ^double point-size 1.0) ; 0.6 - 1.2
@@ -38,9 +38,9 @@
                                                            (v/add nf)) m/TWO_PI)) point-step))
         nx (.x v)
         ny (.y v)
-        screenx (m/norm nx -8.0 8.0 0 width)
-        screeny (m/norm ny -8.0 8.0 0 height)]
-    (if (and (<= 40 screeny (- height 41)) (<= 40 screenx (- width 41)))
+        screenx (m/norm nx -8.0 8.0 0 w)
+        screeny (m/norm ny -8.0 8.0 0 h)]
+    (if (and (<= 40 screeny (- h 41)) (<= 40 screenx (- w 41)))
       (do
         (point canvas screenx screeny)
         (Vec2. nx ny))
@@ -72,8 +72,8 @@
 (defn example-21
   []
   (binding [*skip-random-variations* true]
-    (let [canvas (create-canvas width height)
-          window (show-window canvas "popcorn" width height 25)
+    (let [canvas (create-canvas w h)
+          window (show-window canvas "popcorn" w h 25)
           field-config (make-random-configuration)
           field (make-combination field-config)
           vrand (Vec2. (r/drand -1 1) (r/drand -1 1))

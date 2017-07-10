@@ -19,14 +19,14 @@
 (defn gff-rows [] (vec (repeatedly gff-size r/grand)))
 (def gff (vec (repeatedly gff-size gff-rows)))
 
-(def ^:const ^int width 800)
-(def ^:const ^int height 800)
+(def ^:const ^int w 800)
+(def ^:const ^int h 800)
 
 (defn get-field-value
   "Get bilineary interpolated gaussian field value"
   ^double [^double x ^double y]
-  (let [^double px (m/norm x 0 width 0 gff-size)
-        ^double py (m/norm y 0 height 0 gff-size)
+  (let [^double px (m/norm x 0 w 0 gff-size)
+        ^double py (m/norm y 0 h 0 gff-size)
         ix (m/floor px)
         iy (m/floor py)
         rx (- px ix)
@@ -46,8 +46,8 @@
     (set-background canvas 21 20 19)
     (dotimes [t rays]
       (let [theta (* t rsteps)]
-        (loop [x (double (* 0.5 width))
-               y (double (* 0.5 height))
+        (loop [x (double (* 0.5 w))
+               y (double (* 0.5 h))
                iter (int 0)]
           (when (< iter 350)
             (let [v (* hf (get-field-value x y))
@@ -68,9 +68,9 @@
 
 (do
 
-  (def canvas (create-canvas width height))
+  (def canvas (create-canvas w h))
 
   (with-canvas canvas
     (set-color 220 220 210 200))
 
-  (def window (show-window canvas "GFF" width height 25 #(draw %1 %2 %3))))
+  (def window (show-window canvas "GFF" w h 25 #(draw %1 %2 %3))))

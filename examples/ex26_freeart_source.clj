@@ -33,19 +33,19 @@
 (set! *unchecked-math* :warn-on-boxed)
 
 ;; frame width
-(def ^:const width 640)
+(def ^:const w 640)
 
 ;; frame height
-(def ^:const height 480)
+(def ^:const h 480)
 
 ;; number of frames
 (def ^:const number-of-frames 44)
 
 ;; canvas bound to window
-(def canvas (create-canvas width height))
+(def canvas (create-canvas w h))
 
 ;; canvases which represent frames
-(def canvases (vec (repeatedly number-of-frames #(create-canvas width height))))
+(def canvases (vec (repeatedly number-of-frames #(create-canvas w h))))
 
 ;; pixels from images (44 frames)
 (def images (mapv #(p/load-pixels (str "examples/ex26/" (format "%02d" %) ".jpg")) (range number-of-frames)))
@@ -62,11 +62,11 @@
 
 ;; Display window. I don't know why but running first time shows blank window.
 ;; Close and execute second time.
-(def window (show-window canvas "free_art_-_source" (* width 2) (* height 2) 25 draw))
+(def window (show-window canvas "free_art_-_source" (* w 2) (* h 2) 25 draw))
 
 ;; Prepare noise and spot overlay frames, it's slow
-(def noise-frames (vec (repeatedly number-of-frames #(o/make-noise 60 width height)))) ;;;; change!
-(def spots-frames (vec (repeatedly number-of-frames #(o/make-spots 80 [30 220] width height)))) ;;;; change!
+(def noise-frames (vec (repeatedly number-of-frames #(o/make-noise 60 w h)))) ;;;; change!
+(def spots-frames (vec (repeatedly number-of-frames #(o/make-spots 80 [30 220] w h)))) ;;;; change!
 
 ;; Sonification effect using DjEq filter with colorspace conversion.
 ;; Steps:
@@ -80,14 +80,14 @@
 (defn sonification
   "Sonification based on two parameters"
   [^double t1 ^double t2 pixels]
-  (let [effect (s/make-effect :dj-eq {:lo t1 :mid (- t2) :hi t2 :peak_bw 1.3 :shelf_slope 1.5 :rate 44100.0}) ;;;; change!
+  (let [effect (s/make-effect :dj-eq {:lo t1 :mid (- t2) :hi t2 :peak-bw 1.3 :shelf-slope 1.5 :rate 44100.0}) ;;;; change!
         cpx (p/filter-colors c/to-LUV pixels) ;;;; change!
         in (s/signal-from-pixels cpx {:layout :plane ;;;; change!
                                       :channels [0 1 2] ;;;; change!
                                       :bits 8 ;;;; change!
                                       :signed true ;;;; change!
                                       :coding :none}) ;;;; change!
-        res (s/apply-effect effect in)
+        res (s/apply-effects effect in)
         resp (s/signal-to-pixels (p/clone-pixels pixels) res {:layout :plane ;;;; change!
                                                               :channels [0 1 2] ;;;; change!
                                                               :bits 8 ;;;; change!
@@ -126,13 +126,13 @@
   [canvas ^long time ^long frame]
   (let [^int color (mod time 255)] ;;;; change!
     (set-color canvas 0 0 0 200) ;;;; change!
-    (rect canvas 20 20 (- width 40) (- height 40)) ;;;; change!
+    (rect canvas 20 20 (- w 40) (- h 40)) ;;;; change!
 
     (set-color canvas color (- 255 color) 11 200) ;;;; change!
-    (dotimes [x width]
+    (dotimes [x w]
       (let [^double n (r/noise (/ frame 100.0) (/ frame 200.0) (/ x 20.0))] ;;;; change!
         (when (> n 0.636) ;;;; change!
-          (line canvas x 0 x height))))
+          (line canvas x 0 x h))))
 
     (doseq [[x y size] (filter (fn [_] (r/brand 0.985)) (segments frame))] ;;;; change!
       (set-color canvas (p/get-color (images frame) x y))
@@ -168,7 +168,7 @@
 (defn updater
   "Update frames"
   []
-  (let [buffer (create-canvas width height)]
+  (let [buffer (create-canvas w h)]
     (loop [time (long 0)]
       (let [frame (mod time number-of-frames)]
         (with-canvas buffer

@@ -22,8 +22,8 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
-(def ^:const ^int width 2048)
-(def ^:const ^int height 2048)
+(def ^:const ^int w 2048)
+(def ^:const ^int h 2048)
 (def r [-1.1 1.1 -1.1 1.1])
 (def ^:const ^double step 0.003451234) ;; time step
 (def ^:const ^int first-step 500000)
@@ -102,7 +102,7 @@
            dampstepsx dampstepsy]}]
   (let [^int dampxc (if dampstepsx (count dampstepsx) 0)
         ^int dampyc (if dampstepsy (count dampstepsy) 0)
-        ^BinPixels bp (p/make-binpixels r width height)]
+        ^BinPixels bp (p/make-binpixels r w h)]
     (loop [prevx (double 0.0)
            prevy (double 0.0)
            time (double start-time)
@@ -146,7 +146,7 @@
 ;; press `space` to save
 ;; close window to stop
 (def result (let [config (make-random-config)
-                  canvas (create-canvas width height)
+                  canvas (create-canvas w h)
                   window (show-window canvas "Harmonograph" 800 800 5)]
 
               (defmethod key-pressed ["Harmonograph" \space] [_]
