@@ -22,7 +22,7 @@
   ([n]
    (let [f (fn []
              (let [r (r/irand 4)]
-               {:wave (rand-nth s/waves)
+               {:wave (rand-nth s/oscillators)
                 :freq (freqs r)
                 :amp (amps r)
                 :phase (r/drand)}))]
