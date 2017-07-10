@@ -1,4 +1,4 @@
-(ns examples.NOC.bouncingball-novectors
+(ns examples.NOC.ch01.bouncingball-novectors-1-1
   (:require [clojure2d.core :refer :all]))
 
 (set! *warn-on-reflection* true)
