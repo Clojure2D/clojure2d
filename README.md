@@ -44,7 +44,7 @@ In points:
 
 * Almost decoupled display and canvas (decoupled drawing and refreshing) - you can have as many windows as you want, you can have as many canvases as you want. Display repaints selected canvas automaticaly in separate thread. This way you can operate on canvas in your pace.
 * Processing way is still possible (you can attach draw() function to your Display). However main benefit here: draw function keeps context between invocations, this way you can avoid global state (atoms etc.) and write more functional way.
-* Easy live coding possible (Emacs/Cider/REPL), 'notebook' way of making (like iPython)
+* Easy live coding possible (Emacs/Cider/REPL), 'notebook' way of making
 * FastMath as main math library
 * Main focus on higher level generative/glitch concepts (like sonification support, vector field functions, colorspace operations, things like pixelsorting, slitscan etc. See my Processing sketches, link below)
 
@@ -53,8 +53,8 @@ Check out examples and results folders
 ### What's odd?
 
 It's kind of personal library which supports my (probably not optimal, not convenient for others) way of creating stuff.
-There are still plenty of bugs and not idiomatic code. It's slower than Processing. Eats a lot of memory (Pixels code is generally immutable). Still not stable API and architecture.
-No docs, no tests (yet)
+There are still plenty of bugs and not idiomatic code. It may be slower than Processing. Eats a lot of memory (Pixels code is generally immutable). Still not stable API and architecture.
+No tests (yet)
 
 ## Installation
 
