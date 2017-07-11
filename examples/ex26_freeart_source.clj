@@ -53,7 +53,7 @@
 ;; Iteratively go through canvases (frames) and draw them onto screen canvas
 (defn draw
   "Draw current frame on the screen"
-  [canvas frame state]
+  [canvas window frame state]
   (let [curr (or state canvases)
         id (mod frame number-of-frames)
         current-canvas (first curr)]

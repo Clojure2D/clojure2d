@@ -570,6 +570,7 @@
 ;; You can define function with three parameters which is called just before repainting canvas. You can use it to simulate Processing `draw` behaviour. Function should accept following parameters:
 ;;
 ;; * canvas - canvas to draw on, canvas bound to window will be passed here.
+;; * window - window assiociated with function
 ;; * frame count - current number of calls, starting 0
 ;; * state - any state you want to pass between calls, `nil` initially
 ;;
@@ -593,7 +594,7 @@
 ;; #### Mouse event
 ;;
 ;; As as dispatch you use a vector containing window name as a String and mouse event type as a keyword
-;; As a parameter you get `MouseEvent` object [java.awt.MouseEvent](https://docs.oracle.com/javase/7/docs/api/java/awt/event/MouseEvent.html)
+;; As a parameter you get `MouseEvent` object equipped with `MouseXYProto` protocol [java.awt.MouseEvent](https://docs.oracle.com/javase/7/docs/api/java/awt/event/MouseEvent.html)
 ;;
 ;; Currently implemented types are:
 ;;
@@ -602,7 +603,13 @@
 ;; * `:mouse-pressed`
 ;; * `:mouse-released`
 ;;
-;; To get mouse position call `(.getX e)` and `(.getY e)` where `e` is MouseEvent object.
+;; To get mouse position call `(mouse-x e)` and `(mouse-y e)` where `e` is MouseEvent object.
+
+(defprotocol MouseXYProto
+  "Access to mouse position."
+  (mouse-x [m] "x position")
+  (mouse-y [m] "y position")
+  (mouse-pos [m] "combined position"))
 
 ;; `Window` type definition, equiped with `get-image` method returning bound canvas' image.
 (defrecord Window [^JFrame frame
@@ -616,18 +623,26 @@
   ImageProto
   (get-image [_] (get-image @buffer))
   (width [_] w)
-  (height [_] w))
+  (height [_] h)
+  MouseXYProto
+  (mouse-pos [_]
+    (let [^java.awt.Point p (.getMousePosition panel)]
+      (if (nil? p)
+        (Vec2. -1.0 -1.0)
+        (Vec2. (.x p) (.y p)))))
+  (mouse-x [t]
+    (let [^java.awt.Point p (.getMousePosition panel)]
+      (if (nil? p) -1 (.x p))))
+  (mouse-y [t]
+    (let [^java.awt.Point p (.getMousePosition panel)]
+      (if (nil? p) -1 (.y p)))))
 
 ;; ### Events function
-
-(defprotocol XYProto
-  (get-x [_])
-  (get-y [_]))
-
 (extend MouseEvent
-  XYProto
-  {:get-x #(.getX ^MouseEvent %1)
-   :get-y #(.getY ^MouseEvent %1)})
+  MouseXYProto
+  {:mouse-x #(.getX ^MouseEvent %1)
+   :mouse-y #(.getY ^MouseEvent %1)
+   :mouse-pos #(Vec2. (mouse-x %1) (mouse-y %1))})
 
 ;; Private method which extracts the name of your window (set when `show-window` is called).
 
@@ -741,15 +756,16 @@
   "Repaint canvas on window with set FPS.
 
   * Input: frame, active? atom, function to run before repaint, canvas and sleep time."
-  [panel active? draw-fun buffer stime]  
-  (loop [cnt (long 0)
-         result nil]
-    (let [new-result (when draw-fun 
-                       (with-canvas @buffer
-                         (draw-fun cnt result)))]
-      (Thread/sleep stime)
-      (repaint panel @buffer) 
-      (when @active? (recur (unchecked-inc cnt) new-result)))))
+  [^Window window draw-fun]
+  (let [stime (/ 1000.0 ^double (.fps window))]
+    (loop [cnt (long 0)
+           result nil]
+      (let [new-result (when draw-fun 
+                         (with-canvas @(.buffer window)
+                           (draw-fun window cnt result)))]
+        (Thread/sleep stime)
+        (repaint (.panel window) @(.buffer window)) 
+        (when @(.active? window) (recur (unchecked-inc cnt) new-result))))))
 
 ;; You may want to replace canvas to the other one. To make it pass result of `show-window` function and new canvas.
 ;; Internally it just resets buffer atom for another canvas.
@@ -774,17 +790,18 @@
    (let [active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
-         panel (create-panel buffer wname width height)]
+         panel (create-panel buffer wname width height)
+         window (->Window frame
+                          active?
+                          buffer
+                          panel
+                          fps
+                          width
+                          height
+                          wname)]
      (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
-     (future (refresh-screen-task panel active? draw-fun buffer (/ 1000.0 ^double fps)))
-     (->Window frame
-               active?
-               buffer
-               panel
-               fps
-               width
-               height
-               wname)))
+     (future (refresh-screen-task window draw-fun))
+     window))
   ([canvas wname width height fps]
    (show-window canvas wname width height fps nil))
   ([canvas wname]

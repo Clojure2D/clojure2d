@@ -25,7 +25,7 @@
 
 (defn draw
   ""
-  [canvas framecount & res]
+  [canvas window framecount & res]
   (set-awt-color canvas foreground)
   (set-stroke canvas 1.85)
   (set-awt-background canvas background)
@@ -33,6 +33,6 @@
 
 (defn example-03
   []
-  (show-window (create-canvas 600 600) "clojure-canvas" #(draw %1 %2 %3)))
+  (show-window (create-canvas 600 600) "clojure-canvas" #(draw %1 %2 %3 %4)))
 
 (example-03)

@@ -14,7 +14,7 @@
 
 (defn draw
   "Bounce ball"
-  [canvas _ state]
+  [canvas _ _ state]
   (let [[position velocity] (or state [(Vec2. 100 100)
                                        (Vec2. 2.5 5.0)])
         ^Vec2 nposition (v/add position velocity)]

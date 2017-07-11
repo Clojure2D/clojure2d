@@ -4,7 +4,10 @@ All notable changes to this project will be documented in this file. This change
 ## 0.0.3 - 2017-07-02
 ### Added
 
-- Canvas transformations
+- Canvas transformations (transpose, rotate, scale, push/pop matrix)
+- Image protocol (get-image, width and height fns) for Window, Canvas, image, Pixels
+- Mouse position protocol to Window and MouseEvent
+- Nature of Code examples
 
 ### Changed
 
@@ -15,6 +18,9 @@ All notable changes to this project will be documented in this file. This change
 - Color manimulations refactored (awt vs vec4)
 - Complex type is Vec2 now
 - Session management refactored
+- Draw function accepts also Window (to access mouse position)
+- Examples revisited
+- Signal processing optimisations - speed gain 2x
 
 ## 0.0.2 - 2017-04-14
 ### Added

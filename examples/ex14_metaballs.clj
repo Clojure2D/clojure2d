@@ -70,7 +70,7 @@
 
 (defn draw-balls
   ""
-  [n canvas framecount result]
+  [n canvas window framecount result]
   (let [balls (if result
                 (map move result)
                 (take n (repeatedly make-ball)))]

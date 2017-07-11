@@ -21,7 +21,7 @@
 
 (defn draw
   "Draw interpolations"
-  [c ^long fc dir]
+  [c w ^long fc dir]
   (let [t (m/frac (/ fc 120.0))
         d (if (zero? t) (not dir) dir)
         t' (if d t (- 1.0 t))]
@@ -43,4 +43,4 @@
 
     d))
 
-(def window (show-window canvas "Interpolations" #(draw %1 %2 %3)))
+(def window (show-window canvas "Interpolations" #(draw %1 %2 %3 %4)))

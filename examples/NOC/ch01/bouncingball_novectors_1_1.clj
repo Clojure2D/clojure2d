@@ -11,7 +11,7 @@
 
 (defn draw
   "Bounce ball"
-  [canvas _ state]
+  [canvas _ _ state]
   (let [[^double x ^double y ^double xspeed ^double yspeed] (or state [100 100 2.5 2.0])
         nx (+ x xspeed)
         ny (+ y yspeed)]

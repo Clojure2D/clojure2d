@@ -29,7 +29,7 @@
 
 (defn draw
   "update and draw ball"
-  [canvas _ state]
+  [canvas _ _ state]
   (let [b (or state (Ball. (Vec2. 100.0 100.0)
                            (Vec2. 2.5 5.0)))]
     

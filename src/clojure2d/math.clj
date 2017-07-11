@@ -198,6 +198,7 @@
 
 ;; \\(\sqrt{\pi}\\)
 (def ^:const ^double SQRTPI (sqrt PI))
+(def ^:const ^double SQRT2PI (sqrt TWO_PI))
 
 ;; Golden ratio \\(\varphi\\)
 (def ^:const ^double PHI (* (+ 1.0 SQRT5) 0.5))

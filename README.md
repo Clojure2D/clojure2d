@@ -153,7 +153,7 @@ I've prepared several examples with results where you can check current state of
 * ex31 - wavy lines
 * ex32 - harmonograms on noise (accumulation bins rendering)
 * ex33 - interpolations / easings
-* ex34 - Nature of Code 2.2 forces [link](https://github.com/shiffman/The-Nature-of-Code-Examples/tree/master/chp02_forces/NOC_2_2_forces_many)
+* NOC - Nature of Code examples [link](https://github.com/shiffman/The-Nature-of-Code-Examples/)
 
 ## TODO
 

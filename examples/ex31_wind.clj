@@ -21,7 +21,7 @@
 
 (defn draw
   "Wind algorithm "
-  [canvas _ state]
+  [canvas window _ state]
   (let [^double a (or state 0.0)]
     (set-background canvas 226 210 184)
     (dotimes [j 16]
@@ -43,4 +43,4 @@
           (ellipse canvas x y 2 2))))
     (+ a s)))
 
-(def window (show-window canvas "Wind blows" 30 draw))
+(def window (show-window canvas "Wind blows" draw))

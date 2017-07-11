@@ -60,7 +60,7 @@
 
 (defn draw
   ""
-  [canvas frame _]
+  [canvas window frame _]
   (let [kappa (* (double frame) 0.0041)
         hf (/ (m/sqrt (* 8.0 (/ kappa m/PI))) 
               (- 4.0 kappa))]
@@ -73,4 +73,4 @@
   (with-canvas canvas
     (set-color 220 220 210 200))
 
-  (def window (show-window canvas "GFF" #(draw %1 %2 %3))))
+  (def window (show-window canvas "GFF" #(draw %1 %2 %3 %4))))

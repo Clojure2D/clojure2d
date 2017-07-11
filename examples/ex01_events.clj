@@ -39,8 +39,8 @@
 
     (defmethod mouse-event [name1 :mouse-pressed] [e]
       (let [canvas (make-canvas 1 1)
-            x (get-x e)
-            y (get-y e)
+            x (mouse-x e)
+            y (mouse-y e)
             cr (m/cnorm x 0 399 0 255)
             cg (m/cnorm y 0 399 0 255)]
         (with-canvas canvas

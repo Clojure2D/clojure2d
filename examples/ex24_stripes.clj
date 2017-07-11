@@ -14,12 +14,12 @@
 
 (def colors (:palette (g/color-reducer-machine)))
 
-(def mouse-pos (atom [5 0]))
-
 (defn draw
   ""
-  [canvas fc state]
-  (let [[cnt col] @mouse-pos 
+  [canvas window fc state]
+  (let [^Vec2 mpos (mouse-pos window) 
+        cnt (int (m/cnorm (.x mpos) -1 600 3 100))
+        col (int (m/cnorm (.y mpos) -1 600 0 (count colors)))
         step (/ m/TWO_PI cnt)
         step2 (/ step 2.0)
         vs (reduce #(let [p1x (+ 300 (* 200 (m/cos %2)))
@@ -34,9 +34,4 @@
     (set-color canvas (colors col))
     (triangle-strip canvas vs)))
 
-(defmethod mouse-event ["stripes" :mouse-moved] [e]
-  (reset! mouse-pos
-          [(int (m/cnorm (get-x e) 0 600 3 100))
-           (int (m/cnorm (get-y e) 0 600 0 (count colors)))]))
-
-(def window (show-window canvas "stripes" draw))
+(def window (show-window canvas"stripes" draw))

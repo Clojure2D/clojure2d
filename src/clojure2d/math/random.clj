@@ -95,7 +95,7 @@
 ;; * `mx` - maximum random value, excluded (default: MAX_INT for integers and 1 for floats)
 ;; * `mn` - minimum random value, included (default: 0)
 ;; * `std` - standard deviation for Gaussian (default 1)
-;; * `avg` - average for Gaussian (default 0)
+;; * `mean` - average for Gaussian (default 0)
 ;; * `thr` - expected probability to obtain `true`
 ;;
 ;; Call (RNG - RNG object):
@@ -106,7 +106,7 @@
 ;; * `([ilfd]random RNG mn mx)` - returns random number betwee mn (included) and mx (excluded)
 ;; * `(grandom RNG)` - returns number from normal(0,1) distribution
 ;; * `(grandom RNG std)` - returns number from normal(0,std) distibution
-;; * `(grandom RNG avg std)` - returns number from normal(avg,std) distibution
+;; * `(grandom RNG mean std)` - returns number from normal(mean,std) distibution
 ;; * `(brandom RNG)` - returns true or false with probability 50%
 ;; * `(brandom RNG thr)` - returns true with probability `thr` (false with probability `1-thr`)
 (defprotocol Randomizer
@@ -114,7 +114,7 @@
   (drandom [t] [t mx] [t mn mx] "double random")
   (lrandom [t] [t mx] [t mn mx] "long random")
   (frandom [t] [t mx] [t mn mx] "float random")
-  (grandom [t] [t std] [t avg std] "gaussian random")
+  (grandom [t] [t std] [t mean std] "gaussian random")
   (brandom [t] [t thr] "boolean random, with probability option"))
 
 ;; Extend RandomGenerator interface with functions created by macro `next-random-value-fn`. This way all RNG classes are enriched with new, more convenient functions.
@@ -130,7 +130,7 @@
    :grandom (fn
               ([^RandomGenerator t] (next-random-value-gaussian t))
               ([^RandomGenerator t std] (next-random-value-gaussian t std))
-              ([^RandomGenerator t ^double avg ^double std] (next-random-value-gaussian t avg (+ avg std))))
+              ([^RandomGenerator t ^double mean ^double std] (next-random-value-gaussian t mean (+ mean std))))
    :brandom (fn
               ([^RandomGenerator t] (.nextBoolean t))
               ([^RandomGenerator t ^double thr] (< (next-random-value-double t) thr)))})
@@ -184,6 +184,9 @@
   (create-object-with-seed Well44497b seed))
 (defmethod make-randomizer :default [m & [seed]]
   (create-object-with-seed JDKRandomGenerator seed))
+
+;; List of randomizers
+(def randomizers [:mersenne :isaac :well512a :well1024a :well19937a :well19937c :well44497a :well44497b :jdk])
 
 ;; ### Default RNG
 ;;
