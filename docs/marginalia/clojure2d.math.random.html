@@ -2971,7 +2971,7 @@ As a RNG source <a href="http://commons.apache.org/proper/commons-math/apidocs/o
 <li><code>mx</code> - maximum random value, excluded (default: MAX_INT for integers and 1 for floats)</li>
 <li><code>mn</code> - minimum random value, included (default: 0)</li>
 <li><code>std</code> - standard deviation for Gaussian (default 1)</li>
-<li><code>avg</code> - average for Gaussian (default 0)</li>
+<li><code>mean</code> - average for Gaussian (default 0)</li>
 <li><code>thr</code> - expected probability to obtain <code>true</code></li>
 </ul>
 
@@ -2984,7 +2984,7 @@ As a RNG source <a href="http://commons.apache.org/proper/commons-math/apidocs/o
 <li><code>([ilfd]random RNG mn mx)</code> - returns random number betwee mn (included) and mx (excluded)</li>
 <li><code>(grandom RNG)</code> - returns number from normal(0,1) distribution</li>
 <li><code>(grandom RNG std)</code> - returns number from normal(0,std) distibution</li>
-<li><code>(grandom RNG avg std)</code> - returns number from normal(avg,std) distibution</li>
+<li><code>(grandom RNG mean std)</code> - returns number from normal(mean,std) distibution</li>
 <li><code>(brandom RNG)</code> - returns true or false with probability 50%</li>
 <li><code>(brandom RNG thr)</code> - returns true with probability <code>thr</code> (false with probability <code>1-thr</code>)</li>
 </ul>
@@ -2993,7 +2993,7 @@ As a RNG source <a href="http://commons.apache.org/proper/commons-math/apidocs/o
   (drandom [t] [t mx] [t mn mx] &quot;double random&quot;)
   (lrandom [t] [t mx] [t mn mx] &quot;long random&quot;)
   (frandom [t] [t mx] [t mn mx] &quot;float random&quot;)
-  (grandom [t] [t std] [t avg std] &quot;gaussian random&quot;)
+  (grandom [t] [t std] [t mean std] &quot;gaussian random&quot;)
   (brandom [t] [t thr] &quot;boolean random, with probability option&quot;))</pre></td></tr><tr><td class="docs"><p>Extend RandomGenerator interface with functions created by macro <code>next-random-value-fn</code>. This way all RNG classes are enriched with new, more convenient functions.</p>
 
 <p>Note that <code>grandom</code> is under special care due to different [mn mx] range meaning.</p>
@@ -3007,7 +3007,7 @@ As a RNG source <a href="http://commons.apache.org/proper/commons-math/apidocs/o
    :grandom (fn
               ([^RandomGenerator t] (next-random-value-gaussian t))
               ([^RandomGenerator t std] (next-random-value-gaussian t std))
-              ([^RandomGenerator t ^double avg ^double std] (next-random-value-gaussian t avg (+ avg std))))
+              ([^RandomGenerator t ^double mean ^double std] (next-random-value-gaussian t mean (+ mean std))))
    :brandom (fn
               ([^RandomGenerator t] (.nextBoolean t))
               ([^RandomGenerator t ^double thr] (&lt; (next-random-value-double t) thr)))})</pre></td></tr><tr><td class="docs"><p>Create object of the class with (or not) given seed</p>
@@ -3057,7 +3057,8 @@ As a RNG source <a href="http://commons.apache.org/proper/commons-math/apidocs/o
 (defmethod make-randomizer :well44497b [m &amp; [seed]]
   (create-object-with-seed Well44497b seed))
 (defmethod make-randomizer :default [m &amp; [seed]]
-  (create-object-with-seed JDKRandomGenerator seed))</pre></td></tr><tr><td class="docs"><h3>Default RNG</h3>
+  (create-object-with-seed JDKRandomGenerator seed))</pre></td></tr><tr><td class="docs"><p>List of randomizers</p>
+</td><td class="codes"><pre class="brush: clojure">(def randomizers [:mersenne :isaac :well512a :well1024a :well19937a :well19937c :well44497a :well44497b :jdk])</pre></td></tr><tr><td class="docs"><h3>Default RNG</h3>
 
 <p>Define easy to use functions with JDK randomizer</p>
 

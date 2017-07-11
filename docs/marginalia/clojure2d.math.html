@@ -2993,7 +2993,8 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
 (def ^:const ^double SQRT2_2 (* 0.5 SQRT2))</pre></td></tr><tr><td class="docs"><p>\(\sqrt{3}\)</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double SQRT3 (sqrt 3.0))</pre></td></tr><tr><td class="docs"><p>\(\sqrt{5}\)</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double SQRT5 (sqrt 5.0))</pre></td></tr><tr><td class="docs"><p>\(\sqrt{\pi}\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double SQRTPI (sqrt PI))</pre></td></tr><tr><td class="docs"><p>Golden ratio \(\varphi\)</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double SQRTPI (sqrt PI))
+(def ^:const ^double SQRT2PI (sqrt TWO_PI))</pre></td></tr><tr><td class="docs"><p>Golden ratio \(\varphi\)</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double PHI (* (+ 1.0 SQRT5) 0.5))</pre></td></tr><tr><td class="docs"><p>math.h predefined constants names</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double M_E E)
 (def ^:const ^double M_LOG2E LOG2E)

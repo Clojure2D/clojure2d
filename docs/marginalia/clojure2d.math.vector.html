@@ -2905,6 +2905,7 @@ mathematical vectors: 2d, 3d and 4d </p>
   (reciprocal [v] &quot;reciprocal of elements&quot;)
   (interpolate [v1 v2 t] [v1 v2 t f] &quot;interpolate vectors with value `t`; optionally set interpolation fn&quot;)
   (einterpolate [v1 v2 v] [v1 v2 v f] &quot;interpolate vectors elementwise; optionally set interpolation fn&quot;)
+  (econstrain [v val1 val2] &quot;elementwise constrain&quot;)
   (is-zero? [v1] &quot;is vector zero?&quot;)
   (is-near-zero? [v1] &quot;is vector almost zero? (all elements are less than `TOLERANCE`)&quot;)
   (heading [v1] &quot;vector angle in polar coordinates&quot;)
@@ -2956,6 +2957,7 @@ mathematical vectors: 2d, 3d and 4d </p>
                    ([v1 v2 v f]
                     (mapv #(f %1 %2 %3) v1 v2 v))
                    ([v1 v2 v] (einterpolate v1 v2 v m/lerp)))
+   :econstrain (fn [v val1 val2] (mapv #(m/constrain %1 val1 val2)) v)
    :is-zero? #(every? zero? %)
    :is-near-zero? #(every? near-zero? %)})</pre></td></tr><tr><td class="docs"><p>Create Vec2 and add all necessary protocols</p>
 </td><td class="codes"><pre class="brush: clojure">(deftype Vec2 [^double x ^double y]
@@ -3022,6 +3024,8 @@ mathematical vectors: 2d, 3d and 4d </p>
       (Vec2. (f x (.x v2) (.x v))
              (f y (.y v2) (.y v)))))
   (einterpolate [v1 v2 v] (einterpolate v1 v2 v m/lerp))
+  (econstrain [_ val1 val2] (Vec2. (m/constrain x val1 val2)
+                                   (m/constrain y val1 val2)))
   (is-zero? [_] (and (zero? x) (zero? y)))
   (is-near-zero? [_] (and (near-zero? x) (near-zero? y)))
   (heading [_] (m/atan2 y x))
@@ -3118,6 +3122,9 @@ mathematical vectors: 2d, 3d and 4d </p>
              (f y (.y v2) (.y v))
              (f z (.z v2) (.z v)))))
   (einterpolate [v1 v2 v] (einterpolate v1 v2 v m/lerp))
+  (econstrain [_ val1 val2] (Vec3. (m/constrain x val1 val2)
+                                   (m/constrain y val1 val2)
+                                   (m/constrain z val1 val2)))
   (is-zero? [_] (and (zero? x) (zero? y) (zero? z)))
   (is-near-zero? [_] (and (near-zero? x) (near-zero? y) (near-zero? z)))
   (heading [v1] (angle-between v1 (Vec3. 1 0 0)))
@@ -3276,6 +3283,10 @@ mathematical vectors: 2d, 3d and 4d </p>
              (f z (.z v2) (.z v))
              (f w (.w v2) (.w v)))))
   (einterpolate [v1 v2 v] (einterpolate v1 v2 v m/lerp))
+  (econstrain [_ val1 val2] (Vec4. (m/constrain x val1 val2)
+                                   (m/constrain y val1 val2)
+                                   (m/constrain z val1 val2)
+                                   (m/constrain w val1 val2)))
   (is-zero? [_] (and (zero? x) (zero? y) (zero? z) (zero? w)))
   (is-near-zero? [_] (and (near-zero? x) (near-zero? y) (near-zero? z) (near-zero? w)))
   (heading [v1] (angle-between v1 (Vec4. 1 0 0 0))))</pre></td></tr><tr><td class="docs"><h2>Common vector functions</h2>

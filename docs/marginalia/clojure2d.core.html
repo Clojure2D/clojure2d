@@ -3023,20 +3023,29 @@ You can freely change this setting with <code>binding</code> macro. Default is 9
 <p>Canvas is an object you can draw on and which can be displayed in the window. Technically it's a type cosisting of <code>Graphics2D</code> object which is internally used to draw on the image, image (<code>BufferedImage</code> object), rendering quality hints and singletons for primitives. What is important: to draw on canvas you have to wrap your operations in <code>with-canvas</code> macro. <code>with-canvas</code> is responsible for creating and releasing <code>Graphics2D</code> object. Initially <code>Graphics2D</code> is set to <code>nil</code>.
 Canvas should be accelerated by Java and your video card.
 Reminder: Drawing on canvas is single threaded.</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Let's define protocol to equip Canvas and Window types with <code>get-image</code> function. <code>get-image</code> extracts image.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Let's define protocol to equip Canvas and Window types (or any type with image inside) with <code>get-image</code> function. <code>get-image</code> extracts image. Additionally define width/height getters.</p>
 </td><td class="codes"><pre class="brush: clojure">(defprotocol ImageProto 
-  (get-image [t] &quot;Return BufferedImage&quot;))</pre></td></tr><tr><td class="docs"><p>Canvas type. Use <code>get-image</code> to extract image (<code>BufferedImage</code>).</p>
+  (get-image [t] &quot;Return BufferedImage&quot;)
+  (width [t])
+  (height [t]))</pre></td></tr><tr><td class="docs"><p>Add ImageProto functions to BufferedImage</p>
+</td><td class="codes"><pre class="brush: clojure">(extend BufferedImage
+  ImageProto
+  {:get-image identity
+   :width (fn [^BufferedImage i] (.getWidth i))
+   :height (fn [^BufferedImage i] (.getHeight i))})</pre></td></tr><tr><td class="docs"><p>Canvas type. Use <code>get-image</code> to extract image (<code>BufferedImage</code>).</p>
 </td><td class="codes"><pre class="brush: clojure">(deftype Canvas [^Graphics2D graphics
                  ^BufferedImage buffer
                  ^Line2D line-obj
                  ^Rectangle2D rect-obj
                  ^Ellipse2D ellipse-obj
                  hints
-                 ^long width
-                 ^long height
+                 ^long w
+                 ^long h
                  transform-stack]
   ImageProto
-  (get-image [_] buffer))</pre></td></tr><tr><td class="docs"><p>Let's define three rendering quality options: <code>:low</code>, <code>:mid</code> and <code>:high</code>. Where <code>:low</code> is fastest but has poor quality and <code>:high</code> has best quality but may be slow. Rendering options are used when you create canvas.</p>
+  (get-image [_] buffer)
+  (width [_] w)
+  (height [_] h))</pre></td></tr><tr><td class="docs"><p>Let's define three rendering quality options: <code>:low</code>, <code>:mid</code> and <code>:high</code>. Where <code>:low</code> is fastest but has poor quality and <code>:high</code> has best quality but may be slow. Rendering options are used when you create canvas.</p>
 </td><td class="codes"><pre class="brush: clojure">(def rendering-hints {:low {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF
                             RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR
                             RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
@@ -3076,8 +3085,8 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
              (.rect-obj canvas)
              (.ellipse-obj canvas)
              (.hints canvas)
-             (.width canvas)
-             (.height canvas)
+             (.w canvas)
+             (.h canvas)
              (atom []))))</pre></td></tr><tr><td class="docs"><p>Threading macro which takes care to create and destroy <code>Graphics2D</code> object for drawings on canvas. Macro returns result of last call.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmacro with-canvas
   [canvas &amp; body]  
@@ -3287,7 +3296,7 @@ Transformations are concatenated.</p>
     (reset-matrix canvas)
     (set-color-with-fn set-awt-color canvas c)
     (doto g
-      (.fillRect 0 0 (.width canvas) (.height canvas))
+      (.fillRect 0 0 (.w canvas) (.h canvas))
       (.setColor currc))
     (pop-matrix canvas))
   canvas)</pre></td></tr><tr><td class="docs"><p>Set color for primitive</p>
@@ -3298,7 +3307,7 @@ Transformations are concatenated.</p>
    (.drawImage ^Graphics2D (.graphics canvas) img x y w h nil)
    canvas)
   ([^Canvas canvas img]
-   (image canvas img 0 0 (.width canvas) (.height canvas))))</pre></td></tr><tr><td class="docs"><h2>Display window</h2>
+   (image canvas img 0 0 (.w canvas) (.h canvas))))</pre></td></tr><tr><td class="docs"><h2>Display window</h2>
 
 <p>You can find here a couple of functions which help to display your canvas and build interaction with user.
 Display window is just a Swing <code>JFrame</code> with <code>java.awt.Canvas</code> as panel.
@@ -3338,6 +3347,7 @@ Use this information via <code>window-active?</code> function to control (and po
 
 <ul>
 <li>canvas - canvas to draw on, canvas bound to window will be passed here.</li>
+<li>window - window assiociated with function</li>
 <li>frame count - current number of calls, starting 0</li>
 <li>state - any state you want to pass between calls, <code>nil</code> initially</li>
 </ul>
@@ -3364,7 +3374,7 @@ As a function parameter you get <code>KeyEvent</code> object <a href="https://do
 <h4>Mouse event</h4>
 
 <p>As as dispatch you use a vector containing window name as a String and mouse event type as a keyword
-As a parameter you get <code>MouseEvent</code> object <a href="https://docs.oracle.com/javase/7/docs/api/java/awt/event/MouseEvent.html">java.awt.MouseEvent</a></p>
+As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseXYProto</code> protocol <a href="https://docs.oracle.com/javase/7/docs/api/java/awt/event/MouseEvent.html">java.awt.MouseEvent</a></p>
 
 <p>Currently implemented types are:</p>
 
@@ -3375,19 +3385,41 @@ As a parameter you get <code>MouseEvent</code> object <a href="https://docs.orac
 <li><code>:mouse-released</code></li>
 </ul>
 
-<p>To get mouse position call <code>(.getX e)</code> and <code>(.getY e)</code> where <code>e</code> is MouseEvent object.</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p><code>Window</code> type definition, equiped with <code>get-image</code> method returning bound canvas' image.</p>
+<p>To get mouse position call <code>(mouse-x e)</code> and <code>(mouse-y e)</code> where <code>e</code> is MouseEvent object.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Access to mouse position.</p>
+</td><td class="codes"><pre class="brush: clojure">(defprotocol MouseXYProto
+  (mouse-x [m] &quot;x position&quot;)
+  (mouse-y [m] &quot;y position&quot;)
+  (mouse-pos [m] &quot;combined position&quot;))</pre></td></tr><tr><td class="docs"><p><code>Window</code> type definition, equiped with <code>get-image</code> method returning bound canvas' image.</p>
 </td><td class="codes"><pre class="brush: clojure">(defrecord Window [^JFrame frame
                    active?
                    buffer
                    ^java.awt.Canvas panel
                    ^double fps
-                   ^long width
-                   ^long height
+                   ^long w
+                   ^long h
                    window-name]
   ImageProto
-  (get-image [_] (get-image @buffer)))</pre></td></tr><tr><td class="docs"><h3>Events function</h3>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Private method which extracts the name of your window (set when <code>show-window</code> is called).</p>
+  (get-image [_] (get-image @buffer))
+  (width [_] w)
+  (height [_] h)
+  MouseXYProto
+  (mouse-pos [_]
+    (let [^java.awt.Point p (.getMousePosition panel)]
+      (if (nil? p)
+        (Vec2. -1.0 -1.0)
+        (Vec2. (.x p) (.y p)))))
+  (mouse-x [t]
+    (let [^java.awt.Point p (.getMousePosition panel)]
+      (if (nil? p) -1 (.x p))))
+  (mouse-y [t]
+    (let [^java.awt.Point p (.getMousePosition panel)]
+      (if (nil? p) -1 (.y p)))))</pre></td></tr><tr><td class="docs"><h3>Events function</h3>
+</td><td class="codes"><pre class="brush: clojure">(extend MouseEvent
+  MouseXYProto
+  {:mouse-x #(.getX ^MouseEvent %1)
+   :mouse-y #(.getY ^MouseEvent %1)
+   :mouse-pos #(Vec2. (mouse-x %1) (mouse-y %1))})</pre></td></tr><tr><td class="docs"><p>Private method which extracts the name of your window (set when <code>show-window</code> is called).</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Returns name of the component. Used to dispatch events.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- component-name
   [^ComponentEvent e]
@@ -3474,15 +3506,16 @@ As a parameter you get <code>MouseEvent</code> object <a href="https://docs.orac
 <li>Input: frame, active? atom, function to run before repaint, canvas and sleep time.</li>
 </ul>
 </td><td class="codes"><pre class="brush: clojure">(defn- refresh-screen-task
-  [panel active? draw-fun buffer stime]  
-  (loop [cnt (long 0)
-         result nil]
-    (let [new-result (when draw-fun 
-                       (with-canvas @buffer
-                         (draw-fun cnt result)))]
-      (Thread/sleep stime)
-      (repaint panel @buffer) 
-      (when @active? (recur (unchecked-inc cnt) new-result)))))</pre></td></tr><tr><td class="docs"><p>You may want to replace canvas to the other one. To make it pass result of <code>show-window</code> function and new canvas.
+  [^Window window draw-fun]
+  (let [stime (/ 1000.0 ^double (.fps window))]
+    (loop [cnt (long 0)
+           result nil]
+      (let [new-result (when draw-fun 
+                         (with-canvas @(.buffer window)
+                           (draw-fun window cnt result)))]
+        (Thread/sleep stime)
+        (repaint (.panel window) @(.buffer window)) 
+        (when @(.active? window) (recur (unchecked-inc cnt) new-result))))))</pre></td></tr><tr><td class="docs"><p>You may want to replace canvas to the other one. To make it pass result of <code>show-window</code> function and new canvas.
 Internally it just resets buffer atom for another canvas.
 See examples/ex01_events.clj to see how it works.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Replace canvas in window.</p>
@@ -3497,7 +3530,7 @@ See examples/ex01_events.clj to see how it works.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Show window with width/height, name and required fps of refresh. Optionally pass callback function.</p>
 
 <ul>
-<li>Input: canvas, window name, width, height, frames per seconds, (optional) <code>draw</code> function.</li>
+<li>Input: canvas, window name, width (defalut: canvas width), height (default: canvas height), frames per seconds (default: 60), (optional) <code>draw</code> function.</li>
 <li>Returns <code>Window</code> value</li>
 </ul>
 </td><td class="codes"><pre class="brush: clojure">(defn show-window
@@ -3505,19 +3538,26 @@ See examples/ex01_events.clj to see how it works.</p>
    (let [active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
-         panel (create-panel buffer wname width height)]
+         panel (create-panel buffer wname width height)
+         window (-&gt;Window frame
+                          active?
+                          buffer
+                          panel
+                          fps
+                          width
+                          height
+                          wname)]
      (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
-     (future (refresh-screen-task panel active? draw-fun buffer (/ 1000.0 ^double fps)))
-     (-&gt;Window frame
-               active?
-               buffer
-               panel
-               fps
-               width
-               height
-               wname)))
+     (future (refresh-screen-task window draw-fun))
+     window))
   ([canvas wname width height fps]
-   (show-window canvas wname width height fps nil)))</pre></td></tr><tr><td class="docs"><p>Helper function, check if window is active</p>
+   (show-window canvas wname width height fps nil))
+  ([canvas wname]
+   (show-window canvas wname nil))
+  ([canvas wname draw-fn]
+   (show-window canvas wname 60 draw-fn))
+  ([canvas wname fps draw-fn]
+   (show-window canvas wname (width canvas) (height canvas) fps draw-fn)))</pre></td></tr><tr><td class="docs"><p>Helper function, check if window is active</p>
 </td><td class="codes"><pre class="brush: clojure">(defn window-active?
   [^Window window]
   @(.active? window))</pre></td></tr><tr><td class="docs"><h2>Utility functions</h2>

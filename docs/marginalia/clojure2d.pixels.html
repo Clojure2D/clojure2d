@@ -2909,7 +2909,8 @@ Possible values are:</p>
 <li>or channel value 0-255 - set specific value</li>
 </ul>
 </td><td class="codes"><pre class="brush: clojure">(def ^:dynamic *pixels-edge* :edge)</pre></td></tr><tr><td class="docs"><h2>Pixels type</h2>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Functions for accessing and setting channel values or colors.</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(declare image-from-pixels)</pre></td></tr><tr><td class="docs"><p>Functions for accessing and setting channel values or colors.</p>
 </td><td class="codes"><pre class="brush: clojure">(defprotocol PixelsProto
   (get-value [pixels ch idx] [pixels ch x y] &quot;get channel value by index or position&quot;)
   (get-color [pixels idx] [pixels x y] &quot;get color by index or position&quot;)
@@ -2927,7 +2928,13 @@ Possible values are:</p>
 <li>size - channel size</li>
 <li>pos - function returning actual position in <code>p</code> array from channel and index</li>
 </ul>
+
+<p>Pixels type implements also <code>ImageProto</code> from core namespace</p>
 </td><td class="codes"><pre class="brush: clojure">(deftype Pixels [^ints p ^long w ^long h planar? ^long size pos]
+  core/ImageProto
+  (get-image [t] (image-from-pixels t))
+  (width [_] w)
+  (height [_] h)
   PixelsProto
   (get-channel [_ ch]
     (let [^ints res (int-array size)
@@ -3527,7 +3534,11 @@ Configuration is a map of values:</p>
                   (set-color p (+ x row) (v/interpolate background color alpha)))))))) ;; store!
       p))
   (to-pixels [t background] (to-pixels t background {}))
-  (to-pixels [t] (to-pixels t (Vec4. 0.0 0.0 0.0 0.0) {})))</pre></td></tr><tr><td class="docs"><p>Create BinPixels object</p>
+  (to-pixels [t] (to-pixels t (Vec4. 0.0 0.0 0.0 0.0) {}))
+  core/ImageProto
+  (get-image [t] (core/get-image (to-pixels t)))
+  (width [_] sizex)
+  (height [_] sizey))</pre></td></tr><tr><td class="docs"><p>Create BinPixels object</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-binpixels 
   ^BinPixels [[^double rminx ^double rmaxx ^double rminy ^double rmaxy] ^long sizex ^long sizey]
   (let [sizex+ (inc sizex)
