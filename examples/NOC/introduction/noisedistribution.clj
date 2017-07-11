@@ -30,3 +30,4 @@
     nvals))
 
 (def window (show-window (make-canvas 300 200) "Noise distribution" 200 draw))
+
