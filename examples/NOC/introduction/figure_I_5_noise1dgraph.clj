@@ -2,7 +2,8 @@
   (:require [clojure2d.core :refer :all]
             [clojure2d.math.random :as r]
             [clojure2d.math.vector :as v]
-            [clojure2d.math.joise :as j])
+            [clojure2d.math.joise :as j]
+            [clojure2d.color :as c])
   (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
@@ -23,8 +24,8 @@
         p (map #(Vec2. % (* ^double (height window) ^double (noise-fn (+ t (* 0.01 ^double %))))) (range 0 (width canvas) 2))]
 
     (-> canvas
-        (set-background 255 255 255)
-        (set-color 0 0 0)
+        (set-background c/:white)
+        (set-color c/:black)
         (set-stroke 2.0)
         (path p))
 

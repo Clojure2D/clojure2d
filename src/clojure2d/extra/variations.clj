@@ -69,8 +69,7 @@
 (defmacro make-config-method
   "Add new multimethod for variation configuration"
   [sym m]
-  (let [k (keyword sym)
-        s (symbol (str "config-" sym))]
+  (let [k (keyword sym)]
     `(defmethod make-configuration ~k
        ([k# p#] (merge ~m p#))
        ([k#] ~m))))

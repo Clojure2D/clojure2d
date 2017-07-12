@@ -1,7 +1,8 @@
 (ns example.NOC.introduction.figure-I-2-bellcurve
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
-            [clojure2d.math.vector :as v])
+            [clojure2d.math.vector :as v]
+            [clojure2d.color :as c])
   (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
@@ -23,8 +24,8 @@
         p (map #(Vec2. % (calc-bell % (width window) (height window) sd)) (range 0 (width canvas) 2))]
 
     (-> canvas
-        (set-background 255 255 255)
-        (set-color 0 0 0)
+        (set-background c/:white)
+        (set-color c/:black)
         (set-stroke 2.0)
         (path p))))
 

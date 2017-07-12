@@ -405,6 +405,16 @@
   ([canvas x1 y1 w h]
    (rect canvas x1 y1 w h false)))
 
+(defn crect
+  "Centered version of rectangle"
+  ([canvas x1 y1 w h stroke?]
+   (let [w2 (* 0.5 ^double w)
+         h2 (* 0.5 ^double h)]
+     (rect canvas (- ^double x1 w2) (- ^double y1 h2) w h stroke?))
+   canvas)
+  ([canvas x1 y1 w h]
+   (crect canvas x1 y1 w h false)))
+
 (defn ellipse
   "Draw ellipse with middle at `(x,y)` position with width `w` and height `h`."
   ([^Canvas canvas x1 y1 w h stroke?]
