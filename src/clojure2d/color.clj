@@ -20,13 +20,13 @@
 ;;
 
 (ns clojure2d.color
-  (:require [clojure2d.math :as m]
-            [clojure2d.math.vector :as v]
-            [clojure2d.math.random :as r]
+  (:require [clojure.java.io :as io]
             [clojure.xml :as xml]
-            [clojure.java.io :as io])
-  (:import [clojure2d.math.vector Vec4 Vec3]
-           [java.awt Color]))
+            [clojure2d.math :as m]
+            [clojure2d.math.random :as r]
+            [clojure2d.math.vector :as v])
+  (:import [clojure2d.math.vector Vec3 Vec4]
+           java.awt.Color))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -94,8 +94,8 @@
   (to-luma ^double [^Vec4 c] (to-luma-fn (.x c) (.y c) (.z c)))
   clojure.lang.Keyword
   (to-color [n] (html-color n))
-  (to-awt-color [n] (html-awt-color))
-  (to-luma [n] (to-luma (to-color n)))
+  (to-awt-color [n] (html-awt-color n))
+  (to-luma [n] (to-luma (html-color n)))
   Color
   (to-color [^Color c]
     (Vec4. (.getRed c)
@@ -105,10 +105,27 @@
   (to-awt-color [c] c)
   (to-luma ^double [^Color c] (to-luma-fn (.getRed c) (.getGreen c) (.getBlue c))))
 
+(defn set-alpha
+  "Set alpha channel and return `Vec4` representation."
+  [c a]
+  (let [^Vec4 v (to-color c)]
+    (Vec4. (.x v) (.y v) (.z v) a)))
+
+(defn set-awt-alpha
+  "Set alpha channel and return `Color` representation."
+  [c a]
+  (let [^Color cc (to-awt-color c)]
+    (Color. (.getRed cc)
+            (.getGreen cc)
+            (.getBlue cc)
+            ^int (clamp255 a))))
+
 (defn make-awt-color
   "Create java.awt.Color object. Use with `core/set-awt-color` or `core/set-awt-background`."
   ([c]
    (to-awt-color c))
+  ([c a]
+   (set-awt-alpha c a))
   ([r g b]
    (Color. ^int (clamp255 r)
            ^int (clamp255 g)
@@ -123,6 +140,8 @@
   "Create Vec4 object as color representation. Use with `core/set-color` or `core/set-background`."
   ([c]
    (to-color c))
+  ([c a]
+   (set-alpha c a))
   ([r g b]
    (Vec4. (clamp255 r)
           (clamp255 g)
@@ -141,12 +160,6 @@
   ^double [c]
   (let [^Vec4 ret (to-HSB (to-color c))]
     (.x ret)))
-
-(defn set-alpha
-  "Set alpha channel and return `Vec4` representation."
-  [c ^double a]
-  (let [^Vec4 v (to-color c)]
-    (Vec4. (.x v) (.y v) (.z v) a)))
 
 ;; ## Blending / Composing
 

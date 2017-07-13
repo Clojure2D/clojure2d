@@ -27,14 +27,14 @@
                             ny (m/norm (noise (.y noff)) 0.0 1.0 0 (height canvas))]
                         [(Vec2. nx ny) (v/add noff nstep)])) walkers)]
 
-    (set-background canvas c/:white)
+    (set-background canvas :white)
 
     (dorun (take total (map #(let [[^Vec2 position] %] 
                                (-> canvas
-                                   (set-color c/:gray)
+                                   (set-color :gray)
                                    (ellipse (.x position) (.y position) 48 48)
                                    (set-stroke 2.0)
-                                   (set-color c/:black)
+                                   (set-color :black)
                                    (ellipse (.x position) (.y position) 48 48 true))) result)))
 
     result))

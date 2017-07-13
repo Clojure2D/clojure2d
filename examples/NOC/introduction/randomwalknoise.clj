@@ -20,7 +20,7 @@
         [^double nx ^double ny] (calc-noise tx ty (width canvas) (height canvas))]
 
     (-> canvas
-        (set-color c/:white)
+        (set-color :white)
         (line x y nx ny))
 
     [(+ tx 0.01) (+ ty 0.01) nx ny]))

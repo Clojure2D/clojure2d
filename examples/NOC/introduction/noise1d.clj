@@ -1,7 +1,6 @@
 (ns examples.NOC.introduction.noise1d
   (:require [clojure2d.core :refer :all]
-            [clojure2d.math.random :as r]
-            [clojure2d.math :as m]))
+            [clojure2d.math.random :as r]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)

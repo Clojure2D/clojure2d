@@ -9,7 +9,7 @@
 
 (ns clojure2d.math.vector
   (:require [clojure2d.math :as m])
-  (:import [clojure.lang Counted Sequential Seqable IFn PersistentVector]))
+  (:import [clojure.lang Counted IFn PersistentVector Seqable Sequential]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)

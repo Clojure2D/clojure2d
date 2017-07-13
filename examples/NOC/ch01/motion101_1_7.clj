@@ -1,9 +1,9 @@
 (ns examples.NOC.ch01.motion101-1-7
   (:require [clojure2d.core :refer :all]
-            [clojure2d.math.vector :as v]
+            [clojure2d.math :as m]
             [clojure2d.math.random :as r]
-            [clojure2d.math :as m])
-  (:import [clojure2d.math.vector Vec2]))
+            [clojure2d.math.vector :as v])
+  (:import clojure2d.math.vector.Vec2))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)

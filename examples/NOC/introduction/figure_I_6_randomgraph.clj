@@ -18,8 +18,8 @@
 
 (let [p (map #(Vec2. % (random-fn (height canvas))) (range 0 (width canvas) 2))]
   (with-canvas canvas
-    (set-background c/:white)
-    (set-color c/:black)
+    (set-background :white)
+    (set-color :black)
     (set-stroke 2.0)
     (path p)))
 

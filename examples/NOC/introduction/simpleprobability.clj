@@ -23,10 +23,10 @@
 
     (when (< ^double (r/drand) prob)
       (-> canvas
-          (set-background 0 0 0 1)
-          (set-color c/:white)
+          (set-background :black 1)
+          (set-color :white)
           (ellipse nx ny 10 10)))
 
     (Vec2. nx ny)))
 
-(show-window (make-canvas 200 200) "Simple probability" draw)
+(def window (show-window (make-canvas 200 200) "Simple probability" draw))

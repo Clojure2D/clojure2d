@@ -22,7 +22,7 @@
                      nvals)]
 
     (set-background canvas 100 100 100)
-    (set-color canvas c/:white)
+    (set-color canvas :white)
 
     ;; draw lines
     (dotimes [x (width canvas)]

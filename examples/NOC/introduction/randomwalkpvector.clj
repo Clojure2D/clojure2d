@@ -20,7 +20,7 @@
         ny (m/constrain (.y npos) 0 (height canvas))]
 
     (-> canvas
-        (set-background c/:white)
+        (set-background :white)
         (set-color 175 175 175)
         (crect nx ny 40 40)
         (set-color 0 0 0)

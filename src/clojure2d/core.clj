@@ -12,24 +12,15 @@
 (ns clojure2d.core
   "JFrame, Java2D, file io and simple session management"
   (:require [clojure.java.io :refer :all]
-            [clojure2d.color :as c]
-            [clojure2d.math.vector :as v]
-            [clojure2d.math :as m]
-            [clojure2d.math.random :as r])  
-  (:import [clojure2d.math.vector Vec2]
+            [clojure2d.color :as c])
+  (:import clojure2d.math.vector.Vec2
+           [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
+           [java.awt.event ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
+           [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double]
            [java.awt.image BufferedImage BufferStrategy]
-           [javax.swing ImageIcon]
-           [javax.imageio ImageIO ImageWriter ImageWriteParam IIOImage]
-           [java.awt Graphics2D Image RenderingHints GraphicsEnvironment 
-            Transparency BasicStroke Color Container Dimension Component Toolkit Shape]
-           [java.util Iterator]
-           [java.awt.geom Line2D Line2D$Double
-            Rectangle2D Rectangle2D$Double
-            Path2D Path2D$Double
-            Ellipse2D Ellipse2D$Double]
-           [java.awt.event KeyAdapter KeyEvent MouseAdapter MouseMotionAdapter
-            MouseEvent WindowAdapter WindowEvent ComponentEvent]
-           [javax.swing JFrame SwingUtilities]))
+           java.util.Iterator
+           [javax.imageio IIOImage ImageIO ImageWriteParam ImageWriter]
+           [javax.swing ImageIcon JFrame SwingUtilities]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -506,6 +497,8 @@
   * individual r, g, b (and optional alpha) as integers from 0-255. They are converted to integer and clamped if necessary."
   ([f canvas c]
    (f canvas (c/make-awt-color c)))
+  ([f canvas c a]
+   (f canvas (c/make-awt-color c a)))
   ([f canvas r g b a]
    (f canvas (c/make-awt-color r g b a)))
   ([f canvas r g b]

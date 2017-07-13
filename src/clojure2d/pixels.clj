@@ -18,15 +18,13 @@
 ;; * filters: `dilate`, `erode`, `box-blur`, `gaussian-blur`, `posterize`, `threshold`, `quantile`, `tint`, `normalize`, `equalize`, `negate`.
 
 (ns clojure2d.pixels
-  (:require [clojure2d.math :as m]
-            [clojure2d.math.vector :as v]
-            [clojure2d.math.random :as r]
-            [clojure2d.color :as c]
-            [clojure2d.core :as core])
-  (:import [clojure2d.math.vector Vec4 Vec3 Vec2]
-           [clojure2d.core Canvas]
-           [clojure.lang PersistentVector]
-           [java.awt.image BufferedImage]))
+  (:require [clojure2d.color :as c]
+            [clojure2d.core :as core]
+            [clojure2d.math :as m]
+            [clojure2d.math.vector :as v])
+  (:import clojure2d.core.Canvas
+           [clojure2d.math.vector Vec2 Vec4]
+           java.awt.image.BufferedImage))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)

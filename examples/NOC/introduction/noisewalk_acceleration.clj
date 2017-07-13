@@ -33,7 +33,7 @@
         nhistory (if (== (count nhistory) 1001) (pop nhistory) nhistory)]
 
     (-> canvas
-        (set-background c/:white)
+        (set-background :white)
         (set-color 175 175 175)
         (crect (.x nposition) (.y nposition) 16 16)
         (set-color 0 0 0)

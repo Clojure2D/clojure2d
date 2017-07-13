@@ -24,8 +24,8 @@
         p (map #(Vec2. % (calc-bell % (width window) (height window) sd)) (range 0 (width canvas) 2))]
 
     (-> canvas
-        (set-background c/:white)
-        (set-color c/:black)
+        (set-background :white)
+        (set-color :black)
         (set-stroke 2.0)
         (path p))))
 

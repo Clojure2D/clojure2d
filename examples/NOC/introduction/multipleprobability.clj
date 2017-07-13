@@ -25,7 +25,7 @@
              (.y v))]
 
     (-> canvas
-        (set-background 0 0 0 1)
+        (set-background :black 1)
         (set-color c c c)
         (rect (.x v) (.y v) 10 10)
         (set-color 200 200 200)

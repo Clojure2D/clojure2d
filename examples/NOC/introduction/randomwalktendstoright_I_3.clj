@@ -1,4 +1,4 @@
-(ns examples.NOC.introduction.randomwalktraditional_I_1
+(ns examples.NOC.introduction.randomwalktendstoright-I-3
   (:require [clojure2d.core :refer :all]
             [clojure2d.math.random :as r]
             [clojure2d.math :as m]
@@ -12,16 +12,17 @@
   [canvas _ _ state]
   (let [[^double x ^double y] (or state [(* 0.5 ^int (width canvas))
                                          (* 0.5 ^int (height canvas))])
-        choice (int (r/irand 4))
-        [nx ny] (case choice
-                  0 [(inc x) y]
-                  1 [(dec x) y]
-                  2 [x (inc y)]
-                  3 [x (dec y)])
+        choice ^double (r/drand)
+        [nx ny] (condp > choice
+                  0.4 [(inc x) y]
+                  0.6 [(dec x) y]
+                  0.8 [x (inc y)]
+                  [x (dec y)])
         nx (m/constrain nx 0 (width canvas))
         ny (m/constrain ny 0 (height canvas))]
 
     (-> canvas
+        (set-stroke 2.0)
         (set-color :black)
         (point nx ny))
 
@@ -32,4 +33,4 @@
   (with-canvas canvas
     (set-background :white))
 
-  (show-window canvas "Random Walk - Traditional I_1" draw))
+  (show-window canvas "Random Walk - tends to right I_3" draw))

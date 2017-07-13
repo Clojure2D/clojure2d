@@ -29,7 +29,7 @@
         ny (m/constrain (+ y stepy) 0 (height canvas))]
 
     (-> canvas
-        (set-color c/:white)
+        (set-color :white)
         (line x y nx ny))
 
     [nx ny]))
