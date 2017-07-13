@@ -428,7 +428,7 @@
      (draw-fill-or-stroke (.graphics canvas) p stroke?))
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3]
-   (triangle canvas x1 y2 x2 y2 x3 y3 false)))
+   (triangle canvas x1 y1 x2 y2 x3 y3 false)))
 
 (defn triangle-strip
   "Draw triangle strip. Implementation of `Processing` `STRIP` shape.
