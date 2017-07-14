@@ -14,6 +14,7 @@
 (def ^:const ^int w 640)
 (def ^:const ^int h 360)
 (def ^:const ^int resolution 15)
+(def ^:const ^int vehicles-no 120)
 
 (def ^:const cols (int (/ w resolution)))
 (def ^:const rows (int (/ h resolution)))
@@ -21,10 +22,13 @@
 (defn make-field
   "Create sampled vector field using provided noise function and scales."
   ([noise-fn ^double sx ^double sy]
-   (vec (for [^int i (range cols)]
-          (vec (for [^int j (range rows)]
-                 (let [theta (* m/TWO_PI ^double (noise-fn (* i sx) (* j sy)))]
-                   (Vec2. (m/cos theta) (m/sin theta))))))))
+   (let [^double field-shift-x (r/drand -2 2)
+         ^double field-shift-y (r/drand -2 2)]
+     (vec (for [^int i (range cols)]
+            (vec (for [^int j (range rows)]
+                   (let [theta (* m/TWO_PI ^double (noise-fn (+ field-shift-x (* i sx))
+                                                             (+ field-shift-y (* j sy))))]
+                     (Vec2. (m/cos theta) (m/sin theta)))))))))
   ([] (make-field (j/make-random-fractal-noise) (r/drand 0.005 0.1) (r/drand 0.005 0.1))))
 
 (defn lookup-field
@@ -46,9 +50,9 @@
                                                     (translate x y)
                                                     (rotate (v/heading v))
                                                     (line 0 0 (/ resolution 1.5) 0)
+                                                    (ellipse 0 0 3 3)
                                                     (pop-matrix)))) vv))) field))
   canvas)
-
 
 (deftype Vehicle [position
                   velocity
@@ -95,7 +99,7 @@
 (defn draw
   "Draw on canvas"
   [canvas _ _ state]
-  (let [vehicles (or state (repeatedly 120 make-vehicle))]
+  (let [vehicles (or state (repeatedly vehicles-no make-vehicle))]
     (-> canvas
         (set-background :linen)
         (set-color :black 100)
