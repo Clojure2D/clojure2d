@@ -1,7 +1,7 @@
 (ns examples.NOC.ch01.bouncingball-vectors-1-2
   (:require [clojure2d.core :refer :all]
             [clojure2d.math.vector :as v])
-  (:import [clojure2d.math.vector Vec2]))
+  (:import clojure2d.math.vector.Vec2))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)

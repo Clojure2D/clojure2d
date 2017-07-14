@@ -1,8 +1,7 @@
 (ns examples.NOC.introduction.randomwalktraditional_I_1
   (:require [clojure2d.core :refer :all]
-            [clojure2d.math.random :as r]
             [clojure2d.math :as m]
-            [clojure2d.color :as c]))
+            [clojure2d.math.random :as r]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)

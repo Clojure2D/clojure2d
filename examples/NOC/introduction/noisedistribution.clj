@@ -1,9 +1,7 @@
 (ns examples.NOC.introduction.noisedistribution
   (:require [clojure2d.core :refer :all]
             [clojure2d.math.random :as r]
-            [clojure2d.math.joise :as j]
-            [clojure2d.math.vector :as v]
-            [clojure2d.color :as c]))
+            [clojure2d.math.vector :as v]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)

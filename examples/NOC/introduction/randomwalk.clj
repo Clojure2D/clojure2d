@@ -1,10 +1,7 @@
 (ns examples.NOC.introduction.randomwalk
   (:require [clojure2d.core :refer :all]
-            [clojure2d.math.random :as r]
             [clojure2d.math :as m]
-            [clojure2d.color :as c]
-            [clojure2d.math.vector :as v])
-  (:import [clojure2d.math.vector Vec2]))
+            [clojure2d.math.random :as r]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)

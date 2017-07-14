@@ -1,10 +1,10 @@
 (ns examples.NOC.introduction.noise2d
-  (:require [clojure2d.core :refer :all]
-            [clojure2d.math.random :as r]
+  (:require [clojure2d.color :as c]
+            [clojure2d.core :refer :all]
             [clojure2d.math :as m]
-            [clojure2d.pixels :as p]
             [clojure2d.math.joise :as j]
-            [clojure2d.color :as c]))
+            [clojure2d.math.random :as r]
+            [clojure2d.pixels :as p]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)

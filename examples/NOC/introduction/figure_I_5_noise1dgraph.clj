@@ -1,10 +1,8 @@
 (ns example.NOC.introduction.figure-I-5-noise1dgraph
   (:require [clojure2d.core :refer :all]
-            [clojure2d.math.random :as r]
-            [clojure2d.math.vector :as v]
             [clojure2d.math.joise :as j]
-            [clojure2d.color :as c])
-  (:import [clojure2d.math.vector Vec2]))
+            [clojure2d.math.random :as r])
+  (:import clojure2d.math.vector.Vec2))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)

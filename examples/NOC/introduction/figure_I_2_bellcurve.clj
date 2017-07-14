@@ -1,9 +1,7 @@
 (ns example.NOC.introduction.figure-I-2-bellcurve
   (:require [clojure2d.core :refer :all]
-            [clojure2d.math :as m]
-            [clojure2d.math.vector :as v]
-            [clojure2d.color :as c])
-  (:import [clojure2d.math.vector Vec2]))
+            [clojure2d.math :as m])
+  (:import clojure2d.math.vector.Vec2))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)

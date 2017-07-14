@@ -13,7 +13,7 @@
 
 (def ^:const ^int w 640)
 (def ^:const ^int h 360)
-(def ^:const ^int resolution 15)
+(def ^:const ^int resolution 20)
 (def ^:const ^int vehicles-no 120)
 
 (def ^:const cols (int (/ w resolution)))
@@ -87,7 +87,6 @@
         (push-matrix)
         (translate (.x nposition) (.y nposition))
         (rotate theta) 
-        (set-color 175 0 0 200)
         (triangle 0 (- r2) (- r) r2 r r2)
         (pop-matrix))
 
@@ -103,7 +102,10 @@
     (-> canvas
         (set-background :linen)
         (set-color :black 100)
-        (draw-field @field))
+        (translate (* 0.5 resolution)
+                   (* 0.5 resolution))
+        (draw-field @field)
+        (set-color 175 0 0 200))
     (mapv #(run-vehicle canvas % @field) vehicles)))
 
 (def window (show-window (make-canvas w h) "Flowfield 6_4" draw))
