@@ -39,7 +39,7 @@
                    (v/limit maxforce)))
         (Vec2. 0.0 0.0))))
   (separate [_ bs]
-    (let [steer (reduce #(let [d (v/dist position (.position Boid %2))]
+    (let [steer (reduce #(let [d (v/dist position (.position ^Boid %2))]
                            (if (< 0 d 25.0)
                              (-> position
                                  (v/sub (.position ^Boid %2))
