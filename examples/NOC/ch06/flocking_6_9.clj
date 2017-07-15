@@ -1,5 +1,6 @@
 (ns NOC.ch06.flocking-6-9
-  (:require [clojure2d.math :as m]
+  (:require [clojure2d.core :refer :all]
+            [clojure2d.math :as m]
             [clojure2d.math.random :as r]
             [clojure2d.math.vector :as v])
   (:import clojure2d.math.vector.Vec2))
@@ -38,15 +39,14 @@
                    (v/limit maxforce)))
         (Vec2. 0.0 0.0))))
   (separate [_ bs]
-    (let [bs-with-distance (map #(vector (v/dist position (.position ^Boid %)) %) bs)
-          bs-filtered (filter (fn [[^double dist _]]
-                                (< 0.0 dist 25.0)) bs-with-distance)
-          steer (reduce (fn [sum [dist ^Boid b]]
-                          (-> position
-                              (v/sub (.position b))
-                              (v/normalize)
-                              (v/div dist)
-                              (v/add sum))) (Vec2. 0.0 0.0) bs-filtered)]
+    (let [steer (reduce #(let [d (v/dist position (.position Boid %2))]
+                           (if (< 0 d 25.0)
+                             (-> position
+                                 (v/sub (.position ^Boid %2))
+                                 (v/normalize)
+                                 (v/div d)
+                                 (v/add %1))
+                             %1)) (Vec2. 0.0 0.0) bs)]
 
       (if (pos? ^double (v/mag steer))
         (-> steer
