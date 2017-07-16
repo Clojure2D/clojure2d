@@ -83,7 +83,7 @@
                                                                           (v/add normal-point)) normal-point]
                                                             [current-record current-target current-normal-point])]
                                    (if (< i (- (count p) 2))
-                                     (recur (inc i) new-record new-target new-normal-point)
+                                     (recur (inc i) (double new-record) new-target new-normal-point)
                                      [new-record new-target new-normal-point])))
           acceleration (if (and (> world-record radius) (not (= target position)))
                          (-> target
