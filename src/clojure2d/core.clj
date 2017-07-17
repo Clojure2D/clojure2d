@@ -410,7 +410,7 @@
   "Draw ellipse with middle at `(x,y)` position with width `w` and height `h`."
   ([^Canvas canvas x1 y1 w h stroke?]
    (let [^Ellipse2D e (.ellipse_obj canvas)]
-     (.setFrame e (- ^double x1 (/ ^double w 2.0)) (- ^double y1 (/ ^double h 2.0)) w h)
+     (.setFrame e (- ^double x1 (* ^double w 0.5)) (- ^double y1 (* ^double h 0.5)) w h)
      (draw-fill-or-stroke (.graphics canvas) e stroke?))
    canvas)
   ([canvas x1 y1 w h]
