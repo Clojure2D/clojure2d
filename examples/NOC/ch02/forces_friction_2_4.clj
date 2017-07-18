@@ -1,4 +1,4 @@
-(ns examples.NOC.ch02.forces-many-realgravity-2-3
+(ns examples.NOC.ch02.forces-friction-2-4
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
             [clojure2d.math.random :as r]
@@ -8,20 +8,22 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
-(def ^:const ^int w 640)
-(def ^:const ^int h 360)
+(def ^:const ^int w 383)
+(def ^:const ^int h 200)
 
-(def ^:const ^int number-of-movers 20)
+(def ^:const ^int number-of-movers 5)
 
 (def wind (Vec2. 0.01 0.0))
 (def gravity (Vec2. 0.0 0.1))
 
-(deftype Mover [position velocity ^double mass])
+(deftype Mover [position velocity ^double mass]
+  Object
+  (toString [_] (str position " : " velocity)))
 
 (defn make-mover
   "Create Mover"
   []
-  (->Mover (Vec2. 0.0 0.0)
+  (->Mover (Vec2. (r/drand w) 0.0)
            (Vec2. 0.0 0.0)
            (r/drand 1.0 4.0)))
 
@@ -44,6 +46,9 @@
   [^Mover m]
   (let [acc (-> (Vec2. 0.0 0.0)
                 (apply-force wind (.mass m))
+                (apply-force (-> (.velocity m)
+                                 (v/normalize)
+                                 (v/mult -0.05)) (.mass m))
                 (v/add gravity))
         vel (v/add (.velocity m) acc)
         pos (v/add (.position m) vel)
@@ -68,5 +73,5 @@
   (let [m (or last-m (repeatedly number-of-movers make-mover))]
     (mapv (partial draw-and-move canvas) m)))
 
-(def window (show-window (make-canvas w h) "NOC_2_3_forces_many_realgravity" draw))
+(def window (show-window (make-canvas w h) "NOC_2_4_forces_friction" draw))
 

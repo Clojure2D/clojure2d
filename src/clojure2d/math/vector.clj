@@ -502,7 +502,10 @@
 (defn normalize
   "Normalize vector"
   [v]
-  (div v (mag v)))
+  (let [^double m (mag v)]
+    (if (zero? m)
+      (Vec2. 0.0 0.0)
+      (div v m))))
 
 (defn scale
   "Create new vector with given length"
