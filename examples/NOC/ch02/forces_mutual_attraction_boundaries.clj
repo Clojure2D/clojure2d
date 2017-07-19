@@ -1,9 +1,8 @@
-(ns NOC.ch02.mutual-attraction-2-8
-  (:require [clojure2d.color :as c]
-            [clojure2d.core :refer :all]
-            [clojure2d.math.vector :as v]
+(ns NOC.ch02.forces_many_mutual_boundaries
+  (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
-            [clojure2d.math.random :as r])
+            [clojure2d.math.random :as r]
+            [clojure2d.math.vector :as v])
   (:import clojure2d.math.vector.Vec2))
 
 (set! *warn-on-reflection* true)
@@ -36,15 +35,24 @@
                      (v/mult strength)
                      (v/div mass))))))
   (update-and-draw [m other canvas]
-    (let [acceleration (reduce (partial attract m) (Vec2. 0.0 0.0) other)
+    (let [acceleration (-> (reduce (partial attract m) (Vec2. 0.0 0.0) other)
+                           (v/add (let [fx (cond
+                                             (< (.x position) 50) 1.0
+                                             (> (.x position) (- w 50)) -1.0
+                                             :else 0.0)
+                                        fy (cond
+                                             (< (.y position) 50) 1.0
+                                             (> (.y position) (- h 50)) -1.0
+                                             :else 0.0)]
+                                    (-> (Vec2. fx fy)
+                                        (v/scale 0.1))))) 
           nvelocity (v/add velocity acceleration)
           ^Vec2 nposition (v/add position nvelocity)
           s (* 24.0 mass)]
       
       (-> canvas
-          (set-color :black 100)
+          (set-color 175 175 175 200)
           (ellipse (.x nposition) (.y nposition) s s)
-          (set-stroke 2.0)
           (set-color :black)
           (ellipse (.x nposition) (.y nposition) s s true))
 
@@ -67,5 +75,5 @@
 
     (mapv #(update-and-draw % movers canvas) movers)))
 
-(def window (show-window (make-canvas w h) "Mutual attraction 2_8" draw))
+(def window (show-window (make-canvas w h) "Mutual attraction with boundaries" draw))
 
