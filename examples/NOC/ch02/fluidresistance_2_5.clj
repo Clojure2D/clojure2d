@@ -73,7 +73,6 @@
 
 (def movers (atom (repeatedly number-of-movers make-mover)))
 
-
 (defn draw
   "Draw movers on canvas"
   [canvas _ _ _]
@@ -82,9 +81,9 @@
       (set-color 50 50 50)
       (rect 0 h2 w h2))
   (let [m @movers]
-    (reset! movers (mapv (partial draw-and-move canvas) m))))
+    (swap! movers (constantly (mapv (partial draw-and-move canvas) m)))))
 
 (def window (show-window (make-canvas w h) "NOC_2_5_fluidresistance" draw))
 
-(defmethod mouse-event ["NOC_2_5_fluidresistance" :mouse-pressed] [_]
-  (reset! movers (repeatedly number-of-movers make-mover)))
+(defmethod mouse-event ["NOC_2_5_fluidresistance" :mouse-released] [_]
+  (swap! movers (constantly (repeatedly number-of-movers make-mover))))
