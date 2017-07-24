@@ -367,17 +367,21 @@
 
 (defn line
   "Draw line from point `(x1,y1)` to `(x2,y2)`"
-  [^Canvas canvas x1 y1 x2 y2]
-  (let [^Line2D l (.line-obj canvas)]
-    (.setLine l x1 y1 x2 y2)
-    (.draw ^Graphics2D (.graphics canvas) l))
-  canvas)
+  ([^Canvas canvas x1 y1 x2 y2]
+   (let [^Line2D l (.line-obj canvas)]
+     (.setLine l x1 y1 x2 y2)
+     (.draw ^Graphics2D (.graphics canvas) l))
+   canvas)
+  ([canvas ^Vec2 v1 ^Vec2 v2]
+   (line canvas (.x v1) (.y v1) (.x v2) (.y v2))))
 
 (defn point
   "Draw point at `(x,y)` position"
-  [canvas ^double x ^double y]
-  (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
-  canvas)
+  ([canvas ^double x ^double y]
+   (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
+   canvas)
+  ([canvas ^Vec2 p]
+   (point canvas (.x p) (.y p))))
 
 (defn- draw-fill-or-stroke
   "Draw filled or stroked object."

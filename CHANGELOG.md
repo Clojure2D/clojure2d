@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file. This change
 - Mouse position protocol to Window and MouseEvent
 - Nature of Code examples
 - html 140 colors defined in color namespace (access by (c/to-color :name) or (set-color canvas :name))
+- point and line drawing function accept Vec2 coordinates as well
 
 ### Changed
 

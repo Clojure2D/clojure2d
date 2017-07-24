@@ -1,8 +1,8 @@
 (ns NOC.ch02.attraction-2-6
   (:require [clojure2d.color :as c]
             [clojure2d.core :refer :all]
-            [clojure2d.math.vector :as v]
-            [clojure2d.math :as m])
+            [clojure2d.math :as m]
+            [clojure2d.math.vector :as v])
   (:import clojure2d.math.vector.Vec2))
 
 (set! *warn-on-reflection* true)
