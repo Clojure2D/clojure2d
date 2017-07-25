@@ -717,13 +717,16 @@
   (reset! active? false)
   (.dispose frame))
 
+(def window-icons (mapv #(.getImage (ImageIcon. (resource %))) ["i16.png" "i32.png" "i64.png" "i128.png"]))
+
 (defn- build-frame
   "Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event."
   [^JFrame frame ^java.awt.Canvas panel active? windowname width height]
   (let [closer (proxy [WindowAdapter] []
                  (windowClosing [^WindowEvent e] (close-window frame active?)))]
-    (.add frame panel)
     (doto frame
+      (.setIconImages window-icons)
+      (.add panel)
       (.addKeyListener key-processor)
       (.setResizable false)
       (.pack)

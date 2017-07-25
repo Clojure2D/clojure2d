@@ -27,7 +27,7 @@
 (def ^:const ^long w- (dec w))
 (def ^:const ^long h- (dec h))
 
-(def ^:const ^double fscale 0.7)
+(def ^:const ^double fscale 1.0)
 
 (def s60 (make-spots 60 [60 120 180] w h))
 (def n60 (make-noise 60 w h))
@@ -37,7 +37,9 @@
   [canvas window]
   (let [field-config (vr/make-random-configuration)
         field (vr/make-combination field-config)
-        ;; field (vr/make-variation :perspective 1.0 {})
+        field (vr/make-variation :blocky 1.0 {:x 0.7880436182022095
+                                              :y -0.8832911252975464
+                                              :mp -1.4870004653930664})
         ] 
 
     (pprint field-config)

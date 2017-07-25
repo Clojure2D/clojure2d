@@ -10,6 +10,8 @@ All notable changes to this project will be documented in this file. This change
 - Nature of Code examples
 - html 140 colors defined in color namespace (access by (c/to-color :name) or (set-color canvas :name))
 - point and line drawing function accept Vec2 coordinates as well
+- more variations
+- clojure2d temporary icon
 
 ### Changed
 
