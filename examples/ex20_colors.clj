@@ -1,11 +1,10 @@
 (ns examples.ex20-colors
-  (:require [clojure2d.core :refer :all]
-            [clojure2d.pixels :as p]
-            [clojure2d.color :as c]
+  (:require [clojure2d.color :as c]
+            [clojure2d.core :refer :all]
             [clojure2d.math.vector :as v]
-            [clojure2d.math :as m])
-  (:import [clojure2d.math.vector Vec4]
-           [clojure2d.pixels Pixels]))
+            [clojure2d.pixels :as p])
+  (:import clojure2d.math.vector.Vec4
+           clojure2d.pixels.Pixels))
 
 ;; reduce colors to random palette
 
@@ -21,14 +20,14 @@
   (save-canvas canvas (next-filename "results/ex20/" ".jpg")))
 
 ;; colourlovers
-(p/set-canvas-pixels! canvas (p/filter-colors (c/make-reduce-color-filter) img))
+(p/set-canvas-pixels! canvas (p/filter-colors (c/make-reduce-color-filter (rand-nth c/colourlovers-palettes)) img))
 
 ;; generated palette with 8 colors
-(def random-palette-8 (c/make-random-palette 8))
+(def random-palette-8 (c/make-iq-random-palette 8))
 (p/set-canvas-pixels! canvas (p/filter-colors (c/make-reduce-color-filter random-palette-8) img))
 
 ;; different distance function
-(def random-palette-6 (conj (c/make-random-palette 4) (Vec4. 0 0 0 255.0) (Vec4. 255 255 255 255)))
+(def random-palette-6 (conj (c/make-iq-random-palette 4) (Vec4. 0 0 0 255.0) (Vec4. 255 255 255 255)))
 (p/set-canvas-pixels! canvas (p/filter-colors (c/make-reduce-color-filter v/dist random-palette-6) img))
 (p/set-canvas-pixels! canvas  (p/filter-colors (c/make-reduce-color-filter v/dist-abs random-palette-6) img))
 (p/set-canvas-pixels! canvas  (p/filter-colors (c/make-reduce-color-filter v/dist-cheb random-palette-6) img))

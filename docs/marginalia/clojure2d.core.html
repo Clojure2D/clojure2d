@@ -2880,24 +2880,15 @@ In brief:</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>JFrame, Java2D, file io and simple session management</p>
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.core
   (:require [clojure.java.io :refer :all]
-            [clojure2d.color :as c]
-            [clojure2d.math.vector :as v]
-            [clojure2d.math :as m]
-            [clojure2d.math.random :as r])  
-  (:import [clojure2d.math.vector Vec2]
+            [clojure2d.color :as c])
+  (:import clojure2d.math.vector.Vec2
+           [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
+           [java.awt.event ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
+           [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double]
            [java.awt.image BufferedImage BufferStrategy]
-           [javax.swing ImageIcon]
-           [javax.imageio ImageIO ImageWriter ImageWriteParam IIOImage]
-           [java.awt Graphics2D Image RenderingHints GraphicsEnvironment 
-            Transparency BasicStroke Color Container Dimension Component Toolkit Shape]
-           [java.util Iterator]
-           [java.awt.geom Line2D Line2D$Double
-            Rectangle2D Rectangle2D$Double
-            Path2D Path2D$Double
-            Ellipse2D Ellipse2D$Double]
-           [java.awt.event KeyAdapter KeyEvent MouseAdapter MouseMotionAdapter
-            MouseEvent WindowAdapter WindowEvent ComponentEvent]
-           [javax.swing JFrame SwingUtilities]))</pre></td></tr><tr><td class="docs">
+           java.util.Iterator
+           [javax.imageio IIOImage ImageIO ImageWriteParam ImageWriter]
+           [javax.swing ImageIcon JFrame SwingUtilities]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><p>how many tasks we can run (one less than available cores)?</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^long available-cores (.availableProcessors (Runtime/getRuntime)))
@@ -3179,15 +3170,19 @@ Transformations are concatenated.</p>
 <p>All functions return canvas object</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Draw line from point <code>(x1,y1)</code> to <code>(x2,y2)</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn line
-  [^Canvas canvas x1 y1 x2 y2]
-  (let [^Line2D l (.line-obj canvas)]
-    (.setLine l x1 y1 x2 y2)
-    (.draw ^Graphics2D (.graphics canvas) l))
-  canvas)</pre></td></tr><tr><td class="docs"><p>Draw point at <code>(x,y)</code> position</p>
+  ([^Canvas canvas x1 y1 x2 y2]
+   (let [^Line2D l (.line-obj canvas)]
+     (.setLine l x1 y1 x2 y2)
+     (.draw ^Graphics2D (.graphics canvas) l))
+   canvas)
+  ([canvas ^Vec2 v1 ^Vec2 v2]
+   (line canvas (.x v1) (.y v1) (.x v2) (.y v2))))</pre></td></tr><tr><td class="docs"><p>Draw point at <code>(x,y)</code> position</p>
 </td><td class="codes"><pre class="brush: clojure">(defn point
-  [canvas ^double x ^double y]
-  (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
-  canvas)</pre></td></tr><tr><td class="docs"><p>Draw filled or stroked object.</p>
+  ([canvas ^double x ^double y]
+   (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
+   canvas)
+  ([canvas ^Vec2 p]
+   (point canvas (.x p) (.y p))))</pre></td></tr><tr><td class="docs"><p>Draw filled or stroked object.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- draw-fill-or-stroke
   [^Graphics2D g ^Shape obj stroke?]
   (if stroke?
@@ -3200,11 +3195,19 @@ Transformations are concatenated.</p>
      (draw-fill-or-stroke (.graphics canvas) r stroke?))
    canvas)
   ([canvas x1 y1 w h]
-   (rect canvas x1 y1 w h false)))</pre></td></tr><tr><td class="docs"><p>Draw ellipse with middle at <code>(x,y)</code> position with width <code>w</code> and height <code>h</code>.</p>
+   (rect canvas x1 y1 w h false)))</pre></td></tr><tr><td class="docs"><p>Centered version of rectangle</p>
+</td><td class="codes"><pre class="brush: clojure">(defn crect
+  ([canvas x1 y1 w h stroke?]
+   (let [w2 (* 0.5 ^double w)
+         h2 (* 0.5 ^double h)]
+     (rect canvas (- ^double x1 w2) (- ^double y1 h2) w h stroke?))
+   canvas)
+  ([canvas x1 y1 w h]
+   (crect canvas x1 y1 w h false)))</pre></td></tr><tr><td class="docs"><p>Draw ellipse with middle at <code>(x,y)</code> position with width <code>w</code> and height <code>h</code>.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn ellipse
   ([^Canvas canvas x1 y1 w h stroke?]
    (let [^Ellipse2D e (.ellipse_obj canvas)]
-     (.setFrame e (- ^double x1 (/ ^double w 2.0)) (- ^double y1 (/ ^double h 2.0)) w h)
+     (.setFrame e (- ^double x1 (* ^double w 0.5)) (- ^double y1 (* ^double h 0.5)) w h)
      (draw-fill-or-stroke (.graphics canvas) e stroke?))
    canvas)
   ([canvas x1 y1 w h]
@@ -3220,7 +3223,7 @@ Transformations are concatenated.</p>
      (draw-fill-or-stroke (.graphics canvas) p stroke?))
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3]
-   (triangle canvas x1 y2 x2 y2 x3 y3 false)))</pre></td></tr><tr><td class="docs"><p>Draw triangle strip. Implementation of <code>Processing</code> <code>STRIP</code> shape.</p>
+   (triangle canvas x1 y1 x2 y2 x3 y3 false)))</pre></td></tr><tr><td class="docs"><p>Draw triangle strip. Implementation of <code>Processing</code> <code>STRIP</code> shape.</p>
 
 <p>  Input: list of vertices as Vec2 vectors</p>
 </td><td class="codes"><pre class="brush: clojure">(defn triangle-strip
@@ -3280,6 +3283,8 @@ Transformations are concatenated.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- set-color-with-fn
   ([f canvas c]
    (f canvas (c/make-awt-color c)))
+  ([f canvas c a]
+   (f canvas (c/make-awt-color c a)))
   ([f canvas r g b a]
    (f canvas (c/make-awt-color r g b a)))
   ([f canvas r g b]
@@ -3461,13 +3466,15 @@ As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseX
 </td><td class="codes"><pre class="brush: clojure">(defn- close-window
   [^JFrame frame active?]
   (reset! active? false)
-  (.dispose frame))</pre></td></tr><tr><td class="docs"><p>Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event.</p>
+  (.dispose frame))</pre></td></tr><tr><td class="docs"><p>Create lazy list of icons to be loaded by frame</p>
+</td><td class="codes"><pre class="brush: clojure">(def window-icons (map #(.getImage (ImageIcon. (resource (str &quot;icons/i&quot; % &quot;.png&quot;)))) [10 16 20 24 30 32 40 44 64 128]))</pre></td></tr><tr><td class="docs"><p>Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- build-frame
   [^JFrame frame ^java.awt.Canvas panel active? windowname width height]
   (let [closer (proxy [WindowAdapter] []
                  (windowClosing [^WindowEvent e] (close-window frame active?)))]
-    (.add frame panel)
     (doto frame
+      (.setIconImages window-icons)
+      (.add panel)
       (.addKeyListener key-processor)
       (.setResizable false)
       (.pack)

@@ -2876,7 +2876,7 @@ mathematical vectors: 2d, 3d and 4d </p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.math.vector
   (:require [clojure2d.math :as m])
-  (:import [clojure.lang Counted Sequential Seqable IFn PersistentVector]))</pre></td></tr><tr><td class="docs">
+  (:import [clojure.lang Counted IFn PersistentVector Seqable Sequential]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><p>Tolerance (epsilon), used in <code>is-near-zero?</code> fn</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double TOLERANCE 1.0e-6)</pre></td></tr><tr><td class="docs"><h2>Vector definitions</h2>
@@ -3329,7 +3329,10 @@ mathematical vectors: 2d, 3d and 4d </p>
                 :emd dist-emd})</pre></td></tr><tr><td class="docs"><p>Normalize vector</p>
 </td><td class="codes"><pre class="brush: clojure">(defn normalize
   [v]
-  (div v (mag v)))</pre></td></tr><tr><td class="docs"><p>Create new vector with given length</p>
+  (let [^double m (mag v)]
+    (if (zero? m)
+      (Vec2. 0.0 0.0)
+      (div v m))))</pre></td></tr><tr><td class="docs"><p>Create new vector with given length</p>
 </td><td class="codes"><pre class="brush: clojure">(defn scale
   [v len]
   (mult (normalize v) len))</pre></td></tr><tr><td class="docs"><p>Limit length of the vector by given value</p>

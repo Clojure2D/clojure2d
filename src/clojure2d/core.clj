@@ -717,7 +717,8 @@
   (reset! active? false)
   (.dispose frame))
 
-(def window-icons (mapv #(.getImage (ImageIcon. (resource %))) ["i16.png" "i32.png" "i64.png" "i128.png"]))
+;; Create lazy list of icons to be loaded by frame
+(def window-icons (map #(.getImage (ImageIcon. (resource (str "icons/i" % ".png")))) [10 16 20 24 30 32 40 44 64 128]))
 
 (defn- build-frame
   "Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event."

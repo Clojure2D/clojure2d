@@ -2877,7 +2877,7 @@ net.brehaut.ClojureTools = (function (SH) {
 <li>Nearest color filter</li>
 </ul>
 
-<p>Generally color is represented by Vec4 containing R,G,B,A values from 0 to 255. Three conversion functions are defined by <code>ColorProto</code> which extends Vec3, Vec4 and java.awt.Color types.
+<p>Generally color is represented by Vec4 containing R,G,B,A values from 0 to 255. Three conversion functions are defined by <code>ColorProto</code> which extends Vec3, Vec4, Keyword and java.awt.Color types.
 Functions are:</p>
 
 <ul>
@@ -2886,16 +2886,17 @@ Functions are:</p>
 <li><code>to-luma</code> to get brightness as <code>double</code></li>
 </ul>
 
-<p><code>Vec4</code> is clojure2d color representation.</p>
+<p><code>Vec4</code> is clojure2d color representation.
+Keyword can be used when representing one of 140 html/css colornames (https://www.w3schools.com/colors/colors_names.asp). Eg. :linen</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.color
-  (:require [clojure2d.math :as m]
-            [clojure2d.math.vector :as v]
-            [clojure2d.math.random :as r]
+  (:require [clojure.java.io :as io]
             [clojure.xml :as xml]
-            [clojure.java.io :as io])
-  (:import [clojure2d.math.vector Vec4 Vec3]
-           [java.awt Color]))</pre></td></tr><tr><td class="docs">
+            [clojure2d.math :as m]
+            [clojure2d.math.random :as r]
+            [clojure2d.math.vector :as v])
+  (:import [clojure2d.math.vector Vec3 Vec4]
+           java.awt.Color))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
 (set! *unchecked-math* true)</pre></td></tr><tr><td class="docs"><h2>Clamping functions</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>First define some clamping functions</p>
@@ -2921,7 +2922,10 @@ Functions are:</p>
   ^double [^double r ^double g ^double b]
   (+ (* 0.212671 r)
      (* 0.715160 g)
-     (* 0.072169 b)))</pre></td></tr><tr><td class="docs"><p>Equip <code>Vec3</code>, <code>Vec4</code> and <code>java.awt.Color</code> types with <code>ColorProto</code> functions.</p>
+     (* 0.072169 b)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(declare html-awt-color)
+(declare html-color)</pre></td></tr><tr><td class="docs"><p>Equip <code>Vec3</code>, <code>Vec4</code>, <code>Keyword</code> and <code>java.awt.Color</code> types with <code>ColorProto</code> functions.
+For keyword use one of 140 names from html/css palettes (list: https://www.w3schools.com/colors/colors_names.asp)</p>
 </td><td class="codes"><pre class="brush: clojure">(extend-protocol ColorProto
   Vec3
   (to-color [^Vec3 c]
@@ -2939,6 +2943,10 @@ Functions are:</p>
             ^int (clamp255 (.z c))
             ^int (clamp255 (.w c))))
   (to-luma ^double [^Vec4 c] (to-luma-fn (.x c) (.y c) (.z c)))
+  clojure.lang.Keyword
+  (to-color [n] (html-color n))
+  (to-awt-color [n] (html-awt-color n))
+  (to-luma [n] (to-luma (html-color n)))
   Color
   (to-color [^Color c]
     (Vec4. (.getRed c)
@@ -2946,10 +2954,23 @@ Functions are:</p>
            (.getBlue c)
            (.getAlpha c)))
   (to-awt-color [c] c)
-  (to-luma ^double [^Color c] (to-luma-fn (.getRed c) (.getGreen c) (.getBlue c))))</pre></td></tr><tr><td class="docs"><p>Create java.awt.Color object. Use with <code>core/set-awt-color</code> or <code>core/set-awt-background</code>.</p>
+  (to-luma ^double [^Color c] (to-luma-fn (.getRed c) (.getGreen c) (.getBlue c))))</pre></td></tr><tr><td class="docs"><p>Set alpha channel and return <code>Vec4</code> representation.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn set-alpha
+  [c a]
+  (let [^Vec4 v (to-color c)]
+    (Vec4. (.x v) (.y v) (.z v) a)))</pre></td></tr><tr><td class="docs"><p>Set alpha channel and return <code>Color</code> representation.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn set-awt-alpha
+  [c a]
+  (let [^Color cc (to-awt-color c)]
+    (Color. (.getRed cc)
+            (.getGreen cc)
+            (.getBlue cc)
+            ^int (clamp255 a))))</pre></td></tr><tr><td class="docs"><p>Create java.awt.Color object. Use with <code>core/set-awt-color</code> or <code>core/set-awt-background</code>.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-awt-color
   ([c]
    (to-awt-color c))
+  ([c a]
+   (set-awt-alpha c a))
   ([r g b]
    (Color. ^int (clamp255 r)
            ^int (clamp255 g)
@@ -2962,6 +2983,8 @@ Functions are:</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-color
   ([c]
    (to-color c))
+  ([c a]
+   (set-alpha c a))
   ([r g b]
    (Vec4. (clamp255 r)
           (clamp255 g)
@@ -2976,11 +2999,7 @@ Functions are:</p>
 </td><td class="codes"><pre class="brush: clojure">(defn get-hue
   ^double [c]
   (let [^Vec4 ret (to-HSB (to-color c))]
-    (.x ret)))</pre></td></tr><tr><td class="docs"><p>Set alpha channel and return <code>Vec4</code> representation.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn set-alpha
-  [c ^double a]
-  (let [^Vec4 v (to-color c)]
-    (Vec4. (.x v) (.y v) (.z v) a)))</pre></td></tr><tr><td class="docs"><h2>Blending / Composing</h2>
+    (.x ret)))</pre></td></tr><tr><td class="docs"><h2>Blending / Composing</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Several color blending / composing functions. Used to compose two images (<code>Pixels</code>). See <code>core.pixels</code> namespace for filters.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Some blending functions require additional parameter. You can set it with following variable.</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:dynamic ^double *blend-threshold* 0.5)</pre></td></tr><tr><td class="docs"><p>Prepare look-up table for int->double conversion.</p>
@@ -3735,22 +3754,17 @@ Functions are:</p>
 </td><td class="codes"><pre class="brush: clojure">(defn hex-to-vecs
   [xs]
   (mapv hex-to-vec xs))</pre></td></tr><tr><td class="docs"><h3>Colourlovers</h3>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Read and parse 200 palettes from http://www.colourlovers.com/</p>
-</td><td class="codes"><pre class="brush: clojure">(def palettes
-  (let [p1 (xml/parse (java.io.ByteArrayInputStream. (.getBytes ^String (slurp (io/resource &quot;colourlovers1.xml&quot;)))))
-        p2 (xml/parse (java.io.ByteArrayInputStream. (.getBytes ^String (slurp (io/resource &quot;colourlovers2.xml&quot;)))))
-        f (fn [xml-in] (map (fn [x] (map #((:content %) 0) (-&gt;&gt; x
-                                                                ((:content xml-in))
-                                                                :content
-                                                                (filter #(= (:tag %) :colors))
-                                                                first
-                                                                :content))) (range 100)))
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Read and parse 200 best palettes taken from http://www.colourlovers.com/ (stored locally)</p>
+</td><td class="codes"><pre class="brush: clojure">(def colourlovers-palettes
+  (let [p1 (xml/parse (-&gt; (io/resource &quot;cl1.xml.gz&quot;) io/input-stream java.util.zip.GZIPInputStream.))
+        p2 (xml/parse (-&gt; (io/resource &quot;cl2.xml.gz&quot;) io/input-stream java.util.zip.GZIPInputStream.))
+        f (fn [xml-in] (map (fn [x] (map #((:content %) 0) (:content (first (filter #(= (:tag %) :colors) (:content ((:content xml-in) x))))))) (range 100)))
         l1 (f p1)
         l2 (f p2)]
     (mapv hex-to-vecs (concat l1 l2))))</pre></td></tr><tr><td class="docs"><h3>Inigo Quilez</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>http://iquilezles.org/www/articles/palettes/palettes.htm</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Create palette generator function with given parametrization</p>
-</td><td class="codes"><pre class="brush: clojure">(defn create-palette-fn
+</td><td class="codes"><pre class="brush: clojure">(defn make-iq-palette-fn
   [a b c d]
   (fn [t]
     (let [^Vec3 cc (-&gt; (-&gt;&gt; t
@@ -3763,13 +3777,13 @@ Functions are:</p>
       (-&gt; (Vec4. (.x cc) (.y cc) (.z cc) 1.0)
           (v/mult 255)
           (v/applyf clamp255)))))</pre></td></tr><tr><td class="docs"><p>Create palette with cosinus generator. Input parameter: number of colors.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn make-random-palette
+</td><td class="codes"><pre class="brush: clojure">(defn make-iq-random-palette
   [^long num]
   (let [a (v/generate-vec3 (partial r/drand 0.3 0.7))
         b (v/sub (Vec3. 1.0 1.0 1.1) a)
         c (v/generate-vec3 (partial r/drand 2))
         d (v/generate-vec3 r/drand)
-        f (create-palette-fn a b c d)]
+        f (make-iq-palette-fn a b c d)]
     (mapv f (range 0.0 1.0 (/ 1.0 num)))))</pre></td></tr><tr><td class="docs"><h3>Paletton</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Here you can find reimplementation of http://paletton.com palette generator.
 You can create palette based on <code>hue</code> value with following options:</p>
@@ -3997,12 +4011,288 @@ Parameters are <code>hue</code> value and configuration.</p>
   ([xf c]
    (nearest-color v/dist xf c)))</pre></td></tr><tr><td class="docs"><p>Define reduce color filter to use on <code>Pixels</code>.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-reduce-color-filter
-  ([]
-   (partial nearest-color (rand-nth palettes)))
   ([pal]
    (partial nearest-color pal))
   ([f pal]
-   (partial nearest-color f pal)))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
+   (partial nearest-color f pal)))</pre></td></tr><tr><td class="docs"><p>list of all 140 html colors</p>
+</td><td class="codes"><pre class="brush: clojure">(def html-colors {:aquamarine
+                  {:hex &quot;7FFFD4&quot;, :rgb {:r 127, :g 255, :b 212}},
+                  :lime {:hex &quot;00FF00&quot;, :rgb {:r 0, :g 255, :b 0}},
+                  :deepskyblue
+                  {:hex &quot;00BFFF&quot;, :rgb {:r 0, :g 191, :b 255}},
+                  :darksalmon
+                  {:hex &quot;E9967A&quot;, :rgb {:r 233, :g 150, :b 122}},
+                  :antiquewhite
+                  {:hex &quot;FAEBD7&quot;, :rgb {:r 250, :g 235, :b 215}},
+                  :mediumturquoise
+                  {:hex &quot;48D1CC&quot;, :rgb {:r 72, :g 209, :b 204}},
+                  :slategray
+                  {:hex &quot;708090&quot;, :rgb {:r 112, :g 128, :b 144}},
+                  :sienna
+                  {:hex &quot;A0522D&quot;, :rgb {:r 160, :g 82, :b 45}},
+                  :orange
+                  {:hex &quot;FFA500&quot;, :rgb {:r 255, :g 165, :b 0}},
+                  :navajowhite
+                  {:hex &quot;FFDEAD&quot;, :rgb {:r 255, :g 222, :b 173}},
+                  :lavenderblush
+                  {:hex &quot;FFF0F5&quot;, :rgb {:r 255, :g 240, :b 245}},
+                  :firebrick
+                  {:hex &quot;B22222&quot;, :rgb {:r 178, :g 34, :b 34}},
+                  :orangered
+                  {:hex &quot;FF4500&quot;, :rgb {:r 255, :g 69, :b 0}},
+                  :palevioletred
+                  {:hex &quot;DB7093&quot;, :rgb {:r 219, :g 112, :b 147}},
+                  :lawngreen
+                  {:hex &quot;7CFC00&quot;, :rgb {:r 124, :g 252, :b 0}},
+                  :seashell
+                  {:hex &quot;FFF5EE&quot;, :rgb {:r 255, :g 245, :b 238}},
+                  :lightpink
+                  {:hex &quot;FFB6C1&quot;, :rgb {:r 255, :g 182, :b 193}},
+                  :darkolivegreen
+                  {:hex &quot;556B2F&quot;, :rgb {:r 85, :g 107, :b 47}},
+                  :aliceblue
+                  {:hex &quot;F0F8FF&quot;, :rgb {:r 240, :g 248, :b 255}},
+                  :gray
+                  {:hex &quot;808080&quot;, :rgb {:r 128, :g 128, :b 128}},
+                  :lightsteelblue
+                  {:hex &quot;B0C4DE&quot;, :rgb {:r 176, :g 196, :b 222}},
+                  :whitesmoke
+                  {:hex &quot;F5F5F5&quot;, :rgb {:r 245, :g 245, :b 245}},
+                  :darkgoldenrod
+                  {:hex &quot;B8860B&quot;, :rgb {:r 184, :g 134, :b 11}},
+                  :tan
+                  {:hex &quot;D2B48C&quot;, :rgb {:r 210, :g 180, :b 140}},
+                  :bisque
+                  {:hex &quot;FFE4C4&quot;, :rgb {:r 255, :g 228, :b 196}},
+                  :white
+                  {:hex &quot;FFFFFF&quot;, :rgb {:r 255, :g 255, :b 255}},
+                  :lightgreen
+                  {:hex &quot;90EE90&quot;, :rgb {:r 144, :g 238, :b 144}},
+                  :darkseagreen
+                  {:hex &quot;8FBC8F&quot;, :rgb {:r 143, :g 188, :b 143}},
+                  :crimson
+                  {:hex &quot;DC143C&quot;, :rgb {:r 220, :g 20, :b 60}},
+                  :darkslategray
+                  {:hex &quot;2F4F4F&quot;, :rgb {:r 47, :g 79, :b 79}},
+                  :mistyrose
+                  {:hex &quot;FFE4E1&quot;, :rgb {:r 255, :g 228, :b 225}},
+                  :chocolate
+                  {:hex &quot;D2691E&quot;, :rgb {:r 210, :g 105, :b 30}},
+                  :yellow
+                  {:hex &quot;FFFF00&quot;, :rgb {:r 255, :g 255, :b 0}},
+                  :cadetblue
+                  {:hex &quot;5F9EA0&quot;, :rgb {:r 95, :g 158, :b 160}},
+                  :navy {:hex &quot;000080&quot;, :rgb {:r 0, :g 0, :b 128}},
+                  :ghostwhite
+                  {:hex &quot;F8F8FF&quot;, :rgb {:r 248, :g 248, :b 255}},
+                  :seagreen
+                  {:hex &quot;2E8B57&quot;, :rgb {:r 46, :g 139, :b 87}},
+                  :green {:hex &quot;008000&quot;, :rgb {:r 0, :g 128, :b 0}},
+                  :mediumseagreen
+                  {:hex &quot;3CB371&quot;, :rgb {:r 60, :g 179, :b 113}},
+                  :indigo
+                  {:hex &quot;4B0082&quot;, :rgb {:r 75, :g 0, :b 130}},
+                  :olivedrab
+                  {:hex &quot;6B8E23&quot;, :rgb {:r 107, :g 142, :b 35}},
+                  :cyan {:hex &quot;00FFFF&quot;, :rgb {:r 0, :g 255, :b 255}},
+                  :peachpuff
+                  {:hex &quot;FFDAB9&quot;, :rgb {:r 255, :g 218, :b 185}},
+                  :limegreen
+                  {:hex &quot;32CD32&quot;, :rgb {:r 50, :g 205, :b 50}},
+                  :mediumslateblue
+                  {:hex &quot;7B68EE&quot;, :rgb {:r 123, :g 104, :b 238}},
+                  :violet
+                  {:hex &quot;EE82EE&quot;, :rgb {:r 238, :g 130, :b 238}},
+                  :sandybrown
+                  {:hex &quot;F4A460&quot;, :rgb {:r 244, :g 164, :b 96}},
+                  :yellowgreen
+                  {:hex &quot;9ACD32&quot;, :rgb {:r 154, :g 205, :b 50}},
+                  :mediumspringgreen
+                  {:hex &quot;00FA9A&quot;, :rgb {:r 0, :g 250, :b 154}},
+                  :steelblue
+                  {:hex &quot;4682B4&quot;, :rgb {:r 70, :g 130, :b 180}},
+                  :rosybrown
+                  {:hex &quot;BC8F8F&quot;, :rgb {:r 188, :g 143, :b 143}},
+                  :cornflowerblue
+                  {:hex &quot;6495ED&quot;, :rgb {:r 100, :g 149, :b 237}},
+                  :ivory
+                  {:hex &quot;FFFFF0&quot;, :rgb {:r 255, :g 255, :b 240}},
+                  :lightgoldenrodyellow
+                  {:hex &quot;FAFAD2&quot;, :rgb {:r 250, :g 250, :b 210}},
+                  :salmon
+                  {:hex &quot;FA8072&quot;, :rgb {:r 250, :g 128, :b 114}},
+                  :darkcyan
+                  {:hex &quot;008B8B&quot;, :rgb {:r 0, :g 139, :b 139}},
+                  :peru
+                  {:hex &quot;CD853F&quot;, :rgb {:r 205, :g 133, :b 63}},
+                  :cornsilk
+                  {:hex &quot;FFF8DC&quot;, :rgb {:r 255, :g 248, :b 220}},
+                  :lightslategray
+                  {:hex &quot;778899&quot;, :rgb {:r 119, :g 136, :b 153}},
+                  :blueviolet
+                  {:hex &quot;8A2BE2&quot;, :rgb {:r 138, :g 43, :b 226}},
+                  :forestgreen
+                  {:hex &quot;228B22&quot;, :rgb {:r 34, :g 139, :b 34}},
+                  :lightseagreen
+                  {:hex &quot;20B2AA&quot;, :rgb {:r 32, :g 178, :b 170}},
+                  :gold {:hex &quot;FFD700&quot;, :rgb {:r 255, :g 215, :b 0}},
+                  :gainsboro
+                  {:hex &quot;DCDCDC&quot;, :rgb {:r 220, :g 220, :b 220}},
+                  :darkorchid
+                  {:hex &quot;9932CC&quot;, :rgb {:r 153, :g 50, :b 204}},
+                  :burlywood
+                  {:hex &quot;DEB887&quot;, :rgb {:r 222, :g 184, :b 135}},
+                  :lightskyblue
+                  {:hex &quot;87CEFA&quot;, :rgb {:r 135, :g 206, :b 250}},
+                  :chartreuse
+                  {:hex &quot;7FFF00&quot;, :rgb {:r 127, :g 255, :b 0}},
+                  :snow
+                  {:hex &quot;FFFAFA&quot;, :rgb {:r 255, :g 250, :b 250}},
+                  :moccasin
+                  {:hex &quot;FFE4B5&quot;, :rgb {:r 255, :g 228, :b 181}},
+                  :honeydew
+                  {:hex &quot;F0FFF0&quot;, :rgb {:r 240, :g 255, :b 240}},
+                  :aqua {:hex &quot;00FFFF&quot;, :rgb {:r 0, :g 255, :b 255}},
+                  :darkred
+                  {:hex &quot;8B0000&quot;, :rgb {:r 139, :g 0, :b 0}},
+                  :mediumorchid
+                  {:hex &quot;BA55D3&quot;, :rgb {:r 186, :g 85, :b 211}},
+                  :lightsalmon
+                  {:hex &quot;FFA07A&quot;, :rgb {:r 255, :g 160, :b 122}},
+                  :saddlebrown
+                  {:hex &quot;8B4513&quot;, :rgb {:r 139, :g 69, :b 19}},
+                  :wheat
+                  {:hex &quot;F5DEB3&quot;, :rgb {:r 245, :g 222, :b 179}},
+                  :springgreen
+                  {:hex &quot;00FF7F&quot;, :rgb {:r 0, :g 255, :b 127}},
+                  :darkblue
+                  {:hex &quot;00008B&quot;, :rgb {:r 0, :g 0, :b 139}},
+                  :powderblue
+                  {:hex &quot;B0E0E6&quot;, :rgb {:r 176, :g 224, :b 230}},
+                  :turquoise
+                  {:hex &quot;40E0D0&quot;, :rgb {:r 64, :g 224, :b 208}},
+                  :blanchedalmond
+                  {:hex &quot;FFEBCD&quot;, :rgb {:r 255, :g 235, :b 205}},
+                  :papayawhip
+                  {:hex &quot;FFEFD5&quot;, :rgb {:r 255, :g 239, :b 213}},
+                  :slateblue
+                  {:hex &quot;6A5ACD&quot;, :rgb {:r 106, :g 90, :b 205}},
+                  :lightblue
+                  {:hex &quot;ADD8E6&quot;, :rgb {:r 173, :g 216, :b 230}},
+                  :skyblue
+                  {:hex &quot;87CEEB&quot;, :rgb {:r 135, :g 206, :b 235}},
+                  :red {:hex &quot;FF0000&quot;, :rgb {:r 255, :g 0, :b 0}},
+                  :lightyellow
+                  {:hex &quot;FFFFE0&quot;, :rgb {:r 255, :g 255, :b 224}},
+                  :blue {:hex &quot;0000FF&quot;, :rgb {:r 0, :g 0, :b 255}},
+                  :palegreen
+                  {:hex &quot;98FB98&quot;, :rgb {:r 152, :g 251, :b 152}},
+                  :greenyellow
+                  {:hex &quot;ADFF2F&quot;, :rgb {:r 173, :g 255, :b 47}},
+                  :khaki
+                  {:hex &quot;F0E68C&quot;, :rgb {:r 240, :g 230, :b 140}},
+                  :maroon {:hex &quot;800000&quot;, :rgb {:r 128, :g 0, :b 0}},
+                  :midnightblue
+                  {:hex &quot;191970&quot;, :rgb {:r 25, :g 25, :b 112}},
+                  :floralwhite
+                  {:hex &quot;FFFAF0&quot;, :rgb {:r 255, :g 250, :b 240}},
+                  :deeppink
+                  {:hex &quot;FF1493&quot;, :rgb {:r 255, :g 20, :b 147}},
+                  :paleturquoise
+                  {:hex &quot;AFEEEE&quot;, :rgb {:r 175, :g 238, :b 238}},
+                  :darkkhaki
+                  {:hex &quot;BDB76B&quot;, :rgb {:r 189, :g 183, :b 107}},
+                  :azure
+                  {:hex &quot;F0FFFF&quot;, :rgb {:r 240, :g 255, :b 255}},
+                  :indianred
+                  {:hex &quot;CD5C5C&quot;, :rgb {:r 205, :g 92, :b 92}},
+                  :darkviolet
+                  {:hex &quot;9400D3&quot;, :rgb {:r 148, :g 0, :b 211}},
+                  :mediumpurple
+                  {:hex &quot;9370DB&quot;, :rgb {:r 147, :g 112, :b 219}},
+                  :fuchsia
+                  {:hex &quot;FF00FF&quot;, :rgb {:r 255, :g 0, :b 255}},
+                  :coral
+                  {:hex &quot;FF7F50&quot;, :rgb {:r 255, :g 127, :b 80}},
+                  :mediumvioletred
+                  {:hex &quot;C71585&quot;, :rgb {:r 199, :g 21, :b 133}},
+                  :lemonchiffon
+                  {:hex &quot;FFFACD&quot;, :rgb {:r 255, :g 250, :b 205}},
+                  :mediumblue
+                  {:hex &quot;0000CD&quot;, :rgb {:r 0, :g 0, :b 205}},
+                  :darkmagenta
+                  {:hex &quot;8B008B&quot;, :rgb {:r 139, :g 0, :b 139}},
+                  :goldenrod
+                  {:hex &quot;DAA520&quot;, :rgb {:r 218, :g 165, :b 32}},
+                  :darkorange
+                  {:hex &quot;FF8C00&quot;, :rgb {:r 255, :g 140, :b 0}},
+                  :orchid
+                  {:hex &quot;DA70D6&quot;, :rgb {:r 218, :g 112, :b 214}},
+                  :plum
+                  {:hex &quot;DDA0DD&quot;, :rgb {:r 221, :g 160, :b 221}},
+                  :pink
+                  {:hex &quot;FFC0CB&quot;, :rgb {:r 255, :g 192, :b 203}},
+                  :teal {:hex &quot;008080&quot;, :rgb {:r 0, :g 128, :b 128}},
+                  :magenta
+                  {:hex &quot;FF00FF&quot;, :rgb {:r 255, :g 0, :b 255}},
+                  :lightgrey
+                  {:hex &quot;D3D3D3&quot;, :rgb {:r 211, :g 211, :b 211}},
+                  :purple
+                  {:hex &quot;800080&quot;, :rgb {:r 128, :g 0, :b 128}},
+                  :dodgerblue
+                  {:hex &quot;1E90FF&quot;, :rgb {:r 30, :g 144, :b 255}},
+                  :darkturquoise
+                  {:hex &quot;00CED1&quot;, :rgb {:r 0, :g 206, :b 209}},
+                  :mintcream
+                  {:hex &quot;F5FFFA&quot;, :rgb {:r 245, :g 255, :b 250}},
+                  :hotpink
+                  {:hex &quot;FF69B4&quot;, :rgb {:r 255, :g 105, :b 180}},
+                  :thistle
+                  {:hex &quot;D8BFD8&quot;, :rgb {:r 216, :g 191, :b 216}},
+                  :royalblue
+                  {:hex &quot;4169E1&quot;, :rgb {:r 65, :g 105, :b 225}},
+                  :darkgreen
+                  {:hex &quot;006400&quot;, :rgb {:r 0, :g 100, :b 0}},
+                  :darkslateblue
+                  {:hex &quot;483D8B&quot;, :rgb {:r 72, :g 61, :b 139}},
+                  :silver
+                  {:hex &quot;C0C0C0&quot;, :rgb {:r 192, :g 192, :b 192}},
+                  :darkgray
+                  {:hex &quot;A9A9A9&quot;, :rgb {:r 169, :g 169, :b 169}},
+                  :oldlace
+                  {:hex &quot;FDF5E6&quot;, :rgb {:r 253, :g 245, :b 230}},
+                  :mediumaquamarine
+                  {:hex &quot;66CDAA&quot;, :rgb {:r 102, :g 205, :b 170}},
+                  :brown
+                  {:hex &quot;A52A2A&quot;, :rgb {:r 165, :g 42, :b 42}},
+                  :olive
+                  {:hex &quot;808000&quot;, :rgb {:r 128, :g 128, :b 0}},
+                  :lightcoral
+                  {:hex &quot;F08080&quot;, :rgb {:r 240, :g 128, :b 128}},
+                  :tomato
+                  {:hex &quot;FF6347&quot;, :rgb {:r 255, :g 99, :b 71}},
+                  :lightcyan
+                  {:hex &quot;E0FFFF&quot;, :rgb {:r 224, :g 255, :b 255}},
+                  :linen
+                  {:hex &quot;FAF0E6&quot;, :rgb {:r 250, :g 240, :b 230}},
+                  :lavender
+                  {:hex &quot;E6E6FA&quot;, :rgb {:r 230, :g 230, :b 250}},
+                  :dimgray
+                  {:hex &quot;696969&quot;, :rgb {:r 105, :g 105, :b 105}},
+                  :palegoldenrod
+                  {:hex &quot;EEE8AA&quot;, :rgb {:r 238, :g 232, :b 170}},
+                  :beige
+                  {:hex &quot;F5F5DC&quot;, :rgb {:r 245, :g 245, :b 220}},
+                  :black {:hex &quot;000000&quot;, :rgb {:r 0, :g 0, :b 0}}})</pre></td></tr><tr><td class="docs"><p>Return color by name</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- html-color-fn
+  [n]
+  (let [c (:rgb (html-colors n))
+        r (:r c)
+        g (:g c)
+        b (:b c)]
+    (make-awt-color r g b)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def html-awt-color (memoize html-color-fn))
+(def html-color (memoize #(to-color (html-awt-color %))))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
 SyntaxHighlighter.all();
 
 // hackity hack

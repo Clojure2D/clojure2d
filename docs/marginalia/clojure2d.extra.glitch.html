@@ -3071,11 +3071,11 @@ net.brehaut.ClojureTools = (function (SH) {
    (let [bpal (condp &gt; (r/drand 1.0)
                 0.1 (let [num (r/irand 5 20)]
                       {:type :iq
-                       :palette (c/make-random-palette num)})
+                       :palette (c/make-iq-random-palette num)})
                 0.5 {:type :colourlovers
-                     :palette (rand-nth c/palettes)}
+                     :palette (rand-nth c/colourlovers-palettes)}
                 0.6 (let [preset (rand-nth (keys c/paletton-presets))
-                          p (rand-nth c/palettes)
+                          p (rand-nth c/colourlovers-palettes)
                           h (map #(c/paletton-rgb-to-hue %) p)]
                       {:type :colourlovers-paletton
                        :conf {:hue h

@@ -18,15 +18,15 @@
 ;; All places which can be changed live are marked with ";;;; change!" comment
 
 (ns examples-ex26-freeart-source
-  (:require [clojure2d.core :refer :all]
+  (:require [clojure2d.color :as c]
+            [clojure2d.core :refer :all]
+            [clojure2d.extra.glitch :as g]
+            [clojure2d.extra.overlays :as o]
+            [clojure2d.extra.segmentation :as es]
+            [clojure2d.extra.signal :as s]
             [clojure2d.math :as m]
             [clojure2d.math.random :as r]
-            [clojure2d.pixels :as p]
-            [clojure2d.extra.overlays :as o]
-            [clojure2d.extra.glitch :as g]
-            [clojure2d.extra.signal :as s]
-            [clojure2d.color :as c]
-            [clojure2d.extra.segmentation :as es]))
+            [clojure2d.pixels :as p]))
 
 ;; turn on warnings
 (set! *warn-on-reflection* true)

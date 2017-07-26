@@ -109,10 +109,10 @@ Additionally in following namespaces:
 
 This is namespace for common generative/glitch specific libraries:
 
-* signal - signal processing, wave generators, effects and filters (sonification enabler)
+* signal - signal processing, wave generators, effects and filters (sonification enabler) [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.extra.signal.html)
 * overlays - 3 overlays (noise, spots and rgb scanlines) to finish your images [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.extra.overlays.html)
-* segmentation - segment Pixels into rectangles
-* variariations - vector field functions / variations taken from fractal flames world
+* segmentation - segment Pixels into rectangles [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.extra.segmentation.html)
+* variations - vector field functions / variations taken from fractal flames world [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.extra.variations.html)
 * glitch - glitching filters
 * raymarching - simple ray marching 3d scene renderer
 
@@ -153,7 +153,7 @@ I've prepared several examples with results where you can check current state of
 * ex31 - wavy lines
 * ex32 - harmonograms on noise (accumulation bins rendering)
 * ex33 - interpolations / easings
-* NOC - Nature of Code examples [link](https://github.com/shiffman/The-Nature-of-Code-Examples/)
+* NOC - [Nature of Code](https://github.com/shiffman/The-Nature-of-Code-Examples/) Clojure2d version
 
 ## TODO
 
@@ -213,5 +213,5 @@ Or just Pull Request.
 
 ## License
 
-Copyright © 2016 GenerateMe
+Copyright © 2016-2017 GenerateMe
 Distributed under the MIT Licence
