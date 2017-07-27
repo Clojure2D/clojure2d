@@ -16,7 +16,8 @@
   (:require [clojure2d.math :refer :all]
             [clojure2d.math.complex :as c]
             [clojure2d.math.random :refer :all]
-            [clojure2d.math.vector :as v])
+            [clojure2d.math.vector :as v]
+            [clojure2d.math.random :as r])
   (:import clojure2d.math.vector.Vec2
            [org.apache.commons.math3.special BesselJ Beta Erf Gamma]))
 
@@ -515,25 +516,85 @@
                (* vv (atan2 ay by) r y))))))
 (make-var-method blocky :regular)
 
-;; ### BesselJ
+;; ### Blur Circle
 
-(defn make-besselj
-  "Bessel"
+(defn make-blurcircle
+  "Blur circle"
   [^double amount _]
   (fn [^Vec2 v]
-    (Vec2. (* amount ^double (v/mag v) (BesselJ/value (abs (.x v)) (abs (.y v))))
-           (* amount ^double (v/heading v)))))
-(make-var-method besselj :regular)
+    (let [^double x (drand -1.0 1.0)
+          ^double y (drand -1.0 1.0)
+          absx (abs x)
+          absy (abs y)
+          ^Vec2 ps (if (>= absx absy)
+                     (Vec2. (if (>= x absy)
+                              (+ absx y)
+                              (- (* 5.0 absx) y)) absx)
+                     (Vec2. (if (>= y absx)
+                              (- (* 3.0 absy) x)
+                              (+ (* 7.0 absy) x)) absy))
+          r (* amount (.y ps))
+          a (-> M_PI_4
+                (* (.x ps))
+                (/ (.y ps))
+                (- M_PI_4))
+          sa (sin a)
+          ca (cos a)]
+      (Vec2. (* r ca) (* r sa)))))
+(make-var-method blurcircle :random)
 
-;; ### Beta
-
-(defn make-beta
-  "Beta"
+;; ### Blur
+(defn make-blur
+  "Blur"
   [^double amount _]
   (fn [^Vec2 v]
-    (Vec2. (* amount (Beta/logBeta (+ EPSILON (abs (.x v))) (+ EPSILON (abs (.y v)))))
-           (* amount ^double (v/heading v)))))
-(make-var-method beta :regular)
+    (let [r (drand TWO_PI)
+          sr (sin r)
+          cr (cos r)
+          ^double r2 (drand amount)]
+      (Vec2. (* r2 cr) (* r2 sr)))))
+(make-var-method blur :random)
+
+;; ### Blur pixelize
+
+(make-config-method blurpixelize {:size (srandom 0.01 1.2)
+                                  :scale (drand -1.2 1.2)})
+
+(defn make-blurpixelize
+  "Blur Pixelize from Apo7X15C"
+  [^double amount {:keys [^double size ^double scale]}]
+  (let [inv-size (/ 1.0 size)
+        av (* amount size)
+        half (Vec2. 0.5 0.5)]
+    (fn [v]
+      (-> v
+          (v/mult inv-size)
+          (v/applyf floor)
+          (v/add (-> (v/generate-vec2 drand)
+                     (v/sub half)
+                     (v/mult scale)))
+          (v/add half)
+          (v/mult av)))))
+(make-var-method blurpixelize :random)
+
+;; ### BlurZoom
+
+(make-config-method blurzoom {:length (drand -1.2 1.2)
+                              :x (drand -1.2 1.2)
+                              :y (drand -1.2 1.2)})
+
+(defn make-blurzoom
+  "Blur Zoom from Apo7X15C"
+  [^double amount {:keys [^double length ^double x ^double y]}]
+  (let [xy (Vec2. x y)
+        xy- (Vec2. x (- y))]
+    (fn [v]
+      (-> v
+          (v/sub xy)
+          (v/mult (inc ^double (drand length)))
+          (v/add xy-)
+          (v/mult amount)))))
+(make-var-method blurzoom :random)
 
 ;; ### Boarders
 
@@ -565,31 +626,279 @@
                    (* amount (- (+ hoffsety roundy) 0.25)))))))))
 (make-var-method boarders :random)
 
+(make-config-method boarders2 {:c (drand -1.2 1.2)
+                               :left (drand -1.2 1.2)
+                               :right (drand -1.2 1.2)})
+
+(defn make-boarders2
+  "Boarders"
+  [^double amount {:keys [^double c ^double left ^double right]}]
+  (let [cc (abs c)
+        cl (abs left)
+        cr (abs right)
+        cc (if (zero? cc) EPSILON cc)
+        cl (if (zero? cl) EPSILON cl)
+        cr (if (zero? cr) EPSILON cr)
+        cl (* c cl)
+        cr (+ c (* c cr))]
+    (fn [^Vec2 v]
+      (let [roundx (rint (.x v))
+            roundy (rint (.y v))
+            offsetx (- (.x v) roundx)
+            offsety (- (.y v) roundy)
+            coffsetx (* c offsetx)
+            coffsety (* c offsety)]
+        (if (brand cr)
+          (Vec2. (* amount (+ roundx coffsetx))
+                 (* amount (+ roundy coffsety)))
+          (if (>= (abs offsetx) (abs offsety))
+            
+            (if (>= offsetx 0.0)
+              (Vec2. (* amount (+ coffsetx roundx cl))
+                     (* amount (+ coffsety roundy (/ (* cl offsety) offsetx))))
+              (Vec2. (* amount (- (+ coffsetx roundx) cl))
+                     (* amount (- (+ coffsety roundy) (/ (* cl offsety) offsetx)))))
+            
+            (if (>= offsety 0.0)
+              (Vec2. (* amount (+ coffsetx roundx (/ (* cl offsetx) offsety)))
+                     (* amount (+ coffsety roundy cl)))
+              (Vec2. (* amount (- (+ coffsetx roundx) (/ (* cl offsetx) offsety)))
+                     (* amount (- (+ coffsety roundy) cl))))))))))
+(make-var-method boarders2 :random)
+
 ;; ### Bubble
 
 (defn make-bubble
   "Bubble"
   [^double amount _]
-  (fn [^Vec2 v]
+  (fn [v]
     (v/mult v (/ amount (inc (* 0.25 ^double (v/mag v)))))))
 (make-var-method bubble :regular)
-
 
 ;; ### Butterfly
 
 (defn make-butterfly
   "Butterfly"
   [^double amount _]
-  (fn [^Vec2 v]
-    (let [wx (* amount 1.3029400317411197908970256609023)
-          y2 (* 2.0 (.y v))
-          r (* wx (sqrt (/ (abs (* (.y v) (.x v)))
-                           (+ EPSILON (sq (.x v)) (sq y2)))))]
-      (Vec2. (* r (.x v))
-             (* r y2)))))
+  (let [wx (* amount 1.3029400317411197908970256609023)]
+    (fn [^Vec2 v]
+      (let [y2 (* 2.0 (.y v))
+            r (* wx (sqrt (/ (abs (* (.y v) (.x v)))
+                             (+ EPSILON (sq (.x v)) (sq y2)))))]
+        (Vec2. (* r (.x v))
+               (* r y2))))))
 (make-var-method butterfly :regular)
 
+;; ### BesselJ
+
+(defn make-besselj
+  "Bessel"
+  [^double amount _]
+  (fn [^Vec2 v]
+    (Vec2. (* amount ^double (v/mag v) (BesselJ/value (abs (.x v)) (abs (.y v))))
+           (* amount ^double (v/heading v)))))
+(make-var-method besselj :regular)
+
+;; ### Beta
+
+(defn make-beta
+  "Beta"
+  [^double amount _]
+  (fn [^Vec2 v]
+    (Vec2. (* amount (Beta/logBeta (+ EPSILON (abs (.x v))) (+ EPSILON (abs (.y v)))))
+           (* amount ^double (v/heading v)))))
+(make-var-method beta :regular)
+
 ;; ## C
+
+;; ### CPow3
+
+(make-config-method cpow3 {:r (drand -2 2)
+                           :a (drand -2 2)
+                           :divisor (srandom 0.1 2)
+                           :spread (srandom 0.1 2)
+                           :discrete-spread (srandom 0.1 2)
+                           :spread2 (drand -2 2)
+                           :offset2 (drand -2 2)})
+
+(defn make-cpow3
+  "CPow3"
+  [^double amount {:keys [^double r ^double a ^double divisor ^double spread ^double discrete-spread ^double spread2 ^double offset2]}]
+  (let [ang (/ TWO_PI divisor)
+        c (/ (* r (cos (* HALF_PI a))) divisor)
+        d (/ (* r (sin (* HALF_PI a))) divisor)
+        half-c (* 0.5 c)
+        half-d (* 0.5 d)
+        inv-spread (/ 0.5 spread)
+        full-spread (* TWO_PI spread)
+        fac (* c half-d ang)]
+    (fn [^Vec2 v]
+      (let [^double ai (v/heading v)
+            n (drand spread)
+            ^double n (if (>= discrete-spread 1.0) (int n) n)
+            n (if (neg? ai) (inc n) n)
+            ai (+ ai (* TWO_PI n))
+            ai (if (< (cos (* ai inv-spread)) ^double (drand -1.0 1.0)) (- ai full-spread) ai)
+            lnr2 (log (v/magsq v))
+            ri (* amount (exp (- (* half-c lnr2) (* d ai))))
+            ang2 (* fac ai lnr2 (+ (* spread2 ^double (drand)) offset2))]
+        (Vec2. (* ri (cos ang2))
+               (* ri (sin ang2)))))))
+(make-var-method cpow3 :random)
+
+;; ### CPow
+
+(make-config-method cpow {:r (drand -2 2)
+                          :i (drand -2 2)
+                          :power (srandom 0.1 12)})
+
+(defn make-cpow
+  "CPow"
+  [^double amount {:keys [^double r ^double i ^double power]}]
+  (let [va (/ TWO_PI power)
+        vc (/ r power)
+        vd (/ i power)]
+    (fn [v]
+      (let [^double a (v/heading v)
+            lnr (* 0.5 (log (v/magsq v)))
+            ang (+ (* a vc)
+                   (* vd lnr)
+                   (* va (floor (drand power))))
+            m (* amount (exp (- (* vc lnr)
+                                (* vd a))))]
+        (Vec2. (* m (cos ang)) (* m (sin ang)))))))
+(make-var-method cpow :random)
+
+;; ### Cell
+
+(make-config-method cell {:size (srandom 0.1 2.0)})
+
+(defn make-cell
+  "Cell"
+  [^double amount {:keys [^double size]}]
+  (let [inv-cell-size (/ 1.0 size)
+        av (Vec2. amount (- amount))]
+    (fn [v]
+      (let [^Vec2 xy (-> v
+                         (v/mult inv-cell-size)
+                         (v/applyf floor))
+            dxy (-> v
+                    (v/sub (v/mult xy size)))
+            newxy (if-not (neg? (.y xy))
+                    (if-not (neg? (.x xy))
+                      (v/mult xy 2.0)
+                      (Vec2. (- (inc (* 2.0 (.x xy))))
+                             (* 2.0 (.y xy))))
+                    (if-not (neg? (.x xy))
+                      (Vec2. (* 2.0 (.x xy))
+                             (- (inc (* 2.0 (.y xy)))))
+                      (Vec2. (- (inc (* 2.0 (.x xy))))
+                             (- (inc (* 2.0 (.y xy)))))))]
+        (-> newxy
+            (v/mult size)
+            (v/add dxy)
+            (v/emult av))))))
+(make-var-method cell :regular)
+
+;; ### Checks
+
+(make-config-method checks {:x (drand -10 10)
+                            :y (drand -10 10)
+                            :size (drand -2.0 2.0)
+                            :rnd (if (brand) 0.0 (srandom 0.1 1))})
+
+(defn make-checks
+  "Checks"
+  [^double amount {:keys [^double x ^double y ^double size ^double rnd]}]
+  (let [cs (/ 1.0 (+ size EPSILON))
+        ncx (* -1.0 x)
+        ncy (* -1.0 y)]
+    (fn [^Vec2 v]
+      (let [isxy (+ (round (* cs (.x v)))
+                    (round (* cs (.y v))))
+            dxy (if (even? isxy)
+                  (Vec2. (+ ncx ^double (drand rnd)) ncy)
+                  (Vec2. x (+ y ^double (drand rnd))))]
+        (-> v
+            (v/add dxy)
+            (v/mult amount))))))
+(make-var-method checks :random)
+
+;; ### Chunk
+
+(make-config-method chunk {:a (drand -1.2 1.2)
+                           :b (drand -1.2 1.2)
+                           :c (drand -1.2 1.2)
+                           :d (drand -1.2 1.2)
+                           :e (drand -1.2 1.2)
+                           :f (drand -1.2 1.2)
+                           :mode (brand)})
+
+(defn make-chunk
+  "Chunk, by zephyrtronium https://zephyrtronium.deviantart.com/art/Chunk-Apophysis-Plugin-Pack-182375397"
+  [^double amount {:keys [^double a ^double b ^double c ^double d ^double e ^double f mode]}]
+  (fn [^Vec2 v]
+    (let [r (+ (* a (sq (.x v)))
+               (* b (.x v) (.y v))
+               (* c (sq (.y v)))
+               (* d (.x v))
+               (* e (.y v))
+               f)]
+      (if mode
+        (if-not (pos? r) v zerov)
+        (if (pos? r) v zerov)))))
+(make-var-method chunk :regular)
+
+;; ### Circle blur
+
+(defn make-circleblur
+  "Circle blur"
+  [^double amount _]
+  (fn [_]
+    (let [rad (sqrt (drand))
+          ^double a (drand TWO_PI)]
+      (Vec2. (* amount (cos a) rad)
+             (* amount (sin a) rad)))))
+(make-var-method circleblur :random)
+
+;; ### CircleRand
+
+(make-config-method circlerand {:Sc (srandom 0.1 1.2)
+                                :Dens (drand 1)
+                                :X (drand -20 20)
+                                :Y (drand -20 20)
+                                :Seed (irand Integer/MAX_VALUE)})
+
+(defn make-circlerand
+  "Circle Rand http://eralex61.deviantart.com/art/Circles-Plugins-126273412"
+  [^double amount {:keys [^double Sc ^double Dens ^double X ^double Y ^double Seed]}]
+  (let [xy (Vec2. X Y)] 
+    (fn [v]
+      (loop [iter (int 0)]
+        (let [XY (-> (v/generate-vec2 #(drand -1.0 1.0))
+                     (v/emult xy))
+              ^Vec2 MN (-> XY
+                           (v/mult 0.5)
+                           (v/div Sc)
+                           (v/applyf floor))
+              XY (v/sub XY (-> MN
+                               (v/mult 2.0)
+                               (v/applyf inc)
+                               (v/mult Sc)))]
+          (if (and (< iter 100)
+                   (or (> (discrete-noise (+ Seed (.x MN)) (.y MN)) Dens)
+                       (> ^double (v/mag XY) (-> (discrete-noise (+ 10 (.x MN)) (+ 3 (.y MN)))
+                                                 (* 0.7)
+                                                 (+ 0.3)
+                                                 (* Sc)))))
+            (recur (inc iter))
+            (-> MN
+                (v/mult 2.0)
+                (v/applyf inc)
+                (v/mult Sc)
+                (v/add XY)
+                (v/mult amount))))))))
+(make-var-method circlerand :random)
 
 ;; ### CircleLinear
 
@@ -1031,11 +1340,18 @@
   [^double amount _]
   (fn [^Vec2 v]
     (let [a (+ (* 0.5 ^double (v/heading v)) (* PI ^double (irand 2)))
-          r (->> (v/mag v)
-                 (sqrt)
-                 (* amount))]
+          r (* amount (sqrt (v/mag v)))]
       (Vec2. (* r (cos a)) (* r (sin a))))))
 (make-var-method julia :random)
+
+(defn make-julia2
+  "Julia with different angle calc"
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [a (+ (* 0.5 ^double (atan2 (.x v) (.y v))) (* PI ^double (irand 2)))
+          r (* amount (sqrt (v/mag v)))]
+      (Vec2. (* r (cos a)) (* r (sin a))))))
+(make-var-method julia2 :random)
 
 ;; ### JuliaC
 
@@ -1299,6 +1615,24 @@
           r (/ 1.0 d)]
       (v/mult v r))))
 (make-var-method scry :regular)
+
+;; ### Sech
+
+(defn make-sech
+  "Sech"
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [sn (sin (.y v))
+          cn (cos (.y v))
+          snh (sinh (.x v))
+          cnh (cosh (.x v))
+          d (+ (cos (* 2.0 (.y v)))
+               (cosh (* 2.0 (.x v))))
+          d (if (zero? d) EPSILON d)
+          den (/ 2.0 d)]
+      (Vec2. (* amount den cn cnh)
+             (* (- amount) den sn snh)))))
+(make-var-method sech :regular)
 
 ;; ### Sinusoidal
 

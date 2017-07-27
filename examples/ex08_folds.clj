@@ -27,19 +27,17 @@
 (def ^:const ^long w- (dec w))
 (def ^:const ^long h- (dec h))
 
-(def ^:const ^double fscale 1.0)
+(def ^:const ^double fscale 0.623)
 
-(def s60 (make-spots 60 [60 120 180] w h))
-(def n60 (make-noise 60 w h))
+(def s60 (future (make-spots 60 [60 120 180] w h)))
+(def n60 (future (make-noise 60 w h)))
 
 (defn make-me
   ""
   [canvas window]
   (let [field-config (vr/make-random-configuration)
         field (vr/make-combination field-config)
-        field (vr/make-variation :blocky 1.0 {:x 0.7880436182022095
-                                              :y -0.8832911252975464
-                                              :mp -1.4870004653930664})
+        ;; field (vr/make-variation :circlerand)
         ] 
 
     (pprint field-config)
@@ -63,8 +61,8 @@
     (set-background 255 250 245)
     (set-color 35 35 35 16)
     (make-me disp)
-    (image (render-noise n60 (get-image canvas)))
-    (image (render-spots s60 (get-image canvas))))
+    (image (render-noise @n60 (get-image canvas)))
+    (image (render-spots @s60 (get-image canvas))))
   :done)
 
 (defn example-08
