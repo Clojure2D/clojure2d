@@ -984,6 +984,22 @@
              (- (* amount (sin r) (sinh (.y v))))))))
 (make-var-method cosine :regular)
 
+;; ### Curl
+
+(make-config-method curl {:c1 (drand -1 1)
+                          :c2 (drand -1 1)})
+
+(defn make-curl
+  "Curl"
+  [^double amount {:keys [^double c1 ^double c2]}]
+  (fn [^Vec2 v]
+    (let [re (inc (+ (* c1 (.x v)) (* c2 (- (sq (.x v)) (sq (.y v))))))
+          im (+ (* c1 (.y v)) (* c2 2.0 (.x v) (.y v)))
+          r (/ amount (+ (sq re) (sq im)))]
+      (Vec2. (* r (+ (* (.x v) re) (* (.y v) im)))
+             (* r (- (* (.y v) re) (* (.x v) im)))))))
+(make-var-method curl :regular)
+
 ;; ### Cross
 
 (defn make-cross
@@ -1267,6 +1283,61 @@
            (* amount ^double (v/heading v)))))
 (make-var-method gamma :regular)
 
+;; ### GaussianBlur
+
+(defn make-gaussianblur
+  "Gaussian"
+  [^double amount _]
+  (fn [v]
+    (let [^double a (drand TWO_PI)
+          r (* amount (+ ^double (drand) ^double (drand) ^double (drand) ^double (drand) -2.0))]
+      (Vec2. (* r (cos a)) (* r (sin a))))))
+(make-var-method gaussianblur :random)
+
+;; ### GDOffs
+
+(make-config-method gdoffs {:delta-x (drand -6 6)
+                            :delta-y (drand -6 6)
+                            :area-x (srandom 0.5 3)
+                            :area-y (srandom 0.5 3)
+                            :center-x (drand -1 1)
+                            :center-y (drand -1 1)
+                            :gamma (drand -5 5)
+                            :square brand})
+
+(def ^:const ^double agdod-- 0.1)
+(def ^:const ^double agdoa-- 2.0)
+(def ^:const ^double agdoc-- 1.0)
+
+(defn- fclp ^double [^double a] (if (neg? a) (- (rem (abs a) 1.0)) (rem (abs a) 1.0)))
+(defn- fscl ^double [^double a] (fclp (* 0.5 (inc a))))
+(defn- fosc ^double [^double p ^double a] (fscl (- (cos (* p a TWO_PI)))))
+(defn- flip ^double [^double a ^double b ^double c] (+ a (* c (- b a))))
+
+(defn make-gdoffs
+  "GDOffs"
+  [^double amount {:keys [^double delta-x ^double delta-y ^double area-x ^double area-y ^double center-x ^double center-y ^double gamma square]}]
+  (let [gdodx (* delta-x agdod--)
+        gdody (* delta-y agdod--)
+        gdoax (* agdoa-- (if (< (abs area-x) 0.1) 0.1 (abs area-x)))
+        gdoay (* agdoa-- (if (< (abs area-y) 0.1) 0.1 (abs area-y)))
+        gdocx (* center-x agdoc--)
+        gdocy (* center-y agdoc--)
+        gdog gamma
+        gdos square
+        gdob (/ (* gdog agdoa--) (max gdoax gdoay))]
+    (fn [^Vec2 v]
+      (let [osc-x (fosc gdodx 1.0)
+            osc-y (if gdos (fosc gdody 1.0) 1.0)
+            in-x (+ (.x v) gdocx)
+            in-y (+ (.y v) gdocy)]
+        (v/mult (if gdos
+                  (Vec2. (flip (flip in-x (fosc in-x 4.0) osc-x) (fosc (fclp (* gdob in-x)) 4.0) osc-x)
+                         (flip (flip in-y (fosc in-y 4.0) osc-x) (fosc (fclp (* gdob in-y)) 4.0) osc-x))
+                  (Vec2. (flip (flip in-x (fosc in-x 4.0) osc-x) (fosc (fclp (* gdob in-x)) 4.0) osc-x)
+                         (flip (flip in-y (fosc in-y 4.0) osc-y) (fosc (fclp (* gdob in-y)) 4.0) osc-y))) amount)))))
+(make-var-method gdoffs :regular)
+
 ;; ## H
 ;;
 ;; ### Heart
@@ -1386,11 +1457,32 @@
   [^double amount {:keys [^double power ^double dist]}]
   (let [abspower (int (abs power))
         cpower (* 0.5 (/ dist power))]
-    (fn [^Vec2 v]
+    (fn [v]
       (let [a (/ (+ ^double (v/heading v) (* TWO_PI ^int (irand abspower))) power)
             r (* amount (pow (v/magsq v) cpower))]
         (Vec2. (* r (cos a)) (* r (sin a)))))))
 (make-var-method julian :random)
+
+;; ### JuliaScope
+
+(make-config-method juliascope (let [r (srandom 1 10)]
+                                 {:power (if (brand) r (int r))
+                                  :dist (drand -4 4)}))
+
+(defn make-juliascope
+  "JuliaScope"
+  [^double amount {:keys [^double power ^double dist]}]
+  (let [abspower (int (abs power))
+        cpower (* 0.5 (/ dist power))]
+    (fn [v]
+      (let [^long rnd (lrand abspower)
+            a (if (zero? (bit-and rnd 1))
+                (/ (+ (* TWO_PI rnd) ^double (v/heading v)) power)
+                (/ (- (* TWO_PI rnd) ^double (v/heading v)) power))
+            r (* amount (pow (v/magsq v) cpower))]
+        (Vec2. (* r (cos a)) (* r (sin a)))))))
+(make-var-method juliascope :random)
+
 
 ;; ### JuliaQ
 
@@ -1412,6 +1504,19 @@
 
 ;; ## L
 
+;; ### LogApo
+
+(make-config-method logapo {:base (drand 0.01 20)})
+
+(defn make-logapo
+  "LogApo"
+  [^double amount {:keys [^double base]}]
+  (let [denom (/ 0.5 (log base))]
+    (fn [v]
+      (Vec2. (* amount denom (log (v/magsq v)))
+             (* amount ^double (v/heading v))))))
+(make-var-method logapo :regular)
+
 ;; ### Log
 
 (defn make-log
@@ -1421,6 +1526,42 @@
     (Vec2. (* amount 0.5 (log ^double (v/magsq v)))
            (* amount ^double (v/heading v)))))
 (make-var-method log :regular)
+
+;; ## N
+
+;; ### Ngon
+
+(make-config-method ngon {:circle (drand -2 2)
+                          :corners (drand -2 2)
+                          :power (drand -10 10)
+                          :sides (drand -10 10)})
+
+(defn make-ngon
+  "Ngon"
+  [^double amount {:keys [^double circle ^double corners ^double power ^double sides]}]
+  (let [b (/ TWO_PI sides)
+        hb (/ b 2.0)
+        hpower (/ power 2.0)]
+    (fn [v]
+      (let [r-factor (pow (v/magsq v) hpower)
+            ^double theta (v/heading v)
+            phi (- theta (* b (floor (/ theta b))))
+            phi (if (> phi hb) (- phi b) phi)
+            amp (/ (+ circle (* corners (dec (/ 1.0 (+ (cos phi) EPSILON))))) (+ r-factor EPSILON))]
+        (v/mult v (* amount amp))))))
+(make-var-method ngon :regular)
+
+;; ### Noise
+
+(defn make-noise
+  "Noise"
+  [^double amount _]
+  (fn [v]
+    (let [^double a (drand TWO_PI)
+          ^double r (drand amount)]
+      (Vec2. (* r (cos a))
+             (* r (sin a))))))
+(make-var-method noise :random)
 
 ;; ## P
 
@@ -1539,6 +1680,38 @@
 
 ;; ## R
 
+;; ### Radial Blur
+
+(make-config-method radialblur {:angle (drand (- TWO_PI) TWO_PI)})
+
+(defn make-radialblur
+  "Radial blur"
+  [^double amount {:keys [^double angle]}]
+  (let [spin (* amount (sin (* angle HALF_PI)))
+        zoom (* amount (cos (* angle HALF_PI)))]
+    (fn [^Vec2 v]
+      (let [rnd-g (+ ^double (drand) ^double (drand) ^double (drand) ^double (drand) -2.0)
+            ^double ra (v/mag v)
+            alpha (+ (* spin rnd-g) ^double (v/heading v))
+            rz (dec (* zoom rnd-g))]
+        (Vec2. (+ (* rz (.x v)) (* ra (cos alpha)))
+               (+ (* rz (.y v)) (* ra (sin alpha))))))))
+(make-var-method radialblur :random)
+
+;; ### Rays
+
+(defn make-rays
+  "Rays"
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [ang (* amount ^double (drand PI))
+          r (/ amount (+ EPSILON ^double (v/magsq v)))
+          tanr (* amount r (tan ang))]
+      (Vec2. (* tanr (cos (.x v)))
+             (* tanr (sin (.y v)))))))
+(make-var-method rays :random)
+
+
 ;; ### Rectangles
 
 (make-config-method rectangles {:x (drand -1.5 1.5)
@@ -1598,6 +1771,17 @@
         (v/mult v r)))))
 (make-var-method rings2 :regular)
 
+;; ### Rippled
+
+(defn make-rippled
+  "Rippled"
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [d (+ EPSILON ^double (v/magsq v))]
+      (Vec2. (* (* (tanh d) (* 2.0 (.x v))) (/ amount 2.0))
+             (* (* (cos d) (* 2.0 (.y v))) (/ amount 2.0))))))
+(make-var-method rippled :regular)
+
 ;; ## S
 
 ;; ### Scry
@@ -1644,6 +1828,16 @@
 (make-var-method sinusoidal :regular)
 
 ;; ### Secant
+
+(defn make-secant
+  "Secant2"
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [r (* amount ^double (v/mag v))
+          cr (* amount (cos r))
+          icr (/ 1.0 (if (zero? cr) EPSILON cr))]
+      (Vec2. (* amount (.x v)) icr))))
+(make-var-method secant :regular)
 
 (defn make-secant2
   "Secant2"
@@ -1717,6 +1911,16 @@
              (* amount (- (.y v) y))))))
 (make-var-method splits :regular)
 
+;; ### Square
+
+(defn make-square
+  "Square"
+  [^double amount _]
+  (fn [v]
+    (Vec2. (* amount ^double (drand -0.5 0.5))
+           (* amount ^double (drand -0.5 0.5)))))
+(make-var-method square :random)
+
 ;; ### Squirrel
 
 (make-config-method squirrel {:a (drand EPSILON 4.0)
@@ -1780,6 +1984,20 @@
              (* amount (tan (.y v)))))))
 (make-var-method tangent :regular)
 
+;; ### Twintrian
+
+(defn make-twintrian
+  "Twintrian"
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [r (* amount ^double (drand) ^double (v/mag v))
+          sinr (sin r)
+          diff (+ (cos r) (log10 (sq sinr)))]
+      (Vec2. (* amount diff (.x v))
+             (* amount (.x v) (- diff (* PI sinr)))))))
+(make-var-method twintrian :random)
+
+
 ;; ### Taurus
 
 (make-config-method taurus {:r (drand -5.0 5.0)
@@ -1839,6 +2057,141 @@
 (make-var-method trade :regular)
 
 ;; ## V
+
+;; ### Vibration
+
+(make-config-method vibration {:dir (drand TWO_PI)
+                               :angle (drand TWO_PI)
+                               :freq (srandom 0.01 2.0)
+                               :amp (srandom 0.1 1.0)
+                               :phase (drand)
+                               :dir2 (drand TWO_PI)
+                               :angle2 (drand TWO_PI)
+                               :freq2 (srandom 0.01 2.0)
+                               :amp2 (srandom 0.1 1.0)
+                               :phase2 (drand)})
+
+(defn make-vibration
+  "Vibration http://fractal-resources.deviantart.com/art/Apo-Plugins-Vibration-1-and-2-252001851"
+  [^double amount {:keys [^double dir ^double angle ^double freq ^double amp ^double phase
+                          ^double dir2 ^double angle2 ^double freq2 ^double amp2 ^double phase2]}]
+  (let [total-angle (+ angle dir)
+        cos-dir (cos dir)
+        sin-dir (sin dir)
+        cos-tot (cos total-angle)
+        sin-tot (sin total-angle)
+        scaled-freq (* TWO_PI freq)
+        phase-shift (/ (* TWO_PI phase) freq)
+        total-angle2 (+ angle2 dir2)
+        cos-dir2 (cos dir2)
+        sin-dir2 (sin dir2)
+        cos-tot2 (cos total-angle2)
+        sin-tot2 (sin total-angle2)
+        scaled-freq2 (* TWO_PI freq2)
+        phase-shift2 (/ (* TWO_PI phase2) freq2)]
+    (fn [^Vec2 v]
+      (let [d-along-dir (+ (* (.x v) cos-dir)
+                           (* (.y v) sin-dir))
+            local-amp (* amp (sin (+ (* d-along-dir scaled-freq) phase-shift)))
+            x (+ (.x v) (* local-amp cos-tot))
+            y (+ (.y v) (* local-amp sin-tot))
+            d-along-dir (+ (* (.x v) cos-dir2)
+                           (* (.y v) sin-dir2))
+            local-amp (* amp2 (sin (+ (* d-along-dir scaled-freq2) phase-shift2)))
+            x (+ x (* local-amp cos-tot2))
+            y (+ y (* local-amp sin-tot2))]
+        (Vec2. (* amount x) (* amount y))))))
+(make-var-method vibration :regular)
+
+(make-config-method vibration2 {:dir (drand TWO_PI)
+                                :angle (drand TWO_PI)
+                                :freq (srandom 0.01 2.0)
+                                :amp (srandom 0.1 1.0)
+                                :phase (drand)
+                                :dir2 (drand TWO_PI)
+                                :angle2 (drand TWO_PI)
+                                :freq2 (srandom 0.01 2.0)
+                                :amp2 (srandom 0.1 1.0)
+                                :phase2 (drand)
+                                :dm (drand -0.5 0.5)
+                                :dmfreq (srandom 0.01 1.0)
+                                :tm (drand -0.5 0.5)
+                                :tmfreq (srandom 0.01 1.0)
+                                :fm (drand -0.5 0.5)
+                                :fmfreq (srandom 0.01 1.0)
+                                :am (drand -0.5 0.5)
+                                :amfreq (srandom 0.01 1.0)
+                                :d2m (drand -0.5 0.5)
+                                :d2mfreq (srandom 0.01 1.0)
+                                :t2m (drand -0.5 0.5)
+                                :t2mfreq (srandom 0.01 1.0)
+                                :f2m (drand -0.5 0.5)
+                                :f2mfreq (srandom 0.01 1.0)
+                                :a2m (drand -0.5 0.5)
+                                :a2mfreq (srandom 0.01 1.0)})
+
+(defn- v-modulate 
+  "Modulate"
+  ^double [^double amp ^double freq ^double x]
+  (* amp (cos (* x freq TWO_PI))))
+
+(defn make-vibration2
+  "Vibration 2 http://fractal-resources.deviantart.com/art/Apo-Plugins-Vibration-1-and-2-252001851"
+  [^double amount {:keys [^double dir ^double angle ^double freq ^double amp ^double phase
+                          ^double dir2 ^double angle2 ^double freq2 ^double amp2 ^double phase2
+                          ^double dm ^double dmfreq
+                          ^double tm ^double tmfreq
+                          ^double fm ^double fmfreq
+                          ^double am ^double amfreq
+                          ^double d2m ^double d2mfreq
+                          ^double t2m ^double t2mfreq
+                          ^double f2m ^double f2mfreq
+                          ^double a2m ^double a2mfreq]}]
+  (let [cdir (cos dir)
+        sdir (sin dir)
+        cdir2 (cos dir2)
+        sdir2 (sin dir2)]
+    (fn [^Vec2 v]
+      (let [d-along-dir (+ (* (.x v) cdir)
+                           (* (.y v) sdir))
+            dir-l (+ dir (v-modulate dm dmfreq d-along-dir))
+            angle-l (+ angle (v-modulate tm tmfreq d-along-dir))
+            freq-l (/ (v-modulate fm fmfreq d-along-dir) freq)
+            amp-l (+ amp (* amp (v-modulate am amfreq d-along-dir)))
+            total-angle (+ angle-l dir-l)
+            cos-dir (cos dir-l)
+            sin-dir (sin dir-l)
+            cos-tot (cos total-angle)
+            sin-tot (sin total-angle)
+            scaled-freq (* TWO_PI freq)
+            phase-shift (/ (* TWO_PI phase) freq)
+            d-along-dir (+ (* (.x v) cos-dir)
+                           (* (.y v) sin-dir))
+            local-amp (* amp-l (sin (+ (* d-along-dir scaled-freq) freq-l phase-shift)))
+            x (+ (.x v) (* local-amp cos-tot))
+            y (+ (.y v) (* local-amp sin-tot))
+
+            d-along-dir (+ (* (.x v) cdir2)
+                           (* (.y v) sdir2))
+            dir-l (+ dir2 (v-modulate d2m d2mfreq d-along-dir))
+            angle-l (+ angle2 (v-modulate t2m t2mfreq d-along-dir))
+            freq-l (/ (v-modulate f2m f2mfreq d-along-dir) freq2)
+            amp-l (+ amp2 (* amp2 (v-modulate a2m a2mfreq d-along-dir)))
+            total-angle (+ angle-l dir-l)
+            cos-dir (cos dir-l)
+            sin-dir (sin dir-l)
+            cos-tot (cos total-angle)
+            sin-tot (sin total-angle)
+            scaled-freq (* TWO_PI freq2)
+            phase-shift (/ (* TWO_PI phase2) freq2)
+            d-along-dir (+ (* (.x v) cos-dir)
+                           (* (.y v) sin-dir))
+            local-amp (* amp-l (sin (+ (* d-along-dir scaled-freq) freq-l phase-shift)))
+            x (+ x (* local-amp cos-tot))
+            y (+ y (* local-amp sin-tot))]
+        (Vec2. (* amount x)
+               (* amount y))))))
+(make-var-method vibration2 :regular)
 
 ;; ### Voron
 

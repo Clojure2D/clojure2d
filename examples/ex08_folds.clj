@@ -27,7 +27,7 @@
 (def ^:const ^long w- (dec w))
 (def ^:const ^long h- (dec h))
 
-(def ^:const ^double fscale 0.623)
+(def ^:const ^double fscale 1.0)
 
 (def s60 (future (make-spots 60 [60 120 180] w h)))
 (def n60 (future (make-noise 60 w h)))
@@ -37,7 +37,8 @@
   [canvas window]
   (let [field-config (vr/make-random-configuration)
         field (vr/make-combination field-config)
-        ;; field (vr/make-variation :circlerand)
+        ;; field (vr/make-variation :vibration 1.0 {})
+        
         ] 
 
     (pprint field-config)
@@ -77,4 +78,3 @@
     [canvas window]))
 
 (draw-folds (example-08))
-
