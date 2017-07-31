@@ -839,7 +839,7 @@
     (BinPixels. bins ch1 ch2 ch3 sizex sizey sizex+ fnormx fnormy)))
 
 (defn merge-binpixels
-  "Paralelly merge two binpixels and recalculate min/max. Be sure a and b are equal. Use this function to merge results created in separated threads"
+  "Paralelly merge two binpixels. Be sure a and b are equal. Use this function to merge results created in separated threads"
   ^BinPixels [^BinPixels a ^BinPixels b]
   (let [ch1 (future (amap ^doubles (.ch1 a) idx ret (+ (aget ^doubles (.ch1 a) idx) (aget ^doubles (.ch1 b) idx))))
         ch2 (future (amap ^doubles (.ch2 a) idx ret (+ (aget ^doubles (.ch2 a) idx) (aget ^doubles (.ch2 b) idx))))

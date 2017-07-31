@@ -875,7 +875,7 @@
 ;; * oscilator name (see `oscillators` variable)
 ;; * frequency
 ;; * amplitude
-;; * phase
+;; * phase (0-1)
 ;;
 ;; Multimethod creates oscillator function accepting `double` (time) and resulting `double` from [-1.0 1.0] range.
 
@@ -937,5 +937,5 @@
         ^doubles buffer (double-array len)
         limit (dec seconds)]
     (dotimes [i len]
-      (aset ^doubles buffer (int i) (double (f (m/norm i 0 len 0 limit)))))
+      (aset ^doubles buffer (int i) ^double (f (m/norm i 0 len 0 limit))))
     (Signal. buffer)))

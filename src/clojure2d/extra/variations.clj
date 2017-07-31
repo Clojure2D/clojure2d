@@ -2395,7 +2395,7 @@
      {:type :operation :name operand :var1 f1 :var2 f2}))
   ([f]
    (if (brand 0.1) f
-       (if (brand 0.15)
+       (if (brand 0.1)
          {:type :operation :name :deriv :var f}
          (build-random-configuration-step f (build-random-variation-step)))))
   ([]

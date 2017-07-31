@@ -140,11 +140,13 @@
   * Input: image (`BufferedImage` object) and filename
   * Side effect: saved image"
   [b filename]
-  (println (str "saving: " filename))
+  (println (str "saving: " filename "..."))
   (make-parents filename)
   (let [iwriter (get-image-writer filename)]
     (if-not (nil? iwriter)
-      (save-file-type filename b iwriter)
+      (do
+        (save-file-type filename b iwriter)
+        (println "...done!"))
       (println (str "can't save an image: " filename)))))
 
 ;; ### Additional functions

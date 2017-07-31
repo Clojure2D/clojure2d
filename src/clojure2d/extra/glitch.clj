@@ -1,3 +1,18 @@
+;; # Namespace scope
+;;
+;; Various glitching pixel filters or functions
+;;
+;; * Slitscan
+;; * Mirror
+;; * Slitscan2
+;; * Fold
+;; * Blend two Pixels (compose)
+;; * Reduce colors
+;;
+;; All filters are equiped with random configuration generator. This way you can easily search vast space of options.
+;;
+;; More info soon. Some API is subject to change (make it more consistent).
+
 (ns clojure2d.extra.glitch
   (:require [clojure2d.math :as m]
             [clojure2d.math.random :as r]
@@ -12,13 +27,18 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
-;; Simple 2d SLITSCAN
+;; ## Slitscan
+
+;; ### Simple slitscan
+;;
+;; Pixels are shifted by value returned by wave function. You have to provide separate wave functions for x and y axises.
+;; Random setup is based on sum of oscillators defined in `signal` namespace.
 
 (def freqs (vec (map #(bit-shift-left 1 ^long %) (range 16))))
 (def amps (mapv #(/ 1.0 ^long %) freqs))
 
 (defn slitscan-random-setup
-  ""
+  "Create list of random waves "
   ([n]
    (let [f (fn []
              (let [r (r/irand 4)]
@@ -46,7 +66,7 @@
         shifty (* 0.5 (.h p) ^double (fy (* ^long y sy)))
         xx (rem (int (+ ^long x (.w p) shiftx)) (.w p))
         yy (rem (int (+ ^long y (.h p) shifty)) (.h p))]
-      (p/get-value p ch xx yy)))
+    (p/get-value p ch xx yy)))
 
 (defn make-slitscan-filter
   ""
@@ -60,9 +80,46 @@
 (defn make-shift-channels-filter
   ""
   [amount h v]
-  (let [mv (fn [_] amount)
-        zr (fn [_] 0.0)]
-   (make-slitscan-filter (if h mv zr) (if v mv zr))))
+  (let [mv (constantly amount)
+        zr (constantly 0.0)]
+    (make-slitscan-filter (if h mv zr) (if v mv zr))))
+
+(defn make-slitscan2-filter
+  "f: Vec2 -> Vec2 (use variation)
+   r: value 1.0-3.0"
+  ([f ^double r]
+   (let [r- (- r)]
+     (fn [ch t ^Pixels p]
+       (dotimes [y (.h p)]
+         (let [^double yv (m/norm y 0.0 (.h p) r- r)]
+           (dotimes [x (.w p)]
+             (let [xlerp (m/norm x 0.0 (.w p))
+                   v1 (f (Vec2. r- yv))
+                   v2 (f (Vec2. r yv))
+                   ^Vec2 vv (v/interpolate v1 v2 xlerp)
+                   xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
+                   yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
+               (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
+  ([f]
+   (make-slitscan2-filter f 2.0)))
+
+;;
+(defn make-fold-filter
+  "f: Vec2 -> Vec2 (use variation)
+   r: value 1.0-3.0"
+  ([f ^double r]
+   (let [r- (- r)]
+     (fn [ch t ^Pixels p]
+       (dotimes [y (.h p)]
+         (let [^double yv (m/norm y 0.0 (.h p) r- r)]
+           (dotimes [x (.w p)]
+             (let [^double xv (m/norm x 0.0 (.w p) r- r)
+                   ^Vec2 vv (f (Vec2. xv yv))
+                   xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
+                   yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
+               (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
+  ([f]
+   (make-fold-filter f 2.0)))
 
 ;; mirrorimage
 
@@ -167,44 +224,6 @@
   (t mirror-types))
 
 ;;
-
-(defn make-slitscan2-filter
-  "f: Vec2 -> Vec2 (use variation)
-   r: value 1.0-3.0"
-  ([f ^double r]
-   (let [r- (- r)]
-     (fn [ch t ^Pixels p]
-       (dotimes [y (.h p)]
-         (let [^double yv (m/norm y 0.0 (.h p) r- r)]
-           (dotimes [x (.w p)]
-             (let [xlerp (m/norm x 0.0 (.w p))
-                   v1 (f (Vec2. r- yv))
-                   v2 (f (Vec2. r yv))
-                   ^Vec2 vv (v/interpolate v1 v2 xlerp)
-                   xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
-                   yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
-               (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
-  ([f]
-   (make-slitscan2-filter f 2.0)))
-
-;;
-(defn make-fold-filter
-  "f: Vec2 -> Vec2 (use variation)
-   r: value 1.0-3.0"
-  ([f ^double r]
-   (let [r- (- r)]
-     (fn [ch t ^Pixels p]
-       (dotimes [y (.h p)]
-         (let [^double yv (m/norm y 0.0 (.h p) r- r)]
-           (dotimes [x (.w p)]
-             (let [^double xv (m/norm x 0.0 (.w p) r- r)
-                   ^Vec2 vv (f (Vec2. xv yv))
-                   xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
-                   yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
-               (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
-  ([f]
-   (make-fold-filter f 2.0)))
-
 
 ;; blend machine
 
