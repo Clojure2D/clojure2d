@@ -90,7 +90,7 @@
 (defn- srandom
   "Symetric random from [-mx -mn] and [mn mx]"
   ^double  [^double mn ^double mx]
-  (let [^double rand (drand mn mx)]
+  (let [rand (drand mn mx)]
     (if (brand)
       rand
       (* -1 rand))))
@@ -119,7 +119,7 @@
   "Arch"
   [^double amount _]
   (fn [^Vec2 v]
-    (let [ang (* amount ^double (drand PI))
+    (let [ang (* amount (drand PI))
           sinr (sin ang)
           cosr (cos ang)]
       (if (zero? cosr) zerov
@@ -317,7 +317,7 @@
                   (- pre-tau split)
                   (+ pre-tau split))
             sigma (+ (/ pre-sigma power)
-                     (* mp (floor (* power ^double (drand)))))]
+                     (* mp (floor (* power (drand)))))]
         (bseries-calc amount tau sigma)))))
 (make-var-method btransform :random)
 
@@ -448,7 +448,7 @@
   "Blade"
   [^double amount _]
   (fn [^Vec2 v]
-    (let [r (* ^double (drand amount) ^double (v/mag v))
+    (let [r (* (drand amount) ^double (v/mag v))
           sinr (sin r)
           cosr (cos r)]
       (Vec2. (* amount (.x v) (+ cosr sinr))
@@ -459,7 +459,7 @@
   "Blade2"
   [^double amount _]
   (fn [^Vec2 v]
-    (let [r (* ^double (drand amount) ^double (v/mag v))
+    (let [r (* (drand amount) ^double (v/mag v))
           sinr (sin r)
           cosr (cos r)]
       (Vec2. (* amount (.x v) (+ cosr sinr))
@@ -522,8 +522,8 @@
   "Blur circle"
   [^double amount _]
   (fn [^Vec2 v]
-    (let [^double x (drand -1.0 1.0)
-          ^double y (drand -1.0 1.0)
+    (let [x (drand -1.0 1.0)
+          y (drand -1.0 1.0)
           absx (abs x)
           absy (abs y)
           ^Vec2 ps (if (>= absx absy)
@@ -551,7 +551,7 @@
     (let [r (drand TWO_PI)
           sr (sin r)
           cr (cos r)
-          ^double r2 (drand amount)]
+          r2 (drand amount)]
       (Vec2. (* r2 cr) (* r2 sr)))))
 (make-var-method blur :random)
 
@@ -591,7 +591,7 @@
     (fn [v]
       (-> v
           (v/sub xy)
-          (v/mult (inc ^double (drand length)))
+          (v/mult (inc (drand length)))
           (v/add xy-)
           (v/mult amount)))))
 (make-var-method blurzoom :random)
@@ -735,13 +735,13 @@
     (fn [^Vec2 v]
       (let [^double ai (v/heading v)
             n (drand spread)
-            ^double n (if (>= discrete-spread 1.0) (int n) n)
+            n (double (if (>= discrete-spread 1.0) (int n) n))
             n (if (neg? ai) (inc n) n)
             ai (+ ai (* TWO_PI n))
-            ai (if (< (cos (* ai inv-spread)) ^double (drand -1.0 1.0)) (- ai full-spread) ai)
+            ai (if (< (cos (* ai inv-spread)) (drand -1.0 1.0)) (- ai full-spread) ai)
             lnr2 (log (v/magsq v))
             ri (* amount (exp (- (* half-c lnr2) (* d ai))))
-            ang2 (* fac ai lnr2 (+ (* spread2 ^double (drand)) offset2))]
+            ang2 (* fac ai lnr2 (+ (* spread2 (drand)) offset2))]
         (Vec2. (* ri (cos ang2))
                (* ri (sin ang2)))))))
 (make-var-method cpow3 :random)
@@ -817,8 +817,8 @@
       (let [isxy (+ (round (* cs (.x v)))
                     (round (* cs (.y v))))
             dxy (if (even? isxy)
-                  (Vec2. (+ ncx ^double (drand rnd)) ncy)
-                  (Vec2. x (+ y ^double (drand rnd))))]
+                  (Vec2. (+ ncx (drand rnd)) ncy)
+                  (Vec2. x (+ y (drand rnd))))]
         (-> v
             (v/add dxy)
             (v/mult amount))))))
@@ -856,7 +856,7 @@
   [^double amount _]
   (fn [_]
     (let [rad (sqrt (drand))
-          ^double a (drand TWO_PI)]
+          a (drand TWO_PI)]
       (Vec2. (* amount (cos a) rad)
              (* amount (sin a) rad)))))
 (make-var-method circleblur :random)
@@ -973,6 +973,21 @@
                     (* amount)))))))
 (make-var-method circlelinear :regular)
 
+;; ### Conic
+
+(make-config-method conic {:eccentricity (drand -3 3)
+                           :holes (drand -3 3)})
+
+(defn make-conic
+  "Conc"
+  [^double amount {:keys [^double eccentricity ^double holes]}]
+  (fn [^Vec2 v]
+    (let [magr (/ 1.0 (+ ^double (v/mag v) EPSILON))
+          ct (* (.x v) magr)
+          r (* (/ (* (* amount (- (drand) holes)) eccentricity) (inc (* eccentricity ct))) magr)]
+      (v/mult v r))))
+(make-var-method conic :random)
+
 ;; ### Cosine
 
 (defn make-cosine
@@ -1076,6 +1091,26 @@
             r (* api ^double (v/heading v))]
         (Vec2. (* r sinr) (* r cosr))))))
 (make-var-method disc :regular)
+
+(make-config-method disc2 {:rot (drand -3 3)
+                           :twist (drand -6 6)})
+
+(defn make-disc2
+  "Disc2"
+  [^double amount {:keys [^double rot ^double twist]}]
+  (let [timespi (* rot PI) 
+        k1 (if (> twist TWO_PI) (- (inc twist) TWO_PI) 1.0)
+        k2 (if (< twist (- TWO_PI)) (+ (inc twist) TWO_PI) 1.0) 
+        sinadd (* (sin twist) k1 k2)
+        cosadd (* (dec (cos twist)) k1 k2)]
+    (fn [^Vec2 v]
+      (let [t (* timespi (+ (.x v) (.y v)))
+            sinr (sin t)
+            cosr (cos t)
+            r (/ (* amount ^double (v/heading v)) PI)]
+        (Vec2. (* r (+ cosadd sinr))
+               (* r (+ sinadd cosr)))))))
+(make-var-method disc2 :regular)
 
 ;; ## E
 
@@ -1255,6 +1290,21 @@
       (Vec2. (* r (.y v)) (* r (.x v))))))
 (make-var-method fisheye :regular)
 
+;; ### Flower
+
+(make-config-method flower {:petals (drand -10 10)
+                            :holes (drand -1 1)})
+
+(defn make-flower
+  "Flower"
+  [^double amount {:keys [^double petals ^double holes]}]
+  (fn [v]
+    (let [^double theta (v/heading v)
+          d (/ 1.0 (+ EPSILON ^double (v/mag v)))
+          r (* amount (- (drand) holes) (cos (* petals theta)) d)]
+      (v/mult v r))))
+(make-var-method flower :random)
+
 ;; ### Foci
 
 (defn make-foci
@@ -1289,8 +1339,8 @@
   "Gaussian"
   [^double amount _]
   (fn [v]
-    (let [^double a (drand TWO_PI)
-          r (* amount (+ ^double (drand) ^double (drand) ^double (drand) ^double (drand) -2.0))]
+    (let [a (drand TWO_PI)
+          r (* amount (+ (drand) (drand) (drand) (drand) -2.0))]
       (Vec2. (* r (cos a)) (* r (sin a))))))
 (make-var-method gaussianblur :random)
 
@@ -1410,7 +1460,7 @@
   "Julia"
   [^double amount _]
   (fn [^Vec2 v]
-    (let [a (+ (* 0.5 ^double (v/heading v)) (* PI ^double (irand 2)))
+    (let [a (+ (* 0.5 ^double (v/heading v)) (* PI (irand 2)))
           r (* amount (sqrt (v/mag v)))]
       (Vec2. (* r (cos a)) (* r (sin a))))))
 (make-var-method julia :random)
@@ -1419,7 +1469,7 @@
   "Julia with different angle calc"
   [^double amount _]
   (fn [^Vec2 v]
-    (let [a (+ (* 0.5 ^double (atan2 (.x v) (.y v))) (* PI ^double (irand 2)))
+    (let [a (+ (* 0.5 (atan2 (.x v) (.y v))) (* PI (irand 2)))
           r (* amount (sqrt (v/mag v)))]
       (Vec2. (* r (cos a)) (* r (sin a))))))
 (make-var-method julia2 :random)
@@ -1427,7 +1477,7 @@
 ;; ### JuliaC
 
 (make-config-method juliac {:re (int (srandom 1.0 10.0))
-                            :im (* 0.01 ^double (drand -2.0 2.0))
+                            :im (* 0.01 (drand -2.0 2.0))
                             :dist (drand -2.0 2.0)})
 
 (defn make-juliac
@@ -1436,7 +1486,7 @@
   (let [rre (/ 1.0 re)]
     (fn [^Vec2 v]
       (let [arg (+ ^double (v/heading v)
-                   (* TWO_PI ^double (mod ^int (irand) re)))
+                   (* TWO_PI ^double (mod (irand) re)))
             lnmod (* dist (log (v/magsq v)))
             a (+ (* arg rre)
                  (* lnmod im))
@@ -1458,7 +1508,7 @@
   (let [abspower (int (abs power))
         cpower (* 0.5 (/ dist power))]
     (fn [v]
-      (let [a (/ (+ ^double (v/heading v) (* TWO_PI ^int (irand abspower))) power)
+      (let [a (/ (+ ^double (v/heading v) (* TWO_PI (irand abspower))) power)
             r (* amount (pow (v/magsq v) cpower))]
         (Vec2. (* r (cos a)) (* r (sin a)))))))
 (make-var-method julian :random)
@@ -1475,7 +1525,7 @@
   (let [abspower (int (abs power))
         cpower (* 0.5 (/ dist power))]
     (fn [v]
-      (let [^long rnd (lrand abspower)
+      (let [rnd (lrand abspower)
             a (if (zero? (bit-and rnd 1))
                 (/ (+ (* TWO_PI rnd) ^double (v/heading v)) power)
                 (/ (- (* TWO_PI rnd) ^double (v/heading v)) power))
@@ -1492,12 +1542,12 @@
 (defn make-juliaq
   "juliaq by Zueuk, http://zueuk.deviantart.com/art/juliaq-Apophysis-plugins-340813357" 
   [^double amount {:keys [^double divisor ^double power]}]
-  (let [inv-power (/ ^double divisor power)
+  (let [inv-power (/ divisor power)
         half-inv-power (* 0.5 inv-power)
         inv-power-2pi (/ TWO_PI power)]
     (fn [^Vec2 v]
       (let [a (+ (* inv-power ^double (v/heading v))
-                 (* inv-power-2pi ^int (irand)))
+                 (* inv-power-2pi (irand)))
             r (* amount (pow (v/magsq v) half-inv-power))]
         (Vec2. (* r (cos a)) (* r (sin a)))))))
 (make-var-method juliaq :random)
@@ -1523,7 +1573,7 @@
   "Log"
   [^double amount _]
   (fn [^Vec2 v]
-    (Vec2. (* amount 0.5 (log ^double (v/magsq v)))
+    (Vec2. (* amount 0.5 (log (v/magsq v)))
            (* amount ^double (v/heading v)))))
 (make-var-method log :regular)
 
@@ -1557,8 +1607,8 @@
   "Noise"
   [^double amount _]
   (fn [v]
-    (let [^double a (drand TWO_PI)
-          ^double r (drand amount)]
+    (let [a (drand TWO_PI)
+          r (drand amount)]
       (Vec2. (* r (cos a))
              (* r (sin a))))))
 (make-var-method noise :random)
@@ -1575,14 +1625,14 @@
   "pie from jwildfire"
   [^double amount {:keys [^double slices ^double rotation ^double thickness]}]
   (fn [^Vec2 v]
-    (let [sl (round (+ 0.5 (* slices ^double (drand))))
+    (let [sl (round (+ 0.5 (* slices (drand))))
           a (-> thickness
-                (* ^double (drand))
+                (* (drand))
                 (+ sl)
                 (* TWO_PI)
                 (/ slices)
                 (+ rotation))
-          r (* amount ^double (drand))]
+          r (* amount (drand))]
       (Vec2. (* r (cos a))
              (* r (sin a))))))
 (make-var-method pie :random)
@@ -1690,7 +1740,7 @@
   (let [spin (* amount (sin (* angle HALF_PI)))
         zoom (* amount (cos (* angle HALF_PI)))]
     (fn [^Vec2 v]
-      (let [rnd-g (+ ^double (drand) ^double (drand) ^double (drand) ^double (drand) -2.0)
+      (let [rnd-g (+ (drand) (drand) (drand) (drand) -2.0)
             ^double ra (v/mag v)
             alpha (+ (* spin rnd-g) ^double (v/heading v))
             rz (dec (* zoom rnd-g))]
@@ -1704,7 +1754,7 @@
   "Rays"
   [^double amount _]
   (fn [^Vec2 v]
-    (let [ang (* amount ^double (drand PI))
+    (let [ang (* amount (drand PI))
           r (/ amount (+ EPSILON ^double (v/magsq v)))
           tanr (* amount r (tan ang))]
       (Vec2. (* tanr (cos (.x v)))
@@ -1879,8 +1929,8 @@
 
 ;; ### Split
 
-(make-config-method split {:xsplit (* PI ^double (drand -2.0 2.0))
-                           :ysplit (* PI ^double (drand -2.0 2.0))})
+(make-config-method split {:xsplit (drand (- TWO_PI) TWO_PI)
+                           :ysplit (drand (- TWO_PI) TWO_PI)})
 
 (defn make-split
   "Split"
@@ -1917,8 +1967,8 @@
   "Square"
   [^double amount _]
   (fn [v]
-    (Vec2. (* amount ^double (drand -0.5 0.5))
-           (* amount ^double (drand -0.5 0.5)))))
+    (Vec2. (* amount (drand -0.5 0.5))
+           (* amount (drand -0.5 0.5)))))
 (make-var-method square :random)
 
 ;; ### Squirrel
@@ -1957,6 +2007,31 @@
              (+ (* amount (.y v)) result)))))
 (make-var-method stwin :regular)
 
+;; ### Supershape
+
+(make-config-method supershape {:rnd (drand -1 1)
+                                :m (drand TWO_PI)
+                                :n1 (drand -5 5)
+                                :n2 (drand -5 5)
+                                :n3 (drand -5 5)
+                                :holes (drand -1 1)})
+
+(defn make-supershape
+  "Supershape"
+  [^double amount {:keys [^double rnd ^double m ^double n1 ^double n2 ^double n3 ^double holes]}]
+  (let [pm-4 (/ m 4.0)
+        pneg1-n1 (/ -1.0 n1)]
+    (fn [^Vec2 v]
+      (let [theta (+ (* pm-4 ^double (v/heading v)) M_PI_4)
+            st (sin theta)
+            ct (cos theta)
+            t1 (pow (abs ct) n2)
+            t2 (pow (abs st) n3)
+            ^double mag (v/mag v)
+            r (/ (* (* amount (- (+ (drand rnd) (* (- 1.0 rnd) mag)) holes)) (pow (+ t1 t2) pneg1-n1)) mag)]
+        (v/mult v r)))))
+(make-var-method supershape :random)
+
 ;; ### Swirl
 
 (defn make-swirl
@@ -1990,7 +2065,7 @@
   "Twintrian"
   [^double amount _]
   (fn [^Vec2 v]
-    (let [r (* amount ^double (drand) ^double (v/mag v))
+    (let [r (* amount (drand) ^double (v/mag v))
           sinr (sin r)
           diff (+ (cos r) (log10 (sq sinr)))]
       (Vec2. (* amount diff (.x v))
@@ -2022,15 +2097,6 @@
 
 ;; ### Trade
 
-(defn config-trade
-  "Trade configuration"
-  [p]
-  (let [m (merge {:r1 (drand 0.1 3.0)
-                  :r2 (drand 0.1 3.0)
-                  :d1 (drand -2.0 2.0)
-                  :d2 (drand -2.0 2.0)} p)]
-    (assoc m :c1 (+ ^double (:r1 m) ^double (:d1 m))
-           :c2 (+ ^double (:r2 m) ^double (:d2 m)))))
 (make-config-method trade {:r1 (drand 0.1 3.0)
                            :r2 (drand 0.1 3.0)
                            :d1 (drand -2.0 2.0)
@@ -2409,8 +2475,8 @@
      (let [name (:name f)]
        (if (= name :deriv)
          (assoc f :amount 1.0 :step (sq (drand 0.01 1.0)) :var (randomize-parametrization (:var f)))
-         (let [^double amount1 (if (= name :comp) 1.0 (drand -2.0 2.0))
-               ^double amount2 (if (= name :comp) 1.0 (drand -2.0 2.0)) 
+         (let [amount1 (if (= name :comp) 1.0 (drand -2.0 2.0))
+               amount2 (if (= name :comp) 1.0 (drand -2.0 2.0)) 
                amount (case name
                         :add (/ 1.0 (+ (abs amount1) (abs amount2)))
                         :mult (/ 1.0 (* amount1 amount2))

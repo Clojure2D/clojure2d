@@ -55,19 +55,19 @@
 (defn render-rgb-scanlines
   "Blurs and renders rgb stripes on the image, returns new image. Scale parameter (default 1.6) controls amount of blur. Resulting image is sligtly lighter and desaturated. Correct with normalize filter if necessary."
   ([^BufferedImage p ^double scale]
-   (let [^int w (core/width p)
-         ^int h (core/height p)
-         ^Pixels rimg (-> p
-                          (core/resize-image (int (/ w scale)) (int (/ h scale)))
-                          (core/resize-image w h)
-                          (p/get-image-pixels))
-         ^Pixels l1 (tinter1 rimg)
-         ^Pixels l2 (tinter2 rimg)
+   (let [^long w (core/width p)
+         ^long h (core/height p)
+         rimg (-> p
+                  (core/resize-image (int (/ w scale)) (int (/ h scale)))
+                  (core/resize-image w h)
+                  (p/get-image-pixels))
+         l1 (tinter1 rimg)
+         l2 (tinter2 rimg)
          canvas (core/with-canvas (core/create-canvas w h)
                   (core/image (p/image-from-pixels l1))
                   (draw-lines w h))]
      
-     (let [^Pixels l1 (p/get-canvas-pixels canvas)]
+     (let [l1 (p/get-canvas-pixels canvas)]
        (p/image-from-pixels (p/blend-channels (partial p/blend-channel-xy blend-shift-and-add-f) l1 l2)))))
   ([p] (render-rgb-scanlines p 1.6)))
 
@@ -79,9 +79,9 @@
   "Create noise image with set alpha channel (first parameter)."
   [alpha w h]
   (let [fc (fn [v] 
-             (c/clamp255 (+ 100.0 (* 20.0 ^double (r/grand)))))
+             (c/clamp255 (+ 100.0 (* 20.0 (r/grand)))))
         fa (fn [v] alpha)
-        ^Pixels p (p/filter-channels (partial p/filter-channel fc) nil nil (partial p/filter-channel fa) (p/make-pixels w h))]
+        p (p/filter-channels (partial p/filter-channel fc) nil nil (partial p/filter-channel fa) (p/make-pixels w h))]
     (p/set-channel p 1 (p/get-channel p 0))
     (p/set-channel p 2 (p/get-channel p 0))
     (p/image-from-pixels p)))
@@ -112,22 +112,22 @@
         ^ints pa (int-array size)
         alphas (/ alpha 255.0)]
     (dorun (repeatedly (r/irand limita limitb)
-                       #(let [^int i (r/irand 10 (- w 10))
-                              ^int j (r/irand 10 (- h 10))]
-                          (dorun (for [^int m (range i (+ i ^int (r/irand 1 8)))
-                                       ^int n (range (- j ^int (r/irand 6)) (+ j ^int (r/irand 1 6)))]
-                                   (let [bc (-> ^double (r/grand)
+                       #(let [i (r/irand 10 (- w 10))
+                              j (r/irand 10 (- h 10))]
+                          (dorun (for [m (range i (+ i (r/irand 1 8)))
+                                       n (range (- j (r/irand 6)) (+ j (r/irand 1 6)))]
+                                   (let [bc (-> (r/grand)
                                                 (* 40.0)
                                                 (+ intensity)
                                                 (int))
-                                         a (-> ^double (r/grand)
+                                         a (-> (r/grand)
                                                (* 30.0)
                                                (+ 180.0)
                                                (m/constrain 0.0 255.0)
                                                (* alphas)
                                                (int))]
-                                     (aset pc (+ m (* w n)) bc)
-                                     (aset pa (+ m (* w n)) a)))))))
+                                     (aset pc (+ ^long m (* w ^long n)) bc)
+                                     (aset pa (+ ^long m (* w ^long n)) a)))))))
     (let [^Pixels p (p/make-pixels w h)]
       (p/set-channel p 0 pc)
       (p/set-channel p 3 pa)

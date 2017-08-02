@@ -19,7 +19,7 @@
              (m/wrap 0 (height canvas) (+ 10.0 (.y v)))
              (.y v))]
 
-    (when (< ^double (r/drand) prob)
+    (when (< (r/drand) prob)
       (-> canvas
           (set-background :black 1)
           (set-color :white)

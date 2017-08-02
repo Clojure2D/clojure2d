@@ -347,8 +347,8 @@
           nz (+ (* (- bf ade) x) (* (+ adf be) y) acz)]
       (Vec3. nx ny nz)))
   (to-polar [v1]
-    (let [r (mag v1)
-          zr (/ z ^double r)
+    (let [^double r (mag v1)
+          zr (/ z r)
           theta (cond
                   (<= zr -1) m/PI
                   (>= zr 1) 0
@@ -524,8 +524,8 @@
   [v1 v2]
   (if (or (is-zero? v1) (is-zero? v2))
     0
-    (let [d (dot v1 v2)
-          amt (/ ^double d (* ^double (mag v1) ^double (mag v2)))]
+    (let [^double d (dot v1 v2)
+          amt (/ d (* ^double (mag v1) ^double (mag v2)))]
       (cond
         (<= amt -1) m/PI
         (>= amt 1) 0

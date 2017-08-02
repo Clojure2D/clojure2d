@@ -11,8 +11,8 @@
   [canvas _ _ state]
   (let [[^double x ^double y] (or state [(* 0.5 ^int (width canvas))
                                          (* 0.5 ^int (height canvas))])
-        ^double vx (r/drand -2.0 2.0)
-        ^double vy (r/drand -2.0 2.0)
+        vx (r/drand -2.0 2.0)
+        vy (r/drand -2.0 2.0)
         nx (m/constrain (+ x vx) 0 (width canvas))
         ny (m/constrain (+ y vy) 0 (height canvas))]
 

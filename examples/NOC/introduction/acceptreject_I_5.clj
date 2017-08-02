@@ -17,8 +17,8 @@
 (defn acceptreject
   "found number with probability determined by formula y = x^2"
   ([^long limit]
-   (let [^double r1 (r/drand)
-         ^double r2 (r/drand)]
+   (let [r1 (r/drand)
+         r2 (r/drand)]
      (if (< r2 (* r1 r1))
        r1
        (if (pos? limit)

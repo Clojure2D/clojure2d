@@ -128,12 +128,12 @@
    :frandom (comp float next-random-value-double)
    :drandom next-random-value-double
    :grandom (fn
-              ([^RandomGenerator t] (next-random-value-gaussian t))
-              ([^RandomGenerator t std] (next-random-value-gaussian t std))
-              ([^RandomGenerator t ^double mean ^double std] (next-random-value-gaussian t mean (+ mean std))))
+              ([t] (next-random-value-gaussian t))
+              ([t std] (next-random-value-gaussian t std))
+              ([t ^double mean ^double std] (next-random-value-gaussian t mean (+ mean std))))
    :brandom (fn
               ([^RandomGenerator t] (.nextBoolean t))
-              ([^RandomGenerator t ^double thr] (< (next-random-value-double t) thr)))})
+              ([t ^double thr] (< (next-random-value-double t) thr)))})
 
 ;; Helper macro which creates RNG object of given class and/or seed.
 (defmacro create-object-with-seed
@@ -195,12 +195,28 @@
 ;;`(drand 10) => 3.0752117891384048`  
 ;;`(drand 10 20) => 11.327971928466651`
 (def default-random (make-randomizer :jdk))
-(def irand (partial irandom default-random))
-(def lrand (partial lrandom default-random))
 (def frand (partial frandom default-random))
-(def drand (partial drandom default-random))
-(def grand (partial grandom default-random))
 (def brand (partial brandom default-random))
+
+(defn drand
+  (^double [] (drandom default-random))
+  (^double [mx] (drandom default-random mx))
+  (^double [mn mx] (drandom default-random mn mx)))
+
+(defn grand
+  (^double [] (grandom default-random))
+  (^double [mx] (grandom default-random mx))
+  (^double [mn mx] (grandom default-random mn mx)))
+
+(defn irand
+  (^long [] (irandom default-random))
+  (^long [mx] (irandom default-random mx))
+  (^long [mn mx] (irandom default-random mn mx)))
+
+(defn lrand
+  (^long [] (lrandom default-random))
+  (^long [mx] (lrandom default-random mx))
+  (^long [mn mx] (lrandom default-random mn mx)))
 
 ;; ## Random Vector Sequences
 ;;

@@ -51,19 +51,19 @@
 (defmethod make-primitive :sphere [_ mat conf]
   (let [^double s (:r conf)]
     (fn [p]
-      (HitData. (- ^double (v/mag p) s) mat))))
+      (HitData. (- (v/mag p) s) mat))))
 
 (defmethod make-primitive :plane [_ mat conf]
   (let [n (v/normalize (:normal conf))
         ^double dist (:dist-from-origin conf)]
     (fn [p]
-      (HitData. (+ dist ^double (v/dot p n)) mat))))
+      (HitData. (+ dist (v/dot p n)) mat))))
 
 (defmethod make-primitive :box [_ mat conf]
   (let [b (:box conf)]
     (fn [p]
       (let [d (v/sub (v/abs p) b)]
-        (HitData. (+ ^double (v/mag (v/emx d vzero)) (min 0.0 ^double (v/mx d))) mat)))))
+        (HitData. (+ (v/mag (v/emx d vzero)) (min 0.0 (v/mx d))) mat)))))
 
 (defmethod make-primitive :torus [_ mat conf]
   (let [^double small-radius (:small-radius conf)
@@ -361,10 +361,10 @@
   (fn [^Material mat shadow-f N D pos]
     (let [shadow (shadow-f scene ^Vec3 pos L)
           E (v/sub D)
-          NL (max 0.0 ^double (v/dot N L))
+          NL (max 0.0 (v/dot N L))
           H (v/normalize (v/add L E))
-          NH (max 0.0 ^double (v/dot N H))
-          EH (max 0.0 ^double (v/dot E H))
+          NH (max 0.0 (v/dot N H))
+          EH (max 0.0 (v/dot E H))
           Ff0 (+ (.specularf0 mat) (* (- 1.0 (.specularf0 mat)) (m/pow (- 1.0 EH) 5.0)))
 
           diffuse (v/mult diff-color (* (.diffusion mat) NL))

@@ -22,8 +22,8 @@
 (defn make-particle
   ""
   []
-  (let [^double r (r/drand 0.5 m/TWO_PI)
-        ^double a (r/drand m/TWO_PI)]
+  (let [r (r/drand 0.5 m/TWO_PI)
+        a (r/drand m/TWO_PI)]
     (Vec2. (* r (m/qcos a)) (* r (m/qsin a)))))
 
 (def sinusoidal (make-variation :sinusoidal 1.0 {}))

@@ -11,8 +11,8 @@
   (let [r (r/grand 100 100) ;; setting mean and stdev is built into the library 
         g (r/grand 200 20)
         b (r/grand 0 50)
-        xloc (r/grand (* 0.5 ^double (width canvas)) (* 0.1 ^double (width canvas)))
-        yloc (r/grand (* 0.5 ^double (width canvas)) (* 0.1 ^double (width canvas)))]
+        xloc (r/grand (* 0.5 ^int (width canvas)) (* 0.1 ^int (width canvas)))
+        yloc (r/grand (* 0.5 ^int (width canvas)) (* 0.1 ^int (width canvas)))]
 
     (-> canvas
         (set-background 0 0 0 1)

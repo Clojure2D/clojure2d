@@ -9,7 +9,7 @@
   (:import [clojure2d.math.vector Vec3]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 (def ^:const ^long SIZE 600)
 

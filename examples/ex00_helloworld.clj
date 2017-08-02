@@ -5,6 +5,9 @@
             [clojure2d.math :as m]
             [clojure2d.color :as c]))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* :warn-on-boxed)
+
 ;; define canvas
 (def canvas (make-canvas 600 600))
 
@@ -28,13 +31,13 @@
    window ;; window bound to function (for mouse movements)
    ^long framecount ;; frame number
    state] ;; state (if any), not used here
-  (let [midwidth (* 0.5 ^int (width canvas))] ;; find middle of the canvas
+  (let [midwidth (* 0.5 ^long (width canvas))] ;; find middle of the canvas
 
     (-> canvas ;; use canvas (context is already ready! It's draw function.)
-        (set-background c/:linen) ;; clear background with :inen color
+        (set-background :linen) ;; clear background with :inen color
         (translate midwidth midwidth) ;; set origin in the middle
         (rotate (/ framecount 100.0)) ;; rotate clockwise (based on number of frame)
-        (set-color c/:maroon) ;; set color to maroon
+        (set-color :maroon) ;; set color to maroon
         (crect 0 0 midwidth midwidth) ;; draw centered rectangle
         (rotate (/ framecount -90.0)) ;; rotate counterclockwise
         (set-color 255 69 0 200) ;; set color to orange with transparency

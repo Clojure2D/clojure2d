@@ -25,14 +25,14 @@
 (defn draw-grid
   ""
   [canvas]
-  (let [^int nx (r/irand 2 200)
-        ^int ny (r/irand 2 200)
+  (let [nx (r/irand 2 200)
+        ny (r/irand 2 200)
         noise (r/make-perlin-noise)
-        ^int scale (r/irand 5)
+        scale (r/irand 5)
         nnx (inc (int (* scale nx)))
         nny (inc (int (* scale ny)))
         div (* (- 201 nx) (- 201 ny))
-        ^double shift (r/drand -10 10)]
+        shift (r/drand -10 10)]
     (println (str "nx=" nx))
     (println (str "ny=" ny))
     (dotimes [y 600]

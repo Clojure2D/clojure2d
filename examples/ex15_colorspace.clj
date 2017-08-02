@@ -5,7 +5,7 @@
   (:import [clojure2d.pixels Pixels]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 ;; convert image into some colorspaces
 

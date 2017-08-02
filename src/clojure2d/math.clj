@@ -176,8 +176,8 @@
 ;; where n-1 is result of `low-2-exp` and n is result of `high-2-exp`
 ;; `(low-2-exp TWO_PI) => 2` \\(2^2\eq 4\leq 6.28\\)  
 ;; `(high-2-exp TWO_PI) => 3` \\(6.28\leq 2^3\eq 8\\)
-(def low-2-exp (comp long floor log2))
-(def high-2-exp (comp long ceil log2))
+(defn low-2-exp ^long [v] (-> v log2 floor long))
+(defn high-2-exp ^long [v] (-> v log2 ceil long))
 
 ;; Modulo and abs
 (defn remainder ^double [^double v1 ^double v2] (FastMath/remainder v1 v2))

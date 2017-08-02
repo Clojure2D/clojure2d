@@ -25,8 +25,8 @@
      (loop [A 0.0
             Q 0.0
             k 1]
-       (let [^int posx (r/irand w)
-             ^int posy (r/irand h)
+       (let [posx (r/irand w)
+             posy (r/irand h)
              xk (double (p/get-value pixels ch (+ sx posx) (+ sy posy)))
              newA (+ A (/ (- xk A) k))
              newQ (+ Q (* (- xk A) (- xk newA)) )]
@@ -37,8 +37,8 @@
 (defn segment-pixels
   "Decompose channel into segments where mins is minimum size of segment, maxs is maximum size, thr is accuracy (minimum std dev of pixel values to make decision about subdivision."
   [^Pixels p ch mins maxs thr]
-  (let [ww (bit-shift-left 1 ^long (m/high-2-exp (.w p)))
-        hh (bit-shift-left 1 ^long (m/high-2-exp (.h p)))
+  (let [ww (bit-shift-left 1 (m/high-2-exp (.w p)))
+        hh (bit-shift-left 1 (m/high-2-exp (.h p)))
         mins (max 2 ^long mins)
         ^long maxs maxs
         ^double thr thr

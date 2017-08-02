@@ -253,10 +253,10 @@
   ([p1 p2 {:keys [switch in-cs1 in-cs2 out-cs blend-ch1 blend-ch2 blend-ch3]}]
    (let [[p1 p2] (if switch [p2 p1] [p1 p2]) ; switch images
          result (p/compose-channels blend-ch1 blend-ch2 blend-ch3 nil
-                                    (if in-cs1 (p/filter-colors ((in-cs1 c/colorspaces) 0) p1) p1)
-                                    (if in-cs2 (p/filter-colors ((in-cs2 c/colorspaces) 0) p2) p2))]
+                                    (if in-cs1 (p/filter-colors (first (in-cs1 c/colorspaces)) p1) p1)
+                                    (if in-cs2 (p/filter-colors (first (in-cs2 c/colorspaces)) p2) p2))]
      (if out-cs
-       (p/filter-colors ((out-cs c/colorspaces) 1) result)
+       (p/filter-colors (second (out-cs c/colorspaces)) result)
        result))))
 
 ;; color reducer machine

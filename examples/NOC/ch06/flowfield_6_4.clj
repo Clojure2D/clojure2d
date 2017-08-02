@@ -22,8 +22,8 @@
 (defn make-field
   "Create sampled vector field using provided noise function and scales."
   ([noise-fn ^double sx ^double sy]
-   (let [^double field-shift-x (r/drand -2 2)
-         ^double field-shift-y (r/drand -2 2)]
+   (let [field-shift-x (r/drand -2 2)
+         field-shift-y (r/drand -2 2)]
      (vec (for [^int i (range cols)]
             (vec (for [^int j (range rows)]
                    (let [theta (* m/TWO_PI ^double (noise-fn (+ field-shift-x (* i sx))

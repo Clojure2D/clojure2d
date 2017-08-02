@@ -19,7 +19,7 @@
   [canvas window framecount state]
   (let [random-counts (or state (repeatedly 20 #(int 0)))
         l (int (count random-counts))
-        ^int index (r/irand l)
+        index (r/irand l)
         w (int (/ ^int (width canvas) l))]
 
     (-> canvas

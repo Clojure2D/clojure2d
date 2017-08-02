@@ -45,14 +45,14 @@
   "Make random harmonograph configuration: f1-f4 frequencies, p1-p4 phases, a1-a4 amplitudes,
   nscalex/nscaley - noise scale, n1-n4 noise functions (or value 1.0), c1-c2 colors, dampsteps"
   []
-  (let [^int rngs (r/irand 8 32)
-        ^double fct (if (r/brand 0.5)
-                      m/TWO_PI
-                      (r/drand 2.0 7.0))
+  (let [rngs (r/irand 8 32)
+        fct (if (r/brand 0.5)
+              m/TWO_PI
+              (r/drand 2.0 7.0))
         freqs (map #(/ (* 5.0 fct) (double %)) (remove zero? (range (- rngs) rngs (r/irand 1 rngs))))
-        ^double a1 (r/drand)
+        a1 (r/drand)
         a2 (r/drand (- 1.0 a1))
-        ^double a3 (r/drand)
+        a3 (r/drand)
         a4 (- 1.0 a3)
         n [(make-jnoise) (make-jnoise) j/perlin-noise j/perlin-noise r/noise r/noise r/noise]
         palseq (filter #(> 240 (c/to-luma (first %)) 100) (repeatedly #(:palette (g/color-reducer-machine))))
