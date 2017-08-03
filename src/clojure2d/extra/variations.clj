@@ -16,6 +16,7 @@
   (:require [clojure2d.math :refer :all]
             [clojure2d.math.complex :as c]
             [clojure2d.math.random :refer :all]
+            [clojure2d.math.joise :as j]
             [clojure2d.math.vector :as v]
             [clojure2d.math.random :as r])
   (:import clojure2d.math.vector.Vec2
@@ -94,6 +95,27 @@
     (if (brand)
       rand
       (* -1 rand))))
+
+;; Local noise generating functions (for various noise implementations)
+
+(defn- make-noise-variation
+  "Calculate shift by angle taken from noise"
+  [^double amount scale noise-fn]
+  (fn [v]
+    (let [^Vec2 vv (v/mult v scale)
+          angle (* TWO_PI ^double (noise-fn (.x vv) (.y vv)))]
+      (v/add v (Vec2. (* amount (cos angle))
+                      (* amount (sin angle)))))))
+
+(defn- make-noise-variation2
+  "Calculate shift by vector taken from noise"
+  [^double amount scale noise-fn]
+  (fn [v]
+    (let [^Vec2 vv (v/mult v scale)
+          x1 (- ^double (noise-fn (.x vv) (.y vv)) 0.5)
+          y1 (- ^double (noise-fn (.y vv) E (.x vv)) 0.5)]
+      (v/add v (Vec2. (* amount x1)
+                      (* amount y1))))))
 
 (def ^Vec2 unitx (Vec2. 1.0 0.0))
 (def ^Vec2 zerov (Vec2. 0.0 0.0))
@@ -1015,6 +1037,32 @@
              (* r (- (* (.y v) re) (* (.x v) im)))))))
 (make-var-method curl :regular)
 
+;; ### Curve
+
+(make-config-method curve {:xamp (srandom 0.1 3)
+                           :yamp (srandom 0.1 3)
+                           :xlength (drand 0.1 1.5)
+                           :ylength (drand 0.1 1.5)})
+
+(defn make-curve
+  "Curve"
+  [amount {:keys [^double xamp ^double yamp xlength ylength]}]
+  (let [pc-xlen (/ 1.0 (max EPSILON (sq xlength)))
+        pc-ylen (/ 1.0 (max EPSILON (sq ylength)))
+        len (Vec2. pc-xlen pc-ylen)
+        amp (Vec2. xamp yamp)]
+    (fn [^Vec2 v]
+      (let [rv (Vec2. (.y v) (.x v))]
+        (-> rv
+            (v/emult rv)
+            (v/mult -1.0)
+            (v/emult len)
+            (v/applyf exp)
+            (v/emult amp)
+            (v/add v)
+            (v/mult amount))))))
+(make-var-method curve :regular)
+
 ;; ### Cross
 
 (defn make-cross
@@ -1114,6 +1162,26 @@
 
 ;; ## E
 
+;; ### eDisk
+
+(defn make-edisc
+  "edisc"
+  [^double amount _]
+  (let [w (/ amount 11.57034632)]
+    (fn [^Vec2 v]
+      (let [tmp (inc ^double (v/magsq v))
+            tmp2 (* 2.0 (.x v))
+            xmax (* 0.5 (+ (safe-sqrt (+ tmp tmp2))
+                           (safe-sqrt (- tmp tmp2))))
+            a1 (log (+ xmax (sqrt (dec xmax))))
+            a2 (- (acos (/ (.x v) xmax)))
+            snv (sin a1)
+            snv (if (pos? (.y v)) (- snv) snv)]
+        (Vec2. (* w (cosh a2) (cos a1))
+               (* w (sinh a2) snv))))))
+(make-var-method edisc :regular)
+
+
 ;; ### eMod
 
 (make-config-method emod {:radius (drand 0.1 4)
@@ -1186,6 +1254,28 @@
                 (- (* -a l)))]
         (Vec2. x y)))))
 (make-var-method elliptic :random)
+
+;; ### Escher
+
+(make-config-method escher {:beta (drand TWO_PI)})
+
+(defn make-escher
+  "Escher"
+  [^double amount {:keys [beta]}]
+  (let [seb (sin beta)
+        ceb (cos beta)
+        vc (* 0.5 (inc ceb))
+        vd (* 0.5 seb)]
+    (fn [^Vec2 v]
+      (let [^double a (v/heading v)
+            lnr (* 0.5 (log (v/magsq v)))
+            m (* amount (exp (- (* vc lnr)
+                                (* vd a))))
+            n (+ (* vc a)
+                 (* vd lnr))]
+        (Vec2. (* m (cos n))
+               (* m (sin n)))))))
+(make-var-method escher :regular)
 
 ;; ### Ex
 
@@ -1453,7 +1543,50 @@
 (make-var-method hyperbolic :regular)
 
 ;; ## J
-;;
+
+;; ### Joise noises
+
+(make-config-method joise-basis (assoc (j/make-random-basis-conf)
+                                       :scale (srandom 0.1 1.5)))
+
+(defn make-joise-basis
+  "Joise basis noise (angle version)"
+  [amount c]
+  (let [n (j/make-noise (j/make-basis c))]
+    (make-noise-variation amount (:scale c) n)))
+(make-var-method joise-basis :regular)
+
+(make-config-method joise-basis2 (assoc (j/make-random-basis-conf)
+                                        :scale (srandom 0.1 1.5)))
+
+(defn make-joise-basis2
+  "Joise basis noise (shift version)"
+  [amount c]
+  (let [n (j/make-noise (j/make-basis c))]
+    (make-noise-variation2 amount (:scale c) n)))
+(make-var-method joise-basis2 :regular)
+
+(make-config-method joise-cell (assoc (j/make-random-cell-conf)
+                                      :scale (drand)))
+
+(defn make-joise-cell
+  "Joise basis cell (angle version)"
+  [amount c]
+  (let [n (j/make-noise (j/make-cell c))]
+    (make-noise-variation amount (:scale c) n)))
+(make-var-method joise-cell :regular)
+
+(make-config-method joise-cell2 (assoc (j/make-random-cell-conf)
+                                       :scale (drand)))
+
+(defn make-joise-cell2
+  "Joise basis cell (shift version)"
+  [amount c]
+  (let [n (j/make-noise (j/make-cell c))]
+    (make-noise-variation2 amount (:scale c) n)))
+(make-var-method joise-cell2 :regular)
+
+
 ;; ### Julia
 
 (defn make-julia
@@ -1554,6 +1687,31 @@
 
 ;; ## L
 
+;; ### Lazy Susan
+
+(make-config-method lazysusan {:twist (drand -6 6)
+                               :spin (drand -4 4)
+                               :space (drand -2 2)
+                               :x (drand -1 1)
+                               :y (drand -1 1)})
+
+(defn make-lazysusan
+  "Lazysusan"
+  [^double amount {:keys [^double twist ^double spin ^double space ^double x ^double y]}]
+  (fn [^Vec2 v]
+    (let [xx (- (.x v) x)
+          yy (+ (.y v) y)
+          rr (hypot xx yy)]
+      (if (< rr amount)
+        (let [a (+ (atan2 yy xx) spin (* twist (- amount rr)))
+              nr (* amount rr)]
+          (Vec2. (+ (* nr (cos a)) x)
+                 (- (* nr (sin a)) y)))
+        (let [nr (* amount (inc (/ space rr)))]
+          (Vec2. (+ (* nr xx) x)
+                 (- (* nr yy) y)))))))
+(make-var-method lazysusan :regular)
+
 ;; ### LogApo
 
 (make-config-method logapo {:base (drand 0.01 20)})
@@ -1576,6 +1734,44 @@
     (Vec2. (* amount 0.5 (log (v/magsq v)))
            (* amount ^double (v/heading v)))))
 (make-var-method log :regular)
+
+;; ### Loonie
+
+(defn make-loonie
+  "Loonie"
+  [^double amount _]
+  (let [w2 (sq amount)]
+    (fn [v]
+      (let [^double r2 (v/magsq v)]
+        (if (and (< r2 w2) (not (zero? r2)))
+          (let [r (* amount (sqrt (dec (/ w2 r2))))]
+            (v/mult v r))
+          (v/mult v amount))))))
+(make-var-method loonie :regular)
+
+;; ## M
+
+;; ### Modulus
+
+(make-config-method modulus {:x (srandom 0.01 2.0)
+                             :y (srandom 0.01 2.0)})
+
+(defn make-modulus
+  "Modulus"
+  [amount {:keys [^double x ^double y]}]
+  (let [xr (+ x x)
+        yr (+ y y)]
+    (fn [^Vec2 v]
+      (v/mult (Vec2. (cond
+                       (> (.x v) x) (+ (- x) (rem (+ (.x v) x) xr))
+                       (< (.x v) (- x)) (- x (rem (- x (.x v)) xr))
+                       :else (.x v))
+                     (cond
+                       (> (.y v) y) (+ (- y) (rem (+ (.y v) y) yr))
+                       (< (.y v) (- y)) (- y (rem (- y (.y v)) yr))
+                       :else (.y v))) amount))))
+(make-var-method modulus :regular)
+
 
 ;; ## N
 
@@ -1614,6 +1810,31 @@
 (make-var-method noise :random)
 
 ;; ## P
+
+;; ### Perlin
+
+(make-config-method perlin {:seed (irand)
+                            :scale (srandom 0.1 1.5)
+                            :octaves (irand 1 6)})
+
+(defn make-perlin
+  "Perlin noise"
+  [amount {:keys [seed octaves scale]}]
+  (let [n (make-perlin-noise seed octaves)]
+    (make-noise-variation amount scale n)))
+(make-var-method perlin :regular)
+
+(make-config-method perlin2 {:seed (irand)
+                             :scale (srandom 0.1 1.5)
+                             :octaves (irand 1 6)})
+
+(defn make-perlin2
+  "Perlin noise"
+  [^double amount {:keys [^int seed ^int octaves ^double scale]}]
+  (let [n (make-perlin-noise seed octaves)]
+    (make-noise-variation2 amount scale n)))
+(make-var-method perlin2 :regular)
+
 
 ;; ### Pie
 
@@ -2330,6 +2551,29 @@
                   (+ (.y v))
                   (* amount))))))
 (make-var-method waves :regular)
+
+;; ### Wedge
+
+(make-config-method wedge {:angle (drand TWO_PI)
+                           :hole (drand -2 2)
+                           :count (drand -5 5)
+                           :swirl (drand -2 2)})
+
+(defn make-wedge
+  "Wedge"
+  [^double amount {:keys [^double angle ^double hole ^double count ^double swirl]}]
+  (let [hm1p (* M_1_PI 0.5)]
+    (fn [v]
+      (let [^double r (v/mag v)
+            a (+ ^double (v/heading v) (* r swirl))
+            c (floor (* (+ (* count a) PI) hm1p))
+            comp-fac (- 1.0 (* angle count hm1p))
+            a (+ (* a comp-fac) (* c angle))
+            r (* amount (+ r hole))]
+        (Vec2. (* r (cos a))
+               (* r (sin a)))))))
+(make-var-method wedge :regular)
+
 
 ;; ## Additional variations
 ;;

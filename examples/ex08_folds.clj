@@ -37,7 +37,11 @@
   [canvas window]
   (let [field-config (vr/make-random-configuration)
         field (vr/make-combination field-config)
-        field (vr/make-variation :conic 1.0)] 
+        field (vr/make-variation :wedge 1.0 {:angle 6.006590843200684
+                                             :hole -1.3187131881713867
+                                             :count -2
+                                             :swirl 0.5201194286346436})
+        ] 
 
     (pprint field-config)
     
