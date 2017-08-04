@@ -98,7 +98,7 @@
 
 (defn draw-ducks
   "Iterate and draw"
-  [canvas {:keys [c-const coloring-fn iter-fn ^double mlt var]}]
+  [canvas {:keys [c-const coloring-fn iter-fn ^double mlt]}]
   (let [f (coloring-fns coloring-fn)
         iter (iter-fns iter-fn)
         ^Bounds cbounds @bounds
@@ -139,7 +139,6 @@
   []
   (let [cfname (rand-nth (keys coloring-fns))
         itername (rand-nth (keys iter-fns))
-        itername :burningship-log
         conf {:c-const ((rand-c itername))
               :coloring-fn cfname
               :mlt (r/drand 1 3)
