@@ -66,14 +66,16 @@
                :kali4 (fn [z c] (v/add (c/sin (v/abs (c/reciprocal z))) c))
                :kali2l (fn [z c] (c/log (v/add (v/abs (c/reciprocal z)) c)))
                :kali3l (fn [z c] (c/log (v/add (v/abs (c/reciprocal (c/sq z))) c)))
-               :kali4l (fn [z c] (c/log (v/add (c/sin (v/abs (c/reciprocal z))) c)))
+               :kali4l (fn [z c] (c/log (v/add (c/sinh (v/abs (c/reciprocal z))) c)))
                :kalinewa (fn [z c]
                            (let [nz (v/abs (v/add (c/mult z c) c/ONE))]
                              (v/add nz (c/reciprocal nz))))
                :kalinew (fn [z c]
                           (let [nz (v/add (c/mult z c) c/ONE)]
                             (v/add nz (c/reciprocal nz))))
-               :kaliabs (fn [z c] (v/add (v/abs (c/div z c)) c))})
+               :kaliabs (fn [z c] (v/add (v/abs (c/div z c)) c))
+               :my (fn [z c] (c/sec (v/abs (v/add z c))))
+               :burningship-log (fn [^Vec2 z c] (c/log (v/add (c/sq (v/abs z)) c)))})
 
 ;; Randomize 'c' parameter
 (def rand-c {:ducks #(Vec2. (r/drand 0.2 0.95) (r/drand -0.25 -1.5))
@@ -90,11 +92,13 @@
              :kali4l #(Vec2. (r/drand -0.5 1.0) (r/drand -1.5 0.1))
              :kalinewa #(Vec2. (r/drand -1.5 1.5) (r/drand -1.5 1.5))
              :kalinew #(Vec2. (r/drand -1.5 1.5) (r/drand -1.5 1.5))
-             :kaliabs #(Vec2. (r/drand -0.8 -0.1) (r/drand -0.8 -0.1))})
+             :kaliabs #(Vec2. (r/drand -0.8 -0.1) (r/drand -0.8 -0.1))
+             :my #(Vec2. (r/drand -1.5 1.5) (r/drand -1.5 0))
+             :burningship-log #(Vec2. (r/drand 0.0 1.0) (r/drand -1.0 0.0))})
 
 (defn draw-ducks
   "Iterate and draw"
-  [canvas {:keys [c-const coloring-fn iter-fn ^double mlt]}]
+  [canvas {:keys [c-const coloring-fn iter-fn ^double mlt var]}]
   (let [f (coloring-fns coloring-fn)
         iter (iter-fns iter-fn)
         ^Bounds cbounds @bounds
@@ -130,12 +134,12 @@
     (p/set-canvas-pixels! (p/filter-channels p/normalize-filter nil (p/get-canvas-pixels canvas))))
   (println "done!"))
 
-
 (defn new-fractal
   "Create new config and draw fractal"
   []
   (let [cfname (rand-nth (keys coloring-fns))
         itername (rand-nth (keys iter-fns))
+        itername :burningship-log
         conf {:c-const ((rand-c itername))
               :coloring-fn cfname
               :mlt (r/drand 1 3)
