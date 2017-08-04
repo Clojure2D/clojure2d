@@ -118,8 +118,8 @@
 (defn tan
   "tan"
   [^Vec2 z]
-  (let [aa (* 2 (.x z))
-        bb (* 2 (.y z))
+  (let [aa (* 2.0 (.x z))
+        bb (* 2.0 (.y z))
         cc (+ (m/cos aa) (m/cosh bb))]
     (Vec2. (/ (m/sin aa) cc)
            (/ (m/sinh bb) cc))))
@@ -127,11 +127,27 @@
 (defn tanh
   "tanh"
   [^Vec2 z]
-  (let [aa (* 2 (.x z))
-        bb (* 2 (.y z))
+  (let [aa (* 2.0 (.x z))
+        bb (* 2.0 (.y z))
         cc (+ (m/cosh aa) (m/cos bb))]
     (Vec2. (/ (m/sinh aa) cc)
            (/ (m/sin bb) cc))))
+
+(defn sec
+  "cosecant"
+  [^Vec2 z]
+  (let [cc (+ (m/cos (* 2.0 (.x z)))
+              (m/cosh (* 2.0 (.y z))))]
+    (Vec2. (/ (* 2.0 (m/cos (.x z)) (m/cosh (.y z))) cc)
+           (/ (* 2.0 (m/sin (.x z)) (m/sinh (.y z))) cc))))
+
+(defn csc
+  "cosecant"
+  [^Vec2 z]
+  (let [cc (- (m/cos (* 2.0 (.x z)))
+              (m/cosh (* 2.0 (.y z))))]
+    (Vec2. (/ (* 2.0 (m/cosh (.y z)) (m/sin (.x z))) cc)
+           (/ (* 2.0 (m/cos (.x z)) (m/sinh (.y z))) cc))))
 
 
 (defn exp

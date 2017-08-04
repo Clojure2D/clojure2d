@@ -153,6 +153,7 @@ I've prepared several examples with results where you can check current state of
 * ex31 - wavy lines
 * ex32 - harmonograms on noise (accumulation bins rendering)
 * ex33 - interpolations / easings
+* ex34 - ducks and kalisets explorer
 * NOC - [Nature of Code](https://github.com/shiffman/The-Nature-of-Code-Examples/) Clojure2d version
 
 ## TODO
