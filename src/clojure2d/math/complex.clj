@@ -60,6 +60,11 @@
   [^Vec2 z]
   (Vec2. (- (.x z)) (- (.y z))))
 
+(defn sq
+  "Square"
+  [z]
+  (mult z z))
+
 (defn sqrt
   "Sqrt of complex number"
   [^Vec2 z]
@@ -72,7 +77,7 @@
 
 (defn sqrt1z
   "Sqrt(1-z^2)"
-  [^Vec2 z]
+  [z]
   (->> z
        (mult z)
        (sub ONE)
@@ -145,7 +150,7 @@
 
 (defn acos
   "acos"
-  [^Vec2 z]
+  [z]
   (->> (sqrt1z z)
        (mult I)
        (add z)
@@ -154,7 +159,7 @@
 
 (defn asin
   "asin"
-  [^Vec2 z]
+  [z]
   (->> (sqrt1z z)
        (add (mult I z))
        (log)
@@ -162,7 +167,7 @@
 
 (defn atan
   "atan"
-  [^Vec2 z]
+  [z]
   (->> (sub I z)
        (div (add I z))
        (log)
@@ -170,7 +175,7 @@
 
 (defn pow
   "power"
-  [^Vec2 z1 ^Vec2 z2]
+  [z1 z2]
   (->> z1
        (log)
        (mult z2)
