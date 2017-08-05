@@ -147,9 +147,18 @@
   ([[a b]]
    (complex-matrix a b)))
 
+(defn complex-matrix1
+  "True Complex representation"
+  ([^double a ^double b]
+   (Vec4. a (- b a) (+ a b) (m/sinh a)))
+  ([[a b]]
+   (complex-matrix a b)))
+
+(check-matrix-def complex-matrix1)
+
 ;; window, context and events
 
-(def matrix-maker (atom complex-matrix))
+(def matrix-maker (atom complex-matrix1))
 
 (def canvas (make-canvas w w))
 (def window (show-window canvas "Mandelbrot"))
