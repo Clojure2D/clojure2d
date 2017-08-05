@@ -154,6 +154,7 @@ I've prepared several examples with results where you can check current state of
 * ex32 - harmonograms on noise (accumulation bins rendering)
 * ex33 - interpolations / easings
 * ex34 - ducks and kalisets explorer
+* ex35 - mandelbrot and julia explorer
 * NOC - [Nature of Code](https://github.com/shiffman/The-Nature-of-Code-Examples/) Clojure2d version
 
 ## TODO
