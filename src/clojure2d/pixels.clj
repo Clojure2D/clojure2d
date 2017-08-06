@@ -317,10 +317,10 @@
   You can pass one filter for all channels, separately for channels, you can skip alpha channel, or select channels individually (just pass `nil`). All channels are processed in 4 future threads."
   ([f0 f1 f2 f3 p]
    (let [target (clone-pixels p)
-         ch0 (future (if f0 (f0 0 target p) false))
-         ch1 (future (if f1 (f1 1 target p) false))
-         ch2 (future (if f2 (f2 2 target p) false))
-         ch3 (future (if f3 (f3 3 target p) false))]
+         ch0 (future (when f0 (f0 0 target p)))
+         ch1 (future (when f1 (f1 1 target p)))
+         ch2 (future (when f2 (f2 2 target p)))
+         ch3 (future (when f3 (f3 3 target p)))]
      (dorun (map deref [ch0 ch1 ch2 ch3]))
      target))
   ([f p]
@@ -354,10 +354,10 @@
   "Blend channels parallelly. Similar to `filter-channels`. Bleding function should accept: channel, target and two source pixels"
   ([f0 f1 f2 f3 p1 p2]
    (let [target (clone-pixels p1)
-         ch0 (future (if f0 (f0 0 target p1 p2) false))
-         ch1 (future (if f1 (f1 1 target p1 p2) false))
-         ch2 (future (if f2 (f2 2 target p1 p2) false))
-         ch3 (future (if f3 (f3 3 target p1 p2) false))]
+         ch0 (future (when f0 (f0 0 target p1 p2)))
+         ch1 (future (when f1 (f1 1 target p1 p2)))
+         ch2 (future (when f2 (f2 2 target p1 p2)))
+         ch3 (future (when f3 (f3 3 target p1 p2)))]
      (dorun (map deref [ch0 ch1 ch2 ch3]))
      target))
   ([f p1 p2]

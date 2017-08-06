@@ -29,7 +29,7 @@
            java.awt.Color))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 ;; ## Clamping functions
 
@@ -1294,17 +1294,17 @@
      0.0
      (let [f (max r g b)
            p (min r g b)
-           [l i] (if (== f r)
-                   (if (== p b)
-                     [g (:fi (paletton-base-data 120.0))]
-                     [b (:fi (paletton-base-data 360.0))])
-                   (if (== f g)
-                     (if (== p r)
-                       [b (:fi (paletton-base-data 210.0))]
-                       [r (:fi (paletton-base-data 180.0))])
-                     (if (== p r)
-                       [g (:fi (paletton-base-data 255.0))]
-                       [r (:fi (paletton-base-data 315.0))])))
+           [^double l ^double i] (if (== f r)
+                                   (if (== p b)
+                                     [g (:fi (paletton-base-data 120.0))]
+                                     [b (:fi (paletton-base-data 360.0))])
+                                   (if (== f g)
+                                     (if (== p r)
+                                       [b (:fi (paletton-base-data 210.0))]
+                                       [r (:fi (paletton-base-data 180.0))])
+                                     (if (== p r)
+                                       [g (:fi (paletton-base-data 255.0))]
+                                       [r (:fi (paletton-base-data 315.0))])))
                                         ;d (/ (- f p) f) ;; saturation
                                         ;v (/ f 255.0)   ;; value
            s (i (if (== l p) -1.0

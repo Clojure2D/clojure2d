@@ -23,8 +23,8 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
-(def ^:const ^int w 800)
-(def ^:const ^int h 800)
+(def ^:const ^int w 1000)
+(def ^:const ^int h 1000)
 
 (def ^:const title "Ducks and Kalis")
 
@@ -44,7 +44,7 @@
 (def config (atom {}))
 
 (def canvas (make-canvas w h))
-(def window (show-window canvas title))
+(def window (show-window canvas title 20 nil))
 
 ;; Coloring functions
 (def coloring-fns {:f1 (fn [nz z] (m/exp (* -6.0 ^double (v/mag nz))))
@@ -61,6 +61,12 @@
                :ducksv3 (fn [^Vec2 z c] (c/log (v/add (c/sin (Vec2. (.x z) (m/abs (.y z)))) c)))
                :ducksv4 (fn [^Vec2 z c] (c/log (c/sq (c/add (Vec2. (.x z) (m/abs (.y z))) c))))
                :kali (fn [z c] (v/add (v/div (v/abs z) (v/magsq z)) c))
+               :kalisq (fn [^Vec2 z c] (v/add (v/div (v/abs z) (* (.x z) (.y z))) c))
+               :kalidiv (fn [^Vec2 z c]
+                          (let [az (v/abs z)]
+                            (if (v/is-near-zero? az)
+                              c/ZERO
+                              (v/add (v/div (v/abs (c/div z (v/abs z))) (v/magsq z)) c))))
                :kali2 (fn [z c] (v/add (v/abs (c/reciprocal z)) c))
                :kali3 (fn [z c] (v/add (v/abs (c/reciprocal (c/sq z))) c))
                :kali4 (fn [z c] (v/add (c/sin (v/abs (c/reciprocal z))) c))
@@ -75,6 +81,15 @@
                             (v/add nz (c/reciprocal nz))))
                :kaliabs (fn [z c] (v/add (v/abs (c/div z c)) c))
                :my (fn [z c] (c/sec (v/abs (v/add z c))))
+               :my2 (fn [z c] (c/log (v/abs (c/div z c))))
+               :my3 (fn [z c] (c/log (v/abs (c/div c z))))
+               :my4 (fn [^Vec2 z c] (c/log (c/div (v/abs (c/mult c z)) (v/abs c))))
+               :talism (fn [z c]
+                         (let [az (v/abs z)]
+                           (v/add (c/div (c/sq az) z) c)))
+               :talis1 (fn [z c]
+                         (let [az (v/abs z)]
+                           (v/add (c/div (v/sub (c/sq az) az) z) c)))
                :burningship-log (fn [^Vec2 z c] (c/log (v/add (c/sq (v/abs z)) c)))})
 
 ;; Randomize 'c' parameter
@@ -84,6 +99,8 @@
              :ducksv3 #(Vec2. (r/drand -1.5 1.5) (r/drand -1.5 0.5))
              :ducksv4 #(Vec2. (r/drand -1.5 1.5) (r/drand -1.5 0.0))
              :kali #(Vec2. (r/drand -0.1 -1.9) (r/drand -0.1 -1.9))
+             :kalisq #(Vec2. (r/drand -1.5 1.5) (r/drand -1.5 1.5))
+             :kalidiv #(Vec2. (r/drand -1.5 1.2) (r/drand -1.5 1.3))
              :kali2 #(Vec2. (r/drand -0.1 -1.9) (r/drand -1.9 0.0))
              :kali3 #(Vec2. (r/drand -1.2 1.2) (r/drand -1.2 1.2))
              :kali4 #(Vec2. (r/drand -1.5 0.2) (r/drand -1.2 0.2))
@@ -94,6 +111,11 @@
              :kalinew #(Vec2. (r/drand -1.5 1.5) (r/drand -1.5 1.5))
              :kaliabs #(Vec2. (r/drand -0.8 -0.1) (r/drand -0.8 -0.1))
              :my #(Vec2. (r/drand -1.5 1.5) (r/drand -1.5 0))
+             :my2 #(Vec2. (r/drand -2.5 2.5) (r/drand -1.5 1.5))
+             :my3 #(Vec2. (r/drand -2.5 1.5) (r/drand -1.5 1.5))
+             :my4 #(Vec2. (r/drand -2.5 1.5) (r/drand -1.5 1.5))
+             :talism #(Vec2. (r/drand -1.5 1.5) (r/drand -1.5 1.5))
+             :talis1 #(Vec2. (r/drand -1.5 1.5) (r/drand -1.5 1.5))
              :burningship-log #(Vec2. (r/drand 0.0 1.0) (r/drand -1.0 0.0))})
 
 (defn draw-ducks
