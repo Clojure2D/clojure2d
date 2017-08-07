@@ -72,5 +72,5 @@
 
 (def window (show-window (make-canvas w h) "Separation 6_7" draw))
 
-(defmethod mouse-event ["Separation 6_7" :mouse-dragged] [e]
+(defmethod mouse-event ["Separation 6_7" :mouse-dragged] [e _]
   (swap! vehicles conj (make-vehicle (mouse-x e) (mouse-y e))))

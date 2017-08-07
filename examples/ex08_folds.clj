@@ -37,10 +37,7 @@
   [canvas window]
   (let [field-config (vr/make-random-configuration)
         field (vr/make-combination field-config)
-        field (vr/make-variation :wedge 1.0 {:angle 6.006590843200684
-                                             :hole -1.3187131881713867
-                                             :count -2
-                                             :swirl 0.5201194286346436})
+        ;; field (vr/make-variation :wedge)
         ] 
 
     (pprint field-config)
@@ -74,7 +71,7 @@
   (let [canvas (create-canvas w h)
         window (show-window canvas "folds" 15 nil)]
 
-    (defmethod key-pressed ["folds" \space] [_]
+    (defmethod key-pressed ["folds" \space] [_ _]
       (save-canvas canvas (next-filename "results/ex08/" ".jpg")))
 
     [canvas window]))

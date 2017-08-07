@@ -17,7 +17,7 @@
 (def canvas (make-canvas (width p) (height p)))
 (def window (show-window canvas "Signal" 15 nil))
 
-(defmethod key-pressed ["Signal" \space] [_]
+(defmethod key-pressed ["Signal" \space] [_ _]
   (save-canvas canvas (next-filename "results/ex16/" ".jpg")))
 
 ;; dj-eq

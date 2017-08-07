@@ -65,7 +65,7 @@
                                   (recur (mapv (partial mv-fun canvas time) xs) (+ time 0.001))
                                   canvas)))]    
       
-      (defmethod key-pressed ["curvature2" \space] [_]
+      (defmethod key-pressed ["curvature2" \space] [_ _]
         (save-canvas canvas (next-filename "results/ex10/" ".jpg")))
 
       (pprint field-config)

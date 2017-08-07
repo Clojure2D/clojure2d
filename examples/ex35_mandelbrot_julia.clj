@@ -78,7 +78,8 @@
                          (dec iter)))
             col (* 255.0 (m/pow (/ idx 512.0) 0.4))]
         (set-color canvas col col col)
-        (rect canvas x y 1 1)))))
+        (rect canvas x y 1 1))))
+  make-matrix)
 
 (defn draw-julia
   "Draw Julia type"
@@ -96,7 +97,8 @@
                          (dec iter)))
             col (* 255.0 (m/pow (/ idx 64.0) 0.4))]
         (set-color canvas col col col)
-        (rect canvas x y 1 1)))))
+        (rect canvas x y 1 1))))
+  make-matrix)
 
 (defn check-matrix-def
   "Returns true if matrix definition is valid (ie. reversible)"
@@ -115,11 +117,7 @@
   []
   (let [funs [(fn [a _] a)
               (fn [_ b] b)
-              +
-              * 
-              -
-              m/atan2
-              m/hypot
+              + * - m/atan2 m/hypot
               (fn [a _] (m/sin a))
               (fn [_ b] (m/sin b))
               (fn [a b] (r/noise a b))
@@ -149,39 +147,33 @@
 
 ;; window, context and events
 
-(def matrix-maker (atom complex-matrix))
-
 (def canvas (make-canvas w w))
-(def window (show-window canvas "Mandelbrot"))
+(def window (show-window {:canvas canvas
+                          :window-name "Mandelbrot"
+                          :state complex-matrix}))
 
 (def jcanvas (make-canvas hw hw))
 (def jwindow (show-window jcanvas "Julia"))
 
 (with-canvas canvas
-  (draw-mandelbrot @matrix-maker))
+  (draw-mandelbrot (get-state window)))
 
-(defmethod key-pressed ["Mandelbrot" \space] [_]
-  (reset! matrix-maker (make-matrix-maker))
+(defmethod key-pressed ["Mandelbrot" \space] [_ _]
   (with-canvas canvas
-    (draw-mandelbrot @matrix-maker)))
+    (draw-mandelbrot (make-matrix-maker))))
 
-(defmethod key-pressed ["Julia" \space] [_]
-  (reset! matrix-maker (make-matrix-maker))
+(defmethod key-pressed ["Mandelbrot" \m] [_ _]
   (with-canvas canvas
-    (draw-mandelbrot @matrix-maker)))
+    (draw-mandelbrot complex-matrix)))
 
-(defmethod key-pressed ["Mandelbrot" \m] [_]
-  (reset! matrix-maker complex-matrix)
-  (with-canvas canvas
-    (draw-mandelbrot @matrix-maker)))
-
-(defmethod mouse-event ["Mandelbrot" :mouse-moved] [e]
+(defmethod mouse-event ["Mandelbrot" :mouse-moved] [e matrix-maker]
   (let [nx (m/norm (mouse-y e) 0 w -3 3)
         ny (m/norm (mouse-x e) 0 w -3 3)]
     (with-canvas jcanvas
-      (draw-julia @matrix-maker (@matrix-maker nx ny)))))
+      (draw-julia matrix-maker (matrix-maker nx ny)))))
 
-(defmethod key-pressed ["Mandelbrot" \s] [_]
+(defmethod key-pressed ["Mandelbrot" \s] [_ s]
   (save-canvas canvas (next-filename "results/ex35/mandelbrot" ".jpg"))
-  (save-canvas jcanvas (next-filename "results/ex35/julia" ".jpg")))
+  (save-canvas jcanvas (next-filename "results/ex35/julia" ".jpg"))
+  s)
 

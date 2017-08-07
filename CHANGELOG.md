@@ -1,6 +1,11 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 0.0.4 - 2017-08-07
+### Changed
+
+- Events and Window are carry global state, `show-window` parameters reorganized.
+
 ## 0.0.3 - 2017-07-02
 ### Added
 

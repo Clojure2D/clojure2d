@@ -16,7 +16,7 @@
 (def canvas (make-canvas (width img) (height img)))
 (def window (show-window canvas "Colors" 15 nil))
 
-(defmethod key-pressed ["Colors" \space] [_]
+(defmethod key-pressed ["Colors" \space] [_ _]
   (save-canvas canvas (next-filename "results/ex20/" ".jpg")))
 
 ;; colourlovers

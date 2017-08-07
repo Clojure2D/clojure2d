@@ -50,7 +50,7 @@
   (let [canvas (create-canvas 800 800)
         window (show-window canvas "caustic" 15 nil)]
 
-    (defmethod key-pressed ["caustic" \space] [_]
+    (defmethod key-pressed ["caustic" \space] [_ _]
       (save-canvas canvas (next-filename "results/ex06/" ".jpg")))
 
     (with-canvas canvas

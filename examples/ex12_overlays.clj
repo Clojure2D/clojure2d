@@ -14,7 +14,7 @@
 (def canvas (core/make-canvas (core/width img) (core/height img)))
 (def window (core/show-window canvas "Overlays" 15 nil))
 
-(defmethod core/key-pressed ["Overlays" \space] [_]
+(defmethod core/key-pressed ["Overlays" \space] [_ _]
   (core/save-canvas canvas (core/next-filename "results/ex12/" ".jpg")))
 
 ;; tv/rgb skanning lines

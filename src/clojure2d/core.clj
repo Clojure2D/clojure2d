@@ -594,16 +594,18 @@
 ;; * `key-pressed`
 ;; * `mouse-event`
 ;;
+;; Each multimethod get awt Event object and global state. Each should return new state.
+;;
 ;; #### Key event: `key-pressed` multimethod
 ;;
 ;; Your dispatch value is vector with window name and pressed key (as `char`) which you want to handle.
 ;; This means you write different method for different key.
-;; As a function parameter you get `KeyEvent` object [java.awt.KeyEvent](https://docs.oracle.com/javase/7/docs/api/java/awt/event/KeyEvent.html)
+;; As a function parameters you get `KeyEvent` object [java.awt.KeyEvent](https://docs.oracle.com/javase/7/docs/api/java/awt/event/KeyEvent.html) and global state attached to the Window.
 ;;
 ;; #### Mouse event
 ;;
 ;; As as dispatch you use a vector containing window name as a String and mouse event type as a keyword
-;; As a parameter you get `MouseEvent` object equipped with `MouseXYProto` protocol [java.awt.MouseEvent](https://docs.oracle.com/javase/7/docs/api/java/awt/event/MouseEvent.html)
+;; As a parameter you get `MouseEvent` object equipped with `MouseXYProto` protocol [java.awt.MouseEvent](https://docs.oracle.com/javase/7/docs/api/java/awt/event/MouseEvent.html) and global state attached to the Window.
 ;;
 ;; Currently implemented types are:
 ;;
@@ -639,32 +641,65 @@
       (if (nil? p)
         (Vec2. -1.0 -1.0)
         (Vec2. (.x p) (.y p)))))
-  (mouse-x [t]
+  (mouse-x [_]
     (let [^java.awt.Point p (.getMousePosition panel)]
       (if (nil? p) -1 (.x p))))
-  (mouse-y [t]
+  (mouse-y [_]
     (let [^java.awt.Point p (.getMousePosition panel)]
       (if (nil? p) -1 (.y p)))))
 
 ;; ### Events function
 (extend MouseEvent
   MouseXYProto
-  {:mouse-x #(.getX ^MouseEvent %1)
-   :mouse-y #(.getY ^MouseEvent %1)
-   :mouse-pos #(Vec2. (mouse-x %1) (mouse-y %1))})
+  {:mouse-x #(.getX ^MouseEvent %)
+   :mouse-y #(.getY ^MouseEvent %)
+   :mouse-pos #(Vec2. (mouse-x %) (mouse-y %))})
+
+;; ### Window type helper functions
+
+(defn window-active?
+  "Helper function, check if window is active"
+  [^Window window]
+  @(.active? window))
+
+;; ### Global state management
+;;
+;; Global atom is needed to keep current window state. Events don't know what window sends it. The only option is to get component name.
+
+(def global-state (atom {}))
+
+(defn get-state
+  "Get state from window"
+  [^Window window]
+  (@global-state (.window-name window)))
+
+(defn- change-state! 
+  "Change state for Window (by name)"
+  [window-name state] 
+  (swap! global-state assoc window-name state)
+  (@global-state window-name))
+
+(defn- clear-state!
+  "Clear state for Window (by name)"
+  [window-name]
+  (swap! global-state dissoc window-name))
+
+(defn change-global-state!
+  "Changle global state for Window."
+  [^Window w state]
+  (change-state! (.window-name w) state))
 
 ;; Private method which extracts the name of your window (set when `show-window` is called).
 
 (defn- component-name
   "Returns name of the component. Used to dispatch events."
   [^ComponentEvent e]
-  (let [^Component c (.getComponent e)]
-    (.getName c)))
+  (.getName ^Component (.getComponent e)))
 
 ;; Multimethod used to process pressed key
-(defmulti key-pressed (fn [^KeyEvent e] [(component-name e) (.getKeyChar e)]))
+(defmulti key-pressed (fn [^KeyEvent e state] [(component-name e) (.getKeyChar e)]))
 ;; Do nothing on default
-(defmethod key-pressed :default [e])
+(defmethod key-pressed :default [_ s] s)
 
 ;; Map Java mouse event names onto keywords
 (def mouse-event-map {MouseEvent/MOUSE_CLICKED  :mouse-clicked
@@ -674,26 +709,34 @@
                       MouseEvent/MOUSE_MOVED    :mouse-moved})
 
 ;; Multimethod used to processed mouse events
-(defmulti mouse-event (fn [^MouseEvent e] [(component-name e) (mouse-event-map (.getID e))]))
+(defmulti mouse-event (fn [^MouseEvent e state] [(component-name e) (mouse-event-map (.getID e))]))
 ;; Do nothing on default
-(defmethod mouse-event :default [e])
+(defmethod mouse-event :default [_ s]  s)
 
 ;; Event adapter objects.
 
+;; General function which manipulates state and calls proper event multimethod
+
+(defn- process-state-and-event 
+  "For given event call provided multimethod passing state. Save new state."
+  [ef e]
+  (let [window-name (component-name e)]
+    (change-state! window-name (ef e (@global-state window-name)))))
+
 ;; Key
 (def key-processor (proxy [KeyAdapter] []
-                     (keyPressed [^KeyEvent e] (key-pressed e))))
+                     (keyPressed [e] (process-state-and-event key-pressed e))))
 
 ;; Mouse
 (def mouse-processor (proxy [MouseAdapter] []
-                       (mouseClicked [^MouseEvent e] (mouse-event e))
-                       (mousePressed [^MouseEvent e] (mouse-event e))
-                       (mouseReleased [^MouseEvent e] (mouse-event e))))
+                       (mouseClicked [e] (process-state-and-event mouse-event e))
+                       (mousePressed [e] (process-state-and-event mouse-event e))
+                       (mouseReleased [e] (process-state-and-event mouse-event e))))
 
 ;; Mouse drag and move
 (def mouse-motion-processor (proxy [MouseMotionAdapter] []
-                              (mouseDragged [^MouseEvent e] (mouse-event e))
-                              (mouseMoved [^MouseEvent e] (mouse-event e))))
+                              (mouseDragged [e] (process-state-and-event mouse-event e))
+                              (mouseMoved [e] (process-state-and-event mouse-event e))))
 
 ;; ### Frame machinery functions
 ;;
@@ -711,12 +754,13 @@
       (.setIgnoreRepaint true)
       (.setPreferredSize (Dimension. width height)))))
 
-;; Function used to close and dispose window. As a side effect `active?` atom is set to false.
+;; Function used to close and dispose window. As a side effect `active?` atom is set to false and global state for window is cleared.
 
 (defn- close-window
   "Close window frame"
-  [^JFrame frame active?]
+  [^JFrame frame active? windowname]
   (reset! active? false)
+  (clear-state! windowname)
   (.dispose frame))
 
 ;; Create lazy list of icons to be loaded by frame
@@ -726,7 +770,7 @@
   "Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event."
   [^JFrame frame ^java.awt.Canvas panel active? windowname width height]
   (let [closer (proxy [WindowAdapter] []
-                 (windowClosing [^WindowEvent e] (close-window frame active?)))]
+                 (windowClosing [^WindowEvent e] (close-window frame active? windowname)))]
     (doto frame
       (.setIconImages window-icons)
       (.add panel)
@@ -794,12 +838,24 @@
 
 ;; Finally function which creates and displays window. Function creates window's visibility status (`active?` atom), buffer as atomized canvas, creates frame, creates refreshing task (repainter) and shows window.
 
+(declare to-hex)
+
 (defn show-window
   "Show window with width/height, name and required fps of refresh. Optionally pass callback function.
 
   * Input: canvas, window name, width (defalut: canvas width), height (default: canvas height), frames per seconds (default: 60), (optional) `draw` function.
-  * Returns `Window` value"
-  ([canvas wname width height fps draw-fun]
+  * Returns `Window` value
+
+  As parameters you can provide a map with folowing keys:
+
+  * :canvas
+  * :window-name
+  * :w
+  * :h
+  * :fps
+  * :draw-fn
+  * :state"
+  ([canvas wname width height fps draw-fun state]
    (let [active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
@@ -813,21 +869,29 @@
                           height
                           wname)]
      (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
+     (change-state! wname state)
      (future (refresh-screen-task window draw-fun))
      window))
-  ([canvas wname width height fps]
-   (show-window canvas wname width height fps nil))
   ([canvas wname]
    (show-window canvas wname nil))
   ([canvas wname draw-fn]
    (show-window canvas wname 60 draw-fn))
   ([canvas wname fps draw-fn]
-   (show-window canvas wname (width canvas) (height canvas) fps draw-fn)))
-
-(defn window-active?
-  "Helper function, check if window is active"
-  [^Window window]
-  @(.active? window))
+   (show-window canvas wname (width canvas) (height canvas) fps draw-fn nil))
+  ([canvas wname w h fps]
+   (show-window canvas wname w h fps nil nil))
+  ([canvas wname w h fps draw-fun]
+   (show-window canvas wname w h fps draw-fun nil))
+  ([{:keys [canvas window-name w h fps draw-fn state]
+     :or {canvas (make-canvas 100 100)
+          window-name (str "Clojure2D - " (to-hex (rand-int (Integer/MAX_VALUE)) 8))
+          w (width canvas)
+          h (height canvas)
+          fps 60
+          draw-fn nil
+          state nil}}]
+   (show-window canvas window-name w h fps draw-fn state))
+  ([] (show-window {})))
 
 ;; ## Utility functions
 ;;
@@ -954,6 +1018,7 @@
 (defn get-session-name
   "Get session name"
   []
+  (ensure-session)
   (:name @session-agent))
 
 (defn next-filename

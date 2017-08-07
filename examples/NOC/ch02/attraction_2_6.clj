@@ -10,18 +10,16 @@
 
 (def ^:const ^int w 640)
 (def ^:const ^int h 360)
-
 (def ^:const ^double amass 20.0)
-(def attractor (atom (Vec2. (/ w 2) (/ h 2))))
 
 (defprotocol MoverProto
-  (update-and-draw [t canvas]))
+  (update-and-draw [t canvas window]))
 (deftype Mover [^Vec2 position
                 ^Vec2 velocity
                 ^double mass]
   MoverProto
-  (update-and-draw [_ canvas]
-    (let [att-pos @attractor
+  (update-and-draw [_ canvas window]
+    (let [att-pos (get-state window)
           force (v/sub att-pos position)
           d (m/constrain (v/mag force) 5.0 25.0)
           strength (/ (* amass mass) (m/sq d))
@@ -44,7 +42,7 @@
   ""
   [canvas window framecount state]
   (let [mover (or state (Mover. (Vec2. 400 50) (Vec2. 1.0 0.0) 1.0))
-        ^Vec2 pos @attractor]
+        ^Vec2 pos (get-state window)]
 
     (-> canvas
         (set-background :white)
@@ -56,10 +54,13 @@
         (set-color :black)
         (ellipse (.x pos) (.y pos) (* 2.0 amass) (* 2.0 amass) true))
 
-    (update-and-draw mover canvas)))
+    (update-and-draw mover canvas window)))
 
-(def window (show-window (make-canvas w h) "Attraction 2_6" draw))
+(def window (show-window {:canvas (make-canvas w h)
+                          :window-name "Attraction 2_6"
+                          :draw-fn draw
+                          :state (Vec2. (/ w 2) (/ h 2))}))
 
-(defmethod mouse-event ["Attraction 2_6" :mouse-dragged] [e]
-  (swap! attractor (constantly (mouse-pos e))))
+(defmethod mouse-event ["Attraction 2_6" :mouse-dragged] [e _]
+  (mouse-pos e))
 

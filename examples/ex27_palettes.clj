@@ -48,7 +48,7 @@
     fpalette))
 
 
-(defmethod key-pressed ["Palettes" \space] [_]
+(defmethod key-pressed ["Palettes" \space] [_ _]
   (do-it))
 
 (do-it)

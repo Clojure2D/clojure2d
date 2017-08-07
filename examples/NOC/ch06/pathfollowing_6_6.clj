@@ -15,8 +15,6 @@
 (def ^:const ^double r 4.0)
 (def ^:const ^double r2 (+ r r))
 
-(def debug (atom true))
-
 (defn make-path []
   [(Vec2. -20.0 (/ h 2))
    (Vec2. (r/drand (/ w 2)) (r/drand (/ h 4) (* 0.75 h)))
@@ -34,10 +32,8 @@
       (set-stroke 1.0)
       (path p)))
 
-(def path-global (atom (make-path)))
-
 (defprotocol VehicleProto
-  (follow-and-draw [v canvas p]))
+  (follow-and-draw [v canvas window p]))
 
 (defn get-normal-point
   ""
@@ -55,7 +51,7 @@
   Object
   (toString [_] (str position " : " velocity))
   VehicleProto
-  (follow-and-draw [_ canvas p]
+  (follow-and-draw [_ canvas window p]
     (let [^Vec2 predict-pos (-> velocity
                                 (v/normalize)
                                 (v/mult 50.0)
@@ -106,7 +102,7 @@
                             nposition)
           theta (+ (m/radians 90) ^double (v/heading nvelocity))]
 
-      (when @debug
+      (when (second (get-state window))
         (-> canvas
             (set-color :black 200)
             (line (.x position) (.y position ) (.x predict-pos) (.y predict-pos))
@@ -143,13 +139,16 @@
   (let [vs (or state (repeatedly 5 make-vehicle))]
     (-> canvas
         (set-background :white)
-        (draw-path @path-global))
-    (mapv #(follow-and-draw % canvas @path-global) vs)))
+        (draw-path (first (get-state window))))
+    (mapv #(follow-and-draw % canvas window (first (get-state window))) vs)))
 
-(def window (show-window (make-canvas w h) "Path following 6_6" draw))
+(def window (show-window {:canvas (make-canvas w h)
+                          :window-name "Path following 6_6"
+                          :draw-fn draw
+                          :state [(make-path) true]}))
 
-(defmethod mouse-event ["Path following 6_6" :mouse-released] [e]
-  (reset! path-global (make-path)))
+(defmethod mouse-event ["Path following 6_6" :mouse-released] [e [_ debug]]
+  [(make-path) debug])
 
-(defmethod key-pressed ["Path following 6_6" \space] [_]
-  (swap! debug not))
+(defmethod key-pressed ["Path following 6_6" \space] [_ [p debug]]
+  [p (not debug)])

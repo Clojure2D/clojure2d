@@ -31,13 +31,13 @@
         frame1 (show-window (make-canvas 1 1) name1 400 400 25)
         frame2 (show-window (make-canvas 100 100) name2 400 200 10)]
     
-    (defmethod key-pressed [name1 \space] [_]
+    (defmethod key-pressed [name1 \space] [_ _]
       (println (str "Window: " name1)))
 
-    (defmethod key-pressed [name2 \space] [_]
+    (defmethod key-pressed [name2 \space] [_ _]
       (println (str "Window: " name2)))
 
-    (defmethod mouse-event [name1 :mouse-pressed] [e]
+    (defmethod mouse-event [name1 :mouse-pressed] [e _]
       (let [canvas (make-canvas 1 1)
             x (mouse-x e)
             y (mouse-y e)

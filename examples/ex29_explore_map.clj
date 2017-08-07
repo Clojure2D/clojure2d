@@ -12,7 +12,7 @@
 (def canvas (create-canvas 600 600))
 (def window (show-window canvas "Explore map"))
 
-(defmethod key-pressed ["Explore map" \space] [_]
+(defmethod key-pressed ["Explore map" \space] [_ _]
   (binding [*jpeg-image-quality* 0.9]
     (save-canvas canvas (next-filename "results/ex29/" ".jpg"))))
 
@@ -91,7 +91,7 @@
   
   (loop [[x y] [initx inity]
          count (int 0)]
-    (when (< count 3000)
+    (when (and (window-active? window) (< count 3000))
       (let [xx (m/norm x sminx smaxx 0 600)
             yy (m/norm y sminy smaxy 0 600)]
 

@@ -103,7 +103,7 @@
 
 (def window (show-window (make-canvas w h) "Flocking 6_9" draw))
 
-(defmethod mouse-event ["Flocking 6_9" :mouse-dragged] [e]
+(defmethod mouse-event ["Flocking 6_9" :mouse-dragged] [e _]
   (swap! boids conj (make-boid (mouse-x e) (mouse-y e))))
 
 

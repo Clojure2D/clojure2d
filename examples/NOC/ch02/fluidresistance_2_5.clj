@@ -71,19 +71,19 @@
     (ellipse canvas (.x ^Vec2 (.position m)) (.y ^Vec2 (.position m)) size size true)
     (move-mover m)))
 
-(def movers (atom (repeatedly number-of-movers make-mover)))
-
 (defn draw
   "Draw movers on canvas"
-  [canvas _ _ _]
+  [canvas window _ _]
   (-> canvas
       (set-background 255 255 255)
       (set-color 50 50 50)
       (rect 0 h2 w h2))
-  (let [m @movers]
-    (swap! movers (constantly (mapv (partial draw-and-move canvas) m)))))
+  (change-global-state! window (mapv (partial draw-and-move canvas) (get-state window))))
 
-(def window (show-window (make-canvas w h) "NOC_2_5_fluidresistance" draw))
+(def window (show-window {:canvas (make-canvas w h)
+                          :window-name "NOC_2_5_fluidresistance"
+                          :draw-fn draw
+                          :state (repeatedly number-of-movers make-mover)}))
 
-(defmethod mouse-event ["NOC_2_5_fluidresistance" :mouse-released] [_]
-  (swap! movers (constantly (repeatedly number-of-movers make-mover))))
+(defmethod mouse-event ["NOC_2_5_fluidresistance" :mouse-released] [_ _]
+  (repeatedly number-of-movers make-mover))

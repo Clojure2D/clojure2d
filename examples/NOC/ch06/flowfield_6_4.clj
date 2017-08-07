@@ -92,23 +92,23 @@
 
     (Vehicle. nposition nvelocity (.maxforce v) (.maxspeed v))))
 
-;; field as atom, click to change
-(def field (atom (make-field)))
-
 (defn draw
   "Draw on canvas"
-  [canvas _ _ state]
+  [canvas window _ state]
   (let [vehicles (or state (repeatedly vehicles-no make-vehicle))]
     (-> canvas
         (set-background :linen)
         (set-color :black 100)
         (translate (* 0.5 resolution)
                    (* 0.5 resolution))
-        (draw-field @field)
+        (draw-field (get-state window))
         (set-color 175 0 0 200))
-    (mapv #(run-vehicle canvas % @field) vehicles)))
+    (mapv #(run-vehicle canvas % (get-state window)) vehicles)))
 
-(def window (show-window (make-canvas w h) "Flowfield 6_4" draw))
+(def window (show-window {:canvas (make-canvas w h)
+                          :window-name "Flowfield 6_4"
+                          :draw-fn draw
+                          :state (make-field)}))
 
-(defmethod mouse-event ["Flowfield 6_4" :mouse-pressed] [_]
-  (reset! field (make-field)))
+(defmethod mouse-event ["Flowfield 6_4" :mouse-pressed] [_ _]
+  (make-field))

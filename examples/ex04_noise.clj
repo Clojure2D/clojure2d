@@ -32,7 +32,7 @@
 
 (show-window canvas "noise" 600 600 10)
 
-(defmethod key-pressed ["noise" \space] [_]
+(defmethod key-pressed ["noise" \space] [_ _]
   (save-canvas canvas (next-filename "results/ex04/" ".jpg")))
 
 ;; results/ex04/B129FE12.jpg

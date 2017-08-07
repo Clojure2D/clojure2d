@@ -14,7 +14,7 @@
 (def canvas (create-canvas 600 900))
 (def window (show-window canvas "Generators" 5 nil))
 
-(defmethod key-pressed ["Generators" \space] [_]
+(defmethod key-pressed ["Generators" \space] [_ _]
   (binding [*jpeg-image-quality* 0.9]
     (save-canvas canvas "results/ex30/result.jpg")))
 

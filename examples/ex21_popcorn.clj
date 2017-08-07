@@ -86,7 +86,7 @@
                                   (recur (mapv (partial mv-fun canvas) xs))
                                   canvas)))]
       
-      (defmethod key-pressed ["popcorn" \space] [_]
+      (defmethod key-pressed ["popcorn" \space] [_ _]
         (binding [*jpeg-image-quality* 0.9]
           (save-canvas canvas (next-filename "results/ex21/" ".jpg"))))
 

@@ -6,6 +6,8 @@
 ;; * n - new configuration and render
 ;; * z - zoom in
 ;; * x - zoom out
+;; * w - change weighting scheme (randomize)
+;; * c - change coloring scheme (randomize)
 ;; * SPACE - save image
 ;;
 ;; Click mouse to make new center point
@@ -26,7 +28,7 @@
 (def ^:const ^int w 1000)
 (def ^:const ^int h 1000)
 
-(def ^:const title "Ducks and Kalis")
+(def ^:const title "Ducks and Kalisets")
 
 (deftype Bounds [^double x1 ^double y1
                  ^double x2 ^double y2
@@ -38,13 +40,6 @@
   ""
   [^double x1 ^double y1 ^double x2 ^double y2]
   (Bounds. x1 y1 x2 y2 (* 0.5 (- x2 x1)) (* 0.5 (- y2 y1))))
-
-;; state for interactions
-(def bounds (atom (make-bounds -2 -2 2 2)))
-(def config (atom {}))
-
-(def canvas (make-canvas w h))
-(def window (show-window canvas title 20 nil))
 
 ;; Coloring functions
 (def coloring-fns {:f1 (fn [nz z] (m/exp (* -6.0 ^double (v/mag nz))))
@@ -118,24 +113,30 @@
              :talis1 #(Vec2. (r/drand -1.5 1.5) (r/drand -1.5 1.5))
              :burningship-log #(Vec2. (r/drand 0.0 1.0) (r/drand -1.0 0.0))})
 
+(def weight-fns [:unit :exp :log :rev])
+
 (defn draw-ducks
   "Iterate and draw"
-  [canvas {:keys [c-const coloring-fn iter-fn ^double mlt]}]
+  [canvas {:keys [c-const coloring-fn iter-fn ^double mlt weight-fn ^Bounds bounds]}]
   (let [f (coloring-fns coloring-fn)
         iter (iter-fns iter-fn)
-        ^Bounds cbounds @bounds
-        factor (max 0.0 (- (m/log2 (.sx cbounds))))
+        factor (max 0.0 (- (m/log2 (.sx bounds))))
         limit (+ 20.0 (* 3.0 factor))
-        ww (+ 7.0 factor)]
+        ww (+ 7.0 factor)
+        weightf (case weight-fn
+                  :exp #(m/exp (- (/ ^int % ww)))
+                  :log #(m/log (inc (/ (- limit ^int %) ww)))
+                  :rev #(/ 1.0 (inc ^int %))
+                  (constantly 1.0))]
     (dotimes [x w]
       (dotimes [y h]
-        (let [xx (m/norm x 0.0 w (.x1 cbounds) (.x2 cbounds))
-              yy (m/norm y 0.0 h (.y1 cbounds) (.y2 cbounds))
+        (let [xx (m/norm x 0.0 w (.x1 bounds) (.x2 bounds))
+              yy (m/norm y 0.0 h (.y1 bounds) (.y2 bounds))
               m (loop [i (int 0)
                        z (Vec2. xx yy)
                        sum (double 0)
                        wsum (double 0)]
-                  (let [w (m/exp (- (/ i ww)))
+                  (let [^double w (weightf i)
                         nz (iter z c-const)]
                     (if (< i limit)
                       (recur (inc i)
@@ -148,59 +149,76 @@
           (rect canvas y x 1 1)))))
   canvas)
 
+(defn make-random-config
+  "Create random configuration"
+  []
+  (let [cfname (rand-nth (keys coloring-fns))
+        itername (rand-nth (keys iter-fns))]
+    {:c-const ((rand-c itername))
+     :coloring-fn cfname
+     :mlt (r/drand 1 3)
+     :iter-fn itername
+     :weight-fn (rand-nth weight-fns)
+     :bounds (make-bounds -2 -2 2 2)}))
+
+(def canvas (make-canvas w h))
+(def window (show-window {:canvas canvas
+                          :window-name title
+                          :fps 20
+                          :state (make-random-config)}))
+
 (defn draw-fractal
   "Draw fractal"
-  []
+  [config]
+  (pprint config)
   (with-canvas canvas
-    (draw-ducks @config)
+    (draw-ducks config)
     (p/set-canvas-pixels! (p/filter-channels p/normalize-filter nil (p/get-canvas-pixels canvas))))
-  (println "done!"))
+  (println "done!")
+  config)
 
 (defn new-fractal
   "Create new config and draw fractal"
   []
-  (let [cfname (rand-nth (keys coloring-fns))
-        itername (rand-nth (keys iter-fns))
-        conf {:c-const ((rand-c itername))
-              :coloring-fn cfname
-              :mlt (r/drand 1 3)
-              :iter-fn itername}]
-    (pprint conf)
-    (reset! config conf)
-    (reset! bounds (make-bounds -2 -2 2 2))
-    (draw-fractal)))
+  (draw-fractal (make-random-config)))
 
-(defmethod key-pressed [title \n] [_]
+(defmethod key-pressed [title \n] [_ _]
   (new-fractal))
 
-(defmethod key-pressed [title \space] [_]
-  (save-canvas canvas (next-filename "results/ex34/" ".jpg")))
+(defmethod key-pressed [title \space] [_ state]
+  (save-canvas canvas (next-filename "results/ex34/" ".jpg"))
+  state)
 
 (defn scale-bounds
-  [^double fact]
-  (let [^Bounds cbounds @bounds
-        midx (+ (.x1 cbounds) (.sx cbounds))
-        midy (+ (.y1 cbounds) (.sy cbounds))
-        nsx (* fact (.sx cbounds))
-        nsy (* fact (.sy cbounds))]
+  [^double fact ^Bounds bounds]
+  (let [midx (+ (.x1 bounds) (.sx bounds))
+        midy (+ (.y1 bounds) (.sy bounds))
+        nsx (* fact (.sx bounds))
+        nsy (* fact (.sy bounds))]
     (make-bounds (- midx nsx) (- midy nsy)
                  (+ midx nsx) (+ midy nsy))))
 
-(defmethod key-pressed [title \z] [_]
-  (reset! bounds (scale-bounds 0.5))
-  (draw-fractal))
+(defmethod key-pressed [title \z] [_ config] 
+  (draw-fractal (assoc config :bounds (scale-bounds 0.5 (:bounds config)))))
 
-(defmethod key-pressed [title \x] [_]
-  (reset! bounds (scale-bounds 2.0))
-  (draw-fractal))
+(defmethod key-pressed [title \x] [_ config]
+  (draw-fractal (assoc config :bounds (scale-bounds 2.0 (:bounds config)))))
 
-(defmethod mouse-event [title :mouse-pressed] [e]
-  (let [^Bounds cbounds @bounds
+(defmethod key-pressed [title \c] [_ config]
+  (draw-fractal (assoc config
+                       :coloring-fn (rand-nth (keys coloring-fns))
+                       :mlt (r/drand 1 3))))
+
+(defmethod key-pressed [title \w] [_ config] 
+  (draw-fractal (assoc config :weight-fn (rand-nth weight-fns))))
+
+(defmethod mouse-event [title :mouse-pressed] [e config]
+  (println config)
+  (let [^Bounds cbounds (:bounds config)
         ^double nx (m/norm (mouse-y e) 0 w (.x1 cbounds) (.x2 cbounds))
         ^double ny (m/norm (mouse-x e) 0 h (.y1 cbounds) (.y2 cbounds))
         nbounds (make-bounds (- nx (.sx cbounds)) (- ny (.sy cbounds))
                              (+ nx (.sx cbounds)) (+ ny (.sy cbounds)))]
-    (reset! bounds nbounds)
-    (draw-fractal)))
+    (draw-fractal (assoc config :bounds nbounds))))
 
 (new-fractal)
