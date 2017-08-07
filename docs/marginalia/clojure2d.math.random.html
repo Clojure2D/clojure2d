@@ -3005,12 +3005,12 @@ As a RNG source <a href="http://commons.apache.org/proper/commons-math/apidocs/o
    :frandom (comp float next-random-value-double)
    :drandom next-random-value-double
    :grandom (fn
-              ([^RandomGenerator t] (next-random-value-gaussian t))
-              ([^RandomGenerator t std] (next-random-value-gaussian t std))
-              ([^RandomGenerator t ^double mean ^double std] (next-random-value-gaussian t mean (+ mean std))))
+              ([t] (next-random-value-gaussian t))
+              ([t std] (next-random-value-gaussian t std))
+              ([t ^double mean ^double std] (next-random-value-gaussian t mean (+ mean std))))
    :brandom (fn
               ([^RandomGenerator t] (.nextBoolean t))
-              ([^RandomGenerator t ^double thr] (&lt; (next-random-value-double t) thr)))})</pre></td></tr><tr><td class="docs"><p>Create object of the class with (or not) given seed</p>
+              ([t ^double thr] (&lt; (next-random-value-double t) thr)))})</pre></td></tr><tr><td class="docs"><p>Create object of the class with (or not) given seed</p>
 
 <p>Helper macro which creates RNG object of given class and/or seed.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmacro create-object-with-seed
@@ -3065,12 +3065,24 @@ As a RNG source <a href="http://commons.apache.org/proper/commons-math/apidocs/o
 <p><code>(drand 10) =&gt; 3.0752117891384048</code> <br />
 <code>(drand 10 20) =&gt; 11.327971928466651</code></p>
 </td><td class="codes"><pre class="brush: clojure">(def default-random (make-randomizer :jdk))
-(def irand (partial irandom default-random))
-(def lrand (partial lrandom default-random))
 (def frand (partial frandom default-random))
-(def drand (partial drandom default-random))
-(def grand (partial grandom default-random))
-(def brand (partial brandom default-random))</pre></td></tr><tr><td class="docs"><h2>Random Vector Sequences</h2>
+(def brand (partial brandom default-random))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn drand
+  (^double [] (drandom default-random))
+  (^double [mx] (drandom default-random mx))
+  (^double [mn mx] (drandom default-random mn mx)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn grand
+  (^double [] (grandom default-random))
+  (^double [mx] (grandom default-random mx))
+  (^double [mn mx] (grandom default-random mn mx)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn irand
+  (^long [] (irandom default-random))
+  (^long [mx] (irandom default-random mx))
+  (^long [mn mx] (irandom default-random mn mx)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn lrand
+  (^long [] (lrandom default-random))
+  (^long [mx] (lrandom default-random mx))
+  (^long [mn mx] (lrandom default-random mn mx)))</pre></td></tr><tr><td class="docs"><h2>Random Vector Sequences</h2>
 
 <p>Couple of functions to generate sequences of numbers or vectors.
 You can generate sequence of <code>double</code>, <code>Vec2</code>, <code>Vec3</code> or <code>Vec4</code> types. Just pass the size to creator function.</p>

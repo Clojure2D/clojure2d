@@ -2912,7 +2912,10 @@ Implementation based on Apache Commons Math</p>
            (+ (* a d) (* b c)))))</pre></td></tr><tr><td class="docs"><p>Negate complex</p>
 </td><td class="codes"><pre class="brush: clojure">(defn neg
   [^Vec2 z]
-  (Vec2. (- (.x z)) (- (.y z))))</pre></td></tr><tr><td class="docs"><p>Sqrt of complex number</p>
+  (Vec2. (- (.x z)) (- (.y z))))</pre></td></tr><tr><td class="docs"><p>Square</p>
+</td><td class="codes"><pre class="brush: clojure">(defn sq
+  [z]
+  (mult z z))</pre></td></tr><tr><td class="docs"><p>Sqrt of complex number</p>
 </td><td class="codes"><pre class="brush: clojure">(defn sqrt
   [^Vec2 z]
   (let [x (.x z)
@@ -2922,7 +2925,7 @@ Implementation based on Apache Commons Math</p>
         yy (* (m/signum y) (m/sqrt (- l x)))]
     (Vec2. (* m/SQRT2_2 xx) (* m/SQRT2_2 yy))))</pre></td></tr><tr><td class="docs"><p>Sqrt(1-z^2)</p>
 </td><td class="codes"><pre class="brush: clojure">(defn sqrt1z
-  [^Vec2 z]
+  [z]
   (-&gt;&gt; z
        (mult z)
        (sub ONE)
@@ -2953,18 +2956,30 @@ Implementation based on Apache Commons Math</p>
            (* (m/cosh x) (m/sin y)))))</pre></td></tr><tr><td class="docs"><p>tan</p>
 </td><td class="codes"><pre class="brush: clojure">(defn tan
   [^Vec2 z]
-  (let [aa (* 2 (.x z))
-        bb (* 2 (.y z))
+  (let [aa (* 2.0 (.x z))
+        bb (* 2.0 (.y z))
         cc (+ (m/cos aa) (m/cosh bb))]
     (Vec2. (/ (m/sin aa) cc)
            (/ (m/sinh bb) cc))))</pre></td></tr><tr><td class="docs"><p>tanh</p>
 </td><td class="codes"><pre class="brush: clojure">(defn tanh
   [^Vec2 z]
-  (let [aa (* 2 (.x z))
-        bb (* 2 (.y z))
+  (let [aa (* 2.0 (.x z))
+        bb (* 2.0 (.y z))
         cc (+ (m/cosh aa) (m/cos bb))]
     (Vec2. (/ (m/sinh aa) cc)
-           (/ (m/sin bb) cc))))</pre></td></tr><tr><td class="docs"><p>exp</p>
+           (/ (m/sin bb) cc))))</pre></td></tr><tr><td class="docs"><p>cosecant</p>
+</td><td class="codes"><pre class="brush: clojure">(defn sec
+  [^Vec2 z]
+  (let [cc (+ (m/cos (* 2.0 (.x z)))
+              (m/cosh (* 2.0 (.y z))))]
+    (Vec2. (/ (* 2.0 (m/cos (.x z)) (m/cosh (.y z))) cc)
+           (/ (* 2.0 (m/sin (.x z)) (m/sinh (.y z))) cc))))</pre></td></tr><tr><td class="docs"><p>cosecant</p>
+</td><td class="codes"><pre class="brush: clojure">(defn csc
+  [^Vec2 z]
+  (let [cc (- (m/cos (* 2.0 (.x z)))
+              (m/cosh (* 2.0 (.y z))))]
+    (Vec2. (/ (* 2.0 (m/cosh (.y z)) (m/sin (.x z))) cc)
+           (/ (* 2.0 (m/cos (.x z)) (m/sinh (.y z))) cc))))</pre></td></tr><tr><td class="docs"><p>exp</p>
 </td><td class="codes"><pre class="brush: clojure">(defn exp
   [^Vec2 z]
   (let [e (m/exp (.x z))
@@ -2976,26 +2991,26 @@ Implementation based on Apache Commons Math</p>
   (Vec2. (m/log (abs z))
          (m/atan2 (.y z) (.x z))))</pre></td></tr><tr><td class="docs"><p>acos</p>
 </td><td class="codes"><pre class="brush: clojure">(defn acos
-  [^Vec2 z]
+  [z]
   (-&gt;&gt; (sqrt1z z)
        (mult I)
        (add z)
        (log)
        (mult I-)))</pre></td></tr><tr><td class="docs"><p>asin</p>
 </td><td class="codes"><pre class="brush: clojure">(defn asin
-  [^Vec2 z]
+  [z]
   (-&gt;&gt; (sqrt1z z)
        (add (mult I z))
        (log)
        (mult I-)))</pre></td></tr><tr><td class="docs"><p>atan</p>
 </td><td class="codes"><pre class="brush: clojure">(defn atan
-  [^Vec2 z]
+  [z]
   (-&gt;&gt; (sub I z)
        (div (add I z))
        (log)
        (mult (div I TWO ))))</pre></td></tr><tr><td class="docs"><p>power</p>
 </td><td class="codes"><pre class="brush: clojure">(defn pow
-  [^Vec2 z1 ^Vec2 z2]
+  [z1 z2]
   (-&gt;&gt; z1
        (log)
        (mult z2)

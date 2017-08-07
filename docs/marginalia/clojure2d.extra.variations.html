@@ -2885,7 +2885,9 @@ Code is taken from <a href="https://github.com/tsulej/JWildfire/tree/master/src/
   (:require [clojure2d.math :refer :all]
             [clojure2d.math.complex :as c]
             [clojure2d.math.random :refer :all]
-            [clojure2d.math.vector :as v])
+            [clojure2d.math.joise :as j]
+            [clojure2d.math.vector :as v]
+            [clojure2d.math.random :as r])
   (:import clojure2d.math.vector.Vec2
            [org.apache.commons.math3.special BesselJ Beta Erf Gamma]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
@@ -2951,10 +2953,26 @@ Function returns map with full configuration necessary to create variation. In c
 <p>Locally used random function for some configuration parameters. Mostly used to avoid <code>0</code> value.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- srandom
   ^double  [^double mn ^double mx]
-  (let [^double rand (drand mn mx)]
+  (let [rand (drand mn mx)]
     (if (brand)
       rand
-      (* -1 rand))))</pre></td></tr><tr><td class="docs">
+      (* -1 rand))))</pre></td></tr><tr><td class="docs"><p>Local noise generating functions (for various noise implementations)</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Calculate shift by angle taken from noise</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- make-noise-variation
+  [^double amount scale noise-fn]
+  (fn [v]
+    (let [^Vec2 vv (v/mult v scale)
+          angle (* TWO_PI ^double (noise-fn (.x vv) (.y vv)))]
+      (v/add v (Vec2. (* amount (cos angle))
+                      (* amount (sin angle)))))))</pre></td></tr><tr><td class="docs"><p>Calculate shift by vector taken from noise</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- make-noise-variation2
+  [^double amount scale noise-fn]
+  (fn [v]
+    (let [^Vec2 vv (v/mult v scale)
+          x1 (- ^double (noise-fn (.x vv) (.y vv)) 0.5)
+          y1 (- ^double (noise-fn (.y vv) E (.x vv)) 0.5)]
+      (v/add v (Vec2. (* amount x1)
+                      (* amount y1))))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def ^Vec2 unitx (Vec2. 1.0 0.0))
 (def ^Vec2 zerov (Vec2. 0.0 0.0))</pre></td></tr><tr><td class="docs"><p>Two atoms to store variation names. One for non-random functions and second for random.</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
@@ -2970,7 +2988,7 @@ Function returns map with full configuration necessary to create variation. In c
 </td><td class="codes"><pre class="brush: clojure">(defn make-arch
   [^double amount _]
   (fn [^Vec2 v]
-    (let [ang (* amount ^double (drand PI))
+    (let [ang (* amount (drand PI))
           sinr (sin ang)
           cosr (cos ang)]
       (if (zero? cosr) zerov
@@ -3133,7 +3151,7 @@ Function returns map with full configuration necessary to create variation. In c
                   (- pre-tau split)
                   (+ pre-tau split))
             sigma (+ (/ pre-sigma power)
-                     (* mp (floor (* power ^double (drand)))))]
+                     (* mp (floor (* power (drand)))))]
         (bseries-calc amount tau sigma)))))
 (make-var-method btransform :random)</pre></td></tr><tr><td class="docs"><h3>BWraps7</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
@@ -3243,7 +3261,7 @@ Function returns map with full configuration necessary to create variation. In c
 </td><td class="codes"><pre class="brush: clojure">(defn make-blade
   [^double amount _]
   (fn [^Vec2 v]
-    (let [r (* ^double (drand amount) ^double (v/mag v))
+    (let [r (* (drand amount) ^double (v/mag v))
           sinr (sin r)
           cosr (cos r)]
       (Vec2. (* amount (.x v) (+ cosr sinr))
@@ -3252,7 +3270,7 @@ Function returns map with full configuration necessary to create variation. In c
 </td><td class="codes"><pre class="brush: clojure">(defn make-blade2
   [^double amount _]
   (fn [^Vec2 v]
-    (let [r (* ^double (drand amount) ^double (v/mag v))
+    (let [r (* (drand amount) ^double (v/mag v))
           sinr (sin r)
           cosr (cos r)]
       (Vec2. (* amount (.x v) (+ cosr sinr))
@@ -3299,21 +3317,75 @@ Function returns map with full configuration necessary to create variation. In c
             by (safe-sqrt (- 1.0 (sq ay)))]
         (Vec2. (* vv (atan2 ax bx) r x)
                (* vv (atan2 ay by) r y))))))
-(make-var-method blocky :regular)</pre></td></tr><tr><td class="docs"><h3>BesselJ</h3>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Bessel</p>
-</td><td class="codes"><pre class="brush: clojure">(defn make-besselj
+(make-var-method blocky :regular)</pre></td></tr><tr><td class="docs"><h3>Blur Circle</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Blur circle</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-blurcircle
   [^double amount _]
   (fn [^Vec2 v]
-    (Vec2. (* amount ^double (v/mag v) (BesselJ/value (abs (.x v)) (abs (.y v))))
-           (* amount ^double (v/heading v)))))
-(make-var-method besselj :regular)</pre></td></tr><tr><td class="docs"><h3>Beta</h3>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Beta</p>
-</td><td class="codes"><pre class="brush: clojure">(defn make-beta
+    (let [x (drand -1.0 1.0)
+          y (drand -1.0 1.0)
+          absx (abs x)
+          absy (abs y)
+          ^Vec2 ps (if (&gt;= absx absy)
+                     (Vec2. (if (&gt;= x absy)
+                              (+ absx y)
+                              (- (* 5.0 absx) y)) absx)
+                     (Vec2. (if (&gt;= y absx)
+                              (- (* 3.0 absy) x)
+                              (+ (* 7.0 absy) x)) absy))
+          r (* amount (.y ps))
+          a (-&gt; M_PI_4
+                (* (.x ps))
+                (/ (.y ps))
+                (- M_PI_4))
+          sa (sin a)
+          ca (cos a)]
+      (Vec2. (* r ca) (* r sa)))))
+(make-var-method blurcircle :random)</pre></td></tr><tr><td class="docs"><p>Blur</p>
+
+<h3>Blur</h3>
+</td><td class="codes"><pre class="brush: clojure">(defn make-blur
   [^double amount _]
   (fn [^Vec2 v]
-    (Vec2. (* amount (Beta/logBeta (+ EPSILON (abs (.x v))) (+ EPSILON (abs (.y v)))))
-           (* amount ^double (v/heading v)))))
-(make-var-method beta :regular)</pre></td></tr><tr><td class="docs"><h3>Boarders</h3>
+    (let [r (drand TWO_PI)
+          sr (sin r)
+          cr (cos r)
+          r2 (drand amount)]
+      (Vec2. (* r2 cr) (* r2 sr)))))
+(make-var-method blur :random)</pre></td></tr><tr><td class="docs"><h3>Blur pixelize</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method blurpixelize {:size (srandom 0.01 1.2)
+                                  :scale (drand -1.2 1.2)})</pre></td></tr><tr><td class="docs"><p>Blur Pixelize from Apo7X15C</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-blurpixelize
+  [^double amount {:keys [^double size ^double scale]}]
+  (let [inv-size (/ 1.0 size)
+        av (* amount size)
+        half (Vec2. 0.5 0.5)]
+    (fn [v]
+      (-&gt; v
+          (v/mult inv-size)
+          (v/applyf floor)
+          (v/add (-&gt; (v/generate-vec2 drand)
+                     (v/sub half)
+                     (v/mult scale)))
+          (v/add half)
+          (v/mult av)))))
+(make-var-method blurpixelize :random)</pre></td></tr><tr><td class="docs"><h3>BlurZoom</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method blurzoom {:length (drand -1.2 1.2)
+                              :x (drand -1.2 1.2)
+                              :y (drand -1.2 1.2)})</pre></td></tr><tr><td class="docs"><p>Blur Zoom from Apo7X15C</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-blurzoom
+  [^double amount {:keys [^double length ^double x ^double y]}]
+  (let [xy (Vec2. x y)
+        xy- (Vec2. x (- y))]
+    (fn [v]
+      (-&gt; v
+          (v/sub xy)
+          (v/mult (inc (drand length)))
+          (v/add xy-)
+          (v/mult amount)))))
+(make-var-method blurzoom :random)</pre></td></tr><tr><td class="docs"><h3>Boarders</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Boarders</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-boarders
   [^double amount _]
@@ -3338,25 +3410,236 @@ Function returns map with full configuration necessary to create variation. In c
                    (* amount (+ hoffsety roundy 0.25)))
             (Vec2. (* amount (- (+ hoffsetx roundx) (/ (* 0.25 offsetx) offsety)))
                    (* amount (- (+ hoffsety roundy) 0.25)))))))))
-(make-var-method boarders :random)</pre></td></tr><tr><td class="docs"><h3>Bubble</h3>
+(make-var-method boarders :random)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method boarders2 {:c (drand -1.2 1.2)
+                               :left (drand -1.2 1.2)
+                               :right (drand -1.2 1.2)})</pre></td></tr><tr><td class="docs"><p>Boarders</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-boarders2
+  [^double amount {:keys [^double c ^double left ^double right]}]
+  (let [cc (abs c)
+        cl (abs left)
+        cr (abs right)
+        cc (if (zero? cc) EPSILON cc)
+        cl (if (zero? cl) EPSILON cl)
+        cr (if (zero? cr) EPSILON cr)
+        cl (* c cl)
+        cr (+ c (* c cr))]
+    (fn [^Vec2 v]
+      (let [roundx (rint (.x v))
+            roundy (rint (.y v))
+            offsetx (- (.x v) roundx)
+            offsety (- (.y v) roundy)
+            coffsetx (* c offsetx)
+            coffsety (* c offsety)]
+        (if (brand cr)
+          (Vec2. (* amount (+ roundx coffsetx))
+                 (* amount (+ roundy coffsety)))
+          (if (&gt;= (abs offsetx) (abs offsety))
+            (if (&gt;= offsetx 0.0)
+              (Vec2. (* amount (+ coffsetx roundx cl))
+                     (* amount (+ coffsety roundy (/ (* cl offsety) offsetx))))
+              (Vec2. (* amount (- (+ coffsetx roundx) cl))
+                     (* amount (- (+ coffsety roundy) (/ (* cl offsety) offsetx)))))
+            (if (&gt;= offsety 0.0)
+              (Vec2. (* amount (+ coffsetx roundx (/ (* cl offsetx) offsety)))
+                     (* amount (+ coffsety roundy cl)))
+              (Vec2. (* amount (- (+ coffsetx roundx) (/ (* cl offsetx) offsety)))
+                     (* amount (- (+ coffsety roundy) cl))))))))))
+(make-var-method boarders2 :random)</pre></td></tr><tr><td class="docs"><h3>Bubble</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Bubble</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-bubble
   [^double amount _]
-  (fn [^Vec2 v]
+  (fn [v]
     (v/mult v (/ amount (inc (* 0.25 ^double (v/mag v)))))))
 (make-var-method bubble :regular)</pre></td></tr><tr><td class="docs"><h3>Butterfly</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Butterfly</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-butterfly
   [^double amount _]
+  (let [wx (* amount 1.3029400317411197908970256609023)]
+    (fn [^Vec2 v]
+      (let [y2 (* 2.0 (.y v))
+            r (* wx (sqrt (/ (abs (* (.y v) (.x v)))
+                             (+ EPSILON (sq (.x v)) (sq y2)))))]
+        (Vec2. (* r (.x v))
+               (* r y2))))))
+(make-var-method butterfly :regular)</pre></td></tr><tr><td class="docs"><h3>BesselJ</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Bessel</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-besselj
+  [^double amount _]
   (fn [^Vec2 v]
-    (let [wx (* amount 1.3029400317411197908970256609023)
-          y2 (* 2.0 (.y v))
-          r (* wx (sqrt (/ (abs (* (.y v) (.x v)))
-                           (+ EPSILON (sq (.x v)) (sq y2)))))]
-      (Vec2. (* r (.x v))
-             (* r y2)))))
-(make-var-method butterfly :regular)</pre></td></tr><tr><td class="docs"><h2>C</h2>
-</td><td class="codes"></td></tr><tr><td class="docs"><h3>CircleLinear</h3>
+    (Vec2. (* amount ^double (v/mag v) (BesselJ/value (abs (.x v)) (abs (.y v))))
+           (* amount ^double (v/heading v)))))
+(make-var-method besselj :regular)</pre></td></tr><tr><td class="docs"><h3>Beta</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Beta</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-beta
+  [^double amount _]
+  (fn [^Vec2 v]
+    (Vec2. (* amount (Beta/logBeta (+ EPSILON (abs (.x v))) (+ EPSILON (abs (.y v)))))
+           (* amount ^double (v/heading v)))))
+(make-var-method beta :regular)</pre></td></tr><tr><td class="docs"><h2>C</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><h3>CPow3</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method cpow3 {:r (drand -2 2)
+                           :a (drand -2 2)
+                           :divisor (srandom 0.1 2)
+                           :spread (srandom 0.1 2)
+                           :discrete-spread (srandom 0.1 2)
+                           :spread2 (drand -2 2)
+                           :offset2 (drand -2 2)})</pre></td></tr><tr><td class="docs"><p>CPow3</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-cpow3
+  [^double amount {:keys [^double r ^double a ^double divisor ^double spread ^double discrete-spread ^double spread2 ^double offset2]}]
+  (let [ang (/ TWO_PI divisor)
+        c (/ (* r (cos (* HALF_PI a))) divisor)
+        d (/ (* r (sin (* HALF_PI a))) divisor)
+        half-c (* 0.5 c)
+        half-d (* 0.5 d)
+        inv-spread (/ 0.5 spread)
+        full-spread (* TWO_PI spread)
+        fac (* c half-d ang)]
+    (fn [^Vec2 v]
+      (let [^double ai (v/heading v)
+            n (drand spread)
+            n (double (if (&gt;= discrete-spread 1.0) (int n) n))
+            n (if (neg? ai) (inc n) n)
+            ai (+ ai (* TWO_PI n))
+            ai (if (&lt; (cos (* ai inv-spread)) (drand -1.0 1.0)) (- ai full-spread) ai)
+            lnr2 (log (v/magsq v))
+            ri (* amount (exp (- (* half-c lnr2) (* d ai))))
+            ang2 (* fac ai lnr2 (+ (* spread2 (drand)) offset2))]
+        (Vec2. (* ri (cos ang2))
+               (* ri (sin ang2)))))))
+(make-var-method cpow3 :random)</pre></td></tr><tr><td class="docs"><h3>CPow</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method cpow {:r (drand -2 2)
+                          :i (drand -2 2)
+                          :power (srandom 0.1 12)})</pre></td></tr><tr><td class="docs"><p>CPow</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-cpow
+  [^double amount {:keys [^double r ^double i ^double power]}]
+  (let [va (/ TWO_PI power)
+        vc (/ r power)
+        vd (/ i power)]
+    (fn [v]
+      (let [^double a (v/heading v)
+            lnr (* 0.5 (log (v/magsq v)))
+            ang (+ (* a vc)
+                   (* vd lnr)
+                   (* va (floor (drand power))))
+            m (* amount (exp (- (* vc lnr)
+                                (* vd a))))]
+        (Vec2. (* m (cos ang)) (* m (sin ang)))))))
+(make-var-method cpow :random)</pre></td></tr><tr><td class="docs"><h3>Cell</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method cell {:size (srandom 0.1 2.0)})</pre></td></tr><tr><td class="docs"><p>Cell</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-cell
+  [^double amount {:keys [^double size]}]
+  (let [inv-cell-size (/ 1.0 size)
+        av (Vec2. amount (- amount))]
+    (fn [v]
+      (let [^Vec2 xy (-&gt; v
+                         (v/mult inv-cell-size)
+                         (v/applyf floor))
+            dxy (-&gt; v
+                    (v/sub (v/mult xy size)))
+            newxy (if-not (neg? (.y xy))
+                    (if-not (neg? (.x xy))
+                      (v/mult xy 2.0)
+                      (Vec2. (- (inc (* 2.0 (.x xy))))
+                             (* 2.0 (.y xy))))
+                    (if-not (neg? (.x xy))
+                      (Vec2. (* 2.0 (.x xy))
+                             (- (inc (* 2.0 (.y xy)))))
+                      (Vec2. (- (inc (* 2.0 (.x xy))))
+                             (- (inc (* 2.0 (.y xy)))))))]
+        (-&gt; newxy
+            (v/mult size)
+            (v/add dxy)
+            (v/emult av))))))
+(make-var-method cell :regular)</pre></td></tr><tr><td class="docs"><h3>Checks</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method checks {:x (drand -10 10)
+                            :y (drand -10 10)
+                            :size (drand -2.0 2.0)
+                            :rnd (if (brand) 0.0 (srandom 0.1 1))})</pre></td></tr><tr><td class="docs"><p>Checks</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-checks
+  [^double amount {:keys [^double x ^double y ^double size ^double rnd]}]
+  (let [cs (/ 1.0 (+ size EPSILON))
+        ncx (* -1.0 x)
+        ncy (* -1.0 y)]
+    (fn [^Vec2 v]
+      (let [isxy (+ (round (* cs (.x v)))
+                    (round (* cs (.y v))))
+            dxy (if (even? isxy)
+                  (Vec2. (+ ncx (drand rnd)) ncy)
+                  (Vec2. x (+ y (drand rnd))))]
+        (-&gt; v
+            (v/add dxy)
+            (v/mult amount))))))
+(make-var-method checks :random)</pre></td></tr><tr><td class="docs"><h3>Chunk</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method chunk {:a (drand -1.2 1.2)
+                           :b (drand -1.2 1.2)
+                           :c (drand -1.2 1.2)
+                           :d (drand -1.2 1.2)
+                           :e (drand -1.2 1.2)
+                           :f (drand -1.2 1.2)
+                           :mode (brand)})</pre></td></tr><tr><td class="docs"><p>Chunk, by zephyrtronium https://zephyrtronium.deviantart.com/art/Chunk-Apophysis-Plugin-Pack-182375397</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-chunk
+  [^double amount {:keys [^double a ^double b ^double c ^double d ^double e ^double f mode]}]
+  (fn [^Vec2 v]
+    (let [r (+ (* a (sq (.x v)))
+               (* b (.x v) (.y v))
+               (* c (sq (.y v)))
+               (* d (.x v))
+               (* e (.y v))
+               f)]
+      (if mode
+        (if-not (pos? r) v zerov)
+        (if (pos? r) v zerov)))))
+(make-var-method chunk :regular)</pre></td></tr><tr><td class="docs"><h3>Circle blur</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Circle blur</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-circleblur
+  [^double amount _]
+  (fn [_]
+    (let [rad (sqrt (drand))
+          a (drand TWO_PI)]
+      (Vec2. (* amount (cos a) rad)
+             (* amount (sin a) rad)))))
+(make-var-method circleblur :random)</pre></td></tr><tr><td class="docs"><h3>CircleRand</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method circlerand {:Sc (srandom 0.1 1.2)
+                                :Dens (drand 1)
+                                :X (drand -20 20)
+                                :Y (drand -20 20)
+                                :Seed (irand Integer/MAX_VALUE)})</pre></td></tr><tr><td class="docs"><p>Circle Rand http://eralex61.deviantart.com/art/Circles-Plugins-126273412</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-circlerand
+  [^double amount {:keys [^double Sc ^double Dens ^double X ^double Y ^double Seed]}]
+  (let [xy (Vec2. X Y)] 
+    (fn [v]
+      (loop [iter (int 0)]
+        (let [XY (-&gt; (v/generate-vec2 #(drand -1.0 1.0))
+                     (v/emult xy))
+              ^Vec2 MN (-&gt; XY
+                           (v/mult 0.5)
+                           (v/div Sc)
+                           (v/applyf floor))
+              XY (v/sub XY (-&gt; MN
+                               (v/mult 2.0)
+                               (v/applyf inc)
+                               (v/mult Sc)))]
+          (if (and (&lt; iter 100)
+                   (or (&gt; (discrete-noise (+ Seed (.x MN)) (.y MN)) Dens)
+                       (&gt; ^double (v/mag XY) (-&gt; (discrete-noise (+ 10 (.x MN)) (+ 3 (.y MN)))
+                                                 (* 0.7)
+                                                 (+ 0.3)
+                                                 (* Sc)))))
+            (recur (inc iter))
+            (-&gt; MN
+                (v/mult 2.0)
+                (v/applyf inc)
+                (v/mult Sc)
+                (v/add XY)
+                (v/mult amount))))))))
+(make-var-method circlerand :random)</pre></td></tr><tr><td class="docs"><h3>CircleLinear</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(make-config-method circlelinear {:Sc (drand 1)
                                   :K (drand -2 2)
@@ -3425,7 +3708,18 @@ Function returns map with full configuration necessary to create variation. In c
                     (* Sc)
                     (+ (.y XY))
                     (* amount)))))))
-(make-var-method circlelinear :regular)</pre></td></tr><tr><td class="docs"><h3>Cosine</h3>
+(make-var-method circlelinear :regular)</pre></td></tr><tr><td class="docs"><h3>Conic</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method conic {:eccentricity (drand -3 3)
+                           :holes (drand -3 3)})</pre></td></tr><tr><td class="docs"><p>Conc</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-conic
+  [^double amount {:keys [^double eccentricity ^double holes]}]
+  (fn [^Vec2 v]
+    (let [magr (/ 1.0 (+ ^double (v/mag v) EPSILON))
+          ct (* (.x v) magr)
+          r (* (/ (* (* amount (- (drand) holes)) eccentricity) (inc (* eccentricity ct))) magr)]
+      (v/mult v r))))
+(make-var-method conic :random)</pre></td></tr><tr><td class="docs"><h3>Cosine</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Cosine</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-cosine
   [^double amount _]
@@ -3433,7 +3727,41 @@ Function returns map with full configuration necessary to create variation. In c
     (let [r (* PI (.x v))]
       (Vec2. (* amount (cos r) (cosh (.y v)))
              (- (* amount (sin r) (sinh (.y v))))))))
-(make-var-method cosine :regular)</pre></td></tr><tr><td class="docs"><h3>Cross</h3>
+(make-var-method cosine :regular)</pre></td></tr><tr><td class="docs"><h3>Curl</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method curl {:c1 (drand -1 1)
+                          :c2 (drand -1 1)})</pre></td></tr><tr><td class="docs"><p>Curl</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-curl
+  [^double amount {:keys [^double c1 ^double c2]}]
+  (fn [^Vec2 v]
+    (let [re (inc (+ (* c1 (.x v)) (* c2 (- (sq (.x v)) (sq (.y v))))))
+          im (+ (* c1 (.y v)) (* c2 2.0 (.x v) (.y v)))
+          r (/ amount (+ (sq re) (sq im)))]
+      (Vec2. (* r (+ (* (.x v) re) (* (.y v) im)))
+             (* r (- (* (.y v) re) (* (.x v) im)))))))
+(make-var-method curl :regular)</pre></td></tr><tr><td class="docs"><h3>Curve</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method curve {:xamp (srandom 0.1 3)
+                           :yamp (srandom 0.1 3)
+                           :xlength (drand 0.1 1.5)
+                           :ylength (drand 0.1 1.5)})</pre></td></tr><tr><td class="docs"><p>Curve</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-curve
+  [amount {:keys [^double xamp ^double yamp xlength ylength]}]
+  (let [pc-xlen (/ 1.0 (max EPSILON (sq xlength)))
+        pc-ylen (/ 1.0 (max EPSILON (sq ylength)))
+        len (Vec2. pc-xlen pc-ylen)
+        amp (Vec2. xamp yamp)]
+    (fn [^Vec2 v]
+      (let [rv (Vec2. (.y v) (.x v))]
+        (-&gt; rv
+            (v/emult rv)
+            (v/mult -1.0)
+            (v/emult len)
+            (v/applyf exp)
+            (v/emult amp)
+            (v/add v)
+            (v/mult amount))))))
+(make-var-method curve :regular)</pre></td></tr><tr><td class="docs"><h3>Cross</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Cross</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-cross
   [^double amount _]
@@ -3490,8 +3818,41 @@ Function returns map with full configuration necessary to create variation. In c
             cosr (cos rpi)
             r (* api ^double (v/heading v))]
         (Vec2. (* r sinr) (* r cosr))))))
-(make-var-method disc :regular)</pre></td></tr><tr><td class="docs"><h2>E</h2>
-</td><td class="codes"></td></tr><tr><td class="docs"><h3>eMod</h3>
+(make-var-method disc :regular)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method disc2 {:rot (drand -3 3)
+                           :twist (drand -6 6)})</pre></td></tr><tr><td class="docs"><p>Disc2</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-disc2
+  [^double amount {:keys [^double rot ^double twist]}]
+  (let [timespi (* rot PI) 
+        k1 (if (&gt; twist TWO_PI) (- (inc twist) TWO_PI) 1.0)
+        k2 (if (&lt; twist (- TWO_PI)) (+ (inc twist) TWO_PI) 1.0) 
+        sinadd (* (sin twist) k1 k2)
+        cosadd (* (dec (cos twist)) k1 k2)]
+    (fn [^Vec2 v]
+      (let [t (* timespi (+ (.x v) (.y v)))
+            sinr (sin t)
+            cosr (cos t)
+            r (/ (* amount ^double (v/heading v)) PI)]
+        (Vec2. (* r (+ cosadd sinr))
+               (* r (+ sinadd cosr)))))))
+(make-var-method disc2 :regular)</pre></td></tr><tr><td class="docs"><h2>E</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><h3>eDisk</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>edisc</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-edisc
+  [^double amount _]
+  (let [w (/ amount 11.57034632)]
+    (fn [^Vec2 v]
+      (let [tmp (inc ^double (v/magsq v))
+            tmp2 (* 2.0 (.x v))
+            xmax (* 0.5 (+ (safe-sqrt (+ tmp tmp2))
+                           (safe-sqrt (- tmp tmp2))))
+            a1 (log (+ xmax (sqrt (dec xmax))))
+            a2 (- (acos (/ (.x v) xmax)))
+            snv (sin a1)
+            snv (if (pos? (.y v)) (- snv) snv)]
+        (Vec2. (* w (cosh a2) (cos a1))
+               (* w (sinh a2) snv))))))
+(make-var-method edisc :regular)</pre></td></tr><tr><td class="docs"><h3>eMod</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(make-config-method emod {:radius (drand 0.1 4)
                           :distance (drand 2)})</pre></td></tr><tr><td class="docs"><p>eMod by Michael Faber, http://michaelfaber.deviantart.com/art/eSeries-306044892</p>
@@ -3551,7 +3912,25 @@ Function returns map with full configuration necessary to create variation. In c
                 (* -a l)
                 (- (* -a l)))]
         (Vec2. x y)))))
-(make-var-method elliptic :random)</pre></td></tr><tr><td class="docs"><h3>Ex</h3>
+(make-var-method elliptic :random)</pre></td></tr><tr><td class="docs"><h3>Escher</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method escher {:beta (drand TWO_PI)})</pre></td></tr><tr><td class="docs"><p>Escher</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-escher
+  [^double amount {:keys [beta]}]
+  (let [seb (sin beta)
+        ceb (cos beta)
+        vc (* 0.5 (inc ceb))
+        vd (* 0.5 seb)]
+    (fn [^Vec2 v]
+      (let [^double a (v/heading v)
+            lnr (* 0.5 (log (v/magsq v)))
+            m (* amount (exp (- (* vc lnr)
+                                (* vd a))))
+            n (+ (* vc a)
+                 (* vd lnr))]
+        (Vec2. (* m (cos n))
+               (* m (sin n)))))))
+(make-var-method escher :regular)</pre></td></tr><tr><td class="docs"><h3>Ex</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Ex</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-ex
   [^double amount _]
@@ -3631,7 +4010,18 @@ Function returns map with full configuration necessary to create variation. In c
   (fn [^Vec2 v]
     (let [r (/ (* amount 4.0) (inc ^double (v/mag v)))]
       (Vec2. (* r (.y v)) (* r (.x v))))))
-(make-var-method fisheye :regular)</pre></td></tr><tr><td class="docs"><h3>Foci</h3>
+(make-var-method fisheye :regular)</pre></td></tr><tr><td class="docs"><h3>Flower</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method flower {:petals (drand -10 10)
+                            :holes (drand -1 1)})</pre></td></tr><tr><td class="docs"><p>Flower</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-flower
+  [^double amount {:keys [^double petals ^double holes]}]
+  (fn [v]
+    (let [^double theta (v/heading v)
+          d (/ 1.0 (+ EPSILON ^double (v/mag v)))
+          r (* amount (- (drand) holes) (cos (* petals theta)) d)]
+      (v/mult v r))))
+(make-var-method flower :random)</pre></td></tr><tr><td class="docs"><h3>Foci</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Foci</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-foci
   [^double amount _]
@@ -3652,7 +4042,53 @@ Function returns map with full configuration necessary to create variation. In c
   (fn [^Vec2 v]
     (Vec2. (* amount (Gamma/logGamma (v/mag v)))
            (* amount ^double (v/heading v)))))
-(make-var-method gamma :regular)</pre></td></tr><tr><td class="docs"><h2>H</h2>
+(make-var-method gamma :regular)</pre></td></tr><tr><td class="docs"><h3>GaussianBlur</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Gaussian</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-gaussianblur
+  [^double amount _]
+  (fn [v]
+    (let [a (drand TWO_PI)
+          r (* amount (+ (drand) (drand) (drand) (drand) -2.0))]
+      (Vec2. (* r (cos a)) (* r (sin a))))))
+(make-var-method gaussianblur :random)</pre></td></tr><tr><td class="docs"><h3>GDOffs</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method gdoffs {:delta-x (drand -6 6)
+                            :delta-y (drand -6 6)
+                            :area-x (srandom 0.5 3)
+                            :area-y (srandom 0.5 3)
+                            :center-x (drand -1 1)
+                            :center-y (drand -1 1)
+                            :gamma (drand -5 5)
+                            :square brand})</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double agdod-- 0.1)
+(def ^:const ^double agdoa-- 2.0)
+(def ^:const ^double agdoc-- 1.0)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn- fclp ^double [^double a] (if (neg? a) (- (rem (abs a) 1.0)) (rem (abs a) 1.0)))
+(defn- fscl ^double [^double a] (fclp (* 0.5 (inc a))))
+(defn- fosc ^double [^double p ^double a] (fscl (- (cos (* p a TWO_PI)))))
+(defn- flip ^double [^double a ^double b ^double c] (+ a (* c (- b a))))</pre></td></tr><tr><td class="docs"><p>GDOffs</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-gdoffs
+  [^double amount {:keys [^double delta-x ^double delta-y ^double area-x ^double area-y ^double center-x ^double center-y ^double gamma square]}]
+  (let [gdodx (* delta-x agdod--)
+        gdody (* delta-y agdod--)
+        gdoax (* agdoa-- (if (&lt; (abs area-x) 0.1) 0.1 (abs area-x)))
+        gdoay (* agdoa-- (if (&lt; (abs area-y) 0.1) 0.1 (abs area-y)))
+        gdocx (* center-x agdoc--)
+        gdocy (* center-y agdoc--)
+        gdog gamma
+        gdos square
+        gdob (/ (* gdog agdoa--) (max gdoax gdoay))]
+    (fn [^Vec2 v]
+      (let [osc-x (fosc gdodx 1.0)
+            osc-y (if gdos (fosc gdody 1.0) 1.0)
+            in-x (+ (.x v) gdocx)
+            in-y (+ (.y v) gdocy)]
+        (v/mult (if gdos
+                  (Vec2. (flip (flip in-x (fosc in-x 4.0) osc-x) (fosc (fclp (* gdob in-x)) 4.0) osc-x)
+                         (flip (flip in-y (fosc in-y 4.0) osc-x) (fosc (fclp (* gdob in-y)) 4.0) osc-x))
+                  (Vec2. (flip (flip in-x (fosc in-x 4.0) osc-x) (fosc (fclp (* gdob in-x)) 4.0) osc-x)
+                         (flip (flip in-y (fosc in-y 4.0) osc-y) (fosc (fclp (* gdob in-y)) 4.0) osc-y))) amount)))))
+(make-var-method gdoffs :regular)</pre></td></tr><tr><td class="docs"><h2>H</h2>
 
 <h3>Heart</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Heart</p>
@@ -3702,28 +4138,61 @@ Function returns map with full configuration necessary to create variation. In c
       (Vec2. (/ (sin theta) r)
              (* (cos theta) r)))))
 (make-var-method hyperbolic :regular)</pre></td></tr><tr><td class="docs"><h2>J</h2>
-
-<h3>Julia</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><h3>Joise noises</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method joise-basis (assoc (j/make-random-basis-conf)
+                                       :scale (srandom 0.1 1.5)))</pre></td></tr><tr><td class="docs"><p>Joise basis noise (angle version)</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-joise-basis
+  [amount c]
+  (let [n (j/make-noise (j/make-basis c))]
+    (make-noise-variation amount (:scale c) n)))
+(make-var-method joise-basis :regular)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method joise-basis2 (assoc (j/make-random-basis-conf)
+                                        :scale (srandom 0.1 1.5)))</pre></td></tr><tr><td class="docs"><p>Joise basis noise (shift version)</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-joise-basis2
+  [amount c]
+  (let [n (j/make-noise (j/make-basis c))]
+    (make-noise-variation2 amount (:scale c) n)))
+(make-var-method joise-basis2 :regular)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method joise-cell (assoc (j/make-random-cell-conf)
+                                      :scale (drand)))</pre></td></tr><tr><td class="docs"><p>Joise basis cell (angle version)</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-joise-cell
+  [amount c]
+  (let [n (j/make-noise (j/make-cell c))]
+    (make-noise-variation amount (:scale c) n)))
+(make-var-method joise-cell :regular)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method joise-cell2 (assoc (j/make-random-cell-conf)
+                                       :scale (drand)))</pre></td></tr><tr><td class="docs"><p>Joise basis cell (shift version)</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-joise-cell2
+  [amount c]
+  (let [n (j/make-noise (j/make-cell c))]
+    (make-noise-variation2 amount (:scale c) n)))
+(make-var-method joise-cell2 :regular)</pre></td></tr><tr><td class="docs"><h3>Julia</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Julia</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-julia
   [^double amount _]
   (fn [^Vec2 v]
-    (let [a (+ (* 0.5 ^double (v/heading v)) (* PI ^double (irand 2)))
-          r (-&gt;&gt; (v/mag v)
-                 (sqrt)
-                 (* amount))]
+    (let [a (+ (* 0.5 ^double (v/heading v)) (* PI (irand 2)))
+          r (* amount (sqrt (v/mag v)))]
       (Vec2. (* r (cos a)) (* r (sin a))))))
-(make-var-method julia :random)</pre></td></tr><tr><td class="docs"><h3>JuliaC</h3>
+(make-var-method julia :random)</pre></td></tr><tr><td class="docs"><p>Julia with different angle calc</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-julia2
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [a (+ (* 0.5 (atan2 (.x v) (.y v))) (* PI (irand 2)))
+          r (* amount (sqrt (v/mag v)))]
+      (Vec2. (* r (cos a)) (* r (sin a))))))
+(make-var-method julia2 :random)</pre></td></tr><tr><td class="docs"><h3>JuliaC</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(make-config-method juliac {:re (int (srandom 1.0 10.0))
-                            :im (* 0.01 ^double (drand -2.0 2.0))
+                            :im (* 0.01 (drand -2.0 2.0))
                             :dist (drand -2.0 2.0)})</pre></td></tr><tr><td class="docs"><p>JuliaC</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-juliac
   [^double amount {:keys [^double re ^double im ^double dist]}]
   (let [rre (/ 1.0 re)]
     (fn [^Vec2 v]
       (let [arg (+ ^double (v/heading v)
-                   (* TWO_PI ^double (mod ^int (irand) re)))
+                   (* TWO_PI ^double (mod (irand) re)))
             lnmod (* dist (log (v/magsq v)))
             a (+ (* arg rre)
                  (* lnmod im))
@@ -3740,34 +4209,154 @@ Function returns map with full configuration necessary to create variation. In c
   [^double amount {:keys [^double power ^double dist]}]
   (let [abspower (int (abs power))
         cpower (* 0.5 (/ dist power))]
-    (fn [^Vec2 v]
-      (let [a (/ (+ ^double (v/heading v) (* TWO_PI ^int (irand abspower))) power)
+    (fn [v]
+      (let [a (/ (+ ^double (v/heading v) (* TWO_PI (irand abspower))) power)
             r (* amount (pow (v/magsq v) cpower))]
         (Vec2. (* r (cos a)) (* r (sin a)))))))
-(make-var-method julian :random)</pre></td></tr><tr><td class="docs"><h3>JuliaQ</h3>
+(make-var-method julian :random)</pre></td></tr><tr><td class="docs"><h3>JuliaScope</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method juliascope (let [r (srandom 1 10)]
+                                 {:power (if (brand) r (int r))
+                                  :dist (drand -4 4)}))</pre></td></tr><tr><td class="docs"><p>JuliaScope</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-juliascope
+  [^double amount {:keys [^double power ^double dist]}]
+  (let [abspower (int (abs power))
+        cpower (* 0.5 (/ dist power))]
+    (fn [v]
+      (let [rnd (lrand abspower)
+            a (if (zero? (bit-and rnd 1))
+                (/ (+ (* TWO_PI rnd) ^double (v/heading v)) power)
+                (/ (- (* TWO_PI rnd) ^double (v/heading v)) power))
+            r (* amount (pow (v/magsq v) cpower))]
+        (Vec2. (* r (cos a)) (* r (sin a)))))))
+(make-var-method juliascope :random)</pre></td></tr><tr><td class="docs"><h3>JuliaQ</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(make-config-method juliaq {:power (int (srandom 1 10))
                             :divisor (srandom 1 8)})</pre></td></tr><tr><td class="docs"><p>juliaq by Zueuk, http://zueuk.deviantart.com/art/juliaq-Apophysis-plugins-340813357</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-juliaq
   [^double amount {:keys [^double divisor ^double power]}]
-  (let [inv-power (/ ^double divisor power)
+  (let [inv-power (/ divisor power)
         half-inv-power (* 0.5 inv-power)
         inv-power-2pi (/ TWO_PI power)]
     (fn [^Vec2 v]
       (let [a (+ (* inv-power ^double (v/heading v))
-                 (* inv-power-2pi ^int (irand)))
+                 (* inv-power-2pi (irand)))
             r (* amount (pow (v/magsq v) half-inv-power))]
         (Vec2. (* r (cos a)) (* r (sin a)))))))
 (make-var-method juliaq :random)</pre></td></tr><tr><td class="docs"><h2>L</h2>
-</td><td class="codes"></td></tr><tr><td class="docs"><h3>Log</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><h3>Lazy Susan</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method lazysusan {:twist (drand -6 6)
+                               :spin (drand -4 4)
+                               :space (drand -2 2)
+                               :x (drand -1 1)
+                               :y (drand -1 1)})</pre></td></tr><tr><td class="docs"><p>Lazysusan</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-lazysusan
+  [^double amount {:keys [^double twist ^double spin ^double space ^double x ^double y]}]
+  (fn [^Vec2 v]
+    (let [xx (- (.x v) x)
+          yy (+ (.y v) y)
+          rr (hypot xx yy)]
+      (if (&lt; rr amount)
+        (let [a (+ (atan2 yy xx) spin (* twist (- amount rr)))
+              nr (* amount rr)]
+          (Vec2. (+ (* nr (cos a)) x)
+                 (- (* nr (sin a)) y)))
+        (let [nr (* amount (inc (/ space rr)))]
+          (Vec2. (+ (* nr xx) x)
+                 (- (* nr yy) y)))))))
+(make-var-method lazysusan :regular)</pre></td></tr><tr><td class="docs"><h3>LogApo</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method logapo {:base (drand 0.01 20)})</pre></td></tr><tr><td class="docs"><p>LogApo</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-logapo
+  [^double amount {:keys [^double base]}]
+  (let [denom (/ 0.5 (log base))]
+    (fn [v]
+      (Vec2. (* amount denom (log (v/magsq v)))
+             (* amount ^double (v/heading v))))))
+(make-var-method logapo :regular)</pre></td></tr><tr><td class="docs"><h3>Log</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Log</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-log
   [^double amount _]
   (fn [^Vec2 v]
-    (Vec2. (* amount 0.5 (log ^double (v/magsq v)))
+    (Vec2. (* amount 0.5 (log (v/magsq v)))
            (* amount ^double (v/heading v)))))
-(make-var-method log :regular)</pre></td></tr><tr><td class="docs"><h2>P</h2>
-</td><td class="codes"></td></tr><tr><td class="docs"><h3>Pie</h3>
+(make-var-method log :regular)</pre></td></tr><tr><td class="docs"><h3>Loonie</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Loonie</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-loonie
+  [^double amount _]
+  (let [w2 (sq amount)]
+    (fn [v]
+      (let [^double r2 (v/magsq v)]
+        (if (and (&lt; r2 w2) (not (zero? r2)))
+          (let [r (* amount (sqrt (dec (/ w2 r2))))]
+            (v/mult v r))
+          (v/mult v amount))))))
+(make-var-method loonie :regular)</pre></td></tr><tr><td class="docs"><h2>M</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><h3>Modulus</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method modulus {:x (srandom 0.01 2.0)
+                             :y (srandom 0.01 2.0)})</pre></td></tr><tr><td class="docs"><p>Modulus</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-modulus
+  [amount {:keys [^double x ^double y]}]
+  (let [xr (+ x x)
+        yr (+ y y)]
+    (fn [^Vec2 v]
+      (v/mult (Vec2. (cond
+                       (&gt; (.x v) x) (+ (- x) (rem (+ (.x v) x) xr))
+                       (&lt; (.x v) (- x)) (- x (rem (- x (.x v)) xr))
+                       :else (.x v))
+                     (cond
+                       (&gt; (.y v) y) (+ (- y) (rem (+ (.y v) y) yr))
+                       (&lt; (.y v) (- y)) (- y (rem (- y (.y v)) yr))
+                       :else (.y v))) amount))))
+(make-var-method modulus :regular)</pre></td></tr><tr><td class="docs"><h2>N</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><h3>Ngon</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method ngon {:circle (drand -2 2)
+                          :corners (drand -2 2)
+                          :power (drand -10 10)
+                          :sides (drand -10 10)})</pre></td></tr><tr><td class="docs"><p>Ngon</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-ngon
+  [^double amount {:keys [^double circle ^double corners ^double power ^double sides]}]
+  (let [b (/ TWO_PI sides)
+        hb (/ b 2.0)
+        hpower (/ power 2.0)]
+    (fn [v]
+      (let [r-factor (pow (v/magsq v) hpower)
+            ^double theta (v/heading v)
+            phi (- theta (* b (floor (/ theta b))))
+            phi (if (&gt; phi hb) (- phi b) phi)
+            amp (/ (+ circle (* corners (dec (/ 1.0 (+ (cos phi) EPSILON))))) (+ r-factor EPSILON))]
+        (v/mult v (* amount amp))))))
+(make-var-method ngon :regular)</pre></td></tr><tr><td class="docs"><h3>Noise</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Noise</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-noise
+  [^double amount _]
+  (fn [v]
+    (let [a (drand TWO_PI)
+          r (drand amount)]
+      (Vec2. (* r (cos a))
+             (* r (sin a))))))
+(make-var-method noise :random)</pre></td></tr><tr><td class="docs"><h2>P</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><h3>Perlin</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method perlin {:seed (irand)
+                            :scale (srandom 0.1 1.5)
+                            :octaves (irand 1 6)})</pre></td></tr><tr><td class="docs"><p>Perlin noise</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-perlin
+  [amount {:keys [seed octaves scale]}]
+  (let [n (make-perlin-noise seed octaves)]
+    (make-noise-variation amount scale n)))
+(make-var-method perlin :regular)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method perlin2 {:seed (irand)
+                             :scale (srandom 0.1 1.5)
+                             :octaves (irand 1 6)})</pre></td></tr><tr><td class="docs"><p>Perlin noise</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-perlin2
+  [^double amount {:keys [^int seed ^int octaves ^double scale]}]
+  (let [n (make-perlin-noise seed octaves)]
+    (make-noise-variation2 amount scale n)))
+(make-var-method perlin2 :regular)</pre></td></tr><tr><td class="docs"><h3>Pie</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(make-config-method pie {:slices (srandom 0.01 7.0)
                          :rotation (drand TWO_PI)
@@ -3775,14 +4364,14 @@ Function returns map with full configuration necessary to create variation. In c
 </td><td class="codes"><pre class="brush: clojure">(defn make-pie
   [^double amount {:keys [^double slices ^double rotation ^double thickness]}]
   (fn [^Vec2 v]
-    (let [sl (round (+ 0.5 (* slices ^double (drand))))
+    (let [sl (round (+ 0.5 (* slices (drand))))
           a (-&gt; thickness
-                (* ^double (drand))
+                (* (drand))
                 (+ sl)
                 (* TWO_PI)
                 (/ slices)
                 (+ rotation))
-          r (* amount ^double (drand))]
+          r (* amount (drand))]
       (Vec2. (* r (cos a))
              (* r (sin a))))))
 (make-var-method pie :random)</pre></td></tr><tr><td class="docs"><h3>PDJ</h3>
@@ -3857,7 +4446,31 @@ Function returns map with full configuration necessary to create variation. In c
                   (* amount))]
       (Vec2. xx yy))))
 (make-var-method popcorn2 :regular)</pre></td></tr><tr><td class="docs"><h2>R</h2>
-</td><td class="codes"></td></tr><tr><td class="docs"><h3>Rectangles</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><h3>Radial Blur</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method radialblur {:angle (drand (- TWO_PI) TWO_PI)})</pre></td></tr><tr><td class="docs"><p>Radial blur</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-radialblur
+  [^double amount {:keys [^double angle]}]
+  (let [spin (* amount (sin (* angle HALF_PI)))
+        zoom (* amount (cos (* angle HALF_PI)))]
+    (fn [^Vec2 v]
+      (let [rnd-g (+ (drand) (drand) (drand) (drand) -2.0)
+            ^double ra (v/mag v)
+            alpha (+ (* spin rnd-g) ^double (v/heading v))
+            rz (dec (* zoom rnd-g))]
+        (Vec2. (+ (* rz (.x v)) (* ra (cos alpha)))
+               (+ (* rz (.y v)) (* ra (sin alpha))))))))
+(make-var-method radialblur :random)</pre></td></tr><tr><td class="docs"><h3>Rays</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Rays</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-rays
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [ang (* amount (drand PI))
+          r (/ amount (+ EPSILON ^double (v/magsq v)))
+          tanr (* amount r (tan ang))]
+      (Vec2. (* tanr (cos (.x v)))
+             (* tanr (sin (.y v)))))))
+(make-var-method rays :random)</pre></td></tr><tr><td class="docs"><h3>Rectangles</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(make-config-method rectangles {:x (drand -1.5 1.5)
                                 :y (drand -1.5 1.5)})</pre></td></tr><tr><td class="docs"><p>Rectangles</p>
@@ -3905,7 +4518,15 @@ Function returns map with full configuration necessary to create variation. In c
       (let [^double l (v/mag v)
             r (* amount (- 2.0 (* dx (inc (/ (* 2.0 (int (* 0.5 (inc (/ l dx))))) l)))))]
         (v/mult v r)))))
-(make-var-method rings2 :regular)</pre></td></tr><tr><td class="docs"><h2>S</h2>
+(make-var-method rings2 :regular)</pre></td></tr><tr><td class="docs"><h3>Rippled</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Rippled</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-rippled
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [d (+ EPSILON ^double (v/magsq v))]
+      (Vec2. (* (* (tanh d) (* 2.0 (.x v))) (/ amount 2.0))
+             (* (* (cos d) (* 2.0 (.y v))) (/ amount 2.0))))))
+(make-var-method rippled :regular)</pre></td></tr><tr><td class="docs"><h2>S</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><h3>Scry</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Scry</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-scry
@@ -3919,7 +4540,22 @@ Function returns map with full configuration necessary to create variation. In c
                 (+ EPSILON))
           r (/ 1.0 d)]
       (v/mult v r))))
-(make-var-method scry :regular)</pre></td></tr><tr><td class="docs"><h3>Sinusoidal</h3>
+(make-var-method scry :regular)</pre></td></tr><tr><td class="docs"><h3>Sech</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Sech</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-sech
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [sn (sin (.y v))
+          cn (cos (.y v))
+          snh (sinh (.x v))
+          cnh (cosh (.x v))
+          d (+ (cos (* 2.0 (.y v)))
+               (cosh (* 2.0 (.x v))))
+          d (if (zero? d) EPSILON d)
+          den (/ 2.0 d)]
+      (Vec2. (* amount den cn cnh)
+             (* (- amount) den sn snh)))))
+(make-var-method sech :regular)</pre></td></tr><tr><td class="docs"><h3>Sinusoidal</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Sinusoidal</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-sinusoidal
   [^double amount _]
@@ -3927,6 +4563,14 @@ Function returns map with full configuration necessary to create variation. In c
     (Vec2. (* amount (sin (.x v))) (* amount (sin (.y v))))))
 (make-var-method sinusoidal :regular)</pre></td></tr><tr><td class="docs"><h3>Secant</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Secant2</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-secant
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [r (* amount ^double (v/mag v))
+          cr (* amount (cos r))
+          icr (/ 1.0 (if (zero? cr) EPSILON cr))]
+      (Vec2. (* amount (.x v)) icr))))
+(make-var-method secant :regular)</pre></td></tr><tr><td class="docs"><p>Secant2</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-secant2
   [^double amount _]
   (fn [^Vec2 v]
@@ -3958,8 +4602,8 @@ Function returns map with full configuration necessary to create variation. In c
              (* amount revr (- sina cosr))))))
 (make-var-method spiral :regular)</pre></td></tr><tr><td class="docs"><h3>Split</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(make-config-method split {:xsplit (* PI ^double (drand -2.0 2.0))
-                           :ysplit (* PI ^double (drand -2.0 2.0))})</pre></td></tr><tr><td class="docs"><p>Split</p>
+</td><td class="codes"><pre class="brush: clojure">(make-config-method split {:xsplit (drand (- TWO_PI) TWO_PI)
+                           :ysplit (drand (- TWO_PI) TWO_PI)})</pre></td></tr><tr><td class="docs"><p>Split</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-split
   [^double amount {:keys [^double xsplit ^double ysplit]}]
   (fn [^Vec2 v]
@@ -3982,7 +4626,14 @@ Function returns map with full configuration necessary to create variation. In c
            (if (pos? (.y v))
              (* amount (+ (.y v) y))
              (* amount (- (.y v) y))))))
-(make-var-method splits :regular)</pre></td></tr><tr><td class="docs"><h3>Squirrel</h3>
+(make-var-method splits :regular)</pre></td></tr><tr><td class="docs"><h3>Square</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Square</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-square
+  [^double amount _]
+  (fn [v]
+    (Vec2. (* amount (drand -0.5 0.5))
+           (* amount (drand -0.5 0.5)))))
+(make-var-method square :random)</pre></td></tr><tr><td class="docs"><h3>Squirrel</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(make-config-method squirrel {:a (drand EPSILON 4.0)
                               :b (drand EPSILON 4.0)})</pre></td></tr><tr><td class="docs"><p>Squirrel</p>
@@ -4010,7 +4661,28 @@ Function returns map with full configuration necessary to create variation. In c
           result (/ (* x2-y2 (sin (* TWO_PI distort (+ x y)))) div)]
       (Vec2. (+ (* amount (.x v)) result)
              (+ (* amount (.y v)) result)))))
-(make-var-method stwin :regular)</pre></td></tr><tr><td class="docs"><h3>Swirl</h3>
+(make-var-method stwin :regular)</pre></td></tr><tr><td class="docs"><h3>Supershape</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method supershape {:rnd (drand -1 1)
+                                :m (drand TWO_PI)
+                                :n1 (drand -5 5)
+                                :n2 (drand -5 5)
+                                :n3 (drand -5 5)
+                                :holes (drand -1 1)})</pre></td></tr><tr><td class="docs"><p>Supershape</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-supershape
+  [^double amount {:keys [^double rnd ^double m ^double n1 ^double n2 ^double n3 ^double holes]}]
+  (let [pm-4 (/ m 4.0)
+        pneg1-n1 (/ -1.0 n1)]
+    (fn [^Vec2 v]
+      (let [theta (+ (* pm-4 ^double (v/heading v)) M_PI_4)
+            st (sin theta)
+            ct (cos theta)
+            t1 (pow (abs ct) n2)
+            t2 (pow (abs st) n3)
+            ^double mag (v/mag v)
+            r (/ (* (* amount (- (+ (drand rnd) (* (- 1.0 rnd) mag)) holes)) (pow (+ t1 t2) pneg1-n1)) mag)]
+        (v/mult v r)))))
+(make-var-method supershape :random)</pre></td></tr><tr><td class="docs"><h3>Swirl</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Swirl</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-swirl
   [^double amount _]
@@ -4030,7 +4702,17 @@ Function returns map with full configuration necessary to create variation. In c
           id (/ 1.0 (if (zero? d) EPSILON d))]
       (Vec2. (* amount (sin (.x v)) id)
              (* amount (tan (.y v)))))))
-(make-var-method tangent :regular)</pre></td></tr><tr><td class="docs"><h3>Taurus</h3>
+(make-var-method tangent :regular)</pre></td></tr><tr><td class="docs"><h3>Twintrian</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Twintrian</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-twintrian
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [r (* amount (drand) ^double (v/mag v))
+          sinr (sin r)
+          diff (+ (cos r) (log10 (sq sinr)))]
+      (Vec2. (* amount diff (.x v))
+             (* amount (.x v) (- diff (* PI sinr)))))))
+(make-var-method twintrian :random)</pre></td></tr><tr><td class="docs"><h3>Taurus</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(make-config-method taurus {:r (drand -5.0 5.0)
                             :n (drand -5.0 5.0)
@@ -4049,16 +4731,8 @@ Function returns map with full configuration necessary to create variation. In c
         (Vec2. (* amount cx irsy)
                (* amount sx irsy))))))
 (make-var-method taurus :regular)</pre></td></tr><tr><td class="docs"><h3>Trade</h3>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Trade configuration</p>
-</td><td class="codes"><pre class="brush: clojure">(defn config-trade
-  [p]
-  (let [m (merge {:r1 (drand 0.1 3.0)
-                  :r2 (drand 0.1 3.0)
-                  :d1 (drand -2.0 2.0)
-                  :d2 (drand -2.0 2.0)} p)]
-    (assoc m :c1 (+ ^double (:r1 m) ^double (:d1 m))
-           :c2 (+ ^double (:r2 m) ^double (:d2 m)))))
-(make-config-method trade {:r1 (drand 0.1 3.0)
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method trade {:r1 (drand 0.1 3.0)
                            :r2 (drand 0.1 3.0)
                            :d1 (drand -2.0 2.0)
                            :d2 (drand -2.0 2.0)})</pre></td></tr><tr><td class="docs"><p>trade by Michael Faber,  http://michaelfaber.deviantart.com/art/The-Lost-Variations-258913970</p>
@@ -4080,7 +4754,132 @@ Function returns map with full configuration necessary to create variation. In c
           (v/mult res amount)
           (v/mult v amount))))))
 (make-var-method trade :regular)</pre></td></tr><tr><td class="docs"><h2>V</h2>
-</td><td class="codes"></td></tr><tr><td class="docs"><h3>Voron</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><h3>Vibration</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method vibration {:dir (drand TWO_PI)
+                               :angle (drand TWO_PI)
+                               :freq (srandom 0.01 2.0)
+                               :amp (srandom 0.1 1.0)
+                               :phase (drand)
+                               :dir2 (drand TWO_PI)
+                               :angle2 (drand TWO_PI)
+                               :freq2 (srandom 0.01 2.0)
+                               :amp2 (srandom 0.1 1.0)
+                               :phase2 (drand)})</pre></td></tr><tr><td class="docs"><p>Vibration http://fractal-resources.deviantart.com/art/Apo-Plugins-Vibration-1-and-2-252001851</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-vibration
+  [^double amount {:keys [^double dir ^double angle ^double freq ^double amp ^double phase
+                          ^double dir2 ^double angle2 ^double freq2 ^double amp2 ^double phase2]}]
+  (let [total-angle (+ angle dir)
+        cos-dir (cos dir)
+        sin-dir (sin dir)
+        cos-tot (cos total-angle)
+        sin-tot (sin total-angle)
+        scaled-freq (* TWO_PI freq)
+        phase-shift (/ (* TWO_PI phase) freq)
+        total-angle2 (+ angle2 dir2)
+        cos-dir2 (cos dir2)
+        sin-dir2 (sin dir2)
+        cos-tot2 (cos total-angle2)
+        sin-tot2 (sin total-angle2)
+        scaled-freq2 (* TWO_PI freq2)
+        phase-shift2 (/ (* TWO_PI phase2) freq2)]
+    (fn [^Vec2 v]
+      (let [d-along-dir (+ (* (.x v) cos-dir)
+                           (* (.y v) sin-dir))
+            local-amp (* amp (sin (+ (* d-along-dir scaled-freq) phase-shift)))
+            x (+ (.x v) (* local-amp cos-tot))
+            y (+ (.y v) (* local-amp sin-tot))
+            d-along-dir (+ (* (.x v) cos-dir2)
+                           (* (.y v) sin-dir2))
+            local-amp (* amp2 (sin (+ (* d-along-dir scaled-freq2) phase-shift2)))
+            x (+ x (* local-amp cos-tot2))
+            y (+ y (* local-amp sin-tot2))]
+        (Vec2. (* amount x) (* amount y))))))
+(make-var-method vibration :regular)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method vibration2 {:dir (drand TWO_PI)
+                                :angle (drand TWO_PI)
+                                :freq (srandom 0.01 2.0)
+                                :amp (srandom 0.1 1.0)
+                                :phase (drand)
+                                :dir2 (drand TWO_PI)
+                                :angle2 (drand TWO_PI)
+                                :freq2 (srandom 0.01 2.0)
+                                :amp2 (srandom 0.1 1.0)
+                                :phase2 (drand)
+                                :dm (drand -0.5 0.5)
+                                :dmfreq (srandom 0.01 1.0)
+                                :tm (drand -0.5 0.5)
+                                :tmfreq (srandom 0.01 1.0)
+                                :fm (drand -0.5 0.5)
+                                :fmfreq (srandom 0.01 1.0)
+                                :am (drand -0.5 0.5)
+                                :amfreq (srandom 0.01 1.0)
+                                :d2m (drand -0.5 0.5)
+                                :d2mfreq (srandom 0.01 1.0)
+                                :t2m (drand -0.5 0.5)
+                                :t2mfreq (srandom 0.01 1.0)
+                                :f2m (drand -0.5 0.5)
+                                :f2mfreq (srandom 0.01 1.0)
+                                :a2m (drand -0.5 0.5)
+                                :a2mfreq (srandom 0.01 1.0)})</pre></td></tr><tr><td class="docs"><p>Modulate</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- v-modulate 
+  ^double [^double amp ^double freq ^double x]
+  (* amp (cos (* x freq TWO_PI))))</pre></td></tr><tr><td class="docs"><p>Vibration 2 http://fractal-resources.deviantart.com/art/Apo-Plugins-Vibration-1-and-2-252001851</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-vibration2
+  [^double amount {:keys [^double dir ^double angle ^double freq ^double amp ^double phase
+                          ^double dir2 ^double angle2 ^double freq2 ^double amp2 ^double phase2
+                          ^double dm ^double dmfreq
+                          ^double tm ^double tmfreq
+                          ^double fm ^double fmfreq
+                          ^double am ^double amfreq
+                          ^double d2m ^double d2mfreq
+                          ^double t2m ^double t2mfreq
+                          ^double f2m ^double f2mfreq
+                          ^double a2m ^double a2mfreq]}]
+  (let [cdir (cos dir)
+        sdir (sin dir)
+        cdir2 (cos dir2)
+        sdir2 (sin dir2)]
+    (fn [^Vec2 v]
+      (let [d-along-dir (+ (* (.x v) cdir)
+                           (* (.y v) sdir))
+            dir-l (+ dir (v-modulate dm dmfreq d-along-dir))
+            angle-l (+ angle (v-modulate tm tmfreq d-along-dir))
+            freq-l (/ (v-modulate fm fmfreq d-along-dir) freq)
+            amp-l (+ amp (* amp (v-modulate am amfreq d-along-dir)))
+            total-angle (+ angle-l dir-l)
+            cos-dir (cos dir-l)
+            sin-dir (sin dir-l)
+            cos-tot (cos total-angle)
+            sin-tot (sin total-angle)
+            scaled-freq (* TWO_PI freq)
+            phase-shift (/ (* TWO_PI phase) freq)
+            d-along-dir (+ (* (.x v) cos-dir)
+                           (* (.y v) sin-dir))
+            local-amp (* amp-l (sin (+ (* d-along-dir scaled-freq) freq-l phase-shift)))
+            x (+ (.x v) (* local-amp cos-tot))
+            y (+ (.y v) (* local-amp sin-tot))
+            d-along-dir (+ (* (.x v) cdir2)
+                           (* (.y v) sdir2))
+            dir-l (+ dir2 (v-modulate d2m d2mfreq d-along-dir))
+            angle-l (+ angle2 (v-modulate t2m t2mfreq d-along-dir))
+            freq-l (/ (v-modulate f2m f2mfreq d-along-dir) freq2)
+            amp-l (+ amp2 (* amp2 (v-modulate a2m a2mfreq d-along-dir)))
+            total-angle (+ angle-l dir-l)
+            cos-dir (cos dir-l)
+            sin-dir (sin dir-l)
+            cos-tot (cos total-angle)
+            sin-tot (sin total-angle)
+            scaled-freq (* TWO_PI freq2)
+            phase-shift (/ (* TWO_PI phase2) freq2)
+            d-along-dir (+ (* (.x v) cos-dir)
+                           (* (.y v) sin-dir))
+            local-amp (* amp-l (sin (+ (* d-along-dir scaled-freq) freq-l phase-shift)))
+            x (+ x (* local-amp cos-tot))
+            y (+ y (* local-amp sin-tot))]
+        (Vec2. (* amount x)
+               (* amount y))))))
+(make-var-method vibration2 :regular)</pre></td></tr><tr><td class="docs"><h3>Voron</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(make-config-method voron {:k (srandom 0.6 1.3)
                            :step (srandom 0.1 1.2)
@@ -4143,7 +4942,25 @@ Function returns map with full configuration necessary to create variation. In c
                   (* coeff11)
                   (+ (.y v))
                   (* amount))))))
-(make-var-method waves :regular)</pre></td></tr><tr><td class="docs"><h2>Additional variations</h2>
+(make-var-method waves :regular)</pre></td></tr><tr><td class="docs"><h3>Wedge</h3>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(make-config-method wedge {:angle (drand TWO_PI)
+                           :hole (drand -2 2)
+                           :count (drand -5 5)
+                           :swirl (drand -2 2)})</pre></td></tr><tr><td class="docs"><p>Wedge</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-wedge
+  [^double amount {:keys [^double angle ^double hole ^double count ^double swirl]}]
+  (let [hm1p (* M_1_PI 0.5)]
+    (fn [v]
+      (let [^double r (v/mag v)
+            a (+ ^double (v/heading v) (* r swirl))
+            c (floor (* (+ (* count a) PI) hm1p))
+            comp-fac (- 1.0 (* angle count hm1p))
+            a (+ (* a comp-fac) (* c angle))
+            r (* amount (+ r hole))]
+        (Vec2. (* r (cos a))
+               (* r (sin a)))))))
+(make-var-method wedge :regular)</pre></td></tr><tr><td class="docs"><h2>Additional variations</h2>
 
 <p>https://github.com/d3/d3-geo-projection/tree/master/src</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><h3>Miller</h3>
@@ -4254,7 +5071,7 @@ Function returns map with full configuration necessary to create variation. In c
      {:type :operation :name operand :var1 f1 :var2 f2}))
   ([f]
    (if (brand 0.1) f
-       (if (brand 0.15)
+       (if (brand 0.1)
          {:type :operation :name :deriv :var f}
          (build-random-configuration-step f (build-random-variation-step)))))
   ([]
@@ -4266,8 +5083,8 @@ Function returns map with full configuration necessary to create variation. In c
      (let [name (:name f)]
        (if (= name :deriv)
          (assoc f :amount 1.0 :step (sq (drand 0.01 1.0)) :var (randomize-parametrization (:var f)))
-         (let [^double amount1 (if (= name :comp) 1.0 (drand -2.0 2.0))
-               ^double amount2 (if (= name :comp) 1.0 (drand -2.0 2.0)) 
+         (let [amount1 (if (= name :comp) 1.0 (drand -2.0 2.0))
+               amount2 (if (= name :comp) 1.0 (drand -2.0 2.0)) 
                amount (case name
                         :add (/ 1.0 (+ (abs amount1) (abs amount2)))
                         :mult (/ 1.0 (* amount1 amount2))

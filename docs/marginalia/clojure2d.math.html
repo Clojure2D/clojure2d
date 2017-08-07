@@ -2983,8 +2983,8 @@ All functions operate and return <code>double</code> or in some cases <code>long
 where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-exp</code>
 <code>(low-2-exp TWO_PI) =&gt; 2</code> \(2^2\eq 4\leq 6.28\) <br />
 <code>(high-2-exp TWO_PI) =&gt; 3</code> \(6.28\leq 2^3\eq 8\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def low-2-exp (comp long floor log2))
-(def high-2-exp (comp long ceil log2))</pre></td></tr><tr><td class="docs"><p>Modulo and abs</p>
+</td><td class="codes"><pre class="brush: clojure">(defn low-2-exp ^long [v] (-&gt; v log2 floor long))
+(defn high-2-exp ^long [v] (-&gt; v log2 ceil long))</pre></td></tr><tr><td class="docs"><p>Modulo and abs</p>
 </td><td class="codes"><pre class="brush: clojure">(defn remainder ^double [^double v1 ^double v2] (FastMath/remainder v1 v2))
 (defn abs ^double [^double v] (FastMath/abs v))
 (defn iabs ^long [^long v] (FastMath/abs v))</pre></td></tr><tr><td class="docs"><p>More constants</p>

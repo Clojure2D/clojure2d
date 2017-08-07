@@ -2986,11 +2986,13 @@ You can freely change this setting with <code>binding</code> macro. Default is 9
 </ul>
 </td><td class="codes"><pre class="brush: clojure">(defn save-image
   [b filename]
-  (println (str &quot;saving: &quot; filename))
+  (println (str &quot;saving: &quot; filename &quot;...&quot;))
   (make-parents filename)
   (let [iwriter (get-image-writer filename)]
     (if-not (nil? iwriter)
-      (save-file-type filename b iwriter)
+      (do
+        (save-file-type filename b iwriter)
+        (println &quot;...done!&quot;))
       (println (str &quot;can't save an image: &quot; filename)))))</pre></td></tr><tr><td class="docs"><h3>Additional functions</h3>
 
 <p>Just an image resizer with bicubic interpolation. Native <code>Graphics2D</code> method is called.</p>
@@ -3370,16 +3372,18 @@ Use this information via <code>window-active?</code> function to control (and po
 <li><code>mouse-event</code></li>
 </ul>
 
+<p>Each multimethod get awt Event object and global state. Each should return new state.</p>
+
 <h4>Key event: `key-pressed` multimethod</h4>
 
 <p>Your dispatch value is vector with window name and pressed key (as <code>char</code>) which you want to handle.
 This means you write different method for different key.
-As a function parameter you get <code>KeyEvent</code> object <a href="https://docs.oracle.com/javase/7/docs/api/java/awt/event/KeyEvent.html">java.awt.KeyEvent</a></p>
+As a function parameters you get <code>KeyEvent</code> object <a href="https://docs.oracle.com/javase/7/docs/api/java/awt/event/KeyEvent.html">java.awt.KeyEvent</a> and global state attached to the Window.</p>
 
 <h4>Mouse event</h4>
 
 <p>As as dispatch you use a vector containing window name as a String and mouse event type as a keyword
-As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseXYProto</code> protocol <a href="https://docs.oracle.com/javase/7/docs/api/java/awt/event/MouseEvent.html">java.awt.MouseEvent</a></p>
+As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseXYProto</code> protocol <a href="https://docs.oracle.com/javase/7/docs/api/java/awt/event/MouseEvent.html">java.awt.MouseEvent</a> and global state attached to the Window.</p>
 
 <p>Currently implemented types are:</p>
 
@@ -3414,41 +3418,66 @@ As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseX
       (if (nil? p)
         (Vec2. -1.0 -1.0)
         (Vec2. (.x p) (.y p)))))
-  (mouse-x [t]
+  (mouse-x [_]
     (let [^java.awt.Point p (.getMousePosition panel)]
       (if (nil? p) -1 (.x p))))
-  (mouse-y [t]
+  (mouse-y [_]
     (let [^java.awt.Point p (.getMousePosition panel)]
       (if (nil? p) -1 (.y p)))))</pre></td></tr><tr><td class="docs"><h3>Events function</h3>
 </td><td class="codes"><pre class="brush: clojure">(extend MouseEvent
   MouseXYProto
-  {:mouse-x #(.getX ^MouseEvent %1)
-   :mouse-y #(.getY ^MouseEvent %1)
-   :mouse-pos #(Vec2. (mouse-x %1) (mouse-y %1))})</pre></td></tr><tr><td class="docs"><p>Private method which extracts the name of your window (set when <code>show-window</code> is called).</p>
+  {:mouse-x #(.getX ^MouseEvent %)
+   :mouse-y #(.getY ^MouseEvent %)
+   :mouse-pos #(Vec2. (mouse-x %) (mouse-y %))})</pre></td></tr><tr><td class="docs"><h3>Window type helper functions</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Helper function, check if window is active</p>
+</td><td class="codes"><pre class="brush: clojure">(defn window-active?
+  [^Window window]
+  @(.active? window))</pre></td></tr><tr><td class="docs"><h3>Global state management</h3>
+
+<p>Global atom is needed to keep current window state. Events don't know what window sends it. The only option is to get component name.</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def global-state (atom {}))</pre></td></tr><tr><td class="docs"><p>Get state from window</p>
+</td><td class="codes"><pre class="brush: clojure">(defn get-state
+  [^Window window]
+  (@global-state (.window-name window)))</pre></td></tr><tr><td class="docs"><p>Change state for Window (by name)</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- change-state! 
+  [window-name state] 
+  (swap! global-state assoc window-name state)
+  (@global-state window-name))</pre></td></tr><tr><td class="docs"><p>Clear state for Window (by name)</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- clear-state!
+  [window-name]
+  (swap! global-state dissoc window-name))</pre></td></tr><tr><td class="docs"><p>Changle global state for Window.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn change-global-state!
+  [^Window w state]
+  (change-state! (.window-name w) state))</pre></td></tr><tr><td class="docs"><p>Private method which extracts the name of your window (set when <code>show-window</code> is called).</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Returns name of the component. Used to dispatch events.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- component-name
   [^ComponentEvent e]
-  (let [^Component c (.getComponent e)]
-    (.getName c)))</pre></td></tr><tr><td class="docs"><p>Multimethod used to process pressed key</p>
-</td><td class="codes"><pre class="brush: clojure">(defmulti key-pressed (fn [^KeyEvent e] [(component-name e) (.getKeyChar e)]))</pre></td></tr><tr><td class="docs"><p>Do nothing on default</p>
-</td><td class="codes"><pre class="brush: clojure">(defmethod key-pressed :default [e])</pre></td></tr><tr><td class="docs"><p>Map Java mouse event names onto keywords</p>
+  (.getName ^Component (.getComponent e)))</pre></td></tr><tr><td class="docs"><p>Multimethod used to process pressed key</p>
+</td><td class="codes"><pre class="brush: clojure">(defmulti key-pressed (fn [^KeyEvent e state] [(component-name e) (.getKeyChar e)]))</pre></td></tr><tr><td class="docs"><p>Do nothing on default</p>
+</td><td class="codes"><pre class="brush: clojure">(defmethod key-pressed :default [_ s] s)</pre></td></tr><tr><td class="docs"><p>Map Java mouse event names onto keywords</p>
 </td><td class="codes"><pre class="brush: clojure">(def mouse-event-map {MouseEvent/MOUSE_CLICKED  :mouse-clicked
                       MouseEvent/MOUSE_DRAGGED  :mouse-dragged
                       MouseEvent/MOUSE_PRESSED  :mouse-pressed
                       MouseEvent/MOUSE_RELEASED :mouse-released
                       MouseEvent/MOUSE_MOVED    :mouse-moved})</pre></td></tr><tr><td class="docs"><p>Multimethod used to processed mouse events</p>
-</td><td class="codes"><pre class="brush: clojure">(defmulti mouse-event (fn [^MouseEvent e] [(component-name e) (mouse-event-map (.getID e))]))</pre></td></tr><tr><td class="docs"><p>Do nothing on default</p>
-</td><td class="codes"><pre class="brush: clojure">(defmethod mouse-event :default [e])</pre></td></tr><tr><td class="docs"><p>Event adapter objects.</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Key</p>
+</td><td class="codes"><pre class="brush: clojure">(defmulti mouse-event (fn [^MouseEvent e state] [(component-name e) (mouse-event-map (.getID e))]))</pre></td></tr><tr><td class="docs"><p>Do nothing on default</p>
+</td><td class="codes"><pre class="brush: clojure">(defmethod mouse-event :default [_ s]  s)</pre></td></tr><tr><td class="docs"><p>Event adapter objects.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>General function which manipulates state and calls proper event multimethod</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>For given event call provided multimethod passing state. Save new state.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- process-state-and-event 
+  [ef e]
+  (let [window-name (component-name e)]
+    (change-state! window-name (ef e (@global-state window-name)))))</pre></td></tr><tr><td class="docs"><p>Key</p>
 </td><td class="codes"><pre class="brush: clojure">(def key-processor (proxy [KeyAdapter] []
-                     (keyPressed [^KeyEvent e] (key-pressed e))))</pre></td></tr><tr><td class="docs"><p>Mouse</p>
+                     (keyPressed [e] (process-state-and-event key-pressed e))))</pre></td></tr><tr><td class="docs"><p>Mouse</p>
 </td><td class="codes"><pre class="brush: clojure">(def mouse-processor (proxy [MouseAdapter] []
-                       (mouseClicked [^MouseEvent e] (mouse-event e))
-                       (mousePressed [^MouseEvent e] (mouse-event e))
-                       (mouseReleased [^MouseEvent e] (mouse-event e))))</pre></td></tr><tr><td class="docs"><p>Mouse drag and move</p>
+                       (mouseClicked [e] (process-state-and-event mouse-event e))
+                       (mousePressed [e] (process-state-and-event mouse-event e))
+                       (mouseReleased [e] (process-state-and-event mouse-event e))))</pre></td></tr><tr><td class="docs"><p>Mouse drag and move</p>
 </td><td class="codes"><pre class="brush: clojure">(def mouse-motion-processor (proxy [MouseMotionAdapter] []
-                              (mouseDragged [^MouseEvent e] (mouse-event e))
-                              (mouseMoved [^MouseEvent e] (mouse-event e))))</pre></td></tr><tr><td class="docs"><h3>Frame machinery functions</h3>
+                              (mouseDragged [e] (process-state-and-event mouse-event e))
+                              (mouseMoved [e] (process-state-and-event mouse-event e))))</pre></td></tr><tr><td class="docs"><h3>Frame machinery functions</h3>
 
 <p>Window is JFrame with panel (as java.awt.Canvas object) which is used to draw clojure2d canvas on it.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Create panel which displays canvas. Attach mouse events, give a name (same as window), set size etc.</p>
@@ -3461,17 +3490,18 @@ As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseX
       (.addKeyListener key-processor)
       (.addMouseMotionListener mouse-motion-processor)
       (.setIgnoreRepaint true)
-      (.setPreferredSize (Dimension. width height)))))</pre></td></tr><tr><td class="docs"><p>Function used to close and dispose window. As a side effect <code>active?</code> atom is set to false.</p>
+      (.setPreferredSize (Dimension. width height)))))</pre></td></tr><tr><td class="docs"><p>Function used to close and dispose window. As a side effect <code>active?</code> atom is set to false and global state for window is cleared.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Close window frame</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- close-window
-  [^JFrame frame active?]
+  [^JFrame frame active? windowname]
   (reset! active? false)
+  (clear-state! windowname)
   (.dispose frame))</pre></td></tr><tr><td class="docs"><p>Create lazy list of icons to be loaded by frame</p>
 </td><td class="codes"><pre class="brush: clojure">(def window-icons (map #(.getImage (ImageIcon. (resource (str &quot;icons/i&quot; % &quot;.png&quot;)))) [10 16 20 24 30 32 40 44 64 128]))</pre></td></tr><tr><td class="docs"><p>Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- build-frame
   [^JFrame frame ^java.awt.Canvas panel active? windowname width height]
   (let [closer (proxy [WindowAdapter] []
-                 (windowClosing [^WindowEvent e] (close-window frame active?)))]
+                 (windowClosing [^WindowEvent e] (close-window frame active? windowname)))]
     (doto frame
       (.setIconImages window-icons)
       (.add panel)
@@ -3534,14 +3564,24 @@ See examples/ex01_events.clj to see how it works.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn replace-canvas
   [^Window window canvas]
   (reset! (:buffer window) canvas))</pre></td></tr><tr><td class="docs"><p>Finally function which creates and displays window. Function creates window's visibility status (<code>active?</code> atom), buffer as atomized canvas, creates frame, creates refreshing task (repainter) and shows window.</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Show window with width/height, name and required fps of refresh. Optionally pass callback function.</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(declare to-hex)</pre></td></tr><tr><td class="docs"><p>Show window with width/height, name and required fps of refresh. Optionally pass callback function.</p>
 
 <ul>
 <li>Input: canvas, window name, width (defalut: canvas width), height (default: canvas height), frames per seconds (default: 60), (optional) <code>draw</code> function.</li>
-<li>Returns <code>Window</code> value</li>
+<li><p>Returns <code>Window</code> value</p>
+
+<p>As parameters you can provide a map with folowing keys:</p></li>
+<li><p>:canvas</p></li>
+<li>:window-name</li>
+<li>:w</li>
+<li>:h</li>
+<li>:fps</li>
+<li>:draw-fn</li>
+<li>:state</li>
 </ul>
 </td><td class="codes"><pre class="brush: clojure">(defn show-window
-  ([canvas wname width height fps draw-fun]
+  ([canvas wname width height fps draw-fun state]
    (let [active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
@@ -3555,19 +3595,29 @@ See examples/ex01_events.clj to see how it works.</p>
                           height
                           wname)]
      (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
+     (change-state! wname state)
      (future (refresh-screen-task window draw-fun))
      window))
-  ([canvas wname width height fps]
-   (show-window canvas wname width height fps nil))
   ([canvas wname]
    (show-window canvas wname nil))
   ([canvas wname draw-fn]
    (show-window canvas wname 60 draw-fn))
   ([canvas wname fps draw-fn]
-   (show-window canvas wname (width canvas) (height canvas) fps draw-fn)))</pre></td></tr><tr><td class="docs"><p>Helper function, check if window is active</p>
-</td><td class="codes"><pre class="brush: clojure">(defn window-active?
-  [^Window window]
-  @(.active? window))</pre></td></tr><tr><td class="docs"><h2>Utility functions</h2>
+   (show-window canvas wname (width canvas) (height canvas) fps draw-fn nil))
+  ([canvas wname w h fps]
+   (show-window canvas wname w h fps nil nil))
+  ([canvas wname w h fps draw-fun]
+   (show-window canvas wname w h fps draw-fun nil))
+  ([{:keys [canvas window-name w h fps draw-fn state]
+     :or {canvas (make-canvas 100 100)
+          window-name (str &quot;Clojure2D - &quot; (to-hex (rand-int (Integer/MAX_VALUE)) 8))
+          w (width canvas)
+          h (height canvas)
+          fps 60
+          draw-fn nil
+          state nil}}]
+   (show-window canvas window-name w h fps draw-fn state))
+  ([] (show-window {})))</pre></td></tr><tr><td class="docs"><h2>Utility functions</h2>
 
 <p>Now we have a part with some utilities (I had no idea where to put them).</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Return hex value of given number, padded with leading zeroes if given length</p>
@@ -3667,6 +3717,7 @@ Session is a type of:</p>
     (make-session)))</pre></td></tr><tr><td class="docs"><p>Get session name</p>
 </td><td class="codes"><pre class="brush: clojure">(defn get-session-name
   []
+  (ensure-session)
   (:name @session-agent))</pre></td></tr><tr><td class="docs"><p>Create next unique filename based on session</p>
 </td><td class="codes"><pre class="brush: clojure">(defn next-filename
   ([prefix]

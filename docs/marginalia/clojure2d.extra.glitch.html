@@ -2865,7 +2865,23 @@ net.brehaut.ClojureTools = (function (SH) {
     build_tree: build_tree
   };
 })(SyntaxHighlighter);
-</script><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript"></script><title>clojure2d -- Marginalia</title></head><body><table><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojure2d.extra.glitch" name="clojure2d.extra.glitch"><h1 class="project-name">clojure2d.extra.glitch</h1><a class="toc-link" href="toc.html">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs">
+</script><script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript"></script><title>clojure2d -- Marginalia</title></head><body><table><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#clojure2d.extra.glitch" name="clojure2d.extra.glitch"><h1 class="project-name">clojure2d.extra.glitch</h1><a class="toc-link" href="toc.html">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs"><h1>Namespace scope</h1>
+
+<p>Various glitching pixel filters or functions</p>
+
+<ul>
+<li>Slitscan</li>
+<li>Mirror</li>
+<li>Slitscan2</li>
+<li>Fold</li>
+<li>Blend two Pixels (compose)</li>
+<li>Reduce colors</li>
+</ul>
+
+<p>All filters are equiped with random configuration generator. This way you can easily search vast space of options.</p>
+
+<p>More info soon. Some API is subject to change (make it more consistent).</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.extra.glitch
   (:require [clojure2d.math :as m]
             [clojure2d.math.random :as r]
@@ -2877,10 +2893,14 @@ net.brehaut.ClojureTools = (function (SH) {
   (:import [clojure2d.pixels Pixels]
            [clojure2d.math.vector Vec2 Vec4]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><p>Simple 2d SLITSCAN</p>
+(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><h2>Slitscan</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><h3>Simple slitscan</h3>
+
+<p>Pixels are shifted by value returned by wave function. You have to provide separate wave functions for x and y axises.
+Random setup is based on sum of oscillators defined in <code>signal</code> namespace.</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def freqs (vec (map #(bit-shift-left 1 ^long %) (range 16))))
-(def amps (mapv #(/ 1.0 ^long %) freqs))</pre></td></tr><tr><td class="docs">
+(def amps (mapv #(/ 1.0 ^long %) freqs))</pre></td></tr><tr><td class="docs"><p>Create list of random waves </p>
 </td><td class="codes"><pre class="brush: clojure">(defn slitscan-random-setup
   ([n]
    (let [f (fn []
@@ -2905,7 +2925,7 @@ net.brehaut.ClojureTools = (function (SH) {
         shifty (* 0.5 (.h p) ^double (fy (* ^long y sy)))
         xx (rem (int (+ ^long x (.w p) shiftx)) (.w p))
         yy (rem (int (+ ^long y (.h p) shifty)) (.h p))]
-      (p/get-value p ch xx yy)))</pre></td></tr><tr><td class="docs">
+    (p/get-value p ch xx yy)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-slitscan-filter
   ([]
    (partial p/filter-channel-xy (partial slitscan (make-slitscan-waves) (make-slitscan-waves))))
@@ -2914,9 +2934,41 @@ net.brehaut.ClojureTools = (function (SH) {
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-shift-channels-filter
   [amount h v]
-  (let [mv (fn [_] amount)
-        zr (fn [_] 0.0)]
-   (make-slitscan-filter (if h mv zr) (if v mv zr))))</pre></td></tr><tr><td class="docs"><p>mirrorimage</p>
+  (let [mv (constantly amount)
+        zr (constantly 0.0)]
+    (make-slitscan-filter (if h mv zr) (if v mv zr))))</pre></td></tr><tr><td class="docs"><p>f: Vec2 -> Vec2 (use variation)
+   r: value 1.0-3.0</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-slitscan2-filter
+  ([f ^double r]
+   (let [r- (- r)]
+     (fn [ch t ^Pixels p]
+       (dotimes [y (.h p)]
+         (let [^double yv (m/norm y 0.0 (.h p) r- r)]
+           (dotimes [x (.w p)]
+             (let [xlerp (m/norm x 0.0 (.w p))
+                   v1 (f (Vec2. r- yv))
+                   v2 (f (Vec2. r yv))
+                   ^Vec2 vv (v/interpolate v1 v2 xlerp)
+                   xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
+                   yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
+               (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
+  ([f]
+   (make-slitscan2-filter f 2.0)))</pre></td></tr><tr><td class="docs"><p>f: Vec2 -> Vec2 (use variation)
+   r: value 1.0-3.0</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-fold-filter
+  ([f ^double r]
+   (let [r- (- r)]
+     (fn [ch t ^Pixels p]
+       (dotimes [y (.h p)]
+         (let [^double yv (m/norm y 0.0 (.h p) r- r)]
+           (dotimes [x (.w p)]
+             (let [^double xv (m/norm x 0.0 (.w p) r- r)
+                   ^Vec2 vv (f (Vec2. xv yv))
+                   xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
+                   yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
+               (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
+  ([f]
+   (make-fold-filter f 2.0)))</pre></td></tr><tr><td class="docs"><p>mirrorimage</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- mi-draw-point
   ([ch target source oldx oldy newx newy sx sy]
@@ -3003,39 +3055,7 @@ net.brehaut.ClojureTools = (function (SH) {
 </td><td class="codes"><pre class="brush: clojure">(defn make-mirror-filter
   [t]
   (t mirror-types))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"></td></tr><tr><td class="docs"><p>f: Vec2 -> Vec2 (use variation)
-   r: value 1.0-3.0</p>
-</td><td class="codes"><pre class="brush: clojure">(defn make-slitscan2-filter
-  ([f ^double r]
-   (let [r- (- r)]
-     (fn [ch t ^Pixels p]
-       (dotimes [y (.h p)]
-         (let [^double yv (m/norm y 0.0 (.h p) r- r)]
-           (dotimes [x (.w p)]
-             (let [xlerp (m/norm x 0.0 (.w p))
-                   v1 (f (Vec2. r- yv))
-                   v2 (f (Vec2. r yv))
-                   ^Vec2 vv (v/interpolate v1 v2 xlerp)
-                   xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
-                   yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
-               (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
-  ([f]
-   (make-slitscan2-filter f 2.0)))</pre></td></tr><tr><td class="docs"><p>f: Vec2 -> Vec2 (use variation)
-   r: value 1.0-3.0</p>
-</td><td class="codes"><pre class="brush: clojure">(defn make-fold-filter
-  ([f ^double r]
-   (let [r- (- r)]
-     (fn [ch t ^Pixels p]
-       (dotimes [y (.h p)]
-         (let [^double yv (m/norm y 0.0 (.h p) r- r)]
-           (dotimes [x (.w p)]
-             (let [^double xv (m/norm x 0.0 (.w p) r- r)
-                   ^Vec2 vv (f (Vec2. xv yv))
-                   xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
-                   yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
-               (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
-  ([f]
-   (make-fold-filter f 2.0)))</pre></td></tr><tr><td class="docs"><p>blend machine</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>blend machine</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Return colorspace or nil</p>
 </td><td class="codes"><pre class="brush: clojure">(defn random-blend-get-cs
   []
@@ -3060,10 +3080,10 @@ net.brehaut.ClojureTools = (function (SH) {
   ([p1 p2 {:keys [switch in-cs1 in-cs2 out-cs blend-ch1 blend-ch2 blend-ch3]}]
    (let [[p1 p2] (if switch [p2 p1] [p1 p2]) ; switch images
          result (p/compose-channels blend-ch1 blend-ch2 blend-ch3 nil
-                                    (if in-cs1 (p/filter-colors ((in-cs1 c/colorspaces) 0) p1) p1)
-                                    (if in-cs2 (p/filter-colors ((in-cs2 c/colorspaces) 0) p2) p2))]
+                                    (if in-cs1 (p/filter-colors (first (in-cs1 c/colorspaces)) p1) p1)
+                                    (if in-cs2 (p/filter-colors (first (in-cs2 c/colorspaces)) p2) p2))]
      (if out-cs
-       (p/filter-colors ((out-cs c/colorspaces) 1) result)
+       (p/filter-colors (second (out-cs c/colorspaces)) result)
        result))))</pre></td></tr><tr><td class="docs"><p>color reducer machine</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Randomize color reducing filter, random method, random colors</p>
 </td><td class="codes"><pre class="brush: clojure">(defn color-reducer-machine
