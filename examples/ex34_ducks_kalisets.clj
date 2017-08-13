@@ -78,13 +78,14 @@
                :my (fn [z c] (c/sec (v/abs (v/add z c))))
                :my2 (fn [z c] (c/log (v/abs (c/div z c))))
                :my3 (fn [z c] (c/log (v/abs (c/div c z))))
-               :my4 (fn [^Vec2 z c] (c/log (c/div (v/abs (c/mult c z)) (v/abs c))))
+               :my4 (fn [z c] (c/log (c/div (v/abs (c/mult c z)) (v/abs c))))
+               :my5 (fn [z c] (v/add (v/abs (c/sq z)) c))
                :talism (fn [z c]
                          (let [az (v/abs z)]
                            (v/add (c/div (c/sq az) z) c)))
                :talis1 (fn [z c]
                          (let [az (v/abs z)]
-                           (v/add (c/div (v/sub (c/sq az) az) z) c)))
+                           (v/add (c/div (v/sub (c/sq az) az) z) c))) 
                :burningship-log (fn [^Vec2 z c] (c/log (v/add (c/sq (v/abs z)) c)))})
 
 ;; Randomize 'c' parameter
@@ -109,6 +110,10 @@
              :my2 #(Vec2. (r/drand -2.5 2.5) (r/drand -1.5 1.5))
              :my3 #(Vec2. (r/drand -2.5 1.5) (r/drand -1.5 1.5))
              :my4 #(Vec2. (r/drand -2.5 1.5) (r/drand -1.5 1.5))
+             :my5 #(let [x (r/drand -1 0.5)]
+                     (if (pos? x)
+                       (Vec2. x (r/drand -1.5))
+                       (Vec2. x (r/drand -1.5 0.75))))
              :talism #(Vec2. (r/drand -1.5 1.5) (r/drand -1.5 1.5))
              :talis1 #(Vec2. (r/drand -1.5 1.5) (r/drand -1.5 1.5))
              :burningship-log #(Vec2. (r/drand 0.0 1.0) (r/drand -1.0 0.0))})
@@ -153,7 +158,7 @@
   "Create random configuration"
   []
   (let [cfname (rand-nth (keys coloring-fns))
-        itername (rand-nth (keys iter-fns))]
+        itername (rand-nth (keys iter-fns))] 
     {:c-const ((rand-c itername))
      :coloring-fn cfname
      :mlt (r/drand 1 3)
