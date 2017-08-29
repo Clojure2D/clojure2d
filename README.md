@@ -155,6 +155,7 @@ I've prepared several examples with results where you can check current state of
 * ex33 - interpolations / easings
 * ex34 - ducks and kalisets explorer
 * ex35 - mandelbrot and julia explorer
+* ex36 - spirograph
 * NOC - [Nature of Code](https://github.com/shiffman/The-Nature-of-Code-Examples/) Clojure2d version
 
 ## TODO
