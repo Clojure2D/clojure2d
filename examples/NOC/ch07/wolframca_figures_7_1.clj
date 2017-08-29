@@ -6,7 +6,7 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
-(def ^:const ^int scl 10)
+(def ^:const ^int scl 8)
 (def ^:const ^int w 1000)
 (def ^:const ^int h 800)
 

@@ -78,7 +78,7 @@
       (set-background 255 255 255)
       (set-color 50 50 50)
       (rect 0 h2 w h2))
-  (change-global-state! window (mapv (partial draw-and-move canvas) (get-state window))))
+  (set-state! window (mapv (partial draw-and-move canvas) (get-state window))))
 
 (def window (show-window {:canvas (make-canvas w h)
                           :window-name "NOC_2_5_fluidresistance"

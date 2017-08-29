@@ -684,7 +684,7 @@
   [window-name]
   (swap! global-state dissoc window-name))
 
-(defn change-global-state!
+(defn set-state!
   "Changle global state for Window."
   [^Window w state]
   (change-state! (.window-name w) state))
