@@ -26,8 +26,6 @@
 (defprotocol ParticleProto
   (run [p canvas wind]))
 
-(declare make-particle)
-
 (deftype Particle [pos vel ^int lifespan]
   ParticleProto
   (run [_ canvas wind]
