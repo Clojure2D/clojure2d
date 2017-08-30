@@ -319,9 +319,11 @@
 
 (defn translate
   "Translate origin"
-  [^Canvas canvas ^double tx ^double ty]
-  (.translate ^Graphics2D (.graphics canvas) tx ty)
-  canvas)
+  ([^Canvas canvas ^double tx ^double ty]
+   (.translate ^Graphics2D (.graphics canvas) tx ty)
+   canvas)
+  ([canvas ^Vec2 v]
+   (translate canvas (.x v) (.y v))))
 
 (defn rotate
   "Rotate canvas"
@@ -602,6 +604,8 @@
 ;; This means you write different method for different key.
 ;; As a function parameters you get `KeyEvent` object [java.awt.KeyEvent](https://docs.oracle.com/javase/7/docs/api/java/awt/event/KeyEvent.html) and global state attached to the Window.
 ;;
+;; If you want to dispatch on special keys (like arrows), dispatch on `(char 0xffff)` and read `(.keyCode e)` to get key pressed.
+;;
 ;; #### Mouse event
 ;;
 ;; As as dispatch you use a vector containing window name as a String and mouse event type as a keyword
@@ -699,7 +703,7 @@
 ;; Multimethod used to process pressed key
 (defmulti key-pressed (fn [^KeyEvent e state] [(component-name e) (.getKeyChar e)]))
 ;; Do nothing on default
-(defmethod key-pressed :default [_ s] s)
+(defmethod key-pressed :default [_ s]  s)
 
 ;; Map Java mouse event names onto keywords
 (def mouse-event-map {MouseEvent/MOUSE_CLICKED  :mouse-clicked
@@ -711,7 +715,7 @@
 ;; Multimethod used to processed mouse events
 (defmulti mouse-event (fn [^MouseEvent e state] [(component-name e) (mouse-event-map (.getID e))]))
 ;; Do nothing on default
-(defmethod mouse-event :default [_ s]  s)
+(defmethod mouse-event :default [_ s] s)
 
 ;; Event adapter objects.
 
