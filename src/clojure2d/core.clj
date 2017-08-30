@@ -544,7 +544,9 @@
    (.drawImage ^Graphics2D (.graphics canvas) img x y w h nil)
    canvas)
   ([^Canvas canvas img]
-   (image canvas img 0 0 (.w canvas) (.h canvas))))
+   (image canvas img 0 0 (.w canvas) (.h canvas)))
+  ([^Canvas canvas img x y]
+   (image canvas img x y (width img) (height img))))
 
 ;; ## Display window
 ;;

@@ -622,12 +622,12 @@
   ^long [^long a ^long b]
   (bit-shift-right (bit-and 0xff00 (* a b)) 8))
 
-(defn make-tint-map
+(defn- make-tint-map
   "Create tint lookup tables."
   [r g b a]
   (vec (map #(amap ^ints (int-array 256) idx ret ^long (calc-tint idx %)) [r g b a])))
 
-(defn make-tinter
+(defn- make-tinter
   "Lookup wrapper"
   [^ints a]
   (fn [v] (aget ^ints a ^int v)))
