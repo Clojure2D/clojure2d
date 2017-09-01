@@ -263,9 +263,7 @@
 (defn blend-mdodge
   "Modulus dodge"
   ^double [^double a ^double b]
-  (mod1 (->> b
-               (- 1.0)
-               (/ a))))
+  (mod1 (/ a (max 0.0001 (- 1.0 b)))))
 
 (defn blend-burn
   "Burn"
@@ -277,7 +275,7 @@
 (defn blend-mburn
   "Modulus burn"
   ^double [^double a ^double b]
-  (mod1 (->> b
+  (mod1 (->> (max 0.0001 b)
              (/ (- 1.0 a))
              (- 1.0))))
 
