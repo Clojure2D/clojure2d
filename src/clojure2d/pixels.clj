@@ -642,6 +642,23 @@
   ([r g b]
    (make-tint-filter r g b 256)))
 
+;; ### Modulate filter
+;;
+;; Multiply color channels by specified values from 0-2
+
+(defn make-modulate-filter
+  ""
+  ([ch1 ch2 ch3 ch4]
+   (fn [^long ch target p]
+     (let [^double chv (case ch
+                         0 ch1
+                         1 ch2
+                         2 ch3
+                         ch4)]
+       (filter-channel #(m/iconstrain (* ^int % chv) 0 255) ch target p))))
+  ([ch1 ch2 ch3]
+   (make-modulate-filter ch1 ch2 ch3 1.0)))
+
 ;; ### Normalize
 
 (defn normalize

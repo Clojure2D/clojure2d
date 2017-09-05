@@ -7,7 +7,7 @@
   (:import [clojure2d.pixels Pixels]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 ;; first let's load an image into ^Pixels type
 ;; pixels are layout in planar mode (first red channel, then green, blue and alpha)
@@ -62,6 +62,12 @@
 
 ;; tint image
 (p/set-canvas-pixels! canvas (p/filter-channels (p/make-tint-filter 10 30 200) img))
+
+;; modulate channels (in HSB colorspace don't touch hue, lower saturation and brightness a little bit)
+(p/set-canvas-pixels! canvas (->> img
+                                  (p/filter-colors c/to-HWB)
+                                  (p/filter-channels (p/make-modulate-filter 1.0 1.0 1.0))
+                                  (p/filter-colors c/from-HWB)))
 
 ;; let's compose some images
 
