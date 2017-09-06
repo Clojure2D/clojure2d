@@ -578,3 +578,18 @@
   "Doubles array to Vec4"
   [^doubles a]
   (Vec4. (aget a 0) (aget a 1) (aget a 2) (aget a 3)))
+
+(defn vec4
+  "Make Vec4 vector"
+  ([x y z w] (Vec4. x y z w))
+  ([^Vec3 v w] (Vec4. (.x v) (.y v) (.z v) w))
+  ([^Vec2 v z w] (Vec4. (.x v) (.y v) z w)))
+
+(defn vec3
+  "Make Vec2 vector"
+  ([x y z] (Vec3. x y z))
+  ([^Vec2 v z] (Vec3. (.x v) (.y v) z)))
+
+(defn vec2
+  "Make Vec2 vector"
+  [x y] (Vec2. x y))

@@ -15,10 +15,12 @@
             [clojure2d.pixels :as p]
             [clojure2d.color :as c]
             [clojure2d.math :as m]
-            [clojure2d.math.random :as r])
+            [clojure2d.math.random :as r]
+            [clojure2d.math.vector :as v])
   (:import [java.awt.image BufferedImage]
            [java.awt Color]
-           [clojure2d.pixels Pixels]))
+           [clojure2d.pixels Pixels]
+           [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -70,6 +72,74 @@
      (let [l1 (p/get-canvas-pixels canvas)]
        (p/image-from-pixels (p/blend-channels (partial p/blend-channel-xy blend-shift-and-add-f) l1 l2)))))
   ([p] (render-rgb-scanlines p 1.6)))
+
+;; ## CRT Scanlines
+;;
+;; https://www.shadertoy.com/view/XsjSzR
+;;
+;; :TODO linear/non-linear tranformation on doubles or scaled ints
+;; clean duplicated blur fn
+;; add mask
+
+(defn- adjust-pos-value 
+  "Adjust given position according to offset and resolution"
+  [^double value ^double offset ^double resolution]
+  (* resolution (m/floor (+ offset (/ value resolution)))))
+
+(defn render-crt-scanlines
+  ""
+  [^BufferedImage img {:keys [^double resolution ^double hardpix ^double hardscan ^double gamma]}]
+  (let [^int w (core/width img)
+        ^int h (core/height img)
+        gf (/ 1.0 gamma)
+        p (p/get-image-pixels img)]
+
+    (letfn [(dist [^double pos]
+              (let [poss (/ pos resolution)]
+                (- 0.5 (- poss (m/floor poss)))))
+            (gauss [^double pos ^double scale]
+              (m/pow 2.0 (* scale (m/sq pos))))
+            (h3-blur [ch p ^long xx ^long yy]
+              (let [y (adjust-pos-value yy 0.0 resolution)
+                    x- (adjust-pos-value xx -1.0 resolution)
+                    x (adjust-pos-value xx 0.0 resolution)
+                    x+ (adjust-pos-value xx 1.0 resolution)
+                    ^int a (p/get-value p ch x- y)
+                    ^int b (p/get-value p ch x y)
+                    ^int c (p/get-value p ch x+ y)
+                    ^double dst (dist xx)
+                    ^double wa (gauss (dec dst) hardpix)
+                    ^double wb (gauss dst hardpix)
+                    ^double wc (gauss (inc dst) hardpix)]
+                (/ (+ (* a wa) (* b wb) (* c wc)) (+ wa wb wc))))]
+      (let [blurred (p/filter-channels (partial p/filter-channel-xy h3-blur) nil p)
+            tri (fn [ch p ^long xx ^long yy]
+                  (let [y- (adjust-pos-value yy -1.0 resolution)
+                        y (adjust-pos-value yy 0.0 resolution)
+                        y+ (adjust-pos-value yy 1.0 resolution)
+                        ^int a (p/get-value p ch xx y-)
+                        ^int b (p/get-value p ch xx y)
+                        ^int c (p/get-value p ch xx y+)
+                        ^double dst (dist yy)
+                        ^double wa (gauss (dec dst) hardscan)
+                        ^double wb (gauss dst hardscan)
+                        ^double wc (gauss (inc dst) hardscan)]
+                    (* 255.0  (m/pow (/ (m/constrain (+ (* a wa) (* b wb) (* c wc)) 0.0 255.0) 255.0) gf))))
+            result (p/filter-channels (partial p/filter-channel-xy tri) nil blurred)]
+
+        (p/image-from-pixels result)))))
+
+;;;;;;;;;;
+;; (def img (core/load-image "results/test.jpg"))
+;; (def canvas (core/make-canvas (core/width img) (core/height img)))
+
+;; (time (core/with-canvas canvas (core/image (render-crt-scanlines img {:resolution 8.0 :hardpix -3.0 :hardscan -12.0 :gamma 1.}))))
+
+;; (core/with-canvas canvas
+;; (core/image img))
+
+
+;; (core/show-window canvas "test")
 
 ;; ## Noise
 ;;

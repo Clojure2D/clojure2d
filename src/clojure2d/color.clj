@@ -38,7 +38,7 @@
 (defn clamp255
   "Clamp to 0-255 integer"
   [^double a]
-  (int (m/constrain a 0.0 255.0)))
+  (m/iconstrain (m/round a) 0.0 255.0))
 
 (defn mod255
   "Leave 8 bits from long. Wraps input to 0-255 integer"
@@ -171,13 +171,18 @@
 ;; Prepare look-up table for int->double conversion.
 (def r255 (double-array (map #(/ ^double % 255.0) (range 256))))
 
+(defn get-r255 
+  "Return color value (0-1) by index"
+  ^double [^long idx]
+  (aget ^doubles r255 idx))
+
 ;; Blend colors functions
 
 (defn blend-values
   "Blend channel values with blending function."
   [f a b]
-  (let [aa (aget ^doubles r255 ^int a)
-        bb (aget ^doubles r255 ^int b)]
+  (let [aa (get-r255 a)
+        bb (get-r255 b)]
     (* 255.0 ^double (f aa bb))))
 
 (defn blend-colors
@@ -343,21 +348,21 @@
   ^double [^double a ^double b]
   (let [aa (long (* a 255.0))
         bb (long (* b 255.0))]
-    (aget ^doubles r255 (bit-and 0xff (bit-or aa bb)))))
+    (get-r255 (bit-and 0xff (bit-or aa bb)))))
 
 (defn blend-and
   "Bitwise and"
   ^double [^double a ^double b]
   (let [aa (long (* a 255.0))
         bb (long (* b 255.0))]
-    (aget ^doubles r255 (bit-and 0xff (bit-and aa bb)))))
+    (get-r255 (bit-and 0xff (bit-and aa bb)))))
 
 (defn blend-xor
   "Bitwise xor"
   ^double [^double a ^double b]
   (let [aa (long (* a 255.0))
         bb (long (* b 255.0))]
-    (aget ^doubles r255 (bit-and 0xff (bit-xor aa bb)))))
+    (get-r255 (bit-and 0xff (bit-xor aa bb)))))
 
 (defn blend-exclusion
   "Exclusion"
@@ -599,14 +604,44 @@
         b (clamp255 (- (+ i1 i3) i2))]
     (Vec4. r g b (.w c))))
 
-;; ### XYZ
+;; ### sRGB
 
-(defn- xyz-correct
+(def ^:const ^double gamma-factor (/ 1.0 2.4))
+
+(defn to-linear
   "Gamma correction"
   ^double [^double v]
   (if (> v 0.04045)
     (m/pow (/ (+ 0.055 v) 1.055) 2.4)
     (/ v 12.92)))
+
+(defn from-linear
+  "Gamma correction"
+  ^double [^double v]
+  (if (> v 0.0031308)
+    (- (* 1.055 (m/pow v gamma-factor)) 0.055)
+    (* v 12.92)))
+
+(defn to-sRGB
+  "Linear RGB to non-linear sRGB"
+  [^Vec4 c]
+  (v/vec4 (-> (Vec3. (.x c) (.y c) (.z c))
+              (v/applyf (comp from-linear get-r255))
+              (v/mult 255.0)
+              (v/applyf clamp255))
+          (.w c)))
+
+(defn from-sRGB
+  "Non-linear sRGB to linear RGB"
+  [^Vec4 c]
+  (v/vec4 (-> (Vec3. (.x c) (.y c) (.z c))
+              (v/applyf (comp to-linear get-r255))
+              (v/mult 255.0)
+              (v/applyf clamp255))
+          (.w c)))
+
+
+;; ### XYZ
 
 (def ^:const ^double xyz-xmax 0.9504716671128306)
 (def ^:const ^double xyz-ymax 0.9999570331323426)
@@ -622,11 +657,9 @@
 (defn- to-XYZ-
   "RGB->XYZ with corrections"
   [^Vec4 c]
-  (let [r (xyz-correct (/ (.x c) 255.0))
-        g (xyz-correct (/ (.y c) 255.0))
-        b (xyz-correct (/ (.z c) 255.0))
-        ^Vec3 xyz-raw (to-XYZ-raw (Vec3. r g b))]
-    (Vec4. (.x xyz-raw) (.y xyz-raw) (.z xyz-raw) (.w c))))
+  (let [xyz-raw (to-XYZ-raw (-> (Vec3. (.x c) (.y c) (.z c))
+                                (v/applyf (comp to-linear get-r255))))]
+    (v/vec4 xyz-raw (.w c))))
 
 (defn to-XYZ
   "Normlized RGB->XYZ"
@@ -636,15 +669,6 @@
            (clamp255 (m/norm (.y cc) 0.0 xyz-ymax 0.0 255.0))
            (clamp255 (m/norm (.z cc) 0.0 xyz-zmax 0.0 255.0))
            (.w cc))))
-
-(def ^:const ^double xyz-f (/ 1.0 2.4))
-
-(defn- xyz-decorrect
-  "Gamma correction"
-  ^double [^double v]
-  (if (> v 0.0031308)
-    (- (* 1.055 (m/pow v xyz-f)) 0.055)
-    (* v 12.92)))
 
 (defn from-XYZ-raw
   "Pure XYZ->RGB conversion."
@@ -656,14 +680,8 @@
 (defn- from-XYZ-
   "XYZ->RGB conversion with corrections"
   [^Vec4 c]
-  (let [^Vec3 rgb-raw (from-XYZ-raw (Vec3. (.x c) (.y c) (.z c)))
-        r (xyz-decorrect (.x rgb-raw))
-        g (xyz-decorrect (.y rgb-raw))
-        b (xyz-decorrect (.z rgb-raw))]
-    (Vec4. (* 255.0 r)
-           (* 255.0 g)
-           (* 255.0 b)
-           (.w c))))
+  (let [^Vec3 rgb-raw (v/mult (v/applyf (from-XYZ-raw (Vec3. (.x c) (.y c) (.z c))) from-linear) 255.0)]
+    (v/vec4 rgb-raw (.w c))))
 
 (defn from-XYZ
   "XYZ->RGB normalized"
@@ -826,22 +844,19 @@
 (defn from-HCL
   "HCL->RGB"
   [^Vec4 c]
-  (let [h (* 6.0 (/ (.x c) 255.0))
+  (let [h (* 6.0 (get-r255 (.x c)))
         chr (.y c)
         l (.z c)
         x (* chr (- 1.0 (m/abs (dec ^double (rem h 2.0)))))
-        rgb (cond
-              (and (<= 0.0 h) (< h 1.0)) [chr x 0.0]
-              (and (<= 1.0 h) (< h 2.0)) [x chr 0.0]
-              (and (<= 2.0 h) (< h 3.0)) [0.0 chr x]
-              (and (<= 3.0 h) (< h 4.0)) [0.0 x chr]
-              (and (<= 4.0 h) (< h 5.0)) [x 0.0 chr]
-              :else                      [chr 0.0 x])
-        ^double r (rgb 0)
-        ^double g (rgb 1)
-        ^double b (rgb 2)
-        m (- l (* 0.298839 r) (* 0.586811 g) (* 0.114350 b))]
-    (v/applyf (Vec4. (+ r m) (+ g m) (+  m) (.w c)) clamp255)))
+        ^Vec3 rgb (cond
+                    (and (<= 0.0 h) (< h 1.0)) (Vec3. chr x 0.0)
+                    (and (<= 1.0 h) (< h 2.0)) (Vec3. x chr 0.0)
+                    (and (<= 2.0 h) (< h 3.0)) (Vec3. 0.0 chr x)
+                    (and (<= 3.0 h) (< h 4.0)) (Vec3. 0.0 x chr)
+                    (and (<= 4.0 h) (< h 5.0)) (Vec3. x 0.0 chr)
+                    :else                      (Vec3. chr 0.0 x))
+        m (- l (* 0.298839 (.x rgb)) (* 0.586811 (.y rgb)) (* 0.114350 (.z rgb)))]
+    (v/applyf (Vec4. (+ (.x rgb) m) (+ (.y rgb) m) (+ (.z rgb) m) (.w c)) clamp255)))
 
 ;; ### HSB
 
@@ -851,39 +866,36 @@
   (let [mn (min (.x c) (.y c) (.z c))
         mx (max (.x c) (.y c) (.z c))
         delta (- mx mn)
-        [h s b] (if (zero? mx) [0.0 0.0 0.0]
-                    (let [s (* 255.0 (/ delta mx))
-                          h (if (zero? delta) 0.0 
-                                (/ (double (condp == mx
-                                             (.x c) (/ (- (.y c) (.z c)) delta)
-                                             (.y c) (+ 2.0 (/ (- (.z c) (.x c)) delta))
-                                             (.z c) (+ 4.0 (/ (- (.x c) (.y c)) delta)))) 6.0))]
-                      [(* 255.0 (if (neg? h) (inc h) h)) s mx]))]
-    (v/applyf (Vec4. h s b (.w c)) clamp255)))
+        hsb (if (zero? mx) (Vec3. 0.0 0.0 0.0)
+                (let [s (* 255.0 (/ delta mx))
+                      h (if (zero? delta) 0.0 
+                            (/ (double (condp == mx
+                                         (.x c) (/ (- (.y c) (.z c)) delta)
+                                         (.y c) (+ 2.0 (/ (- (.z c) (.x c)) delta))
+                                         (.z c) (+ 4.0 (/ (- (.x c) (.y c)) delta)))) 6.0))]
+                  (v/applyf (Vec3. (* 255.0 (if (neg? h) (inc h) h)) s mx) clamp255)))]
+    (v/vec4 hsb (.w c))))
 
 (defn from-HSB
   "HSB->RGB"
   [^Vec4 c]
   (if (zero? (.y c)) (Vec4. (.z c) (.z c) (.z c) (.w c))
-      (let [h (/ (.x c) 255.0)
-            s (/ (.y c) 255.0)
-            b (/ (.z c) 255.0)
+      (let [h (get-r255 (.x c))
+            s (get-r255 (.y c))
+            b (get-r255 (.z c))
             h (* 6.0 (- h (m/floor h)))
             f (- h (m/floor h))
             p (* b (- 1.0 s))
             q (* b (- 1.0 (* s f)))
             t (* b (- 1.0 (* s (- 1.0 f))))
             rgb (condp == (int h)
-                  0 [b t p]
-                  1 [q b p]
-                  2 [p b t]
-                  3 [p q b]
-                  4 [t p b]
-                  5 [b p q])
-            ^double r (rgb 0)
-            ^double g (rgb 1)
-            ^double b (rgb 2)]
-        (v/applyf (Vec4. (* 255.0 r) (* 255.0 g) (* 255.0 b) (.w c)) clamp255))))
+                  0 (Vec3. b t p)
+                  1 (Vec3. q b p)
+                  2 (Vec3. p b t)
+                  3 (Vec3. p q b)
+                  4 (Vec3. t p b)
+                  5 (Vec3. b p q))            ]
+        (v/vec4 (v/applyf (v/mult rgb 255.0) clamp255) (.w c)))))
 
 ;; ### HSI
 
@@ -917,7 +929,7 @@
 (defn from-HSI
   "HSI->RGB"
   [^Vec4 c]
-  (let [^Vec4 cc (v/div c 255.0)
+  (let [^Vec4 cc (v/applyf c get-r255)
         h (* 360.0 (.x cc))
         h (- h (* 360.0 (m/floor (/ h 360.0))))
         v1 (* (.z cc) (- 1.0 (.y cc)))
@@ -925,16 +937,16 @@
               (< h 120.0) (let [b v1
                                 r (from-hsi-helper cc h)
                                 g (- (* 3.0 (.z cc)) r b)]
-                            [r g b])
+                            (Vec3. r g b))
               (< h 240.0) (let [r v1
                                 g (from-hsi-helper cc (- h 120.0))
                                 b (- (* 3.0 (.z cc)) r g)]
-                            [r g b])
+                            (Vec3. r g b))
               :else (let [g v1
                           b (from-hsi-helper cc (- h 240.0))
                           r (- (* 3.0 (.z cc)) g b)]
-                      [r g b]))]
-    (v/applyf (v/mult (Vec4. (rgb 0) (rgb 1) (rgb 2) (.w cc)) 255.0) clamp255)))
+                      (Vec3. r g b)))]
+    (v/vec4 (v/applyf (v/mult rgb 255.0) clamp255) (.w c))))
 
 ;; ### HWB
 
@@ -969,14 +981,14 @@
           f (if (odd? i) (- 1.0 f) f)
           n (+ w (* f (- v w)))
           rgb (condp == i
-                0 [v n w]
-                1 [n v w]
-                2 [w v n]
-                3 [w n v]
-                4 [n w v]
-                5 [v w n]
-                6 [v n w])]
-      (v/applyf (Vec4. (* 255.0 ^double (rgb 0)) (* 255.0 ^double (rgb 1)) (* 255.0 ^double (rgb 2)) (.w c)) clamp255))))
+                0 (Vec3. v n w)
+                1 (Vec3. n v w)
+                2 (Vec3. w v n)
+                3 (Vec3. w n v)
+                4 (Vec3. n w v)
+                5 (Vec3. v w n)
+                6 (Vec3. v n w))]
+      (v/vec4 (v/applyf (v/mult rgb 255.0) clamp255) (.w c)))))
 
 ;; ### YPbPr
 
@@ -1138,7 +1150,8 @@
                   :YCgCo [to-YCgCo from-YCgCo]
                   :YUV   [to-YUV from-YUV]
                   :YIQ   [to-YIQ from-YIQ]
-                  :Gray  [to-Gray identity]})
+                  :Gray  [to-Gray identity]
+                  :sRGB  [to-sRGB from-sRGB]})
 
 ;; List of color spaces names
 (def colorspaces-names (keys colorspaces))

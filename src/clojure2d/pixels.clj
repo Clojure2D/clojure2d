@@ -396,7 +396,7 @@
 
 (defn get-3x3
   "Return 9 channel values around given position."
-  [ch ^Pixels p ^long x ^long y]
+  [ch p ^long x ^long y]
   [(get-value p ch (dec x) (dec y))
    (get-value p ch x  (dec y))
    (get-value p ch (inc x) (dec y))
@@ -409,7 +409,7 @@
 
 (defn get-cross-f
   "Return value from 5 (cross) values using binary functions."
-  [f ch ^Pixels p x y]
+  [f ch p x y]
   (f ^int (get-value p ch x (dec ^long y))
      (f ^int (get-value p ch (dec ^long x) y)
         (f ^int (get-value p ch x y)
