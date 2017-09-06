@@ -39,3 +39,11 @@
                    (o/render-noise noise-overlay)
                    (o/render-spots spots-overlay)
                    (o/render-rgb-scanlines))))
+
+;; crt scanlines
+(core/with-canvas canvas
+  (core/image (o/render-crt-scanlines img)))
+
+;; crt scanlines with mask
+(core/with-canvas canvas
+  (core/image (o/render-crt-scanlines img {:resolution 4 :mask-light 1.5})))

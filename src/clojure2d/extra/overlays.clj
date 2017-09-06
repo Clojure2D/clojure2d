@@ -3,6 +3,7 @@
 ;; Three overlays to give more analog view of the images.
 ;;
 ;; * `render-rgb-scanlines` - adds rgb tv scan lines slightly bluring image
+;; * `render-crt-scanlines` - adds old monitor scan lines
 ;; * `make-noise` and `render-noise` - create and add white noise layer
 ;; * `make-spots` and `render-spots` - create and add small spots
 ;;
@@ -87,59 +88,66 @@
   (* resolution (m/floor (+ offset (/ value resolution)))))
 
 (defn render-crt-scanlines
-  ""
-  [^BufferedImage img {:keys [^double resolution ^double hardpix ^double hardscan ^double gamma]}]
-  (let [^int w (core/width img)
-        ^int h (core/height img)
-        gf (/ 1.0 gamma)
-        p (p/get-image-pixels img)]
+  "Create CRT scanlines and rgb patterns. Parameters:
 
-    (letfn [(dist [^double pos]
-              (let [poss (/ pos resolution)]
-                (- 0.5 (- poss (m/floor poss)))))
-            (gauss [^double pos ^double scale]
-              (m/pow 2.0 (* scale (m/sq pos))))
-            (h3-blur [ch p ^long xx ^long yy]
-              (let [y (adjust-pos-value yy 0.0 resolution)
-                    x- (adjust-pos-value xx -1.0 resolution)
-                    x (adjust-pos-value xx 0.0 resolution)
-                    x+ (adjust-pos-value xx 1.0 resolution)
-                    ^int a (p/get-value p ch x- y)
-                    ^int b (p/get-value p ch x y)
-                    ^int c (p/get-value p ch x+ y)
-                    ^double dst (dist xx)
-                    ^double wa (gauss (dec dst) hardpix)
-                    ^double wb (gauss dst hardpix)
-                    ^double wc (gauss (inc dst) hardpix)]
-                (/ (+ (* a wa) (* b wb) (* c wc)) (+ wa wb wc))))]
-      (let [blurred (p/filter-channels (partial p/filter-channel-xy h3-blur) nil p)
-            tri (fn [ch p ^long xx ^long yy]
-                  (let [y- (adjust-pos-value yy -1.0 resolution)
-                        y (adjust-pos-value yy 0.0 resolution)
-                        y+ (adjust-pos-value yy 1.0 resolution)
-                        ^int a (p/get-value p ch xx y-)
-                        ^int b (p/get-value p ch xx y)
-                        ^int c (p/get-value p ch xx y+)
-                        ^double dst (dist yy)
-                        ^double wa (gauss (dec dst) hardscan)
-                        ^double wb (gauss dst hardscan)
-                        ^double wc (gauss (inc dst) hardscan)]
-                    (* 255.0  (m/pow (/ (m/constrain (+ (* a wa) (* b wb) (* c wc)) 0.0 255.0) 255.0) gf))))
-            result (p/filter-channels (partial p/filter-channel-xy tri) nil blurred)]
+  * resolution - size of the scanlines (default 6.0)
+  * hardpix - horizontal blur, -2.0 soft, -8.0 hard (default -4.0)
+  * hardscan - scanline softness, -4.0 soft, -16.0 hard (default -12.0)
+  * mask-dark - crt mask dark part multiplier 0.25-1.0 (default 1.0, none)
+  * mask-light - crt mask color part multiplier 1.0-1.75 (default 1.0, none)
+  * mask-mult - crt mask pattern shift, 0.0+ (default 3.0, crt grid)"
+  ([img] (render-crt-scanlines img {}))
+  ([^BufferedImage img {:keys [^double resolution ^double hardpix ^double hardscan ^double mask-dark ^double mask-light ^int mask-mult]
+                        :or {resolution 6.0 hardpix -4.0 hardscan -12.0 mask-dark 1.0 mask-light 1.0 mask-mult 3.0}}]
+   (let [^int w (core/width img)
+         ^int h (core/height img)
+         p (p/get-image-pixels img)]
 
-        (p/image-from-pixels result)))))
-
-;;;;;;;;;;
-;; (def img (core/load-image "results/test.jpg"))
-;; (def canvas (core/make-canvas (core/width img) (core/height img)))
-
-;; (time (core/with-canvas canvas (core/image (render-crt-scanlines img {:resolution 8.0 :hardpix -3.0 :hardscan -12.0 :gamma 1.}))))
-
-;; (core/with-canvas canvas
-;; (core/image img))
-
-
-;; (core/show-window canvas "test")
+     (letfn [(dist [^double pos]
+               (let [poss (/ pos resolution)]
+                 (- 0.5 (- poss (m/floor poss)))))
+             (gauss [^double pos ^double scale]
+               (m/pow 2.0 (* scale (m/sq pos))))
+             (h3-blur [ch p ^long xx ^long yy]
+               (let [y (adjust-pos-value yy 0.0 resolution)
+                     x- (adjust-pos-value xx -1.0 resolution)
+                     x (adjust-pos-value xx 0.0 resolution)
+                     x+ (adjust-pos-value xx 1.0 resolution)
+                     ^int a (p/get-value p ch x- y)
+                     ^int b (p/get-value p ch x y)
+                     ^int c (p/get-value p ch x+ y)
+                     ^double dst (dist xx)
+                     ^double wa (gauss (dec dst) hardpix)
+                     ^double wb (gauss dst hardpix)
+                     ^double wc (gauss (inc dst) hardpix)]
+                 (-> (+ (* a wa) (+ (* b wb) (* c wc)))
+                     (/ (+ wa wb wc))
+                     (/ 255.0)
+                     (c/to-linear)
+                     (* 1000000.0))))]
+       
+       (let [blurred (p/filter-channels (partial p/filter-channel-xy h3-blur) nil p)
+             tri (fn [^long ch p ^long xx ^long yy]
+                   (let [y- (adjust-pos-value yy -1.0 resolution)
+                         y (adjust-pos-value yy 0.0 resolution)
+                         y+ (adjust-pos-value yy 1.0 resolution)
+                         ^int a (p/get-value p ch xx y-)
+                         ^int b (p/get-value p ch xx y)
+                         ^int c (p/get-value p ch xx y+)
+                         ^double dst (dist yy)
+                         ^double wa (gauss (dec dst) hardscan)
+                         ^double wb (gauss dst hardscan)
+                         ^double wc (gauss (inc dst) hardscan)
+                         xf (unsigned-bit-shift-right (rem (+ xx (* mask-mult yy)) 6) 1)]
+                     (-> (+ (* a wa) (+ (* b wb) (* c wc)))
+                         (/ 1000000.0)
+                         (c/from-linear) 
+                         (* 255.0)
+                         (* (if (== ch xf) mask-light mask-dark))
+                         (m/iconstrain 0 255))))]
+         (->> blurred
+              (p/filter-channels (partial p/filter-channel-xy tri) nil)
+              (p/image-from-pixels)))))))
 
 ;; ## Noise
 ;;
