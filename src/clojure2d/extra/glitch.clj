@@ -34,19 +34,19 @@
 ;; Pixels are shifted by value returned by wave function. You have to provide separate wave functions for x and y axises.
 ;; Random setup is based on sum of oscillators defined in `signal` namespace.
 
-(def freqs (vec (map #(bit-shift-left 1 ^long %) (range 16))))
+(def freqs (mapv #(bit-shift-left 1 ^long %) (range 8)))
 (def amps (mapv #(/ 1.0 ^long %) freqs))
 
 (defn slitscan-random-setup
   "Create list of random waves "
   ([n]
-   (let [f (fn []
-             (let [r (r/irand 4)]
+   (letfn [(f []
+             (let [r (if (r/brand 0.75) (r/irand 4) (r/irand (count freqs)))]
                {:wave (rand-nth s/oscillators)
                 :freq (freqs r)
                 :amp (amps r)
                 :phase (r/drand)}))]
-     (filter (fn [_] (r/brand 0.8)) (repeatedly n f))))
+     (repeatedly n f)))
   ([]
    (slitscan-random-setup (r/irand 2 6))))
 
@@ -62,10 +62,10 @@
   [fx fy ch ^Pixels p x y]
   (let [sx (/ 1.0 (.w p))
         sy (/ 1.0 (.h p))
-        shiftx (* 0.5 (.w p) ^double (fx (* ^long x sx)))
-        shifty (* 0.5 (.h p) ^double (fy (* ^long y sy)))
-        xx (rem (int (+ ^long x (.w p) shiftx)) (.w p))
-        yy (rem (int (+ ^long y (.h p) shifty)) (.h p))]
+        shiftx (* 0.3 (.w p) ^double (fx (* ^long x sx)))
+        shifty (* 0.3 (.h p) ^double (fy (* ^long y sy)))
+        xx (m/wrap 0.0 (.w p) (+ ^long x shiftx))
+        yy (m/wrap 0.0 (.h p) (+ ^long y shifty))]
     (p/get-value p ch xx yy)))
 
 (defn make-slitscan-filter

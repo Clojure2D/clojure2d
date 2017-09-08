@@ -1,4 +1,4 @@
-(defproject clojure2d "0.0.4-SNAPSHOT"
+(defproject clojure2d "0.0.5-SNAPSHOT"
   :description "Creative coding / glitch library backed by Java2D"
   :plugins [[refactor-nrepl "2.4.0-SNAPSHOT"]
             [cider/cider-nrepl "0.15.1-SNAPSHOT"]
@@ -20,7 +20,7 @@
                  [org.apache.commons/commons-math3 "3.6.1"]
                  [com.flowpowered/flow-noise "1.0.0"]
                  [com.sudoplay.joise/joise "1.1.0-RC2"]
-                 [net.littleredcomputer/sicmutils "0.10.0"]
+                 [net.littleredcomputer/sicmutils "0.10.0"] ;; to be removed
                                         ;	 [de.sciss/jwave "1.0.3"]
                  [criterium "0.4.4"]
                                         ; [org.bytedeco/javacv-platform "1.3.2"]

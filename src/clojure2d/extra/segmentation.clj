@@ -36,12 +36,11 @@
 
 (defn segment-pixels
   "Decompose channel into segments where mins is minimum size of segment, maxs is maximum size, thr is accuracy (minimum std dev of pixel values to make decision about subdivision."
-  [^Pixels p ch mins maxs thr]
+  [^Pixels p ch {:keys [^long min-size ^long max-size ^double threshold]
+                 :or {mins 4 maxs 256 thr 15.0}}]
   (let [ww (bit-shift-left 1 (m/high-2-exp (.w p)))
         hh (bit-shift-left 1 (m/high-2-exp (.h p)))
-        mins (max 2 ^long mins)
-        ^long maxs maxs
-        ^double thr thr
+        mins (max 2 min-size)
 
         segmf (fn local-segmentation
                 [^long x ^long y ^long size res]
@@ -49,9 +48,9 @@
                   res
                   (lazy-seq
                    (let [^double stdev (calc-stdev p ch x y size size)]
-                     (if (or (> size maxs)
+                     (if (or (> size max-size)
                              (and (> size mins)
-                                  (> stdev thr)))
+                                  (> stdev threshold)))
                        (let [mid (long (/ size 2))]
                          (->> res
                               (local-segmentation (+ x mid) (+ y mid) mid)

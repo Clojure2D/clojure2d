@@ -28,7 +28,7 @@
    (example-13 canvas :default))
   ([canvas strategy]
    (binding [p/*pixels-edge* 128] ; let's be sure we have some fixed value outside the image
-     (let [segm (segm/segment-pixels img channel min-size max-size threshold)
+     (let [segm (segm/segment-pixels img channel {:min-size min-size :max-size max-size :threshold threshold})
            iter (core/make-counter 0)
 
            draw (fn [canv] (doseq [[x y size] segm]

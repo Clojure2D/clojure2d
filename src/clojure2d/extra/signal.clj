@@ -14,7 +14,6 @@
             [clojure2d.core :refer :all]
             [clojure2d.color :as c]
             [clojure.java.io :refer :all]
-            [clojure2d.math.joise :as j]
             [clojure2d.math.vector :as v]
             [criterium.core :as bench]
             [clojure2d.math.random :as r])
@@ -886,13 +885,13 @@
     (* a
        (m/sin (+ (* p m/TWO_PI) (* x m/TWO_PI f))))))
 
-;; Define noise for `:noise` oscillator
-(def snoise (j/make-noise (j/auto-correct (j/make-basis) 10000 -1.0 1.0)))
+(def snoise (r/make-perlin-noise (r/irand) 2))
 
 (defmethod make-wave :noise [_ ^double f ^double a ^double p]
-  (fn ^double [^double x]
-    (* a
-       ^double (snoise (* (+ p x) f)))))
+  (let [shift-noise (r/drand -5.0 5.0)]
+    (fn ^double [^double x]
+      (* a 2.0
+         (- ^double (snoise (* (+ p x) f) shift-noise) 0.5)))))
 
 (defmethod make-wave :saw [_ ^double f ^double a ^double p] 
   (fn ^double [^double x]

@@ -29,8 +29,8 @@
 
 (def ^:const ^double fscale 0.7)
 
-(def s60 (future (make-spots 60 [60 120 180] w h)))
-(def n60 (future (make-noise 60 w h)))
+(def s60 (future (make-spots w h {:alpha 60 :intensities [60 120 180]})))
+(def n60 (future (make-noise w h {:alpha 60})))
 
 (defn make-me
   ""
@@ -61,8 +61,8 @@
     (set-background 255 250 245)
     (set-color 35 35 35 16)
     (make-me disp)
-    (image (render-noise @n60 (get-image canvas)))
-    (image (render-spots @s60 (get-image canvas))))
+    (image (render-noise (get-image canvas) @n60))
+    (image (render-spots (get-image canvas) @s60)))
   :done)
 
 (defn example-08

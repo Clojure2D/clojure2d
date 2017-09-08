@@ -1,7 +1,18 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 0.0.5 - 2017-09-06
+
+### Changed
+
+- Overlays API changed to image + configuration map
+
 ## 0.0.4 - 2017-08-07
+
+### Added
+
+- New overlay - crt scanlines
+
 ### Changed
 
 - Events and Window carry global state, `show-window` parameters reorganized.

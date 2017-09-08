@@ -15,16 +15,24 @@
 (def ^Pixels img (p/load-pixels "results/test.jpg"))
 
 (def canvas (make-canvas (width img) (height img)))
-(def window (show-window canvas "Glitch" 15 nil))
+(def window (show-window canvas "Glitch"))
 
 (defmethod key-pressed ["Glitch" \space] [_ _]
   (save-canvas canvas (next-filename "results/ex19/" ".jpg")))
 
 ;; slitscan
 
-(p/set-canvas-pixels! canvas (p/filter-channels (g/make-slitscan-filter) nil img))
+(def sc-config-x
+  (let [s (g/slitscan-random-setup)]
+    (println s)
+    (g/make-slitscan-waves s)))
 
-(p/set-canvas-pixels! canvas (p/filter-channels (g/make-slitscan-filter) (g/make-slitscan-filter) (g/make-slitscan-filter) nil img))
+(def sc-config-y
+  (let [s (g/slitscan-random-setup)]
+    (println s)
+    (g/make-slitscan-waves s)))
+
+(p/set-canvas-pixels! canvas (p/filter-channels (g/make-slitscan-filter sc-config-x sc-config-y) nil img))
 
 ;; channel shift
 

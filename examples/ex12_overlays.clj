@@ -9,7 +9,7 @@
 (set! *unchecked-math* true)
 
 ;; load image and store
-(def ^BufferedImage img (core/load-image "results/test.jpg"))
+(def img (core/load-image "results/test.jpg"))
 
 (def canvas (core/make-canvas (core/width img) (core/height img)))
 (def window (core/show-window canvas "Overlays" 15 nil))
@@ -22,23 +22,23 @@
   (core/image (o/render-rgb-scanlines img)))
 
 ;; noise
-(def noise-overlay (o/make-noise 80 (core/width img) (core/height img)))
+(def noise-overlay (o/make-noise (core/width img) (core/height img) {:alpha 80}))
 
 (core/with-canvas canvas
-  (core/image (o/render-noise noise-overlay img)))
+  (core/image (o/render-noise img noise-overlay)))
 
 ;; spots, it's good to prepare overlay first, than apply onto the image
-(def spots-overlay (o/make-spots 80 [30 60 120 180] (core/width img) (core/height img)))
+(def spots-overlay (o/make-spots (core/width img) (core/height img) {:alpha 80 :intensities [30 60 120 180]}))
 
 (core/with-canvas canvas
-  (core/image (o/render-spots spots-overlay img)))
+  (core/image (o/render-spots img spots-overlay)))
 
 ;; apply all
 (core/with-canvas canvas
-  (core/image (->> img
-                   (o/render-noise noise-overlay)
-                   (o/render-spots spots-overlay)
-                   (o/render-rgb-scanlines))))
+  (core/image (-> img
+                  (o/render-noise noise-overlay)
+                  (o/render-spots spots-overlay)
+                  (o/render-rgb-scanlines))))
 
 ;; crt scanlines
 (core/with-canvas canvas

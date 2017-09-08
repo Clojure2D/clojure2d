@@ -30,8 +30,8 @@
 ;; run several times
 (let [lst (into [] (map #(s/make-wave (rand-nth s/oscillators) (f %) (a %) (r/drand 1)) (range 1 5)))]
   (with-canvas canvas
-    (set-color (java.awt.Color/white))
-    (set-background java.awt.Color/black)
+    (set-color :white)
+    (set-background :black)
     (draw-fun (s/make-sum-wave lst)))
   :done)
 
@@ -57,11 +57,8 @@
     (let [yy (/ y 600.0)
           lst (map #(s/make-wave (nth wvs %) (f (nth octaves %)) (a (nth octaves %)) (+ (* yy ^double (nth phasemult %)) ^double (nth phases %))) (range num))]
       (with-canvas canvas
-        (draw-fun2 y (s/make-sum-wave lst))
-                                        ;                 (set-background (java.awt.Color/black))
-                                        ;                 (draw-fun (make-sum-wave lst))
-        )
-      :done)))
+        (draw-fun2 y (s/make-sum-wave lst)))))
+  :done)
 
 
 ;; save signal to file

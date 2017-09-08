@@ -65,8 +65,8 @@
 (def window (show-window canvas "free_art_-_source" (* w 2) (* h 2) 25 draw))
 
 ;; Prepare noise and spot overlay frames, it's slow
-(def noise-frames (vec (repeatedly number-of-frames #(o/make-noise 60 w h)))) ;;;; change!
-(def spots-frames (vec (repeatedly number-of-frames #(o/make-spots 80 [30 220] w h)))) ;;;; change!
+(def noise-frames (vec (repeatedly number-of-frames #(o/make-noise w h {:alpha 60})))) ;;;; change!
+(def spots-frames (vec (repeatedly number-of-frames #(o/make-spots w h {:alpha 80 :intensities [30 220]})))) ;;;; change!
 
 ;; Sonification effect using DjEq filter with colorspace conversion.
 ;; Steps:
@@ -102,7 +102,7 @@
 
 ;; decompose images into segments
 (binding [p/*pixels-edge* :wrap] ;;;; change!
-  (def segments (mapv #(es/segment-pixels % 0 8 128 18.0) images))) ;;;; change!
+  (def segments (mapv #(es/segment-pixels % 0 {:min-size 8 :max-size 128 :threshold 18.0}) images))) ;;;; change!
 
 ;; This code generates frame
 ;; Input:
@@ -149,10 +149,10 @@
          (p/set-canvas-pixels! canvas))
 
     (with-canvas (canvases frame)
-      (image (->> (get-image canvas)
-                  (o/render-rgb-scanlines) ;;;; change!
-                  (o/render-noise (noise-frames frame)) ;;;; change!
-                  (o/render-spots (spots-frames frame))))))) ;;;; change!
+      (image (-> (get-image canvas)
+                 (o/render-rgb-scanlines) ;;;; change!
+                 (o/render-noise (noise-frames frame)) ;;;; change!
+                 (o/render-spots (spots-frames frame))))))) ;;;; change!
 
 ;; atom controlling updater
 (def is-running (atom true))
