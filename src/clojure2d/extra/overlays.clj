@@ -47,8 +47,8 @@
        (line canvas 0 y++ w y++))))
   canvas)
 
-(def tinter1 (partial p/filter-channels (p/make-tint-filter 255 142 25)))
-(def tinter2 (partial p/filter-channels (p/make-tint-filter 46 142 255)))
+(def tinter1 (partial p/filter-channels (p/make-tint-filter 245 130 16)))
+(def tinter2 (partial p/filter-channels (p/make-tint-filter 36 130 225)))
 
 (defn render-rgb-scanlines
   "Blurs and renders rgb stripes on the image, returns new image. Scale parameter (default 1.6) controls amount of blur. Resulting image is sligtly lighter and desaturated. Correct with normalize filter if necessary."

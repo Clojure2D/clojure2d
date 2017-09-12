@@ -17,6 +17,10 @@
 (defmethod core/key-pressed ["Overlays" \space] [_ _]
   (core/save-canvas canvas (core/next-filename "results/ex12/" ".jpg")))
 
+;; image
+(core/with-canvas canvas
+  (core/image img))
+
 ;; tv/rgb skanning lines
 (core/with-canvas canvas
   (core/image (o/render-rgb-scanlines img)))
