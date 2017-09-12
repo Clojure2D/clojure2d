@@ -7,6 +7,10 @@ All notable changes to this project will be documented in this file. This change
 
 - Overlays API changed to image + configuration map
 
+### Fixed
+
+- rgb scanlines bad tint values
+
 ## 0.0.4 - 2017-08-07
 
 ### Added
