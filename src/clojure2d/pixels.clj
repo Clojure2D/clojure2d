@@ -831,7 +831,7 @@
                       color (v/applyf (Vec4. c1 c2 c3 255.0) c/clamp255)
                       color (if (and (== 1.0 saturation) (== 1.0 brightness))
                               color
-                              (c/from-HSB (v/emult multiplier (c/to-HSB color))))] ;; apply brightness, saturation factors
+                              (c/from-HSB (v/applyf (v/emult multiplier (c/to-HSB color)) c/clamp255)))] ;; apply brightness, saturation factors
                   (set-color p (+ x row) (v/interpolate background color alpha)))))))) ;; store!
       p))
   (to-pixels [t background] (to-pixels t background {}))
