@@ -411,6 +411,19 @@
   ([effects config config-back]
    (make-effects-filter effects config config-back 0)))
 
+;; ## Helper functions
+
+(defn db-to-linear
+  "DB to Linear (audacity)"
+  [x]
+  (/ (m/pow 10.0 x) 20.0))
+
+(defn linear-to-db
+  "Linear to DB (audacity)"
+  [x]
+  (* 20.0 (m/log10 x)))
+
+
 ;; ## Effects / Filters
 
 (defmulti make-effect (fn [m conf] m))
@@ -834,6 +847,25 @@
                                (SampleAndState. last (StateDecimator. (dec ncount) last)))
                              (SampleAndState. (.last state) (StateDecimator. ncount (.last state))))))
                         ([] (StateDecimator. 0.0 0.0))))))
+
+;; ### BassTreble
+;;
+;; Name: `:basstreble`
+;;
+;; Configuration:
+;;
+;; * `:bass` - bass gain
+;; * `:treble` - treble gain
+;; * `:gain` - gain
+;; * `:rate` - sample rate
+;; * `:slope` - slope for both (0.4 default)
+;; * `:bass-freq` - bass freq (250.0 default)
+;; * `:treble-freq` - treble freq (4000.0 default)
+(deftype StateBassTreble [^double xn1Bass ^double xn2Bass ^double yn1Bass ^double yn2Bass
+                          ^double xn1Treble ^double xn2Treble ^double yn1Treble ^double yn2Treble])
+
+
+;;https://github.com/audacity/audacity/blob/master/src/effects/BassTreble.cpp#L381
 
 ;; ## File operations
 
