@@ -415,14 +415,13 @@
 
 (defn db-to-linear
   "DB to Linear (audacity)"
-  [x]
-  (/ (m/pow 10.0 x) 20.0))
+  ^double [^double x]
+  (m/pow 10.0 (/ x 20.0)))
 
 (defn linear-to-db
   "Linear to DB (audacity)"
-  [x]
+  ^double [x]
   (* 20.0 (m/log10 x)))
-
 
 ;; ## Effects / Filters
 
@@ -434,8 +433,8 @@
 ;;
 ;; Confguration:
 ;;
-;; * `:rate` - sample rate
-;; * `:cutoff` - cutoff frequency
+;; * `:rate` - sample rate (default 44100.0)
+;; * `:cutoff` - cutoff frequency (default 2000.0)
 
 (defn- calc-filter-alpha
   "Calculate alpha factor"
@@ -444,8 +443,9 @@
         tau (/ 1.0 (* cutoff m/TWO_PI))]
     (/ tinterval (+ tau tinterval))))
 
-(defmethod make-effect :simple-lowpass [_ conf]
-  (let [alpha (calc-filter-alpha (:rate conf) (:cutoff conf))] 
+(defmethod make-effect :simple-lowpass [_ {:keys [rate cutoff]
+                                           :or {rate 44100.0 cutoff 2000.0}}]
+  (let [alpha (calc-filter-alpha rate cutoff)] 
     (make-effect-node (fn
                         ([^double sample ^double prev]
                          (let [s1 (* sample alpha)
@@ -625,10 +625,11 @@
 ;;
 ;; * `:fc` - center frequency
 ;; * `:gain` - gain
-;; * `:bw` - bandwidth
-;; * `:fs` - sampling rate
-(defmethod make-effect :biquad-eq [_ conf]
-  (make-biquad-filter (biquad-eq-params (:fc conf) (:gain conf) (:bw conf) (:fs conf))))
+;; * `:bw` - bandwidth (default: 1.0)
+;; * `:fs` - sampling rate (defatult: 44100.0)
+(defmethod make-effect :biquad-eq [_ {:keys [fc gain bw fs]
+                                      :or {fc 0.0 gain 0.0 bw 1.0 fs 44100.0}}]
+  (make-biquad-filter (biquad-eq-params fc gain bw fs)))
 
 ;; ### Biquad high/low shelf
 ;;
@@ -638,13 +639,15 @@
 ;;
 ;; * `:fc` - center frequency
 ;; * `:gain` - gain
-;; * `:slope` - shelf slope
-;; * `:fs` - sampling rate
-(defmethod make-effect :biquad-hs [_ conf]
-  (make-biquad-filter (biquad-hs-params (:fc conf) (:gain conf) (:slope conf) (:fs conf))))
+;; * `:slope` - shelf slope (default 1.5)
+;; * `:fs` - sampling rate (default 44100.0)
+(defmethod make-effect :biquad-hs [_ {:keys [fc gain slope fs]
+                                      :or {fc 0.0 gain 0.0 slope 1.5 fs 44100.0}}]
+  (make-biquad-filter (biquad-hs-params fc gain slope fs)))
 
-(defmethod make-effect :biquad-ls [_ conf]
-  (make-biquad-filter (biquad-ls-params (:fc conf) (:gain conf) (:slope conf) (:fs conf))))
+(defmethod make-effect :biquad-ls [_ {:keys [fc gain slope fs]
+                                      :or {fc 0.0 gain 0.0 slope 1.5 fs 44100.0}}]
+  (make-biquad-filter (biquad-ls-params fc gain slope fs)))
 
 ;; ### Biquad lowpass/highpass/bandpass
 ;;
@@ -653,16 +656,18 @@
 ;; Configuration:
 ;;
 ;; * `:fc` - cutoff/center frequency
-;; * `:bw` - bandwidth
-;; * `:fs` - sampling rate
-(defmethod make-effect :biquad-lp [_ conf]
-  (make-biquad-filter (biquad-lp-params (:fc conf) (:bw conf) (:fs conf))))
+;; * `:bw` - bandwidth (default 1.0)
+;; * `:fs` - sampling rate (default 44100.0)
 
-(defmethod make-effect :biquad-hp [_ conf]
-  (make-biquad-filter (biquad-hp-params (:fc conf) (:bw conf) (:fs conf))))
+(defn- lhb-params
+  "Create parameters for lp hp and bp biquad filters."
+  [f {:keys [fc bw fs]
+      :or {fc 0.0 bw 1.0 fs 44100.0}}]
+  (f fc bw fs))
 
-(defmethod make-effect :biquad-bp [_ conf]
-  (make-biquad-filter (biquad-bp-params (:fc conf) (:bw conf) (:fs conf))))
+(defmethod make-effect :biquad-lp [_ conf] (make-biquad-filter (lhb-params biquad-lp-params conf)))
+(defmethod make-effect :biquad-hp [_ conf] (make-biquad-filter (lhb-params biquad-hp-params conf)))
+(defmethod make-effect :biquad-bp [_ conf] (make-biquad-filter (lhb-params biquad-bp-params conf)))
 
 ;; ### DJ Equalizer
 ;;
@@ -673,14 +678,15 @@
 ;; * `:high` - high frequency gain (10000Hz)
 ;; * `:mid` - mid frequency gain (1000Hz)
 ;; * `:low` - low frequency gain (100Hz)
-;; * `:shelf-slope` - shelf slope for high frequency
-;; * `:peak-bw` - peak bandwidth for mid and low frequencies
-;; * `:rate` - sampling rate
-(defmethod make-effect :dj-eq [_ conf]
+;; * `:shelf-slope` - shelf slope for high frequency (default 1.5)
+;; * `:peak-bw` - peak bandwidth for mid and low frequencies (default 1.0)
+;; * `:rate` - sampling rate (default 44100.0)
+(defmethod make-effect :dj-eq [_ {:keys [hi mid low shelf-slope peak-bw rate]
+                                  :or {hi 0.0 mid 0.0 low 0.0 shelf-slope 1.5 peak-bw 1.0 rate 44100.0}}]
   (let [b (compose-effects
-           (make-effect :biquad-hs {:fc 10000.0 :gain (:hi conf) :slope (:shelf-slope conf) :fs (:rate conf)})
-           (make-effect :biquad-eq {:fc 1000.0 :gain (:mid conf) :bw (:peak-bw conf) :fs (:rate conf)})
-           (make-effect :biquad-eq {:fc 100.0 :gain (:lo conf) :bw (:peak-bw conf) :fs (:rate conf)}))]
+           (make-effect :biquad-hs {:fc 10000.0 :gain hi :slope shelf-slope :fs rate})
+           (make-effect :biquad-eq {:fc 1000.0 :gain mid :bw peak-bw :fs rate})
+           (make-effect :biquad-eq {:fc 100.0 :gain low :bw peak-bw :fs rate}))]
     (make-effect-node (fn
                         ([sample state]
                          (let [^EffectsList res (single-pass state sample)]
@@ -691,10 +697,10 @@
 ;;
 ;; Name: `:phaser-allpass`
 ;;
-;; Configuration: `:delay` - delay factor
-(defmethod make-effect :phaser-allpass [_ conf]
-  (let [^double d (:delay conf)
-        a1 (/ (- 1.0 d) (inc d))]
+;; Configuration: `:delay` - delay factor (default: 0.5)
+(defmethod make-effect :phaser-allpass [_ {:keys [^double delay]
+                                           :or {delay 0.5}}]
+  (let [a1 (/ (- 1.0 delay) (inc delay))]
     (make-effect-node (fn
                         ([^double sample ^double zm1]
                          (let [y (+ zm1 (* sample (- a1)))
@@ -706,28 +712,28 @@
 ;;
 ;; Name: `:divider`
 ;;
-;; Configuration: `:denominator` (long)
+;; Configuration: `:denom` (long, default 2.0)
 (deftype StateDivider [^double out ^double amp ^double count ^double lamp ^double last ^int zeroxs])
 
-(defmethod make-effect :divider [_ conf]
-  (let [^long denom (:denominator conf)]
-    (make-effect-node
-     (fn
-       ([^double sample ^StateDivider state]
-        (let [count (inc (.count state))
-              ^StateDivider s1 (if (or (and (> sample 0.0) (<= (.last state) 0.0))
-                                       (and (neg? sample) (>= (.last state) 0.0)))
-                                 (if (== denom 1)
-                                   (StateDivider. (if (pos? (.out state)) -1.0 1.0) 0.0 0.0 (/ (.amp state) count) (.last state) 0)
-                                   (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (inc (.zeroxs state))))
-                                 (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (.zeroxs state)))
-              amp (+ (.amp s1) (m/abs sample))
-              ^StateDivider s2 (if (and (> denom 1)
-                                        (== ^long (rem (.zeroxs s1) denom) (dec denom)))
-                                 (StateDivider. (if (pos? (.out s1)) -1.0 1.0) 0.0 0 (/ amp (.count s1)) (.last s1) 0)
-                                 (StateDivider. (.out s1) amp (.count s1) (.lamp s1) (.last s1) (.zeroxs s1)))]
-          (SampleAndState. (* (.out s2) (.lamp s2)) (StateDivider. (.out s2) (.amp s2) (.count s2) (.lamp s2) sample (.zeroxs s2)))))
-       ([] (StateDivider. 1.0 0.0 0.0 0.0 0.0 0.0))))))
+(defmethod make-effect :divider [_ {:keys [^long denom]
+                                    :or {denom 2.0}}]
+  (make-effect-node
+   (fn
+     ([^double sample ^StateDivider state]
+      (let [count (inc (.count state))
+            ^StateDivider s1 (if (or (and (> sample 0.0) (<= (.last state) 0.0))
+                                     (and (neg? sample) (>= (.last state) 0.0)))
+                               (if (== denom 1)
+                                 (StateDivider. (if (pos? (.out state)) -1.0 1.0) 0.0 0.0 (/ (.amp state) count) (.last state) 0)
+                                 (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (inc (.zeroxs state))))
+                               (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (.zeroxs state)))
+            amp (+ (.amp s1) (m/abs sample))
+            ^StateDivider s2 (if (and (> denom 1)
+                                      (== ^long (rem (.zeroxs s1) denom) (dec denom)))
+                               (StateDivider. (if (pos? (.out s1)) -1.0 1.0) 0.0 0 (/ amp (.count s1)) (.last s1) 0)
+                               (StateDivider. (.out s1) amp (.count s1) (.lamp s1) (.last s1) (.zeroxs s1)))]
+        (SampleAndState. (* (.out s2) (.lamp s2)) (StateDivider. (.out s2) (.amp s2) (.count s2) (.lamp s2) sample (.zeroxs s2)))))
+     ([] (StateDivider. 1.0 0.0 0.0 0.0 0.0 0.0)))))
 
 ;; ### FM filter
 ;;
@@ -737,18 +743,16 @@
 ;;
 ;; Configuration:
 ;;
-;; * `:quant` - quantization value (0.0 - if no quantization)
-;; * `:omega` - carrier factor
-;; * `:phase` - deviation factor
+;; * `:quant` - quantization value (0.0 - if no quantization, default 10)
+;; * `:omega` - carrier factor (default 0.014)
+;; * `:phase` - deviation factor (default 0.00822)
 (deftype StateFm [^double pre ^double integral ^int t lp])
 
-(defmethod make-effect :fm [_ conf]
+(defmethod make-effect :fm [_ {:keys [^double quant ^double omega ^double phase]
+                               :or {quant 10.0 omega 0.014 phase 0.00822}}]
   (let [lp-chain (compose-effects (make-effect :simple-lowpass {:rate 100000 :cutoff 25000})
                                   (make-effect :simple-lowpass {:rate 100000 :cutoff 10000})
-                                  (make-effect :simple-lowpass {:rate 100000 :cutoff 1000}))
-        ^double quant (:quant conf)
-        ^double omega (:omega conf)
-        ^double phase (:phase conf)]
+                                  (make-effect :simple-lowpass {:rate 100000 :cutoff 1000}))]
     (make-effect-node
      (fn
        ([^double sample ^StateFm state]
@@ -773,10 +777,11 @@
 ;;
 ;; Confguration:
 ;;
-;; * `:rate` - sample rate
-;; * `:freq` - cutoff frequency
-(defmethod make-effect :bandwidth-limit [_ conf]
-  (let [dx (double (/ ^double (:freq conf) ^double (:rate conf)))]
+;; * `:rate` - sample rate (default 44100.0)
+;; * `:freq` - cutoff frequency (default 1000.0)
+(defmethod make-effect :bandwidth-limit [_ {:keys [^double freq ^double rate]
+                                            :or {freq 1000.0 rate 44100.0}}]
+  (let [dx (double (/ ^double freq rate))]
     (make-effect-node (fn
                         ([^double sample ^double state]
                          (let [res (if (>= sample state)
@@ -791,16 +796,16 @@
 ;;
 ;; Confguration:
 ;;
-;; * `:factor` - distortion factor
-(defmethod make-effect :distort [_ conf]
-  (let [fact (double (:factor conf))
-        nfact (inc fact)]
+;; * `:factor` - distortion factor (default 1.0)
+(defmethod make-effect :distort [_ {:keys [^double factor]
+                                    :or {factor 1.0}}]
+  (let [nfact (inc factor)]
     (make-effect-node (fn 
                         ([^double sample state]
-                         (let [div (+ fact (m/abs sample))
+                         (let [div (+ factor (m/abs sample))
                                res (* nfact (/ sample div))]
                            (SampleAndState. res state)))
-                        ([] nil)))))
+                        ([])))))
 
 ;; ### Fast overdrive
 ;;
@@ -808,16 +813,16 @@
 ;;
 ;; Confguration:
 ;;
-;; * `:drive` - drive
-(defmethod make-effect :foverdrive [_ conf]
-  (let [^double drive (:drive conf)
-        drivem1 (dec drive)]
+;; * `:drive` - drive (default 2.0)
+(defmethod make-effect :foverdrive [_ {:keys [^double drive]
+                                       :or {drive 2.0}}]
+  (let [drivem1 (dec drive)]
     (make-effect-node (fn
                         ([^double sample state]
                          (let [fx (m/abs sample)
                                res (/ (* sample (+ fx drive)) (inc (+ (* sample sample) (* fx drivem1))))]
                            (SampleAndState. res state)))
-                        ([] nil)))))
+                        ([])))))
 
 ;; ### Decimator
 ;;
@@ -825,15 +830,16 @@
 ;;
 ;; Confguration:
 ;;
-;; * `:bits` - bit depth
-;; * `:fs` - decimator sample rate
-;; * `:rate` - input sample rate
+;; * `:bits` - bit depth (default 4)
+;; * `:fs` - decimator sample rate (default 22050.0)
+;; * `:rate` - input sample rate (default 44100.0)
 (deftype StateDecimator [^double count ^double last])
 
-(defmethod make-effect :decimator [_ conf]
-  (let [step (m/pow 0.5 (- ^double (:bits conf) 0.9999))
+(defmethod make-effect :decimator [_ {:keys [^double bits ^double fs ^double rate]
+                                      :or {bits 4.0 fs 22050.0 rate 44100.0}}]
+  (let [step (m/pow 0.5 (- bits 0.9999))
         stepr (/ 1.0 step)
-        ratio (/ ^double (:fs conf) ^double (:rate conf))]
+        ratio (/ fs rate)]
     (make-effect-node (fn
                         ([^double sample ^StateDecimator state]
                          (let [ncount (+ (.count state) ratio)]
@@ -854,18 +860,64 @@
 ;;
 ;; Configuration:
 ;;
-;; * `:bass` - bass gain
-;; * `:treble` - treble gain
-;; * `:gain` - gain
-;; * `:rate` - sample rate
-;; * `:slope` - slope for both (0.4 default)
-;; * `:bass-freq` - bass freq (250.0 default)
-;; * `:treble-freq` - treble freq (4000.0 default)
+;; * `:bass` - bass gain (default 1.0)
+;; * `:treble` - treble gain (default 1.0)
+;; * `:gain` - gain (default 0.0)
+;; * `:rate` - sample rate (default 44100.0)
+;; * `:slope` - slope for both (default 0.4)
+;; * `:bass-freq` - bass freq (default 250.0)
+;; * `:treble-freq` - treble freq (default 4000.0)
 (deftype StateBassTreble [^double xn1Bass ^double xn2Bass ^double yn1Bass ^double yn2Bass
                           ^double xn1Treble ^double xn2Treble ^double yn1Treble ^double yn2Treble])
 
+(defmethod make-effect :basstreble [_ {:keys [^double bass ^double treble ^double gain ^double rate ^double slope ^double bass-freq ^double treble-freq]
+                                       :or {bass 1.0 treble 1.0 gain 0.0 rate 44100.0 slope 0.4 bass-freq 250.0 treble-freq 4000.0}}]
+  (let [data-gain (db-to-linear gain)
+        wb (/ (* m/TWO_PI bass-freq) rate)
+        wt (/ (* m/TWO_PI treble-freq) rate) 
+        cwb (m/cos wb)
+        cwt (m/cos wt)
+        ab (m/exp (/ (* 2.302585092994046 bass) 40.0))
+        ab+ (inc ab)
+        ab- (dec ab)
+        at (m/exp (/ (* 2.302585092994046 treble) 40.0))
+        at+ (inc at)
+        at- (dec at)
+        bb (m/sqrt (- (/ (inc (m/sq ab)) slope) (m/sq (dec ab))))
+        bt (m/sqrt (- (/ (inc (m/sq at)) slope) (m/sq (dec at))))
+        bswb (* bb (m/sin wb))
+        bswt (* bt (m/sin wt))
 
-;;https://github.com/audacity/audacity/blob/master/src/effects/BassTreble.cpp#L381
+        b0b (* ab (+ (- ab+ (* ab- cwb)) bswb))
+        b1b (* 2.0 ab (- ab- (* ab+ cwb)))
+        b2b (* ab (- (- ab+ (* ab- cwb)) bswb))
+        a0b (+ (+ ab+ (* ab- cwb)) bswb)
+        a1b (* -2.0 (+ ab- (* ab+ cwb)))
+        a2b (- (+ ab+ (* ab- cwb)) bswb)
+
+        b0t (* at (+ (+ at+ (* at- cwt)) bswt))
+        b1t (* -2.0 at (+ at- (* at+ cwt)))
+        b2t (* at (- (+ at+ (* at- cwt)) bswt))
+        a0t (+ (- at+ (* at- cwt)) bswt)
+        a1t (* 2.0 (- at- (* at+ cwt)))
+        a2t (- (- at+ (* at- cwt)) bswt)]
+    (make-effect-node (fn
+                        ([^double sample ^StateBassTreble state]
+                         (let [outb (/ (-> (* b0b sample)
+                                           (+ (* b1b (.xn1Bass state)))
+                                           (+ (* b2b (.xn2Bass state)))
+                                           (- (* a1b (.yn1Bass state)))
+                                           (- (* a2b (.yn2Bass state)))) a0b)
+                               outt (/ (-> (* b0t outb)
+                                           (+ (* b1t (.xn1Treble state)))
+                                           (+ (* b2t (.xn2Treble state)))
+                                           (- (* a1t (.yn1Treble state)))
+                                           (- (* a2t (.yn2Treble state)))) a0t)]
+                           (SampleAndState. (* outt data-gain)
+                                            (StateBassTreble. sample (.xn1Bass state) outb (.yn1Bass state)
+                                                              outb (.xn1Treble state) outt (.yn1Treble state)))))
+                        ([] (StateBassTreble. 0.0 0.0 0.0 0.0
+                                              0.0 0.0 0.0 0.0))))))
 
 ;; ## File operations
 

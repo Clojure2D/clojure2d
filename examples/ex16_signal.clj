@@ -72,7 +72,6 @@
         (p/set-canvas-pixels! canvas (p/filter-channels p/normalize resp))))
 
 ;; fm filter
-
 (time (let [effect (make-effects-filter (make-effect :fm {:quant 10 :omega (* m/TWO_PI 0.00225857) :phase 0.00822}) (width p))
             res (p/filter-channels effect nil p)]
         (p/set-canvas-pixels! canvas res)))
