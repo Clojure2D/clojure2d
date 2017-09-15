@@ -153,6 +153,7 @@
   ^double [^double value]
   (if (neg? value) 0 (sqrt value)))
 (defn qsqrt ^double [^double v] (FastMath/sqrtQuick v))
+(defn rqsqrt ^double [^double v] (FastMath/invSqrtQuick v))
 
 ;; \\(\sqrt{x^2+y^2}\\) and \\(\sqrt{x^2+y^2+z^2}\\)
 (defn hypot

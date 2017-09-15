@@ -76,6 +76,24 @@
             res (p/filter-channels effect nil p)]
         (p/set-canvas-pixels! canvas res)))
 
+;; Echo uses array of doubles internally to keep the state, don't use one effect in multiple threads. Filter-channels runs the same effect (with one state) in 3 threads for red, green and blue channels separately.
+;; Wrong way (run multiple times)
+(time (let [effect (make-effects-filter (make-effect :echo {}))
+            res (p/filter-channels effect nil p)]
+        (p/set-canvas-pixels! canvas res)))
+
+;; Good way
+(time (let [effect-r (make-effects-filter (make-effect :echo {}))
+            effect-g (make-effects-filter (make-effect :echo {}))
+            effect-b (make-effects-filter (make-effect :echo {}))
+            res (p/filter-channels effect-r effect-g effect-b nil p)]
+        (p/set-canvas-pixels! canvas res)))
+
+;; vcf303 normalize (or equalize) after filtering
+(time (let [effect (make-effects-filter (make-effect :vcf303 {:trigger true}) (* 50 ^long (width p)))
+            res (p/filter-channels p/equalize-filter nil (p/filter-channels effect nil p))]
+        (p/set-canvas-pixels! canvas res)))
+
 ;; saving and loading signal to and from file
 (save-signal (signal-from-pixels p {:layout :interleaved
                                     :coding :alaw

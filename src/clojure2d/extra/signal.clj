@@ -830,13 +830,13 @@
 ;;
 ;; Confguration:
 ;;
-;; * `:bits` - bit depth (default 4)
+;; * `:bits` - bit depth (default 2)
 ;; * `:fs` - decimator sample rate (default 22050.0)
 ;; * `:rate` - input sample rate (default 44100.0)
 (deftype StateDecimator [^double count ^double last])
 
 (defmethod make-effect :decimator [_ {:keys [^double bits ^double fs ^double rate]
-                                      :or {bits 4.0 fs 22050.0 rate 44100.0}}]
+                                      :or {bits 2.0 fs 22050.0 rate 44100.0}}]
   (let [step (m/pow 0.5 (- bits 0.9999))
         stepr (/ 1.0 step)
         ratio (/ fs rate)]
@@ -918,6 +918,92 @@
                                                               outb (.xn1Treble state) outt (.yn1Treble state)))))
                         ([] (StateBassTreble. 0.0 0.0 0.0 0.0
                                               0.0 0.0 0.0 0.0))))))
+
+;; ### Echo (audacity)
+;;
+;; Name: `:echo`
+;;
+;; Configuration:
+;;
+;; * `:delay` - delay time in seconds (default 0.5)
+;; * `:decay` - decay (amount echo in signal, default 0.5)
+;; * `:rate` - sample rate (default 44100.0)
+;;
+;; Warning! Echo filter uses mutable array as state, don't use the same filter in paraller processing
+;; See example 16
+(deftype StateEcho [^doubles buffer ^int position])
+
+(defmethod make-effect :echo [_ {:keys [^double delay ^double decay ^double rate]
+                                 :or {delay 0.5 decay 0.5 rate 44100.0}}]
+  (let [buffer-len (int (min 10000000 (* delay rate)))]
+    (make-effect-node (fn
+                        ([^double sample ^StateEcho state]
+                         (let [result (+ sample (* decay (aget ^doubles (.buffer state) (.position state))))]
+                           (aset ^doubles (.buffer state) (.position state) result)
+                           (SampleAndState. result (StateEcho. (.buffer state) (rem (inc (.position state)) buffer-len)))))
+                        ([]
+                         (StateEcho. (double-array buffer-len 0.0) 0))))))
+
+;; ### Vcf303
+;;
+;; Name: `:vcf303`
+;;
+;; Configuration:
+;;
+;; * `:rate` - sample rate (default 44100.0)
+;; * `:trigger` - boolean, trigger some action (default `false`), set true when you reset filter every line
+;; * `:cutoff` - cutoff frequency (values 0-1, default 0.8)
+;; * `:resonance` - resonance (values 0-1, default 0.8)
+;; * `:env-mod` - envelope modulation (values 0-1, default 0.5)
+;; * `:decay` - decay (values 0-1, default 1.0)
+;;
+;; Warning: filter requires normalization
+(deftype StateVcf303 [^double d1 ^double d2 ^double c0 ^int env-pos ^Vec3 abc])
+
+(defmethod make-effect :vcf303 [_ {:keys [^double rate trigger ^double cutoff ^double resonance ^double env-mod ^double decay]
+                                   :or {rate 44100.0 trigger false cutoff 0.8 resonance 0.8 env-mod 0.5 decay 1.0}}]
+  (let [scale (/ m/PI rate)
+        e0 (* scale
+              (m/exp (-> (- 5.613 (* 0.8 env-mod))
+                         (+ (* 2.1553 cutoff))
+                         (- (* 0.7696 (- 1.0 resonance))))))        
+        d (m/pow (->> decay
+                      (* 2.3)
+                      (+ 0.2)
+                      (* rate)
+                      (/ 1.0)
+                      (m/pow 0.1)) 64.0)
+        r (m/exp (- (* 3.455 resonance) 1.20))
+        recalc-abc (fn [^double vc0]
+                     (let [whopping (+ e0 vc0)
+                           k (m/exp (/ (- whopping) r))
+                           a (* (+ k k) (m/cos (+ whopping whopping)))
+                           b (* (- k) k)
+                           c (* 0.2 (- (- 1.0 a) b))]
+                       (Vec3. a b c)))
+        init-c0       (if trigger
+                        (- (* scale
+                              (m/exp (-> (+ 6.109 (* 1.5876 env-mod))
+                                         (+ (* 2.1553 cutoff))
+                                         (- (* 1.2 (- 1.0 resonance)))))) e0)
+                        0.0)]    
+    (make-effect-node (fn
+                        ([^double sample ^StateVcf303 state]
+                         (let [^Vec3 abc (.abc state)
+                               result (-> (* (.x abc) (.d1 state))
+                                          (+ (* (.y abc) (.d2 state)))
+                                          (+ (* (.z abc) sample)))
+                               d2 (.d1 state)
+                               d1 result
+                               env-pos (inc (.env-pos state))]
+                           (if (>= env-pos 64)
+                             (let [c0 (* d (.c0 state))]
+                               (SampleAndState. result
+                                                (StateVcf303. d1 d2 c0 0 (recalc-abc c0))))
+                             (SampleAndState. result
+                                              (StateVcf303. d1 d2 (.c0 state) env-pos abc)))))
+                        ([] (StateVcf303. 0.0 0.0 init-c0 0 (recalc-abc init-c0)))))))
+
 
 ;; ## File operations
 
