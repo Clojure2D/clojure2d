@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file. This change
 
 ## 0.0.5 - 2017-09-06
 
+### Added
+
+- Vcf303, Echo and BassTreble signal processing effects + example 16 updated
+
 ### Changed
 
 - Overlays API changed to image + configuration map
