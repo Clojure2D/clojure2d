@@ -58,17 +58,17 @@
 
 ;; full process without use of filter-channels
 (time (let [effect (make-effect :biquad-eq {:fc 2000 :gain -30 :bw 1 :fs 100000})
-            in (signal-from-pixels p {:layout :interleaved
-                                      :coding :alaw
-                                      :signed true
-                                      :channels [2 0 1]
-                                      :bits 16})
-            res (apply-effects effect in)
-            resp (signal-to-pixels (p/clone-pixels p) res {:layout :interleaved
-                                                           :coding :alaw-rev
-                                                           :signed true
-                                                           :channels [2 0 1]
-                                                           :bits 16})]
+            resp (apply-effects-to-pixels effect
+                                          {:layout :interleaved
+                                           :coding :alaw
+                                           :signed true
+                                           :channels [2 0 1]
+                                           :bits 16}
+                                          {:layout :interleaved
+                                           :coding :alaw-rev
+                                           :signed true
+                                           :channels [2 0 1]
+                                           :bits 16} p)]
         (p/set-canvas-pixels! canvas (p/filter-channels p/normalize resp))))
 
 ;; fm filter
@@ -92,6 +92,15 @@
 ;; vcf303 normalize (or equalize) after filtering
 (time (let [effect (make-effects-filter (make-effect :vcf303 {:trigger true}) (* 50 ^long (width p)))
             res (p/filter-channels p/equalize-filter nil (p/filter-channels effect nil p))]
+        (p/set-canvas-pixels! canvas res)))
+
+;; vcf303 normalize (or equalize) after filtering
+(time (let [effect (make-effect :slew-limit {:maxrise 50 :maxfall 1000})
+            res (p/filter-channels p/normalize-filter nil (apply-effects-to-pixels effect {:signed true} {:signed true} p))]
+        (p/set-canvas-pixels! canvas res)))
+
+(time (let [effect (make-effect :mda-thru-zero {:speed 0.41 :depth 0.4 :feedback 0.2 :depth-mod 0.1 :mix 0.5})
+            res (p/filter-channels p/normalize-filter nil (apply-effects-to-pixels effect {:signed true} {:signed true} p))]
         (p/set-canvas-pixels! canvas res)))
 
 ;; saving and loading signal to and from file

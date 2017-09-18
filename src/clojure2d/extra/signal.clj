@@ -249,7 +249,7 @@
 (defn signal-from-pixels
   "Main entry point for `Pixels` to `Signal` conversions according to configuration."
   ([^Pixels p conf]
-   (let [config (merge pixels-default-configuration conf) ;; prepare configuration
+   (let [config (merge pixels-default-configuration conf) ;; prepare configuration 
          channels (if (= :all (:channels config)) [0 1 2 3] (:channels config)) ;; list and order of channels
          ^long b (:bits config) ;; number of bits used for representation
          e (:little-endian config) ;; endianness
@@ -397,19 +397,32 @@
      (Signal. out)))
   ([effects s] (apply-effects effects s 0)))
 
+(defn- process-pixels
+  "Process pixels as signal based on config for given pixels p. Store result in given target t."
+  [p t effects config config-back reset]
+  (signal-to-pixels t (apply-effects effects (signal-from-pixels p config) reset) config-back))
+
 (defn make-effects-filter
   "Process `Pixels` as `Signal`. Provide configurations to properly convert Pixels to Signal and vice versa (default stored in `pixels-default-configuration` variable).
-   Optionally set `reset` value (reinit effects' state after `reset` samples."
+   Optionally set `reset` value (reinit effects' state after `reset` samples. Filter operates on one channel at time and is defined to be used with `filter-channels`. See `filter-pixels` to process lineary (and take benefit of layouts)"
   ([effects config config-back reset]
    (fn [ch target p]
      (let [c {:channels [ch]}]
-       (signal-to-pixels target (apply-effects effects (signal-from-pixels p (merge config c)) reset) (merge config-back c)))))
+       (process-pixels p target effects (merge config c) (merge config-back c) reset))))
   ([effects]
    (make-effects-filter effects {} {} 0))
   ([effects reset]
    (make-effects-filter effects {} {} reset))
   ([effects config config-back]
    (make-effects-filter effects config config-back 0)))
+
+(defn apply-effects-to-pixels
+  "Filter pixels as signal, directly. Pixels are not filtered channel by channel."
+  ([effects config config-back reset pixels]
+   (process-pixels pixels (p/clone-pixels pixels) effects config config-back reset))
+  ([effects pixels] (apply-effects-to-pixels effects {} {} 0 pixels))
+  ([effects reset pixels] (apply-effects-to-pixels effects {} {} reset pixels))
+  ([effects config config-back pixels] (apply-effects-to-pixels effects config config-back 0 pixels)))
 
 ;; ## Helper functions
 
@@ -1004,6 +1017,68 @@
                                               (StateVcf303. d1 d2 (.c0 state) env-pos abc)))))
                         ([] (StateVcf303. 0.0 0.0 init-c0 0 (recalc-abc init-c0)))))))
 
+;; ### Slew limiter (http://git.drobilla.net/cgit.cgi/omins.lv2.git/tree/src/slew_limiter.c)
+;;
+;; Name: `:slew-limit`
+;;
+;; Configuration:
+;;
+;; * `:rate` - sample rate
+;; * `:maxrise` - maximum change for rising signal (in terms of 1/rate steps, default 500)
+;; * `:maxfall` - maximum change for falling singal (default 500)
+
+(defmethod make-effect :slew-limit [_ {:keys [^double rate ^double maxrise ^double maxfall]
+                                       :or {rate 44100.0 maxrise 500.0 maxfall 500.0}}]
+  (let [maxinc (/ maxrise rate)
+        maxdec (- (/ maxfall rate))]
+    (make-effect-node (fn
+                        ([^double sample ^double prev]
+                         (let [increment (- sample prev) 
+                               nsample (+ prev (m/constrain increment maxdec maxinc))]
+                           (SampleAndState. nsample nsample)))
+                        ([] 0.0)))))
+
+;; ### mdaThruZero
+;;
+;; Name: `:mda-thru-zero`
+;;
+;; Configuration:
+;;
+;; * `:rate` - sample rate
+;; * `:speed` - effect rate
+;; * `:depth`
+;; * `:mix`
+;; * `:depth-mod`
+;; * `:feedback`
+;;
+;; Warning: like `:echo` internal state is kept in doubles array.
+(deftype StateMdaThruZero [^doubles buffer ^double ph ^long bp ^double f])
+
+(defmethod make-effect :mda-thru-zero [_ {:keys [^double rate ^double speed ^double depth ^double mix ^double depth-mod ^double feedback]
+                                          :or {rate 44100.0 speed 0.3 depth 0.43 mix 0.47 feedback 0.3 depth-mod 1.0}}]
+  (let [rat (/ (* (m/pow 10.0 (- 2.0 (* 3.0 speed))) 2.0) rate)
+        dep (* 2000.0 (m/sq depth))
+        dem (- dep (* dep depth-mod))
+        dep (- dep dem)
+        wet mix
+        dry (- 1.0 wet)
+        fb (- (* 1.9 feedback) 0.95)]
+    (make-effect-node (fn
+                        ([^double sample ^StateMdaThruZero state]
+                         (let [ph (+ (.ph state) rat)
+                               ph (if (> ph 1.0) (- ph 2.0) ph)
+                               bp (bit-and (dec (.bp state)) 0x7ff)]
+                           (aset ^doubles (.buffer state) bp (+ sample (* fb (.f state))))
+                           (let [tmpf (+ dem (* dep (- 1.0 (m/sq ph))))
+                                 tmp (int tmpf)
+                                 tmpf (- tmpf tmp)
+                                 tmp (bit-and (+ tmp bp) 0x7ff)
+                                 tmpi (bit-and (inc tmp) 0x7ff)
+                                 f (aget ^doubles (.buffer state) tmp)
+                                 f (+ (* tmpf (- (aget ^doubles (.buffer state) tmpi) f)) f)
+                                 result (+ (* sample dry) (* f wet))]
+                             (SampleAndState. result (StateMdaThruZero. (.buffer state) ph bp f)))))
+                        ([] (StateMdaThruZero. (double-array 2048) 0.0 0 0.0))))))
 
 ;; ## File operations
 
