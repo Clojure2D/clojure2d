@@ -14,7 +14,7 @@
   (:import [net.jafama FastMath]
            [clojure2d.math.vector Vec4]))
 
-(def p1 (p/load-pixels "generateme/girl/StockSnap_HXVDSUJRUU.jpg"))
+(def p1 (p/load-pixels "generateme/b/b.jpg"))
 
 (def p2 (p/load-pixels "generateme/gface/2.jpg"))
 
@@ -33,32 +33,35 @@
       b2 (g/blend-machine)]
   (println b)
   (comment println b2)
-  (p/set-canvas-pixels! canvas (p/filter-channels p/normalize-filter false 
+  (p/set-canvas-pixels! canvas (p/filter-channels p/equalize-filter false 
                                                   (p/filter-channels p/normalize-filter false
-                                                                     (g/blend-machine p3 p1 b)))))
+                                                                     (g/blend-machine p4 p3 b)))))
 
 (core/with-canvas canvas
-  (core/image (o/render-rgb-scanlines (p/image-from-pixels p4))))
+  (core/image (o/render-rgb-scanlines (p/image-from-pixels p5))))
 
 (core/with-canvas canvas
-  (core/image (-> (p/image-from-pixels p4)
+  (core/image (-> (p/image-from-pixels p5)
                   (o/render-noise noise-overlay)
                   (o/render-spots spots-overlay))))
 
 (core/with-canvas canvas
-  (core/image (o/render-crt-scanlines (p/image-from-pixels p4) {:resolution 2})))
+  (core/image (o/render-crt-scanlines (p/image-from-pixels p3) {:resolution 2})))
 
 (core/close-session)
 
-(core/save-canvas canvas (core/next-filename "generateme/girl/aaa" ".png"))
+(core/save-canvas canvas (core/next-filename "generateme/b/aaa" ".png"))
 
-(p/set-canvas-pixels! canvas p4)
+(p/set-canvas-pixels! canvas p3)
 
 (def p2 (p/get-canvas-pixels canvas))
 
 (def p3 (p/get-canvas-pixels canvas))
 
 (def p4 (p/get-canvas-pixels canvas))
+
+(def p5 (p/get-canvas-pixels canvas))
+
 
 (defn make-more-colors
   [palette]
@@ -75,7 +78,7 @@
 (do
   (def palette (make-more-colors (g/color-reducer-machine)))
   (comment println palette)
-  (p/set-canvas-pixels! canvas (p/filter-channels p/normalize-filter nil (g/color-reducer-machine palette p5))))
+  (p/set-canvas-pixels! canvas (p/filter-channels p/normalize-filter nil (g/color-reducer-machine palette p2))))
 
 ;;mirror
 (defn make-random-mirror
@@ -87,7 +90,7 @@
            (g/make-mirror-filter (rand-nth (keys g/mirror-types)))
            nil))
 
-(p/set-canvas-pixels! canvas (->> p2
+(p/set-canvas-pixels! canvas (->> p1
                                   ((make-random-mirror))
                                   ((make-random-mirror))))
 
@@ -111,22 +114,26 @@
                                                       (g/make-slitscan2-filter f 2.02) nil p1)))))
 
 
+
+
 ;; full process without use of filter-channels
 (time (let [effect (make-effect :dj-eq {:lo (r/drand -5 5) :mid 10 :hi (r/drand -5 5) :peak-bw 1.3 :shelf-slope 1.5 :rate (r/irand 4000 100000)})
-            effect2 (make-effect :distort {:factor 1.0})
-            inluv (p/filter-colors c/to-LUV p2)
-            
-            in (signal-from-pixels inluv {:layout :planar
-                                          :channels [0 1 2]
-                                          :bits 8
-                                          :coding :none
-                                          :signed true})
-            res (apply-effects effect2 in)
-            resp (signal-to-pixels (p/clone-pixels p1) res {:channels [0 1 2]
-                                                            :layout :planar
-                                                            :bits 8
-                                                            :coding :none
-                                                            :signed true})]
+            effect2 (make-effect :divider {:denom 2})
+            effect3 (make-effect :slew-limit {:maxrise 500 :maxfall 1000}
+                                 )
+            inluv (p/filter-colors c/to-LUV p1)
+
+            resp (apply-effects-to-pixels effect3
+                                          {:layout :interleaved
+                                           :channels [0 1 2]
+                                           :bits 8
+                                           :coding :none
+                                           :signed true}
+                                          {:channels [0 1 2]
+                                           :layout :interleaved
+                                           :bits 8
+                                           :coding :none
+                                           :signed true} inluv)]
         (p/set-canvas-pixels! canvas (p/filter-channels p/equalize-filter nil resp
                                                         ;; (p/filter-colors c/from-LUV resp)
                                                         ))))
@@ -149,7 +156,7 @@
       (pprint field-config)
       (p/set-canvas-pixels! canvas (p/filter-channels (g/make-fold-filter f 2.01)
                                                       (g/make-fold-filter f 2.0)
-                                                      (g/make-fold-filter f 1.99) nil p4)))))
+                                                      (g/make-fold-filter f 1.99) nil p5)))))
 
 
 ;;; some speed tests

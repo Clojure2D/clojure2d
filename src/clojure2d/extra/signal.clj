@@ -846,12 +846,12 @@
 ;; Confguration:
 ;;
 ;; * `:bits` - bit depth (default 2)
-;; * `:fs` - decimator sample rate (default 22050.0)
+;; * `:fs` - decimator sample rate (default 4410.0)
 ;; * `:rate` - input sample rate (default 44100.0)
 (deftype StateDecimator [^double count ^double last])
 
 (defmethod make-effect :decimator [_ {:keys [^double bits ^double fs ^double rate]
-                                      :or {bits 2.0 fs 22050.0 rate 44100.0}}]
+                                      :or {bits 2.0 fs 4410.0 rate 44100.0}}]
   (let [step (m/pow 0.5 (- bits 0.9999))
         stepr (/ 1.0 step)
         ratio (/ fs rate)]
