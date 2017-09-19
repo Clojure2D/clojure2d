@@ -1,7 +1,7 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
-## 0.0.5 - 2017-09-06
+## 0.0.5 - 2017-09-19
 
 ### Added
 
@@ -10,6 +10,8 @@ All notable changes to this project will be documented in this file. This change
 ### Changed
 
 - Overlays API changed to image + configuration map
+- Switched from clojure math to primitive math library
+- FastMath bindings changed to macros for several methods
 
 ### Fixed
 

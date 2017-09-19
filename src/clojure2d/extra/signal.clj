@@ -16,13 +16,15 @@
             [clojure.java.io :refer :all]
             [clojure2d.math.vector :as v]
             [criterium.core :as bench]
-            [clojure2d.math.random :as r])
+            [clojure2d.math.random :as r]
+            [primitive-math :as prim])
   (:import [clojure2d.pixels Pixels]
            [clojure2d.math.vector Vec2 Vec3]
            [clojure.lang Counted]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(prim/use-primitive-operators)
 
 ;; ## Signal
 ;;
@@ -165,7 +167,7 @@
   "Convert double value to integers for given number of bits, endianness and sign. Return vector of integers."
   [^long bits ^double v little-endian sign]
   (let [vv (m/constrain v -1.0 1.0)
-        restored (long (condp == bits
+        restored (long (condp m/eq bits
                          8 (if sign
                              (m/norm vv -1.0 1.0 s8-min s8-max)
                              (m/norm vv -1.0 1.0 0 0xff))
@@ -175,7 +177,7 @@
                          24 (if sign
                               (m/norm vv -1.0 1.0 s24-min s24-max)
                               (m/norm vv -1.0 1.0 0 0xffffff))))]
-    (condp == bits
+    (condp m/eq bits
       8 (bit-and restored 0xff)
       16 (let [a (bit-and restored 0xff)
                b (bit-and (bit-shift-right restored 8) 0xff)]
@@ -255,7 +257,7 @@
          e (:little-endian config) ;; endianness
          s (:signed config) ;; sign
          nb (bit-shift-right b 3) ;; number of packed values in signal value (1 - one value, 8 bits; 2 - two values; 16 bits; 3 - three values; 24 bits) 
-         ^doubles buff (double-array (int (m/ceil (/ (* (count channels) (.size p)) nb)))) ;; target buffer
+         ^doubles buff (double-array (int (m/ceil (/ (double (* (count channels) (.size p))) (double nb))))) ;; target buffer
          ^ints layout (if (= :planar (:layout config)) ;; layout Pixels and give pure ints
                         (pre-layout-planar true p channels)
                         (pre-layout-interleaved true p channels))
@@ -270,7 +272,7 @@
      (loop [idx (int 0) ;; take values, convert to double, encode and store into buffer
             bidx (int 0)]
        (when (< idx limit)
-         (condp == nb
+         (condp m/eq nb
            1 (aset ^doubles buff bidx ^double (coding (ints-to-double (aget ^ints layout idx) e s)))
            2 (aset ^doubles buff bidx ^double (coding (ints-to-double (aget ^ints layout idx) (aget ^ints layout (inc idx)) e s)))
            3 (aset ^doubles buff bidx ^double (coding (ints-to-double (aget ^ints layout idx) (aget ^ints layout (inc idx)) (aget ^ints layout (+ 2 idx)) e s))))
@@ -759,7 +761,7 @@
 ;; * `:quant` - quantization value (0.0 - if no quantization, default 10)
 ;; * `:omega` - carrier factor (default 0.014)
 ;; * `:phase` - deviation factor (default 0.00822)
-(deftype StateFm [^double pre ^double integral ^int t lp])
+(deftype StateFm [^double pre ^double integral ^double t lp])
 
 (defmethod make-effect :fm [_ {:keys [^double quant ^double omega ^double phase]
                                :or {quant 10.0 omega 0.014 phase 0.00822}}]
@@ -779,7 +781,7 @@
               ^EffectsList res (single-pass (.lp state) dem)
               demf (/ (* 2.0 (- (.sample res) omega)) phase)]
           (SampleAndState. (m/constrain demf -1.0 1.0) (StateFm. m new-integral (inc (.t state)) res))))
-       ([] (StateFm. 0.0 0.0 0 lp-chain))))))
+       ([] (StateFm. 0.0 0.0 0.0 lp-chain))))))
 
 
 ;; ### Bandwidth limit
@@ -857,11 +859,11 @@
                         ([^double sample ^StateDecimator state]
                          (let [ncount (+ (.count state) ratio)]
                            (if (>= ncount 1.0)
-                             (let [delta (* step ^double (rem (->> sample
-                                                                   m/sgn
-                                                                   (* step 0.5)
-                                                                   (+ sample)
-                                                                   (* stepr)) 1.0))
+                             (let [delta (* step ^double (m/remainder (->> sample
+                                                                           m/sgn
+                                                                           (* step 0.5)
+                                                                           (+ sample)
+                                                                           (* stepr)) 1.0))
                                    last (- sample delta)]
                                (SampleAndState. last (StateDecimator. (dec ncount) last)))
                              (SampleAndState. (.last state) (StateDecimator. ncount (.last state))))))
@@ -948,7 +950,7 @@
 
 (defmethod make-effect :echo [_ {:keys [^double delay ^double decay ^double rate]
                                  :or {delay 0.5 decay 0.5 rate 44100.0}}]
-  (let [buffer-len (int (min 10000000 (* delay rate)))]
+  (let [buffer-len (int (min 10000000.0 (* delay rate)))]
     (make-effect-node (fn
                         ([^double sample ^StateEcho state]
                          (let [result (+ sample (* decay (aget ^doubles (.buffer state) (.position state))))]
@@ -1071,7 +1073,7 @@
                            (aset ^doubles (.buffer state) bp (+ sample (* fb (.f state))))
                            (let [tmpf (+ dem (* dep (- 1.0 (m/sq ph))))
                                  tmp (int tmpf)
-                                 tmpf (- tmpf tmp)
+                                 tmpf (- tmpf (double tmp))
                                  tmp (bit-and (+ tmp bp) 0x7ff)
                                  tmpi (bit-and (inc tmp) 0x7ff)
                                  f (aget ^doubles (.buffer state) tmp)

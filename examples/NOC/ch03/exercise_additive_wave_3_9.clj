@@ -28,7 +28,7 @@
 (defn calc-waves
   "Calculate waves values for each point based on waves data"
   [wdata theta]
-  (map-indexed #(generate-wave ylen %2 (if (even? %1) m/sin m/cos) theta) wdata))
+  (map-indexed #(generate-wave ylen %2 (if (even? %1) (fn [v] (m/sin v)) (fn [v] (m/cos v))) theta) wdata))
 
 (defn draw
   "Sum waves values and draw"

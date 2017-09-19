@@ -8,11 +8,14 @@
 ;; All vectors are equipped with Counted (`count`), Sequential, Sequable (`seq`) and IFn protocols. Additionally Clojure vector is equipped with defined here `VectorProto`.
 
 (ns clojure2d.math.vector
-  (:require [clojure2d.math :as m])
+  (:require [clojure2d.math :as m]
+            [primitive-math :as prim])
   (:import [clojure.lang Counted IFn PersistentVector Seqable Sequential]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+
+(prim/use-primitive-operators)
 
 ;; Tolerance (epsilon), used in `is-near-zero?` fn
 (def ^:const ^double TOLERANCE 1.0e-6)
@@ -69,7 +72,7 @@
 
 (defn- near-zero?
   "Is your value less than TOLERANCE?"
-  [v]
+  [^double v]
   (< (m/abs v) TOLERANCE))
 
 ;; Add `VectorProto` to Clojure vector using map/reduce terms.
@@ -78,21 +81,21 @@
   {:to-vec identity
    :applyf #(mapv %2 %1)
    :magsq (fn [v] (reduce #(+ (double %1) (* (double %2) (double %2))) v))
-   :mag (comp m/sqrt magsq)
-   :dot #(reduce + (map * %1 %2))
-   :add #(mapv + %1 %2)
-   :sub #(mapv - %1 %2)
+   :mag #(m/sqrt (magsq %))
+   :dot #(reduce clojure.core/+ (map clojure.core/* %1 %2))
+   :add #(mapv clojure.core/+ %1 %2)
+   :sub #(mapv clojure.core/- %1 %2)
    :mult (fn [v1 v] (map #(* (double %) ^double v) v1))
-   :emult #(mapv * %1 %2)
+   :emult #(mapv clojure.core/* %1 %2)
    :div #(mult %1 (/ 1.0 (double %2)))
    :abs #(mapv m/abs %)
-   :mx #(reduce max %)
-   :mn #(reduce min %)
-   :emx #(mapv max %1 %2)
-   :emn #(mapv min %1 %2)
-   :maxdim #(first (reduce (find-idx-reducer-fn >) [0.0 0.0 (first %)] %))
-   :mindim #(first (reduce (find-idx-reducer-fn <) [0.0 0.0 (first %)] %))
-   :sum #(reduce + %)
+   :mx #(reduce clojure.core/max %)
+   :mn #(reduce clojure.core/min %)
+   :emx #(mapv clojure.core/max %1 %2)
+   :emn #(mapv clojure.core/min %1 %2)
+   :maxdim #(first (reduce (find-idx-reducer-fn clojure.core/>) [0.0 0.0 (first %)] %))
+   :mindim #(first (reduce (find-idx-reducer-fn clojure.core/<) [0.0 0.0 (first %)] %))
+   :sum #(reduce clojure.core/+ %)
    :permute #(mapv (fn [idx] (%1 idx)) %2)
    :reciprocal #(mapv (fn [v] (/ 1.0 ^double v)) %)
    :interpolate (fn
@@ -104,7 +107,7 @@
                     (mapv #(f %1 %2 %3) v1 v2 v))
                    ([v1 v2 v] (einterpolate v1 v2 v m/lerp)))
    :econstrain (fn [v val1 val2] (mapv #(m/constrain %1 val1 val2)) v)
-   :is-zero? #(every? zero? %)
+   :is-zero? #(every? clojure.core/zero? %)
    :is-near-zero? #(every? near-zero? %)})
 
 ;; Create Vec2 and add all necessary protocols
@@ -350,8 +353,8 @@
     (let [^double r (mag v1)
           zr (/ z r)
           theta (cond
-                  (<= zr -1) m/PI
-                  (>= zr 1) 0
+                  (<= zr -1.0) m/PI
+                  (>= zr 1.0) 0
                   :else (m/acos zr))
           phi (m/atan2 y x)]
       (Vec3. r theta phi)))
@@ -527,8 +530,8 @@
     (let [^double d (dot v1 v2)
           amt (/ d (* ^double (mag v1) ^double (mag v2)))]
       (cond
-        (<= amt -1) m/PI
-        (>= amt 1) 0
+        (<= amt -1.0) m/PI
+        (>= amt 1.0) 0
         :else (m/acos amt)))))
 
 (defn aligned?

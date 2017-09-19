@@ -672,7 +672,7 @@
 ;;
 ;; Global atom is needed to keep current window state. Events don't know what window sends it. The only option is to get component name.
 
-(def global-state (atom {}))
+(defonce global-state (atom {}))
 
 (defn get-state
   "Get state from window"
@@ -965,7 +965,7 @@
                         counter])
 
 ;; Session is stored in agent
-(def session-agent (agent (map->SessionType {})))
+(defonce session-agent (agent (map->SessionType {})))
 
 ;; Logging to file is turned off by default.
 (def ^:dynamic *log-to-file* false)

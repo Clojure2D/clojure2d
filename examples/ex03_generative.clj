@@ -25,7 +25,7 @@
 
 (defn draw
   ""
-  [canvas window framecount & res]
+  [canvas window framecount _]
   (set-awt-color canvas foreground)
   (set-stroke canvas 1.85)
   (set-awt-background canvas background)

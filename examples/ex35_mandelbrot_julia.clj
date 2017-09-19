@@ -117,7 +117,7 @@
   []
   (let [funs [(fn [a _] a)
               (fn [_ b] b)
-              + * - m/atan2 m/hypot
+              + * - #(m/atan2 %1 %2) #(m/hypot %1 %2)
               (fn [a _] (m/sin a))
               (fn [_ b] (m/sin b))
               (fn [a b] (r/noise a b))

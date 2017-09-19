@@ -66,7 +66,7 @@
 ;; modulate channels (in HSB colorspace don't touch hue, lower saturation and brightness a little bit)
 (p/set-canvas-pixels! canvas (->> img
                                   (p/filter-colors c/to-HWB)
-                                  (p/filter-channels (p/make-modulate-filter 1.0 1.0 1.0))
+                                  (p/filter-channels (p/make-modulate-filter 1.0 0.5 0.5))
                                   (p/filter-colors c/from-HWB)))
 
 ;; let's compose some images

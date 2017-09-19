@@ -5,11 +5,14 @@
 
 (ns clojure2d.math.complex
   (:require [clojure2d.math :as m]
-            [clojure2d.math.vector :as v])
+            [clojure2d.math.vector :as v]
+            [primitive-math :as prim])
   (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+
+(prim/use-primitive-operators)
 
 (def ^:const I (Vec2. 0.0 1.0))
 (def ^:const I- (Vec2. 0.0 -1.0))

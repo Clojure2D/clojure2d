@@ -21,13 +21,15 @@
   (:require [clojure2d.color :as c]
             [clojure2d.core :as core]
             [clojure2d.math :as m]
-            [clojure2d.math.vector :as v])
+            [clojure2d.math.vector :as v]
+            [primitive-math :as prim])
   (:import clojure2d.core.Canvas
            [clojure2d.math.vector Vec2 Vec4]
            java.awt.image.BufferedImage))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(prim/use-primitive-operators)
 
 ;; `*pixels-edge*` describe what is the value of pixel when accessing from outside the image.
 ;; Possible values are:
@@ -275,7 +277,7 @@
   "Filter pixels color-wise with given function. Filtering function should accept and return color as `Vec4`. You can use color space conversion functions defined in `color` namespace."
   [f ^Pixels p]
   (let [^Pixels target (clone-pixels p)
-        pre-step (max 40000 ^long (/ (.size p) core/available-tasks))
+        pre-step (double (max 40000 ^long (/ (.size p) core/available-tasks)))
         step (int (m/ceil pre-step))
         parts (range 0 (.size p) step)
         ftrs (doall
@@ -417,8 +419,8 @@
               ^int (get-value p ch x (inc ^long y)))))))
 
 ;; Create dilate and erode filters
-(def dilate-filter (partial filter-channel-xy (partial get-cross-f max)))
-(def erode-filter (partial filter-channel-xy (partial get-cross-f min)))
+(def dilate-filter (partial filter-channel-xy (partial get-cross-f #(max ^int %1 ^int %2))))
+(def erode-filter (partial filter-channel-xy (partial get-cross-f #(min ^int %1 ^int %2))))
 
 (defn- make-aget-2d
   "2d `ints` array getter with `:edge` boundary."
@@ -442,7 +444,7 @@
       (let [aget-2d (make-aget-2d in w h)
             size (* w h)
             ^ints target (int-array size)
-            iarr (/ 1.0 (inc (+ r r)))
+            iarr (/ 1.0 (double (inc (+ r r))))
             r+ (inc r)
             rang (range (- r+) r)]
         (dotimes [x w]
@@ -452,7 +454,7 @@
               (when (< y h)
                 (let [nv (- (+ v ^long (aget-2d x (+ y r)))
                             ^long (aget-2d x (- y r+)))]
-                  (aset ^ints target (+ x (* w y)) (int (* nv iarr)))
+                  (aset ^ints target (+ x (* w y)) (int (* (double nv) iarr)))
                   (recur (unchecked-inc y) nv))))))
         target)))
 
@@ -463,7 +465,7 @@
       (let [aget-2d (make-aget-2d in w h)
             size (* w h)
             ^ints target (int-array size)
-            iarr (/ 1.0 (inc (+ r r)))
+            iarr (/ 1.0 (double (inc (+ r r))))
             r+ (inc r)
             rang (range (- r+) r)]
         (dotimes [y h]
@@ -474,7 +476,7 @@
               (when (< x w)
                 (let [nv (- (+ v ^long (aget-2d (+ x r) y))
                             ^long (aget-2d (- x r+) y))]
-                  (aset ^ints target (+ x off) (int (* nv iarr)))
+                  (aset ^ints target (+ x off) (int (* (double nv) iarr)))
                   (recur (unchecked-inc x) nv))))))
         target)))
 
@@ -504,19 +506,19 @@
 
 (defn radius-for-gauss
   "Calculate radius for gaussian blur."
-  [^double sigma ^long n]
-  (let [sigma* (* 12 sigma sigma)
+  [^double sigma ^double n]
+  (let [sigma* (* 12.0 sigma sigma)
         w-ideal (-> sigma*
                     (/ n)
                     (inc)
                     (m/sqrt)
                     (m/floor))
         wl (if (even? (int w-ideal)) (dec w-ideal) w-ideal)
-        wu (+ wl 2)
-        m-ideal (/ (- sigma* (* n (m/sq wl)) (* 4 n wl) (* 3 n))
-                   (- (* -4 wl) 4))
-        m (m/round m-ideal)]
-    (vec (map #(int (/ (dec (if (< ^int % m) wl wu)) 2)) (range n)))))
+        wu (+ wl 2.0)
+        m-ideal (/ (- sigma* (* n (m/sq wl)) (* 4.0 n wl) (* 3.0 n))
+                   (- (* -4.0 wl) 4.0))
+        m (long (m/round m-ideal))]
+    (vec (map #(int (/ (dec (if (< ^long % m) wl wu)) 2.0)) (range n)))))
 
 (def radius-for-gauss-memo (memoize radius-for-gauss))
 
@@ -588,7 +590,7 @@
 (defn make-threshold
   "Create threshold filter for given value."
   ([^double thr]
-   (let [t (long (* 256 thr))]
+   (let [t (long (* 256.0 thr))]
      (partial filter-channel (partial threshold-pixel t))))
   ([]
    (make-threshold 0.5)))
@@ -655,7 +657,7 @@
                          1 ch2
                          2 ch3
                          ch4)]
-       (filter-channel #(m/iconstrain (* ^int % chv) 0 255) ch target p))))
+       (filter-channel #(m/iconstrain (* (double %) chv) 0 255) ch target p))))
   ([ch1 ch2 ch3]
    (make-modulate-filter ch1 ch2 ch3 1.0)))
 
@@ -688,7 +690,7 @@
   [ch ^Pixels p]
   (let [^doubles hist (double-array 256 0.0)
         sz (.size p)
-        d (double (/ 1.0 (.size p)))]
+        d (double (/ 1.0 (double (.size p))))]
     (loop [idx (int 0)]
       (if (< idx sz)
         (let [c (get-value p ch idx)]
@@ -784,8 +786,8 @@
           ivx (long vx)
           ivy (long vy)]
       (when (and (< -1 ivx sizex) (< -1 ivy sizey)) 
-        (let [restx (- vx ivx)
-              resty (- vy ivy)
+        (let [restx (- vx (double ivx))
+              resty (- vy (double ivy))
               ivx+ (inc ivx)
               ivy+ (inc ivy)]
 

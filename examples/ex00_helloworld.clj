@@ -2,7 +2,6 @@
 
 (ns examples.ex00-helloworld
   (:require [clojure2d.core :refer :all]
-            [clojure2d.math :as m]
             [clojure2d.color :as c]))
 
 (set! *warn-on-reflection* true)

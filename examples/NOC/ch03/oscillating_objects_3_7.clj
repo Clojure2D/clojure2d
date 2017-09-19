@@ -21,7 +21,7 @@
     (Oscillator. (v/add angle velocity) velocity amplitude))
   (display [o canvas]
     (let [^Vec2 xy (-> angle
-                       (v/applyf m/sin)
+                       (v/applyf #(m/sin %))
                        (v/emult amplitude))]
       (-> canvas
           (set-stroke 2.0)

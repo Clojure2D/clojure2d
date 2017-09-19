@@ -9,11 +9,13 @@
             [clojure2d.math.random :refer :all]
             [clojure2d.math.vector :as v]
             [clojure2d.color :as c]
-            [clojure2d.extra.variations :as var])
+            [clojure2d.extra.variations :as var]
+            [primitive-math :as prim])
   (:import [clojure2d.math.vector Vec2 Vec3]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
+(prim/use-primitive-operators)
 
 (def ^:const ^long w 1000)
 (def ^:const ^long h 1000)
@@ -69,7 +71,7 @@
         t
         (recur (unchecked-inc i) (+ diffh t))))))
 
-(def ^:const ^long k 16)
+(def ^:const ^double k 16.0)
 
 (defn softshadow
   ""

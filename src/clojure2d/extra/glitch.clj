@@ -20,12 +20,14 @@
             [clojure2d.core :refer :all]
             [clojure2d.math.vector :as v]
             [clojure2d.extra.signal :as s]
+            [primitive-math :as prim]
             [clojure2d.color :as c])
   (:import [clojure2d.pixels Pixels]
            [clojure2d.math.vector Vec2 Vec4]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(prim/use-primitive-operators)
 
 ;; ## Slitscan
 
@@ -35,7 +37,7 @@
 ;; Random setup is based on sum of oscillators defined in `signal` namespace.
 
 (def freqs (mapv #(bit-shift-left 1 ^long %) (range 8)))
-(def amps (mapv #(/ 1.0 ^long %) freqs))
+(def amps (mapv #(/ 1.0 (double %)) freqs))
 
 (defn slitscan-random-setup
   "Create list of random waves "
@@ -60,12 +62,16 @@
 (defn slitscan
   ""
   [fx fy ch ^Pixels p x y]
-  (let [sx (/ 1.0 (.w p))
-        sy (/ 1.0 (.h p))
-        shiftx (* 0.3 (.w p) ^double (fx (* ^long x sx)))
-        shifty (* 0.3 (.h p) ^double (fy (* ^long y sy)))
-        xx (m/wrap 0.0 (.w p) (+ ^long x shiftx))
-        yy (m/wrap 0.0 (.h p) (+ ^long y shifty))]
+  (let [wp (double (.w p))
+        hp (double (.h p))
+        x (double x)
+        y (double y)
+        sx (/ 1.0 wp)
+        sy (/ 1.0 hp)
+        shiftx (* 0.3 wp ^double (fx (* x sx)))
+        shifty (* 0.3 hp ^double (fy (* y sy)))
+        xx (m/wrap 0.0 wp (+ x shiftx))
+        yy (m/wrap 0.0 hp (+ y shifty))]
     (p/get-value p ch xx yy)))
 
 (defn make-slitscan-filter
@@ -134,7 +140,7 @@
 (defn- mi-do-horizontal
   ""
   [t ch target ^Pixels source]
-  (dotimes [y (/ (.h source) 2.0)]
+  (dotimes [y (/ (.h source) 2)]
     (dotimes [x (.w source)]
       (if t
         (mi-draw-point ch target source x y x (- (.h source) y 1))
@@ -143,7 +149,7 @@
 (defn- mi-do-vertical
   ""
   [t ch target ^Pixels source]
-  (dotimes [x (/ (.w source) 2.0)]
+  (dotimes [x (/ (.w source) 2)]
     (dotimes [y (.h source)]
       (if t
         (mi-draw-point ch target source x y (- (.w source) x 1) y)
@@ -158,7 +164,7 @@
         ty (if shift? (- (.h source) size) 0)]
     (dotimes [y size]
       (dotimes [x (inc y)]
-        (condp == t
+        (condp m/eq t
           0 (mi-draw-point ch target source x y y x tx ty)
           1 (mi-draw-point ch target source y x x y tx ty)
           2 (mi-draw-point ch target source x y (- size x 1) (- size y 1) tx ty)
@@ -174,7 +180,7 @@
     (dotimes [y size]
       (loop [x (int (dec size))]
         (when (>= x (- size y 1))
-          (condp == t
+          (condp m/eq t
             0 (mi-draw-point ch target source x y (- size y 1) (- size x 1) tx ty)
             1 (mi-draw-point ch target source (- size y 1) (- size x 1) x y tx ty)
             2 (mi-draw-point ch target source x y (- size x 1) (- size y 1) tx ty)
@@ -264,7 +270,7 @@
 (defn color-reducer-machine
   "Randomize color reducing filter, random method, random colors"
   ([]
-   (let [bpal (condp > (r/drand 1.0)
+   (let [bpal (condp #(> ^double %1 ^double %2) (r/drand 1.0)
                 0.1 (let [num (r/irand 5 20)]
                       {:type :iq
                        :palette (c/make-iq-random-palette num)})

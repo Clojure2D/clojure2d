@@ -4,11 +4,13 @@
 
 (ns clojure2d.extra.raymarching
   (:require [clojure2d.math :as m]
-            [clojure2d.math.vector :as v])
+            [clojure2d.math.vector :as v]
+            [primitive-math :as prim])
   (:import [clojure2d.math.vector Vec2 Vec3]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
+(prim/use-primitive-operators)
 
 (def ^Vec3 vzero (Vec3. 0.0 0.0 0.0))
 
@@ -51,19 +53,19 @@
 (defmethod make-primitive :sphere [_ mat conf]
   (let [^double s (:r conf)]
     (fn [p]
-      (HitData. (- (v/mag p) s) mat))))
+      (HitData. (- ^double (v/mag p) s) mat))))
 
 (defmethod make-primitive :plane [_ mat conf]
   (let [n (v/normalize (:normal conf))
         ^double dist (:dist-from-origin conf)]
     (fn [p]
-      (HitData. (+ dist (v/dot p n)) mat))))
+      (HitData. (+ dist ^double (v/dot p n)) mat))))
 
 (defmethod make-primitive :box [_ mat conf]
   (let [b (:box conf)]
     (fn [p]
       (let [d (v/sub (v/abs p) b)]
-        (HitData. (+ (v/mag (v/emx d vzero)) (min 0.0 (v/mx d))) mat)))))
+        (HitData. (+ ^double (v/mag (v/emx d vzero)) (min 0.0 ^double (v/mx d))) mat)))))
 
 (defmethod make-primitive :torus [_ mat conf]
   (let [^double small-radius (:small-radius conf)
@@ -261,7 +263,7 @@
     (loop [i (int 0)
            occ 0.0
            pw 1.0]
-      (let [ik (* i k)
+      (let [ik (* (double i) k)
             sh (if (odd? i) ik (- ik))
             yshift (v/mult (Vec3. sh ik (- sh)) 0.2) ;; vary a normal a little bit
             fac (+ 0.01 ik)
@@ -344,7 +346,7 @@
            (if (or (> i steps)
                    (< dist precision)
                    (> t tmax))
-             [(HitData. t (if (> t tmax) background m)) (- 1.0 (/ (double i) steps))]
+             [(HitData. t (if (> t tmax) background m)) (- 1.0 (/ (double i) (double steps)))]
              (recur (+ t (* stepf dist))
                     (unchecked-inc i)
                     (.mat d))))))))
@@ -361,10 +363,10 @@
   (fn [^Material mat shadow-f N D pos]
     (let [shadow (shadow-f scene ^Vec3 pos L)
           E (v/sub D)
-          NL (max 0.0 (v/dot N L))
+          NL (max 0.0 ^double (v/dot N L))
           H (v/normalize (v/add L E))
-          NH (max 0.0 (v/dot N H))
-          EH (max 0.0 (v/dot E H))
+          NH (max 0.0 ^double (v/dot N H))
+          EH (max 0.0 ^double (v/dot E H))
           Ff0 (+ (.specularf0 mat) (* (- 1.0 (.specularf0 mat)) (m/pow (- 1.0 EH) 5.0)))
 
           diffuse (v/mult diff-color (* (.diffusion mat) NL))

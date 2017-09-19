@@ -16,7 +16,8 @@
 
 (ns clojure2d.math.joise
   (:require [clojure2d.math :refer :all]
-            [clojure2d.math.random :refer :all])
+            [clojure2d.math.random :refer :all]
+            [primitive-math :as prim])
   (:import [com.sudoplay.joise.module Module SourcedModule ScalarParameter
             ModuleBasisFunction ModuleBasisFunction$BasisType ModuleBasisFunction$InterpolationType
             ModuleCellular ModuleCellGen
@@ -27,6 +28,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(prim/use-primitive-operators)
 
 ;; ## Noise creators
 

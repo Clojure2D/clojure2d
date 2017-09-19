@@ -9,10 +9,13 @@
 
 (ns clojure2d.math
   "Math functions"
+  (:require [primitive-math :as prim])
   (:import net.jafama.FastMath))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+
+(prim/use-primitive-operators)
 
 ;; ## Math functions
 ;;
@@ -36,23 +39,38 @@
 (def ^:const ^double TWO_THIRD (/ 2.0 3.0))
 (def ^:const ^double SIXTH (/ 1.0 6.0))
 
+(defmacro ^:private fastmath-proxy
+  "Wrapps operation into macro"
+  ([alt-name name]
+   (let [f (symbol (str "net.jafama.FastMath/" name))
+         d (str "FastMath " name " function.")]
+     `(defmacro ~alt-name
+        ([x#]
+         (list '~f x#))
+        ([x# y#]
+         (list '~f x# y#))
+        ([x# y# z#]
+         (list '~f x# y# z#)))))
+  ([name]
+   `(fastmath-proxy ~name ~name)))
+
 ;; Trigonometry
-(defn sin ^double [^double v] (FastMath/sin v))
-(defn cos ^double [^double v] (FastMath/cos v))
-(defn tan ^double [^double v] (FastMath/tan v))
-(defn asin ^double [^double v] (FastMath/asin v))
-(defn acos ^double [^double v] (FastMath/acos v))
-(defn atan ^double [^double v] (FastMath/atan v))
-(defn sinh ^double [^double v] (FastMath/sinh v))
-(defn cosh ^double [^double v] (FastMath/cosh v))
-(defn tanh ^double [^double v] (FastMath/tanh v))
-(defn asinh ^double [^double v] (FastMath/asinh v))
-(defn acosh ^double [^double v] (FastMath/acosh v))
-(defn atanh ^double [^double v] (FastMath/atanh v))
+(fastmath-proxy sin)
+(fastmath-proxy cos)
+(fastmath-proxy tan)
+(fastmath-proxy asin)
+(fastmath-proxy acos)
+(fastmath-proxy atan)
+(fastmath-proxy sinh)
+(fastmath-proxy cosh)
+(fastmath-proxy tanh)
+(fastmath-proxy asinh)
+(fastmath-proxy acosh)
+(fastmath-proxy atanh)
 
 ;; Quick and less accurate `sin` and `cos`
-(defn qsin ^double [^double v] (FastMath/sinQuick v))
-(defn qcos ^double [^double v] (FastMath/cosQuick v))
+(fastmath-proxy qsin sinQuick)
+(fastmath-proxy qcos cosQuick)
 
 ;; Additional trigonometry functions
 (defn cot ^double [^double v] (FastMath/tan (- HALF_PI v)))
@@ -63,7 +81,7 @@
 (defn acot ^double [^double v] (- HALF_PI (FastMath/atan v)))
 (defn asec ^double [^double v] (FastMath/acos (/ 1.0 v)))
 (defn acsc ^double [^double v] (FastMath/asin (/ 1.0 v)))
-(defn atan2 ^double [^double v1 ^double v2] (FastMath/atan2 v1 v2))
+(fastmath-proxy atan2)
 
 ;; Additional hyperbolic functions
 (defn coth ^double [^double v] (/ 1.0 (FastMath/tanh v)))
@@ -76,16 +94,16 @@
 (defn acsch ^double [^double v] (FastMath/asinh (/ 1.0 v)))
 
 ;; exp and log
-(defn exp ^double [^double v] (FastMath/exp v))
-(defn log ^double [^double v] (FastMath/log v))
-(defn log10 ^double [^double v] (FastMath/log10 v))
+(fastmath-proxy exp)
+(fastmath-proxy log)
+(fastmath-proxy log10)
 
 ;; Roots (square and cubic)
-(defn sqrt ^double [^double v] (FastMath/sqrt v))
-(defn cbrt ^double [^double v] (FastMath/cbrt v))
+(fastmath-proxy sqrt)
+(fastmath-proxy cbrt)
 
 ;; Quick version of exponential \\(e^x\\)
-(defn qexp ^double [^double v] (FastMath/expQuick v))
+(fastmath-proxy qexp expQuick)
 
 ;; Radians to degrees (and opposite) conversions
 (def ^:const ^double rad-in-deg (/ 180.0 PI))
@@ -102,7 +120,7 @@
         (/ (FastMath/sin x) x))))
 
 ;; Alias for natural logarithm
-(def ln log)
+(fastmath-proxy ln log)
 
 ;; Few logarithm constants
 ;; \\(\ln 2\\)
@@ -128,7 +146,7 @@
   (/ (FastMath/log v) (FastMath/log base)))
 
 ;; Quick logarithm
-(defn qlog ^double [^double v] (FastMath/logQuick v))
+(fastmath-proxy qlog logQuick)
 
 ;; \\(\log_2 e\\)
 (def ^:const ^double LOG2E (log2 E))
@@ -136,41 +154,41 @@
 ;; \\(\log_{10} e\\)
 (def ^:const ^double LOG10E (log10 E))
 
-;; Powers (normal, quick and fast)
-(defn pow ^double [^double v1 ^double v2] (FastMath/pow v1 v2))
-(defn qpow ^double [^double v1 ^double v2] (FastMath/powQuick v1 v2))
+;; Powers (normal, quick)
+(fastmath-proxy pow)
+(fastmath-proxy qpow powQuick)
 
 ;; Fast version of power, second parameter should be integer
-(defn fpow ^double [^double v1 ^double v2] (FastMath/powFast v1 v2))
+(fastmath-proxy fpow powFast)
 
 ;; Square and cubic
-(defn sq ^double [^double v] (FastMath/pow2 v))
-(def pow2 sq)
-(defn pow3 ^double [^double v] (FastMath/pow3 v))
+(defn sq ^double [^double v] (* v v))
+(defn pow2 ^double [^double v] (* v v))
+(defn pow3 ^double [^double v] (* v (* v v)))
 
 (defn safe-sqrt
   "Safe sqrt, for value <= 0 result is 0"
   ^double [^double value]
   (if (neg? value) 0 (sqrt value)))
-(defn qsqrt ^double [^double v] (FastMath/sqrtQuick v))
-(defn rqsqrt ^double [^double v] (FastMath/invSqrtQuick v))
+(fastmath-proxy qsqrt sqrtQuick)
+(fastmath-proxy rqsqrt invSqrtQuick)
 
 ;; \\(\sqrt{x^2+y^2}\\) and \\(\sqrt{x^2+y^2+z^2}\\)
-(defn hypot
-  "Hyponetuse"
-  (^double [^double x ^double y]
-   (FastMath/hypot x y))
-  (^double [^double x ^double y ^double z]
-   (FastMath/hypot x y z)))
+(fastmath-proxy hypot)
 
 ;; Rounding functions
 (defn floor ^double [^double v] (FastMath/floor v))
 (defn ceil ^double [^double v] (FastMath/ceil v))
 (defn round ^long [^double v] (FastMath/round v))
-(defn rint ^double [^double v] (FastMath/rint v))
+(fastmath-proxy rint)
+
+;; Modulo and abs
+(fastmath-proxy remainder)
+(defn abs ^double [^double v] (FastMath/abs v))
+(fastmath-proxy iabs)
 
 ;; fractional part, always returns values from 0.0 to 1.0 (exclusive)
-(defn frac ^double [^double v] (FastMath/abs (- v (long v))))
+(defmacro frac [v] `(abs (- ~v (double (long ~v)))))
 
 ;; Find power of 2 exponent for double number where  
 ;; \\(2^(n-1)\leq x\leq 2^n\\)  
@@ -179,11 +197,6 @@
 ;; `(high-2-exp TWO_PI) => 3` \\(6.28\leq 2^3\eq 8\\)
 (defn low-2-exp ^long [v] (-> v log2 floor long))
 (defn high-2-exp ^long [v] (-> v log2 ceil long))
-
-;; Modulo and abs
-(defn remainder ^double [^double v1 ^double v2] (FastMath/remainder v1 v2))
-(defn abs ^double [^double v] (FastMath/abs v))
-(defn iabs ^long [^long v] (FastMath/abs v))
 
 ;; More constants
 
@@ -350,6 +363,12 @@
            (* cycle)
            (- value)))))
 
+;; Primitive math eq
+(defn eq 
+  "Primitive math equality helper for doubles"
+  [^double a ^double b]
+  (== a b))
+
 ;; ### Statistics
 ;;
 ;; Whole code is taken from public GIST: https://gist.github.com/scottdw/2960070
@@ -382,8 +401,8 @@
    (let [svs (sort vs)]
      (quantile p (count vs) svs (first svs) (last svs))))
   ([p c svs mn mx]
-   (let [pic (* ^double p (inc ^long c))
-         k (round pic)
+   (let [pic (* ^double p (double (inc ^long c)))
+         k (double (round pic))
          d (- pic k)
          ^double ndk (if (zero? k) mn (nth svs (dec k)))]
      (cond
@@ -401,8 +420,10 @@
 ;; `(mean '(1 2 3 -1 -1 2 -1 11 111)) => 14.11111111111111`
 (defn mean
   "Calculate mean of a list"
-  ([vs] (mean (reduce + vs) (count vs)))
+  ([vs] (mean (reduce clojure.core/+ vs) (count vs)))
   ([^double sm sz] (/ sm (double sz))))
+
+(+ 1 2)
 
 ;; `(standard-deviation '(1 2 3 -1 -1 2 -1 11 111)) => 34.43333154064031`
 (defn standard-deviation
@@ -410,7 +431,7 @@
   ([vs]
    (standard-deviation vs (double (count vs)) (mean vs)))
   ([vs ^double sz ^double u]
-   (sqrt (/ ^double (reduce + (map #(pow (- ^double % u) 2) vs)) sz))))
+   (sqrt (/ ^double (reduce clojure.core/+ (map #(pow (- ^double % u) 2) vs)) sz))))
 
 ;; `(median-absolute-deviation '(1 2 3 -1 -1 2 -1 11 111))  => 3.0`
 (defn median-absolute-deviation
@@ -426,10 +447,10 @@
    (let [q1 (quantile 0.25 vs)
          m (median vs)
          q3 (quantile 0.75 vs)]
-       (lower-adjacent-value (sort vs) m (- q3 q1))))
+     (lower-adjacent-value (sort vs) m (- q3 q1))))
   ([svs ^double m ^double qd]
-     (let [l (- m qd)]
-       (first (filter (partial < l) svs)))))
+   (let [l (- m qd)]
+     (first (filter (partial clojure.core/< l) svs)))))
 
 ;; `(upper-adjacent-value '(1 2 3 -1 -1 2 -1 11 111)) => 3`
 (defn upper-adjacent-value
@@ -447,36 +468,36 @@
 (defn stats-map
   "Calculate several statistics from the list and return as map"
   ([vs]
-     (let [sz (count vs)
-           svs (sort vs)
-           rsvs (reverse svs)
-           mn (first svs)
-           mx (first rsvs)
-           sm (reduce + vs)
-           u (mean sm sz)
-           mdn (median sz svs mn mx)
-           q1 (quantile 0.25 sz svs mn mx)
-           q3 (quantile 0.75 sz svs mn mx)
-           sd (standard-deviation vs sz u)
-           mad (median-absolute-deviation vs mdn)
-           qd (- ^double q3 ^double q1)
-           lav (lower-adjacent-value svs mdn qd)
-           uav (upper-adjacent-value rsvs mdn qd)]
-       {:Size sz
-        :Min mn
-        :Max mx
-        :Mean u
-        :Median mdn
-        :Mode (mode vs)
-        :Q1 q1
-        :Q3 q3
-        :Total sm
-        :SD sd
-        :MAD mad
-        :LAV lav
-        :UAV uav}))
+   (let [sz (count vs)
+         svs (sort vs)
+         rsvs (reverse svs)
+         mn (first svs)
+         mx (first rsvs)
+         sm (reduce clojure.core/+ vs)
+         u (mean sm sz)
+         mdn (median sz svs mn mx)
+         q1 (quantile 0.25 sz svs mn mx)
+         q3 (quantile 0.75 sz svs mn mx)
+         sd (standard-deviation vs sz u)
+         mad (median-absolute-deviation vs mdn)
+         qd (- ^double q3 ^double q1)
+         lav (lower-adjacent-value svs mdn qd)
+         uav (upper-adjacent-value rsvs mdn qd)]
+     {:Size sz
+      :Min mn
+      :Max mx
+      :Mean u
+      :Median mdn
+      :Mode (mode vs)
+      :Q1 q1
+      :Q3 q3
+      :Total sm
+      :SD sd
+      :MAD mad
+      :LAV lav
+      :UAV uav}))
   ([ks vs]
-     (zipmap ks (map (stats-map vs) ks))))
+   (zipmap ks (map (stats-map vs) ks))))
 
 (defn- closest-mean-fn
   [means]

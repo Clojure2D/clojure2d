@@ -9,12 +9,18 @@
 
 (ns clojure2d.math.random
   (:require [clojure2d.math :refer :all]
-            [clojure2d.math.vector :as v])
+            [clojure2d.math.vector :as v]
+            [primitive-math :as prim])
   (:import [clojure2d.math.vector Vec2]
            [org.apache.commons.math3.random RandomGenerator ISAACRandom JDKRandomGenerator MersenneTwister
             Well512a Well1024a Well19937a Well19937c Well44497a Well44497b
             RandomVectorGenerator HaltonSequenceGenerator SobolSequenceGenerator UnitSphereRandomVectorGenerator]
            [com.flowpowered.noise.module.source Perlin]))
+
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* :warn-on-boxed)
+
+(prim/use-primitive-operators)
 
 ;; ## Random function wrappers
 ;; 
@@ -321,6 +327,6 @@
          n (unchecked-add-int X (unchecked-multiply-int Y 57))
          nn (unchecked-int (bit-xor n (bit-shift-left n 13)))
          nnn (unchecked-add-int 1376312589 (unchecked-multiply-int nn (unchecked-add-int 789221 (unchecked-multiply-int nn (unchecked-multiply-int nn 15731)))))]
-     (* AM (unchecked-int (bit-and 0x7fffffff nnn)))))
+     (* AM (double (unchecked-int (bit-and 0x7fffffff nnn))))))
   (^double [^long X]
    (discrete-noise X 0)))

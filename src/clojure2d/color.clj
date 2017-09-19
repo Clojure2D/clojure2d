@@ -24,12 +24,15 @@
             [clojure.xml :as xml]
             [clojure2d.math :as m]
             [clojure2d.math.random :as r]
-            [clojure2d.math.vector :as v])
+            [clojure2d.math.vector :as v]
+            [primitive-math :as prim])
   (:import [clojure2d.math.vector Vec3 Vec4]
+           [primitive_math Primitives]
            java.awt.Color))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(prim/use-primitive-operators)
 
 ;; ## Clamping functions
 
@@ -574,9 +577,9 @@
 (defn to-CMY
   "RGB -> CMY"
   [^Vec4 c]
-  (Vec4. (- 255 (.x c))
-         (- 255 (.y c))
-         (- 255 (.z c))
+  (Vec4. (- 255.0 (.x c))
+         (- 255.0 (.y c))
+         (- 255.0 (.z c))
          (.w c)))
 
 (def from-CMY to-CMY)
@@ -699,8 +702,8 @@
 (def ^:const ^double CIEEpsilon (/ 216.0 24389.0))
 (def ^:const ^double CIEK (/ 24389.0 27.0))
 (def ^:const ^double OneThird (/ 1.0 3.0))
-(def ^:const ^double D65FX-4 (/ (* 4.0 D65X) (+ D65X 15 (* 3.0 D65Z))))
-(def ^:const ^double D65FY-9 (/ 9.0 (+ D65X 15 (* 3.0 D65Z))))
+(def ^:const ^double D65FX-4 (/ (* 4.0 D65X) (+ D65X 15.0 (* 3.0 D65Z))))
+(def ^:const ^double D65FY-9 (/ 9.0 (+ D65X 15.0 (* 3.0 D65Z))))
 
 (defn- perceptible-reciprocal
   "LUV reciprocal"
@@ -834,8 +837,8 @@
   (let [mx (max (.x c) (.y c) (.z c))
         chr (- mx (min (.x c) (.y c) (.z c)))
         h (* 255.0 (/ (if (zero? chr) 0.0
-                          (double (condp == mx
-                                    (.x c) (rem (+ 6.0 (/ (- (.y c) (.z c)) chr)) 6.0)
+                          (double (condp m/eq mx
+                                    (.x c) (m/remainder (+ 6.0 (/ (- (.y c) (.z c)) chr)) 6.0)
                                     (.y c) (+ 2.0 (/ (- (.z c) (.x c)) chr))
                                     (.z c) (+ 4.0 (/ (- (.x c) (.y c)) chr))))) 6.0))
         luma (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))]
@@ -847,7 +850,7 @@
   (let [h (* 6.0 (get-r255 (.x c)))
         chr (.y c)
         l (.z c)
-        x (* chr (- 1.0 (m/abs (dec ^double (rem h 2.0)))))
+        x (* chr (- 1.0 (m/abs (dec ^double (m/remainder h 2.0)))))
         ^Vec3 rgb (cond
                     (and (<= 0.0 h) (< h 1.0)) (Vec3. chr x 0.0)
                     (and (<= 1.0 h) (< h 2.0)) (Vec3. x chr 0.0)
@@ -869,7 +872,7 @@
         hsb (if (zero? mx) (Vec3. 0.0 0.0 0.0)
                 (let [s (* 255.0 (/ delta mx))
                       h (if (zero? delta) 0.0 
-                            (/ (double (condp == mx
+                            (/ (double (condp m/eq mx
                                          (.x c) (/ (- (.y c) (.z c)) delta)
                                          (.y c) (+ 2.0 (/ (- (.z c) (.x c)) delta))
                                          (.z c) (+ 4.0 (/ (- (.x c) (.y c)) delta)))) 6.0))]
@@ -888,7 +891,7 @@
             p (* b (- 1.0 s))
             q (* b (- 1.0 (* s f)))
             t (* b (- 1.0 (* s (- 1.0 f))))
-            rgb (condp == (int h)
+            rgb (condp m/eq (int h)
                   0 (Vec3. b t p)
                   1 (Vec3. q b p)
                   2 (Vec3. p b t)
@@ -956,11 +959,11 @@
   (let [w (min (.x c) (.y c) (.z c))
         v (max (.x c) (.y c) (.z c))
         h (if (== w v) 0.0
-              (let [^double f (condp == w
+              (let [^double f (condp m/eq w
                                 (.x c) (- (.y c) (.z c))
                                 (.y c) (- (.z c) (.x c))
                                 (.z c) (- (.x c) (.y c)))
-                    ^double p (condp == w
+                    ^double p (condp m/eq w
                                 (.x c) 3.0
                                 (.y c) 5.0
                                 (.z c) 1.0)]
@@ -976,11 +979,11 @@
     (let [^double h (m/norm (.x c) 1.0 255.0 0.0 6.0)
           v (- 1.0 (/ (.z c) 255.0))
           w (/ (.y c) 255.0)
-          i (int (m/floor h))
+          i (m/floor h)
           f (- h i)
-          f (if (odd? i) (- 1.0 f) f)
+          f (if (odd? (int i)) (- 1.0 f) f)
           n (+ w (* f (- v w)))
-          rgb (condp == i
+          rgb (condp m/eq i
                 0 (Vec3. v n w)
                 1 (Vec3. n v w)
                 2 (Vec3. w v n)
@@ -1205,7 +1208,7 @@
                             (v/mult c)
                             (v/add d))
                        (v/mult m/TWO_PI)
-                       (v/applyf m/cos)
+                       (v/applyf #(m/cos %))
                        (v/emult b)
                        (v/add a))]
       (-> (Vec4. (.x cc) (.y cc) (.z cc) 1.0)
@@ -1214,7 +1217,7 @@
 
 (defn make-iq-random-palette
   "Create palette with cosinus generator. Input parameter: number of colors."
-  [^long num]
+  [^double num]
   (let [a (v/generate-vec3 (partial r/drand 0.3 0.7))
         b (v/sub (Vec3. 1.0 1.0 1.1) a)
         c (v/generate-vec3 (partial r/drand 2))
@@ -1271,7 +1274,7 @@
                      (* 0.75 (m/tan (* m/HALF_PI (/ (- 210.0 e) 30.0))))))
             :fi (fn ^double [^double e]
                   (if (== e -1.0) 180.0
-                      (- 210 (* 2.0 (/ (* (m/atan (/ e 0.75)) 30.0) m/PI)))))
+                      (- 210.0 (* 2.0 (/ (* (m/atan (/ e 0.75)) 30.0) m/PI)))))
             :g s
             :rgb (fn [e n r] (Vec4. r e n 255.0))}
      255.0 {:a (:gb paletton-base-values)

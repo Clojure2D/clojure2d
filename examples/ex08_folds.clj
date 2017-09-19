@@ -1,3 +1,4 @@
+
 (ns examples.ex08-folds
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
@@ -45,11 +46,11 @@
     (loop [y y1]
       (loop [x x1]
         
-        (let [^Vec2 vv (v/mult (v/applyf (v/mult (field (Vec2. x y)) fscale) m/sin) 2.7)
+        (let [^Vec2 vv (v/mult (v/applyf (v/mult (field (Vec2. x y)) fscale) #(m/sin %)) 2.7)
               xx (m/norm (+ (.x vv) ^double (r/grand 0.0012)) x1- x2+ 0.0 w)
               yy (m/norm (+ (.y vv) ^double (r/grand 0.0012)) y1- y2+ 0.0 h)]
           (point canvas xx yy))
-
+        
         (when (and (window-active? window) (< x x2)) (recur (+ x step))))
       (when (and (window-active? window) (< y y2)) (recur (+ y step)))))
   canvas)
