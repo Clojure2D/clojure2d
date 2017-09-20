@@ -12,7 +12,8 @@
             [clojure2d.math.vector :as vv]
             [clojure.pprint :refer [pprint]])
   (:import [net.jafama FastMath]
-           [clojure2d.math.vector Vec4]))
+           [clojure2d.math.vector Vec4]
+           [clojure2d.java PrimitiveMath]))
 
 (def p1 (p/load-pixels "generateme/b/b.jpg"))
 

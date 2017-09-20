@@ -15,7 +15,6 @@
             [clojure2d.color :as c]
             [clojure.java.io :refer :all]
             [clojure2d.math.vector :as v]
-            [criterium.core :as bench]
             [clojure2d.math.random :as r]
             [primitive-math :as prim])
   (:import [clojure2d.pixels Pixels]
