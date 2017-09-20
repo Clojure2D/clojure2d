@@ -9,13 +9,12 @@
             [clojure2d.math.random :refer :all]
             [clojure2d.math.vector :as v]
             [clojure2d.color :as c]
-            [clojure2d.extra.variations :as var]
-            [primitive-math :as prim])
+            [clojure2d.extra.variations :as var])
   (:import [clojure2d.math.vector Vec2 Vec3]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
-(prim/use-primitive-operators)
+(m/use-primitive-operators)
 
 (def ^:const ^long w 1000)
 (def ^:const ^long h 1000)
@@ -125,7 +124,7 @@
 (defn gamma
   ""
   [col]
-  (v/applyf col #(m/pow (m/constrain % 0.0 1.0) 1.5)))
+  (v/applyf col #(m/pow (m/constrain ^double % 0.0 1.0) 1.5)))
 
 (defn desaturate
   ""
@@ -153,7 +152,7 @@
                             (v/dot cam2 point)
                             (v/dot cam3 point)) ;; view vector
             t (cast-ray rd terrain) ;; distance to terrain
-            s (m/constrain (v/dot rd sun-light) 0.0 1.0) ;; sun direction
+            s (m/constrain ^double (v/dot rd sun-light) 0.0 1.0) ;; sun direction
             bcol (-> sun-color
                      (v/mult (* 0.2 (m/pow s 6.0)))
                      (v/add (v/sub sky-color (v/mult (Vec3. (.y rd) (.y rd) (.y rd)) 0.9)))
@@ -162,7 +161,7 @@
                   (let [^Vec3 pos (v/add ro (v/mult rd t))
                         ^Vec3 nor (normal terrain pos t)
                         hh (- 1.0 (smoothstep -2.0 1.0 (.y pos)))
-                        sun (m/constrain (v/dot nor sun-light) 0.0 1.0)
+                        sun (m/constrain ^double (v/dot nor sun-light) 0.0 1.0)
                         sha (if (> sun 0.01) (softshadow pos sun-light terrain) 0.0)
                         sky (+ 0.5 (* 0.5 (.y nor)))
 

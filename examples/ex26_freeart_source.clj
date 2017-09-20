@@ -31,6 +31,7 @@
 ;; turn on warnings
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 ;; frame width
 (def ^:const w 640)
@@ -53,7 +54,7 @@
 ;; Iteratively go through canvases (frames) and draw them onto screen canvas
 (defn draw
   "Draw current frame on the screen"
-  [canvas window frame state]
+  [canvas window ^long frame state]
   (let [curr (or state canvases)
         id (mod frame number-of-frames)
         current-canvas (first curr)]
@@ -124,7 +125,7 @@
 (defn scenario
   "This is the function where all the things will happen"
   [canvas ^long time ^long frame]
-  (let [^int color (mod time 255)] ;;;; change!
+  (let [color (mod time 255)] ;;;; change!
     (set-color canvas 0 0 0 200) ;;;; change!
     (rect canvas 20 20 (- w 40) (- h 40)) ;;;; change!
 

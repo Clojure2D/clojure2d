@@ -12,13 +12,13 @@
   (let [[^double x ^double y] (or state [(* 0.5 ^int (width canvas))
                                          (* 0.5 ^int (height canvas))])
         choice ^double (r/drand)
-        [nx ny] (condp > choice
-                  0.4 [(inc x) y]
-                  0.6 [(dec x) y]
-                  0.8 [x (inc y)]
-                  [x (dec y)])
-        nx (m/constrain nx 0 (width canvas))
-        ny (m/constrain ny 0 (height canvas))]
+        [^double nx ^double ny] (condp > choice
+                                  0.4 [(inc x) y]
+                                  0.6 [(dec x) y]
+                                  0.8 [x (inc y)]
+                                  [x (dec y)])
+        nx (m/constrain nx 0 ^int (width canvas))
+        ny (m/constrain ny 0 ^int (height canvas))]
 
     (-> canvas
         (set-stroke 2.0)

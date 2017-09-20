@@ -13,7 +13,7 @@
   ""
   [canvas window _ state]
   (let [^Vec2 v (or state (Vec2. 0.0 0.0))
-        prob (/ ^double (m/constrain (mouse-x window) 5 (width window)) ^double (width window))
+        prob (/ (m/constrain ^int (mouse-x window) 5 ^int (width window)) (double (width window)))
         nx (m/wrap 0 (width canvas) (+ 10.0 (.x v)))
         ny (if (zero? nx)
              (m/wrap 0 (height canvas) (+ 10.0 (.y v)))

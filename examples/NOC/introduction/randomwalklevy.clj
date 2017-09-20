@@ -24,8 +24,8 @@
         stepsize- (- stepsize)
         stepx (r/drand stepsize- stepsize)
         stepy (r/drand stepsize- stepsize) 
-        nx (m/constrain (+ x stepx) 0 (width canvas))
-        ny (m/constrain (+ y stepy) 0 (height canvas))]
+        nx (m/constrain (+ x stepx) 0.0 ^double (width canvas))
+        ny (m/constrain (+ y stepy) 0.0 ^double (height canvas))]
 
     (-> canvas
         (set-color :white)

@@ -10,6 +10,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 (def ^:const ^int w 640)
 (def ^:const ^int h 360)
@@ -34,8 +35,8 @@
 (defn lookup-field
   "Lookup field value at point"
   [field ^Vec2 lookup]
-  (let [column (m/iconstrain (/ (.x lookup) resolution) 0 (dec cols))
-        row (m/iconstrain (/ (.y lookup) resolution) 0 (dec rows))]
+  (let [column (long (m/constrain (/ (.x lookup) resolution) 0 (dec cols)))
+        row (long (m/constrain (/ (.y lookup) resolution) 0 (dec rows)))]
     (get-in field [column row])))
 
 (defn draw-field
@@ -112,3 +113,4 @@
 
 (defmethod mouse-event ["Flowfield 6_4" :mouse-pressed] [_ _]
   (make-field))
+

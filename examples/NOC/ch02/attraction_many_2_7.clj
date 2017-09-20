@@ -25,7 +25,7 @@
   (update-and-draw [_ canvas window]
     (let [att-pos (get-state window)
           force (v/sub att-pos position)
-          d (m/constrain (v/mag force) 5.0 25.0)
+          d (m/constrain ^double (v/mag force) 5.0 25.0)
           strength (/ (* amass mass) (m/sq d))
           nvelocity (v/add velocity (-> force
                                         v/normalize

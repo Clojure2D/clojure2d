@@ -21,6 +21,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 (def ^:const ^int w 2048)
 (def ^:const ^int h 2048)
@@ -49,13 +50,13 @@
         fct (if (r/brand 0.5)
               m/TWO_PI
               (r/drand 2.0 7.0))
-        freqs (map #(/ (* 5.0 fct) (double %)) (remove zero? (range (- rngs) rngs (r/irand 1 rngs))))
+        freqs (map #(/ (* 5.0 fct) ^double %) (remove #(zero? ^double %) (range (- rngs) rngs (r/irand 1 rngs))))
         a1 (r/drand)
         a2 (r/drand (- 1.0 a1))
         a3 (r/drand)
         a4 (- 1.0 a3)
         n [(make-jnoise) (make-jnoise) j/perlin-noise j/perlin-noise r/noise r/noise r/noise]
-        palseq (filter #(> 240 (c/to-luma (first %)) 100) (repeatedly #(:palette (g/color-reducer-machine))))
+        palseq (filter #(> 240 ^double (c/to-luma (first %)) 100) (repeatedly #(:palette (g/color-reducer-machine))))
         pal1 (first palseq)
         pal2 (second palseq)
         c1 (first pal1)

@@ -22,11 +22,13 @@
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
             [clojure2d.math.random :as r]
-            [clojure2d.math.vector :as v])
+            [clojure2d.math.vector :as v]
+            [clojure2d.pixels :as p])
   (:import [clojure2d.math.vector Vec2 Vec4]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 (def ^:const ^int w 800)
 (def ^:const ^int hw (/ w 2))
@@ -110,14 +112,16 @@
         matrix-m (map matrix-creator)
         det-m (map det)
         checker (comp not-zerof matrix-m det-m (take 100000))]
-    (not-every? zero? (transduce checker conj generator))))
+    (not-every? clojure.core/zero? (transduce checker conj generator))))
 
 (defn make-matrix-maker
   "Create matrix maker. Values are result of applying some random functions or their combinations"
   []
   (let [funs [(fn [a _] a)
               (fn [_ b] b)
-              + * - #(m/atan2 %1 %2) #(m/hypot %1 %2)
+              clojure.core/+
+              clojure.core/*
+              clojure.core/- #(m/atan2 %1 %2) #(m/hypot %1 %2)
               (fn [a _] (m/sin a))
               (fn [_ b] (m/sin b))
               (fn [a b] (r/noise a b))

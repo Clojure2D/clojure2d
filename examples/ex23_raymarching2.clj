@@ -9,7 +9,8 @@
            [clojure2d.extra.raymarching HitData Material]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 (def ^:const ^long w 1200)
 (def ^:const ^long h 1200)

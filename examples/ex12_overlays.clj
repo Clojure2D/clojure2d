@@ -6,7 +6,7 @@
   (:import [java.awt.image BufferedImage]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 ;; load image and store
 (def img (core/load-image "results/test.jpg"))

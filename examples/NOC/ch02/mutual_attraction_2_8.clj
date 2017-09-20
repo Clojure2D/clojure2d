@@ -29,7 +29,7 @@
     (if (== id (.id ^Mover m2))
       v
       (let [force (v/sub (.position ^Mover m2) position)
-            distance (m/constrain (v/mag force) 5.0 25.0)
+            distance (m/constrain ^double (v/mag force) 5.0 25.0)
             strength (/ (* g mass (.mass ^Mover m2)) (m/sq distance))] 
         (v/add v (-> force
                      v/normalize

@@ -9,7 +9,8 @@
             [clojure2d.math.random :as r]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 ;; size of discrete gaussian free field grid (grid of size gff-size x gff-size)
 (def ^:const ^int gff-size (r/irand 5 100))
@@ -31,24 +32,24 @@
         iy (m/floor py)
         rx (- px ix)
         ry (- py iy)
-        ix (int (mod ix gff-size))
-        iy (int (mod iy gff-size))
-        ix+ (int (mod (inc ix) gff-size))
-        iy+ (int (mod (inc iy) gff-size))
+        ix (unchecked-int (mod ix gff-size))
+        iy (unchecked-int (mod iy gff-size))
+        ix+ (unchecked-int (mod (inc ix) gff-size))
+        iy+ (unchecked-int (mod (inc iy) gff-size))
         vy1 (m/lerp (get-in gff [ix iy]) (get-in gff [ix+ iy]) rx)
         vy2 (m/lerp (get-in gff [ix iy+]) (get-in gff [ix+ iy+]) rx)]
     (m/lerp vy1 vy2 ry)))
 
 (defn my-draw
   ""
-  [canvas hf]
+  [canvas ^double hf]
   (do
     (set-background canvas 21 20 19)
     (dotimes [t rays]
       (let [theta (* t rsteps)]
-        (loop [x (double (* 0.5 w))
-               y (double (* 0.5 h))
-               iter (int 0)]
+        (loop [x (* 0.5 w)
+               y (* 0.5 h)
+               iter (long 0)]
           (when (< iter 350)
             (let [v (* hf (get-field-value x y))
                   sx (m/sin (+ v theta))
@@ -56,12 +57,12 @@
               (rect canvas x y 0.8 0.8)
               (recur (+ x sx)
                      (+ y sy)
-                     (unchecked-inc-int iter)))))))))
+                     (inc iter)))))))))
 
 (defn draw
   ""
-  [canvas window frame _]
-  (let [kappa (* (double frame) 0.0041)
+  [canvas window ^long frame _]
+  (let [kappa (* frame 0.0041)
         hf (/ (m/sqrt (* 8.0 (/ kappa m/PI))) 
               (- 4.0 kappa))]
     (my-draw canvas hf)))

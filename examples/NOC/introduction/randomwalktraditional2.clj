@@ -13,8 +13,8 @@
                                          (* 0.5 ^int (height canvas))])
         stepx (dec (int (r/drand 3)))
         stepy (dec (int (r/drand 3)))
-        nx (m/constrain (+ x stepx) 0 (width canvas))
-        ny (m/constrain (+ y stepy) 0 (height canvas))]
+        nx (m/constrain (+ x stepx) 0 ^int (width canvas))
+        ny (m/constrain (+ y stepy) 0 ^int (height canvas))]
 
     (-> canvas
         (set-color :white)

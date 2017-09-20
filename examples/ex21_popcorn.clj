@@ -10,7 +10,8 @@
   (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 (def ^:const ^long w 900)
 (def ^:const ^long h 900)
@@ -38,8 +39,8 @@
                                                            (v/add nf)) m/TWO_PI)) point-step))
         nx (.x v)
         ny (.y v)
-        screenx (m/norm nx -8.0 8.0 0 w)
-        screeny (m/norm ny -8.0 8.0 0 h)]
+        ^double screenx (m/norm nx -8.0 8.0 0 w)
+        ^double screeny (m/norm ny -8.0 8.0 0 h)]
     (if (and (<= 40 screeny (- h 41)) (<= 40 screenx (- w 41)))
       (do
         (point canvas screenx screeny)

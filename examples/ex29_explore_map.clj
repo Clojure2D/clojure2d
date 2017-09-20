@@ -8,6 +8,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 (def canvas (create-canvas 600 600))
 (def window (show-window canvas "Explore map"))
@@ -20,8 +21,8 @@
   "Standard Map"
   [^double K]
   (fn [^double I ^double Theta]
-    (let [^double I' (mod (+ I (* K (m/sin Theta))) m/TWO_PI)
-          ^double Theta' (mod (+ Theta I') m/TWO_PI)]
+    (let [I' (mod (+ I (* K (m/sin Theta))) m/TWO_PI)
+          Theta' (mod (+ Theta I') m/TWO_PI)]
       [I' Theta'])))
 
 (defn make-henon-quadratic-map

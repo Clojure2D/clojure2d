@@ -23,7 +23,7 @@
   ""
   [^Mover m]
   (let [force (v/sub attractor-pos (.position m))
-        distance (m/constrain (v/mag force) 5.0 25.0)
+        distance (m/constrain ^double (v/mag force) 5.0 25.0)
         strength (/ (* 0.4 attractor-mass (.mass m)) (m/sq distance))]
     (-> force
         (v/normalize)

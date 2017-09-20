@@ -9,7 +9,7 @@
   (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
-(set! *unchecked-math* true)
+(set! *unchecked-math* :warn-on-boxed)
 
 (defn draw-glass
   ""

@@ -5,6 +5,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 (def ^:const ^int scl 8)
 (def ^:const ^int w 1000)

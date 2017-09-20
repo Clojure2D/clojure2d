@@ -5,6 +5,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 (def ^:const ^int scl 8)
 (def ^:const ^int w 640)
@@ -23,12 +24,12 @@
 (defn neighbours
   "Count neighbours"
   [board ^long x ^long y]
-  (reduce + (for [^long offx [-1 0 1]
-                  ^long offy [-1 0 1]
-                  :when (not (and (zero? offx) (zero? offy)))
-                  :let [xx (+ offx x)
-                        yy (+ offy y)]]
-              (get-in board [yy xx]))))
+  (reduce clojure.core/+ (for [^long offx [-1 0 1]
+                               ^long offy [-1 0 1]
+                               :when (not (and (zero? offx) (zero? offy)))
+                               :let [xx (+ offx x)
+                                     yy (+ offy y)]]
+                           (get-in board [yy xx]))))
 
 (defn next-board
   "Calculate next board"
