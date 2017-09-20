@@ -1,4 +1,4 @@
-# clojure2d
+# clojure2d [![Build Status](https://travis-ci.org/Clojure2D/clojure2d.svg?branch=master)](https://travis-ci.org/Clojure2D/clojure2d)
 
 Clojure2D is a lightweight library supporting generative coding or glitching. It's based on Java2D directly. It's Clojure only, no ClojureScript version.
 
