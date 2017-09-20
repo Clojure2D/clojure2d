@@ -38,7 +38,7 @@
 
 (defn clamp255
   "Clamp to 0-255 integer"
-  [^double a]
+  ^long [^double a]
   (m/constrain (m/round a) 0 255))
 
 (defn mod255
@@ -46,15 +46,15 @@
   ^long [^long a]
   (bit-and 0xff a))
 
-(defn clamp1
+(defmacro clamp1
   "Clamp to 0.0-1.0"
-  ^double [^double v]
-  (m/constrain v 0.0 1.0))
+  [v]
+  `(m/constrain ~v 0.0 1.0))
 
-(defn mod1
+(defmacro mod1
   "Cut to 0.0-1.0"
-  ^double [^double v]
-  (m/frac v))
+  [v]
+  `(m/frac ~v))
 
 ;; ## Color representation
 
@@ -81,17 +81,17 @@
   (to-color [^Vec3 c]
     (Vec4. (.x c) (.y c) (.z c) 255))
   (to-awt-color [^Vec3 c]
-    (Color. ^int (clamp255 (.x c))
-            ^int (clamp255 (.y c))
-            ^int (clamp255 (.z c))))
+    (Color. (clamp255 (.x c))
+            (clamp255 (.y c))
+            (clamp255 (.z c))))
   (to-luma ^double [^Vec3 c] (to-luma-fn (.x c) (.y c) (.z c)))
   Vec4
   (to-color [c] c)
   (to-awt-color [^Vec4 c]
-    (Color. ^int (clamp255 (.x c))
-            ^int (clamp255 (.y c))
-            ^int (clamp255 (.z c))
-            ^int (clamp255 (.w c))))
+    (Color.  (clamp255 (.x c))
+             (clamp255 (.y c))
+             (clamp255 (.z c))
+             (clamp255 (.w c))))
   (to-luma ^double [^Vec4 c] (to-luma-fn (.x c) (.y c) (.z c)))
   clojure.lang.Keyword
   (to-color [n] (html-color n))
@@ -119,7 +119,7 @@
     (Color. (.getRed cc)
             (.getGreen cc)
             (.getBlue cc)
-            ^int (clamp255 a))))
+            (clamp255 a))))
 
 (defn make-awt-color
   "Create java.awt.Color object. Use with `core/set-awt-color` or `core/set-awt-background`."
@@ -128,14 +128,14 @@
   ([c a]
    (set-awt-alpha c a))
   ([r g b]
-   (Color. ^int (clamp255 r)
-           ^int (clamp255 g)
-           ^int (clamp255 b)))
+   (Color. (clamp255 r)
+           (clamp255 g)
+           (clamp255 b)))
   ([r g b a]
-   (Color. ^int (clamp255 r)
-           ^int (clamp255 g)
-           ^int (clamp255 b)
-           ^int (clamp255 a))))
+   (Color. (clamp255 r)
+           (clamp255 g)
+           (clamp255 b)
+           (clamp255 a))))
 
 (defn make-color
   "Create Vec4 object as color representation. Use with `core/set-color` or `core/set-background`."
@@ -228,22 +228,22 @@
 (defn blend-linearburn
   "Linear burn"
   ^double [^double a ^double b]
-  (clamp1 (- (+ a b) 1.0)))
+  (clamp1 (dec (+ a b))))
 
 (defn blend-mlinearburn
   "Modulus linear burn"
   ^double [^double a ^double b]
-  (mod1 (- (+ a b) 1.0)))
+  (mod1 (dec (+ a b))))
 
 (defn blend-darken
   "Darken"
-  ^double [^double a ^double b]
-  (if (> a b) b a))
+  ^double [^double a ^double b] 
+  (min a b))
 
 (defn blend-lighten
   "Lighten"
   ^double [^double a ^double b]
-  (if (< a b) b a))
+  (max a b))
 
 (defn blend-multiply
   "Multiply"
@@ -255,16 +255,12 @@
   ^double [^double a ^double b]
   (let [ra (- 1.0 a)
         rb (- 1.0 b)]
-    (->> ra
-         (* rb)
-         (- 1.0))))
+    (- 1.0 (* rb ra))))
 
 (defn blend-dodge
   "Dodge"
   ^double [^double a ^double b]
-  (clamp1 (->> b
-               (- 1.0)
-               (/ a))))
+  (clamp1 (/ a (- 1.0 b))))
 
 (defn blend-mdodge
   "Modulus dodge"
@@ -274,16 +270,12 @@
 (defn blend-burn
   "Burn"
   ^double [^double a ^double b]
-  (clamp1 (->> b
-               (/ (- 1.0 a))
-               (- 1.0))))
+  (clamp1 (- 1.0 (/ (- 1.0 a) b))))
 
 (defn blend-mburn
   "Modulus burn"
   ^double [^double a ^double b]
-  (mod1 (->> (max 0.0001 b)
-             (/ (- 1.0 a))
-             (- 1.0))))
+  (mod1 (- 1.0 (/ (- 1.0 a) (max 0.0001 b)))))
 
 (defn blend-hardmix
   "Hard mix"
@@ -347,22 +339,22 @@
 (defn blend-or
   "Bitwise or"
   ^double [^double a ^double b]
-  (let [aa (long (* a 255.0))
-        bb (long (* b 255.0))]
+  (let [aa (unchecked-long (* a 255.0))
+        bb (unchecked-long (* b 255.0))]
     (get-r255 (bit-and 0xff (bit-or aa bb)))))
 
 (defn blend-and
   "Bitwise and"
   ^double [^double a ^double b]
-  (let [aa (long (* a 255.0))
-        bb (long (* b 255.0))]
+  (let [aa (unchecked-long (* a 255.0))
+        bb (unchecked-long (* b 255.0))]
     (get-r255 (bit-and 0xff (bit-and aa bb)))))
 
 (defn blend-xor
   "Bitwise xor"
   ^double [^double a ^double b]
-  (let [aa (long (* a 255.0))
-        bb (long (* b 255.0))]
+  (let [aa (unchecked-long (* a 255.0))
+        bb (unchecked-long (* b 255.0))]
     (get-r255 (bit-and 0xff (bit-xor aa bb)))))
 
 (defn blend-exclusion
@@ -376,7 +368,7 @@
   ^double [^double a ^double b]
   (let [c (- (+ a a) 1.0)]
     (cond (< b c) c
-          (and (<= c b) (< b (+ c 1.0))) b
+          (bool-and (<= c b) (< b (+ c 1.0))) b
           :else (+ c 1.0))))
 
 (defn blend-pinlight
@@ -392,7 +384,7 @@
 (defn blend-opacity
   "Opacity (with `*blend-threshold*`)"
   (^double [^double a ^double b ^double thr]
-   (m/lerp a b thr))
+   (m/mlerp a b thr))
   (^double [^double a ^double b]
    (m/lerp a b *blend-threshold*)))
 
@@ -607,7 +599,7 @@
 
 ;; ### sRGB
 
-(def ^:const ^double gamma-factor (/ 1.0 2.4))
+(def ^:const ^double gamma-factor (/ 2.4))
 
 (defn to-linear
   "Gamma correction"
@@ -640,7 +632,6 @@
               (v/mult 255.0)
               (v/applyf clamp255))
           (.w c)))
-
 
 ;; ### XYZ
 
@@ -707,7 +698,7 @@
   "LUV reciprocal"
   ^double [^double x]
   (if (>= (m/abs x) m/EPSILON)
-    (/ 1.0 x)
+    (/ x)
     (/ (m/sgn x) m/EPSILON)))
 
 (defn to-LUV
@@ -835,10 +826,11 @@
   (let [mx (max (.x c) (.y c) (.z c))
         chr (- mx (min (.x c) (.y c) (.z c)))
         h (* 255.0 (/ (if (zero? chr) 0.0
-                          (double (condp m/eq mx
-                                    (.x c) (m/remainder (+ 6.0 (/ (- (.y c) (.z c)) chr)) 6.0)
-                                    (.y c) (+ 2.0 (/ (- (.z c) (.x c)) chr))
-                                    (.z c) (+ 4.0 (/ (- (.x c) (.y c)) chr))))) 6.0))
+                          (if (== mx (.x c))
+                            (rem (+ 6.0 (/ (- (.y c) (.z c)) chr)) 6.0)
+                            (if (== mx (.y c))
+                              (+ 2.0 (/ (- (.z c) (.x c)) chr))
+                              (+ 4.0 (/ (- (.x c) (.y c)) chr))))) 6.0))
         luma (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))]
     (v/applyf (Vec4. h chr luma (.w c)) clamp255)))
 
@@ -848,7 +840,7 @@
   (let [h (* 6.0 (get-r255 (.x c)))
         chr (.y c)
         l (.z c)
-        x (* chr (- 1.0 (m/abs (dec ^double (m/remainder h 2.0)))))
+        x (* chr (- 1.0 (m/abs (dec (rem h 2.0)))))
         ^Vec3 rgb (cond
                     (and (<= 0.0 h) (< h 1.0)) (Vec3. chr x 0.0)
                     (and (<= 1.0 h) (< h 2.0)) (Vec3. x chr 0.0)
@@ -869,11 +861,12 @@
         delta (- mx mn)
         hsb (if (zero? mx) (Vec3. 0.0 0.0 0.0)
                 (let [s (* 255.0 (/ delta mx))
-                      h (if (zero? delta) 0.0 
-                            (/ (double (condp m/eq mx
-                                         (.x c) (/ (- (.y c) (.z c)) delta)
-                                         (.y c) (+ 2.0 (/ (- (.z c) (.x c)) delta))
-                                         (.z c) (+ 4.0 (/ (- (.x c) (.y c)) delta)))) 6.0))]
+                      h (if (zero? delta) 0.0
+                            (/ (if (== mx (.x c))
+                                 (/ (- (.y c) (.z c)) delta)
+                                 (if (== mx (.y c))
+                                   (+ 2.0 (/ (- (.z c) (.x c)) delta))
+                                   (+ 4.0 (/ (- (.x c) (.y c)) delta)))) 6.0))]
                   (v/applyf (Vec3. (* 255.0 (if (neg? h) (inc h) h)) s mx) clamp255)))]
     (v/vec4 hsb (.w c))))
 
@@ -889,7 +882,7 @@
             p (* b (- 1.0 s))
             q (* b (- 1.0 (* s f)))
             t (* b (- 1.0 (* s (- 1.0 f))))
-            rgb (condp m/eq (int h)
+            rgb (case (unchecked-int h)
                   0 (Vec3. b t p)
                   1 (Vec3. q b p)
                   2 (Vec3. p b t)
@@ -981,7 +974,7 @@
           f (- h i)
           f (if (odd? (int i)) (- 1.0 f) f)
           n (+ w (* f (- v w)))
-          rgb (condp m/eq i
+          rgb (case i
                 0 (Vec3. v n w)
                 1 (Vec3. n v w)
                 2 (Vec3. w v n)
@@ -1128,7 +1121,7 @@
 (defn to-Gray
   "RGB->Grayscale"
   [^Vec4 c]
-  (let [l (to-luma c)]
+  (let [^double l (to-luma c)]
     (Vec4. l l l (.w c))))
 
 ;; do nothing in reverse
@@ -1173,8 +1166,8 @@
   "Convert hexadecimal color representation to color"
   [s]
   (let [x (Long/parseLong s 16)
-        x1 (bit-and 0xff (bit-shift-right x 16))
-        x2 (bit-and 0xff (bit-shift-right x 8))
+        x1 (bit-and 0xff (>> x 16))
+        x2 (bit-and 0xff (>> x 8))
         x3 (bit-and 0xff x)]
     (Vec4. x1 x2 x3 255)))
 
@@ -1210,7 +1203,7 @@
                        (v/emult b)
                        (v/add a))]
       (-> (Vec4. (.x cc) (.y cc) (.z cc) 1.0)
-          (v/mult 255)
+          (v/mult 255.0)
           (v/applyf clamp255)))))
 
 (defn make-iq-random-palette
@@ -1221,7 +1214,7 @@
         c (v/generate-vec3 (partial r/drand 2))
         d (v/generate-vec3 r/drand)
         f (make-iq-palette-fn a b c d)]
-    (mapv f (range 0.0 1.0 (/ 1.0 num)))))
+    (mapv f (range 0.0 1.0 (/ num)))))
 
 ;; ### Paletton
 
@@ -1418,15 +1411,15 @@
 (defmethod paletton-palette :triad [_ hue & conf]
   (let [{compl :compl
          preset :preset
-         angle :angle
+         ^double angle :angle
          adj :adj
          :or {compl false
               preset :full
               angle 30.0
               adj true}} (first conf)
         chue (+ 180.0 ^double hue)
-        hue1 (if adj (+ ^double hue ^double angle) (+ chue ^double angle))
-        hue2 (if adj (- ^double hue ^double angle) (- chue ^double angle))
+        hue1 (if adj (+ ^double hue angle) (+ chue angle))
+        hue2 (if adj (- ^double hue angle) (- chue angle))
         ppreset (if (keyword? preset) (paletton-presets preset) preset)
         p1 (make-monochromatic-palette hue ppreset)
         p2 (make-monochromatic-palette hue1 ppreset)
@@ -1440,11 +1433,11 @@
 ;; * `:angle` - angle between main hue and additional color
 (defmethod paletton-palette :tetrad [_ hue & conf]
   (let [{preset :preset
-         angle :angle
+         ^double angle :angle
          :or {preset :full
               angle 30.0}} (first conf)
         p1 (paletton-palette :monochromatic hue {:preset preset :compl true})
-        p2 (paletton-palette :monochromatic (+ ^double angle ^double hue) {:preset preset :compl true})]
+        p2 (paletton-palette :monochromatic (+ angle ^double hue) {:preset preset :compl true})]
     (vec (concat p1 p2))))
 
 ;; ## Additional functions
@@ -1455,7 +1448,7 @@
    (let [s (count xf)]
      (loop [i (int 0)
             currc c
-            currdist (double Double/MAX_VALUE)]
+            currdist Double/MAX_VALUE]
        (if (< i s)
          (let [c1 (xf i)
                dist (double (f c c1))]

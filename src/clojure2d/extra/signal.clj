@@ -197,8 +197,8 @@
                          (if (< idx (.size p))
                            (do
                              (if dir
-                               (aset ^ints buff titer (int (p/get-value p channel idx)))
-                               (p/set-value p channel idx (int (aget ^ints buff titer))))
+                               (aset ^ints buff titer ^int (p/get-value p channel idx))
+                               (p/set-value p channel idx (aget ^ints buff titer)))
                              (recur (inc idx) (inc titer)))
                            titer))]
          (recur (next ch) (int curr-iter)))))
@@ -218,8 +218,8 @@
                          (if ch
                            (let [channel (first ch)]
                              (if dir
-                               (aset ^ints buff titer (int (p/get-value p channel idx)))
-                               (p/set-value p channel idx (int (aget ^ints buff titer))))
+                               (aset ^ints buff titer ^int (p/get-value p channel idx))
+                               (p/set-value p channel idx (aget ^ints buff titer)))
                              (recur (next ch) (inc titer)))
                            titer))]
          (recur (inc idx) (int curr-iter)))))
@@ -255,7 +255,7 @@
          e (:little-endian config) ;; endianness
          s (:signed config) ;; sign
          nb (bit-shift-right b 3) ;; number of packed values in signal value (1 - one value, 8 bits; 2 - two values; 16 bits; 3 - three values; 24 bits) 
-         ^doubles buff (double-array (int (m/ceil (/ (double (* (count channels) (.size p))) (double nb))))) ;; target buffer
+         ^doubles buff (double-array (m/ceil (/ (* (count channels) (.size p)) (double nb)))) ;; target buffer
          ^ints layout (if (= :planar (:layout config)) ;; layout Pixels and give pure ints
                         (pre-layout-planar true p channels)
                         (pre-layout-interleaved true p channels))
@@ -288,7 +288,7 @@
         ^long b (:bits config) ;; number of bits in signal
         e (:little-endian config) ;; endianness
         s (:signed config) ;; sign
-        nb (bit-shift-right b 3) ;; number of values)
+        nb (>> b 3) ;; number of values)
         ^doubles buff (.signal sig) ;; extract signal
         ^ints layout (int-array (* (count channels) (.size target))) ;; prepare layout
         limit (- (alength layout) (dec nb)) ;; number of values to process
@@ -304,7 +304,7 @@
       (when (< idx limit)
         (let [v (coding (aget ^doubles buff bidx))]
           (condp = nb
-            1 (aset ^ints layout idx (int (double-to-ints 8 v e s)))
+            1 (aset ^ints layout idx ^int (double-to-ints 8 v e s)) ;; boxed math
             2 (let [^Vec2 v (double-to-ints 16 v e s)]
                 (aset ^ints layout idx (int (.x v)))
                 (aset ^ints layout (inc idx) (int (.y v))))
@@ -452,8 +452,8 @@
 (defn- calc-filter-alpha
   "Calculate alpha factor"
   ^double [^double rate ^double cutoff]
-  (let [tinterval (/ 1.0 rate)
-        tau (/ 1.0 (* cutoff m/TWO_PI))]
+  (let [tinterval (/ rate)
+        tau (/ (* cutoff m/TWO_PI))]
     (/ tinterval (+ tau tinterval))))
 
 (defmethod make-effect :simple-lowpass [_ {:keys [rate cutoff]
@@ -497,7 +497,7 @@
               (/ sw)
               (m/sinh)
               (* sw))
-        a0r (/ 1.0 (+ 1.0 (/ g J)))
+        a0r (/ (+ 1.0 (/ g J)))
 
         b0 (* a0r (+ 1.0 (* g J)))
         b1 (* a0r -2.0 cw)
@@ -571,7 +571,7 @@
         sn (m/sin omega)
         cs (m/cos omega)
         alpha (* sn (m/sinh (* m/LN2_2 bw (/ omega sn))))
-        a0r (/ 1.0 (inc alpha))
+        a0r (/ (inc alpha))
         cs- (- 1.0 cs)
         
         b0 (* a0r 0.5 cs-)
@@ -588,7 +588,7 @@
         sn (m/sin omega)
         cs (m/cos omega)
         alpha (* sn (m/sinh (* m/LN2_2 bw (/ omega sn))))
-        a0r (/ 1.0 (inc alpha))
+        a0r (/ (inc alpha))
         cs+ (inc cs)
         
         b0 (* a0r 0.5 cs+)
@@ -605,7 +605,7 @@
         sn (m/sin omega)
         cs (m/cos omega)
         alpha (* sn (m/sinh (* m/LN2_2 bw (/ omega sn))))
-        a0r (/ 1.0 (inc alpha))
+        a0r (/ (inc alpha))
         
         b0 (* a0r alpha)
         b1 0.0
@@ -734,15 +734,15 @@
    (fn
      ([^double sample ^StateDivider state]
       (let [count (inc (.count state))
-            ^StateDivider s1 (if (or (and (> sample 0.0) (<= (.last state) 0.0))
-                                     (and (neg? sample) (>= (.last state) 0.0)))
+            ^StateDivider s1 (if (bool-or (bool-and (> sample 0.0) (<= (.last state) 0.0))
+                                          (bool-and (neg? sample) (>= (.last state) 0.0)))
                                (if (== denom 1)
                                  (StateDivider. (if (pos? (.out state)) -1.0 1.0) 0.0 0.0 (/ (.amp state) count) (.last state) 0)
                                  (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (inc (.zeroxs state))))
                                (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (.zeroxs state)))
             amp (+ (.amp s1) (m/abs sample))
-            ^StateDivider s2 (if (and (> denom 1)
-                                      (== ^long (rem (.zeroxs s1) denom) (dec denom)))
+            ^StateDivider s2 (if (bool-and (> denom 1)
+                                           (== ^long (rem (.zeroxs s1) denom) (dec denom)))
                                (StateDivider. (if (pos? (.out s1)) -1.0 1.0) 0.0 0 (/ amp (.count s1)) (.last s1) 0)
                                (StateDivider. (.out s1) amp (.count s1) (.lamp s1) (.last s1) (.zeroxs s1)))]
         (SampleAndState. (* (.out s2) (.lamp s2)) (StateDivider. (.out s2) (.amp s2) (.count s2) (.lamp s2) sample (.zeroxs s2)))))
@@ -773,7 +773,7 @@
               new-integral (+ (.integral state) sig)
               m (m/cos (+ new-integral (* omega (.t state))))
               ^double m (if (pos? quant)
-                          (m/norm (int (m/norm m -1.0 1.0 0.0 quant)) 0.0 quant -1.0 1.0)
+                          (m/norm (unchecked-int (m/norm m -1.0 1.0 0.0 quant)) 0.0 quant -1.0 1.0)
                           m)
               dem (m/abs (- m (.pre state)))
               ^EffectsList res (single-pass (.lp state) dem)
@@ -794,7 +794,7 @@
 ;; * `:freq` - cutoff frequency (default 1000.0)
 (defmethod make-effect :bandwidth-limit [_ {:keys [^double freq ^double rate]
                                             :or {freq 1000.0 rate 44100.0}}]
-  (let [dx (double (/ ^double freq rate))]
+  (let [dx (/ freq rate)]
     (make-effect-node (fn
                         ([^double sample ^double state]
                          (let [res (if (>= sample state)
@@ -851,7 +851,7 @@
 (defmethod make-effect :decimator [_ {:keys [^double bits ^double fs ^double rate]
                                       :or {bits 2.0 fs 4410.0 rate 44100.0}}]
   (let [step (m/pow 0.5 (- bits 0.9999))
-        stepr (/ 1.0 step)
+        stepr (/ step)
         ratio (/ fs rate)]
     (make-effect-node (fn
                         ([^double sample ^StateDecimator state]
@@ -948,7 +948,7 @@
 
 (defmethod make-effect :echo [_ {:keys [^double delay ^double decay ^double rate]
                                  :or {delay 0.5 decay 0.5 rate 44100.0}}]
-  (let [buffer-len (int (min 10000000.0 (* delay rate)))]
+  (let [buffer-len (int (min 10000000 (* delay rate)))]
     (make-effect-node (fn
                         ([^double sample ^StateEcho state]
                          (let [result (+ sample (* decay (aget ^doubles (.buffer state) (.position state))))]
@@ -1070,8 +1070,8 @@
                                bp (bit-and (dec (.bp state)) 0x7ff)]
                            (aset ^doubles (.buffer state) bp (+ sample (* fb (.f state))))
                            (let [tmpf (+ dem (* dep (- 1.0 (m/sq ph))))
-                                 tmp (int tmpf)
-                                 tmpf (- tmpf (double tmp))
+                                 tmp (unchecked-int tmpf)
+                                 tmpf (- tmpf tmp)
                                  tmp (bit-and (+ tmp bp) 0x7ff)
                                  tmpi (bit-and (inc tmp) 0x7ff)
                                  f (aget ^doubles (.buffer state) tmp)
@@ -1181,5 +1181,5 @@
         ^doubles buffer (double-array len)
         limit (dec seconds)]
     (dotimes [i len]
-      (aset ^doubles buffer (int i) ^double (f (m/norm i 0 len 0 limit))))
+      (aset ^doubles buffer i ^double (f (m/norm i 0 len 0 limit))))
     (Signal. buffer)))

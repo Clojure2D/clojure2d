@@ -26,7 +26,7 @@
             k 1.0]
        (let [posx (r/irand w)
              posy (r/irand h)
-             xk (double (p/get-value pixels ch (+ sx posx) (+ sy posy)))
+             ^int xk (p/get-value pixels ch (+ sx posx) (+ sy posy))
              newA (+ A (/ (- xk A) k))
              newQ (+ Q (* (- xk A) (- xk newA)) )]
          (if (< k limit)
@@ -37,8 +37,8 @@
   "Decompose channel into segments where mins is minimum size of segment, maxs is maximum size, thr is accuracy (minimum std dev of pixel values to make decision about subdivision."
   [^Pixels p ch {:keys [^long min-size ^long max-size ^double threshold]
                  :or {mins 4 maxs 256 thr 15.0}}]
-  (let [ww (bit-shift-left 1 (m/high-2-exp (.w p)))
-        hh (bit-shift-left 1 (m/high-2-exp (.h p)))
+  (let [ww (<< 1 (m/high-2-exp (.w p)))
+        hh (<< 1 (m/high-2-exp (.h p)))
         mins (max 2 min-size)
 
         segmf (fn local-segmentation
@@ -50,7 +50,7 @@
                      (if (or (> size max-size)
                              (and (> size mins)
                                   (> stdev threshold)))
-                       (let [mid (long (/ size 2))]
+                       (let [mid (>> size 1)]
                          (->> res
                               (local-segmentation (+ x mid) (+ y mid) mid)
                               (local-segmentation x (+ y mid) mid)

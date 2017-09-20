@@ -54,10 +54,10 @@
 (defn render-rgb-scanlines
   "Blurs and renders rgb stripes on the image, returns new image. Scale parameter (default 1.6) controls amount of blur. Resulting image is sligtly lighter and desaturated. Correct with normalize filter if necessary."
   ([p {:keys [^double scale] :or {scale 1.6}}]
-   (let [w (double (width p))
-         h (double (height p))
+   (let [^int w (width p)
+         ^int h (height p)
          rimg (-> p
-                  (resize-image (int (/ w scale)) (int (/ h scale)))
+                  (resize-image (unchecked-int (/ w scale)) (unchecked-int (/ h scale)))
                   (resize-image w h)
                   (p/get-image-pixels))
          l1 (tinter1 rimg)
@@ -109,9 +109,9 @@
                      x- (adjust-pos-value xx -1.0 resolution)
                      x (adjust-pos-value xx 0.0 resolution)
                      x+ (adjust-pos-value xx 1.0 resolution)
-                     a (double (p/get-value p ch x- y))
-                     b (double (p/get-value p ch x y))
-                     c (double (p/get-value p ch x+ y))
+                     ^int a (p/get-value p ch x- y)
+                     ^int b (p/get-value p ch x y)
+                     ^int c (p/get-value p ch x+ y)
                      ^double dst (dist xx)
                      ^double wa (gauss (dec dst) hardpix)
                      ^double wb (gauss dst hardpix)
@@ -127,14 +127,14 @@
                    (let [y- (adjust-pos-value yy -1.0 resolution)
                          y (adjust-pos-value yy 0.0 resolution)
                          y+ (adjust-pos-value yy 1.0 resolution)
-                         a (double (p/get-value p ch xx y-))
-                         b (double (p/get-value p ch xx y))
-                         c (double (p/get-value p ch xx y+))
+                         ^int a (p/get-value p ch xx y-)
+                         ^int b (p/get-value p ch xx y)
+                         ^int c (p/get-value p ch xx y+)
                          ^double dst (dist yy)
                          ^double wa (gauss (dec dst) hardscan)
                          ^double wb (gauss dst hardscan)
                          ^double wc (gauss (inc dst) hardscan)
-                         xf (unsigned-bit-shift-right (rem (+ xx (* mask-mult yy)) 6) 1)]
+                         xf (>>> (rem (+ xx (* mask-mult yy)) 6) 1)]
                      (-> (+ (* a wa) (+ (* b wb) (* c wc)))
                          (/ 1000000.0)
                          (c/from-linear) 
@@ -180,7 +180,7 @@
 (defn- spots
   "Create transparent image with spots with set alpha and intensity"
   [^double alpha ^double intensity ^long w ^long h]
-  (let [size (double (* 4 w h))
+  (let [size (* 4 w h)
         limita (int (min 5.0 (* 1.0e-5 (/ size 4.0))))
         limitb (int (min 6.0 (* 6.0e-5 (/ size 4.0))))
         ^ints pc (int-array size)

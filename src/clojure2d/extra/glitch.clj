@@ -35,8 +35,8 @@
 ;; Pixels are shifted by value returned by wave function. You have to provide separate wave functions for x and y axises.
 ;; Random setup is based on sum of oscillators defined in `signal` namespace.
 
-(def freqs (mapv #(bit-shift-left 1 ^long %) (range 8)))
-(def amps (mapv #(/ 1.0 (double %)) freqs))
+(def freqs (mapv #(<< 1 ^long %) (range 8)))
+(def amps (mapv #(/ ^long %) freqs))
 
 (defn slitscan-random-setup
   "Create list of random waves "
@@ -61,16 +61,14 @@
 (defn slitscan
   ""
   [fx fy ch ^Pixels p x y]
-  (let [wp (double (.w p))
-        hp (double (.h p))
-        x (double x)
-        y (double y)
+  (let [wp (.w p)
+        hp (.h p)
         sx (/ 1.0 wp)
         sy (/ 1.0 hp)
-        shiftx (* 0.3 wp ^double (fx (* x sx)))
-        shifty (* 0.3 hp ^double (fy (* y sy)))
-        xx (m/wrap 0.0 wp (+ x shiftx))
-        yy (m/wrap 0.0 hp (+ y shifty))]
+        shiftx (* 0.3 wp ^double (fx (* ^int x sx)))
+        shifty (* 0.3 hp ^double (fy (* ^int y sy)))
+        xx (m/wrap 0.0 wp (+ ^int x shiftx))
+        yy (m/wrap 0.0 hp (+ ^int y shifty))]
     (p/get-value p ch xx yy)))
 
 (defn make-slitscan-filter
@@ -102,8 +100,8 @@
                    v1 (f (Vec2. r- yv))
                    v2 (f (Vec2. r yv))
                    ^Vec2 vv (v/interpolate v1 v2 xlerp)
-                   xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
-                   yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
+                   xx (unchecked-int (m/norm (.x vv) r- r 0.0 (.w p)))
+                   yy (unchecked-int (m/norm (.y vv) r- r 0.0 (.h p)))]
                (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
   ([f]
    (make-slitscan2-filter f 2.0)))
@@ -120,8 +118,8 @@
            (dotimes [x (.w p)]
              (let [^double xv (m/norm x 0.0 (.w p) r- r)
                    ^Vec2 vv (f (Vec2. xv yv))
-                   xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
-                   yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
+                   xx (unchecked-int (m/norm (.x vv) r- r 0.0 (.w p)))
+                   yy (unchecked-int (m/norm (.y vv) r- r 0.0 (.h p)))]
                (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
   ([f]
    (make-fold-filter f 2.0)))
@@ -184,7 +182,7 @@
             1 (mi-draw-point ch target source (- size y 1) (- size x 1) x y tx ty)
             2 (mi-draw-point ch target source x y (- size x 1) (- size y 1) tx ty)
             3 (mi-draw-point ch target source (- size x 1) (- size y 1) x y tx ty))
-          (recur (unchecked-dec x)))))))
+          (recur (dec x)))))))
 
 (defn- mi-do-diag-rect
   ""

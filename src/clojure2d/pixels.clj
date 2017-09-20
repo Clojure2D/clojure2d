@@ -77,7 +77,7 @@
       (if planar?
         (System/arraycopy p off res 0 size)
         (dotimes [idx size]
-          (aset res idx (aget p (+ ^long ch (bit-shift-left idx 2))))))
+          (aset res idx (aget p (+ ^long ch (<< idx 2))))))
       res))
 
   (set-channel [_ ch v]
@@ -97,7 +97,7 @@
       (condp = *pixels-edge*
         :zero 0
         :edge (get-value pixels ch (m/constrain ^long x 0 (dec w)) (m/constrain ^long y 0 (dec h)))
-        :wrap (get-value pixels ch (int (m/wrap 0 w x)) (int (m/wrap 0 h y)))
+        :wrap (get-value pixels ch (unchecked-int (m/wrap 0 w x)) (unchecked-int (m/wrap 0 h y)))
         *pixels-edge*)
       (get-value pixels ch (+ ^long x (* ^long y w)))))
 
@@ -115,12 +115,12 @@
       (condp = *pixels-edge*
         :zero (Vec4. 0 0 0 255)
         :edge (get-color pixels (m/constrain ^long x 0 (dec w)) ((m/constrain ^long y 0 (dec h))))
-        :wrap (get-color pixels (int (m/wrap 0 w x)) (int (m/wrap 0 h y)))
+        :wrap (get-color pixels (unchecked-int (m/wrap 0 w x)) (unchecked-int (m/wrap 0 h y)))
         (Vec4. *pixels-edge* *pixels-edge* *pixels-edge* 255))
       (get-color pixels (+ ^long x (* ^long y w)))))
 
   (set-value [_ ch idx v]
-    (aset ^ints p (int (pos ch idx)) (int v))
+    (aset ^ints p (unchecked-int (pos ch idx)) (unchecked-int v))
     p)
 
   (set-value [pixels ch x y v]
@@ -128,10 +128,10 @@
 
   (set-color [_ idx v] 
     (let [^Vec4 v v]
-      (aset ^ints p ^long (pos 0 idx) (int (.x v)))
-      (aset ^ints p ^long (pos 1 idx) (int (.y v)))
-      (aset ^ints p ^long (pos 2 idx) (int (.z v)))
-      (aset ^ints p ^long (pos 3 idx) (int (.w v))))
+      (aset ^ints p ^long (pos 0 idx) (unchecked-int (.x v)))
+      (aset ^ints p ^long (pos 1 idx) (unchecked-int (.y v)))
+      (aset ^ints p ^long (pos 2 idx) (unchecked-int (.z v)))
+      (aset ^ints p ^long (pos 3 idx) (unchecked-int (.w v))))
     p)
 
   (set-color [pixels x y v]
@@ -191,7 +191,7 @@
             (let [q (quot x (.size p))
                   r (rem x (.size p))]
               (+ q (bit-shift-left r 2))))]
-    (replace-pixels p (amap ^ints (.p p) idx ret (int (aget ^ints (.p p) (int (f idx))))) true)))
+    (replace-pixels p (amap ^ints (.p p) idx ret (unchecked-int (aget ^ints (.p p) (unchecked-int (f idx))))) true)))
 
 (defn from-planar
   "Convert planar pixel layout to interleaved"
@@ -200,7 +200,7 @@
             (let [q (bit-shift-right x 0x2)
                   r (bit-and x 0x3)]
               (+ q (* (.size p) r))))]
-    (replace-pixels p (amap ^ints (.p p) idx ret (int (aget ^ints (.p p) (int (f idx))))) false)))
+    (replace-pixels p (amap ^ints (.p p) idx ret (unchecked-int (aget ^ints (.p p) (unchecked-int (f idx))))) false)))
 
 ;; ## Pixels converters
 
@@ -228,7 +228,7 @@
    (let [^Pixels p (if (.planar? pin) (from-planar pin) pin)] 
      (.. b
          (getRaster)
-         (setPixels ^int x ^int y (int (.w p)) (int (.h p)) ^ints (.p p))))
+         (setPixels ^int x ^int y (unchecked-int (.w p)) (unchecked-int (.h p)) ^ints (.p p))))
    b)
   ([^BufferedImage b ^Pixels p]
    (set-image-pixels! b 0 0 p)))
@@ -277,12 +277,12 @@
   [f ^Pixels p]
   (let [^Pixels target (clone-pixels p)
         pre-step (double (max 40000 ^long (/ (.size p) core/available-tasks)))
-        step (int (m/ceil pre-step))
+        step (unchecked-int (m/ceil pre-step))
         parts (range 0 (.size p) step)
         ftrs (doall
               (map
                #(future (let [end (min (+ ^long % step) (.size p))]
-                          (loop [idx (int %)]
+                          (loop [idx (unchecked-int %)]
                             (when (< idx end)
                               (set-color target idx ^Vec4 (f (get-color p idx)))
                               (recur (unchecked-inc idx))))))
@@ -297,7 +297,7 @@
   (let [size (.size target)
         start (* ch size)
         stop (* (inc ch) size)]
-    (loop [idx (int start)]
+    (loop [idx (unchecked-int start)]
       (when (< idx stop)
         (aset ^ints (.p target) idx ^int (f (aget ^ints (.p p) idx)))
         (recur (unchecked-inc idx))))
@@ -335,8 +335,8 @@
   "Blend one channel, write result into target. Works only on planar. Blending function should accept two `int` values (as channel values) and return `int`. If you want to use blending functions which are predefined in `color` namespace use `compose-channels` filter. This is "
   [f ch ^Pixels target ^Pixels p1 ^Pixels p2]
   (let [size (.size target)
-        start (int (* ^long ch size))
-        stop (int (* (inc ^long ch) size))]
+        start (* ^long ch size)
+        stop (* (inc ^long ch) size)]
     (loop [idx start]
       (when (< idx stop)
         (aset ^ints (.p target) idx ^int (f (aget ^ints (.p p1) idx) (aget ^ints (.p p2) idx)))
@@ -443,7 +443,7 @@
       (let [aget-2d (make-aget-2d in w h)
             size (* w h)
             ^ints target (int-array size)
-            iarr (/ 1.0 (double (inc (+ r r))))
+            iarr (/ (inc (+ r r)))
             r+ (inc r)
             rang (range (- r+) r)]
         (dotimes [x w]
@@ -453,7 +453,7 @@
               (when (< y h)
                 (let [nv (- (+ v ^long (aget-2d x (+ y r)))
                             ^long (aget-2d x (- y r+)))]
-                  (aset ^ints target (+ x (* w y)) (int (* (double nv) iarr)))
+                  (aset ^ints target (+ x (* w y)) (unchecked-int (* (double nv) iarr)))
                   (recur (unchecked-inc y) nv))))))
         target)))
 
@@ -464,7 +464,7 @@
       (let [aget-2d (make-aget-2d in w h)
             size (* w h)
             ^ints target (int-array size)
-            iarr (/ 1.0 (double (inc (+ r r))))
+            iarr (/ (inc (+ r r)))
             r+ (inc r)
             rang (range (- r+) r)]
         (dotimes [y h]
@@ -475,7 +475,7 @@
               (when (< x w)
                 (let [nv (- (+ v ^long (aget-2d (+ x r) y))
                             ^long (aget-2d (- x r+) y))]
-                  (aset ^ints target (+ x off) (int (* (double nv) iarr)))
+                  (aset ^ints target (+ x off) (unchecked-int (* (double nv) iarr)))
                   (recur (unchecked-inc x) nv))))))
         target)))
 
@@ -512,11 +512,11 @@
                     (inc)
                     (m/sqrt)
                     (m/floor))
-        wl (if (even? (int w-ideal)) (dec w-ideal) w-ideal)
+        wl (if (even? (unchecked-int w-ideal)) (dec w-ideal) w-ideal)
         wu (+ wl 2.0)
         m-ideal (/ (- sigma* (* n (m/sq wl)) (* 4.0 n wl) (* 3.0 n))
                    (- (* -4.0 wl) 4.0))
-        m (long (m/round m-ideal))]
+        m (m/round m-ideal)]
     (vec (map #(int (/ (dec (if (< ^long % m) wl wu)) 2.0)) (range n)))))
 
 (def radius-for-gauss-memo (memoize radius-for-gauss))
@@ -552,7 +552,7 @@
   [^long numlev]
   (let [f (fn ^long [^long idx] (-> idx
                                     (* numlev)
-                                    (bit-shift-right 8)
+                                    (>> 8)
                                     (* 255)
                                     (/ (dec numlev))))
         ^ints tmp (int-array 256)]
@@ -563,7 +563,7 @@
 (defn posterize-pixel
   "Posterize one pixel"
   [levels v]
-  (aget ^ints levels (int v)))
+  (aget ^ints levels (unchecked-int v)))
 
 (defn make-posterize
   "Create posterize filter"
@@ -589,7 +589,7 @@
 (defn make-threshold
   "Create threshold filter for given value."
   ([^double thr]
-   (let [t (long (* 256.0 thr))]
+   (let [t (unchecked-long (* 256.0 thr))]
      (partial filter-channel (partial threshold-pixel t))))
   ([]
    (make-threshold 0.5)))
@@ -621,7 +621,7 @@
 (defn- calc-tint
   "Calculate tint"
   ^long [^long a ^long b]
-  (bit-shift-right (bit-and 0xff00 (* a b)) 8))
+  (>> (bit-and 0xff00 (* a b)) 8))
 
 (defn- make-tint-map
   "Create tint lookup tables."
@@ -651,12 +651,12 @@
   ""
   ([ch1 ch2 ch3 ch4]
    (fn [^long ch target p]
-     (let [^double chv (case ch
-                         0 ch1
-                         1 ch2
-                         2 ch3
-                         ch4)]
-       (filter-channel #(m/constrain (long (* (double %) chv)) 0 255) ch target p))))
+     (let [chv (case ch
+                 0 ch1
+                 1 ch2
+                 2 ch3
+                 ch4)]
+       (filter-channel #(m/constrain (* (double %) ^long chv) 0.0 255.0) ch target p))))
   ([ch1 ch2 ch3]
    (make-modulate-filter ch1 ch2 ch3 1.0)))
 
@@ -689,7 +689,7 @@
   [ch ^Pixels p]
   (let [^doubles hist (double-array 256 0.0)
         sz (.size p)
-        d (double (/ 1.0 (double (.size p))))]
+        d (/ (.size p))]
     (loop [idx (int 0)]
       (if (< idx sz)
         (let [c (get-value p ch idx)]
@@ -703,10 +703,10 @@
   (let [^ints lookup (int-array 256 0)]
     (loop [currmn Integer/MAX_VALUE
            currmx Integer/MIN_VALUE
-           sum (double 0.0)
-           idx (int 0)]
+           sum 0.0
+           idx 0]
       (if (< idx 256)
-        (let [currsum (+ sum ^double (aget ^doubles hist idx))
+        (let [currsum (+ sum (aget ^doubles hist idx))
               val (m/round (m/constrain (* sum 255.0) 0.0 255.0))]
           (aset ^ints lookup idx val)
           (recur (min val currmn)
@@ -785,8 +785,8 @@
           ivx (long vx)
           ivy (long vy)]
       (when (and (< -1 ivx sizex) (< -1 ivy sizey)) 
-        (let [restx (- vx (double ivx))
-              resty (- vy (double ivy))
+        (let [restx (- vx ivx)
+              resty (- vy ivy)
               ivx+ (inc ivx)
               ivy+ (inc ivy)]
 
@@ -830,7 +830,7 @@
                       c3 (* 255.0 (+ (* intensity col3)
                                      (* rintensity (m/pow col3 cgamma))))
                       color (v/applyf (Vec4. c1 c2 c3 255.0) c/clamp255)
-                      color (if (and (== 1.0 saturation) (== 1.0 brightness))
+                      color (if (bool-and (== 1.0 saturation) (== 1.0 brightness))
                               color
                               (c/from-HSB (v/applyf (v/emult multiplier (c/to-HSB color)) c/clamp255)))] ;; apply brightness, saturation factors
                   (set-color p (+ x row) (v/interpolate background color alpha)))))))) ;; store!
