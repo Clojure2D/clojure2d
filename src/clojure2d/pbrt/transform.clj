@@ -1,15 +1,15 @@
 ;; 3d space transformations, pbrt.org
 
 (ns clojure2d.pbrt.transform
-  (:require [clojure2d.math :refer :all]
+  (:require [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
-            [clojure2d.pbrt.matrix :as mat]
-            [clojure2d.math :as m])
+            [clojure2d.pbrt.matrix :as mat])
   (:import [clojure2d.pbrt.matrix Matrix4x4]
            [clojure2d.math.vector Vec3]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 (defprotocol TransformProto
   (mult [t1 t2]))
@@ -74,22 +74,22 @@
    (make-transform :rotate (.x v) (.y v) (.z v)))
   ([_ ^double x ^double y ^double z]
    (let [result (if (zero? x) mat/I
-                    (let [sa (sin x)
-                          ca (cos x)]
+                    (let [sa (m/sin x)
+                          ca (m/cos x)]
                       (Matrix4x4. 1.0 0.0 0.0 0.0
                                   0.0 ca (- sa) 0.0
                                   0.0 sa ca 0.0
                                   0.0 0.0 0.0 1.0)))
          result (if (zero? y) result
-                    (let [sa (sin y)
-                          ca (cos y)]
+                    (let [sa (m/sin y)
+                          ca (m/cos y)]
                       (mat/mult result (Matrix4x4. ca 0.0 sa 0.0
                                                    0.0 1.0 0.0 0.0
                                                    (- sa) 0.0 ca 0.0
                                                    0.0 0.0 0.0 1.0))))
          result (if (zero? z) result
-                    (let [sa (sin z)
-                          ca (cos z)]
+                    (let [sa (m/sin z)
+                          ca (m/cos z)]
                       (mat/mult result (Matrix4x4. ca (- sa) 0.0 0.0
                                                    sa ca 0.0 0.0
                                                    0.0 0.0 1.0 0.0
@@ -99,8 +99,8 @@
 (defmethod make-transform :axis-rotate
   ([_ ^double angle ^Vec3 axis]
    (let [^Vec3 a (v/normalize axis)
-         sa (sin angle)
-         ca (cos angle)
+         sa (m/sin angle)
+         ca (m/cos angle)
          ca- (- 1.0 ca)
          x2 (* (.x a) (.x a))
          y2 (* (.y a) (.y a))
@@ -135,7 +135,7 @@
                           0.0 1.0 0.0 0.0
                           0.0 0.0 (/ f dfn) (/ (* (- f) n) dfn)
                           0.0 0.0 1.0 0.0)
-        invtanang (/ 1.0 (tan (* 0.5 fov)))]
+        invtanang (/ 1.0 (m/tan (* 0.5 fov)))]
     (mult (make-transform :scale invtanang invtanang 1.0)
           (make-transform :default persp))))
 

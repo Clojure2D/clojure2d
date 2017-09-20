@@ -8,14 +8,12 @@
 ;; All vectors are equipped with Counted (`count`), Sequential, Sequable (`seq`) and IFn protocols. Additionally Clojure vector is equipped with defined here `VectorProto`.
 
 (ns clojure2d.math.vector
-  (:require [clojure2d.math :as m]
-            [primitive-math :as prim])
+  (:require [clojure2d.math :as m])
   (:import [clojure.lang Counted IFn PersistentVector Seqable Sequential]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
-
-(prim/use-primitive-operators)
+(m/use-primitive-operators)
 
 ;; Tolerance (epsilon), used in `is-near-zero?` fn
 (def ^:const ^double TOLERANCE 1.0e-6)
@@ -85,9 +83,9 @@
    :dot #(reduce clojure.core/+ (map clojure.core/* %1 %2))
    :add #(mapv clojure.core/+ %1 %2)
    :sub #(mapv clojure.core/- %1 %2)
-   :mult (fn [v1 v] (map #(* (double %) ^double v) v1))
+   :mult (fn [v1 v] (map #(clojure.core/* (double %) ^double v) v1))
    :emult #(mapv clojure.core/* %1 %2)
-   :div #(mult %1 (/ 1.0 (double %2)))
+   :div #(mult %1 (/ (double %2)))
    :abs #(mapv m/abs %)
    :mx #(reduce clojure.core/max %)
    :mn #(reduce clojure.core/min %)
@@ -97,7 +95,7 @@
    :mindim #(first (reduce (find-idx-reducer-fn clojure.core/<) [0.0 0.0 (first %)] %))
    :sum #(reduce clojure.core/+ %)
    :permute #(mapv (fn [idx] (%1 idx)) %2)
-   :reciprocal #(mapv (fn [v] (/ 1.0 ^double v)) %)
+   :reciprocal #(mapv (fn [^double v] (/ v)) %)
    :interpolate (fn
                   ([v1 v2 t f]
                    (mapv #(f %1 %2 t) v1 v2))
@@ -106,7 +104,7 @@
                    ([v1 v2 v f]
                     (mapv #(f %1 %2 %3) v1 v2 v))
                    ([v1 v2 v] (einterpolate v1 v2 v m/lerp)))
-   :econstrain (fn [v val1 val2] (mapv #(m/constrain %1 val1 val2)) v)
+   :econstrain (fn [v val1 val2] (mapv #(m/constrain ^double %1 ^double val1 ^double val2)) v)
    :is-zero? #(every? clojure.core/zero? %)
    :is-near-zero? #(every? near-zero? %)})
 
@@ -117,8 +115,8 @@
   (equals [_ v]
     (and (instance? Vec2 v)
          (let [^Vec2 v v]
-           (and (== x (.x v))
-                (== y (.y v))))))
+           (bool-and (== x (.x v))
+                     (== y (.y v))))))
   Sequential
   Seqable
   (seq [_] (list x y))
@@ -126,7 +124,7 @@
   (count [_] 2)
   IFn
   (invoke [_ id]
-    (case (int id)
+    (case (unchecked-int id)
       0 x
       1 y
       nil))
@@ -164,7 +162,7 @@
   (sum [_] (+ x y))
   (permute [p [^long i1 ^long i2]]
     (Vec2. (p i1) (p i2)))
-  (reciprocal [_] (Vec2. (/ 1.0 x) (/ 1.0 y)))
+  (reciprocal [_] (Vec2. (/ x) (/ y)))
   (interpolate [_ v2 t f]
     (let [^Vec2 v2 v2] (Vec2. (f x (.x v2) t)
                               (f y (.y v2) t))))
@@ -175,10 +173,10 @@
       (Vec2. (f x (.x v2) (.x v))
              (f y (.y v2) (.y v)))))
   (einterpolate [v1 v2 v] (einterpolate v1 v2 v m/lerp))
-  (econstrain [_ val1 val2] (Vec2. (m/constrain x val1 val2)
-                                   (m/constrain y val1 val2)))
-  (is-zero? [_] (and (zero? x) (zero? y)))
-  (is-near-zero? [_] (and (near-zero? x) (near-zero? y)))
+  (econstrain [_ val1 val2] (Vec2. (m/constrain x ^double val1 ^double val2)
+                                   (m/constrain y ^double val1 ^double val2)))
+  (is-zero? [_] (bool-and (zero? x) (zero? y)))
+  (is-near-zero? [_] (m/bool-and (near-zero? x) (near-zero? y)))
   (heading [_] (m/atan2 y x))
   (rotate [_ angle]
     (let [sa (m/sin angle)
@@ -199,6 +197,8 @@
     (Vec2. (* x (m/cos y))
            (* x (m/sin y)))))
 
+
+
 ;; Create Vec3 and add all necessary protocols
 (deftype Vec3 [^double x ^double y ^double z]
   Object
@@ -206,9 +206,9 @@
   (equals [_ v]
     (and (instance? Vec3 v)
          (let [^Vec3 v v]
-           (and (== x (.x v))
-                (== y (.y v))
-                (== z (.z v))))))
+           (bool-and (== x (.x v))
+                     (== y (.y v))
+                     (== z (.z v))))))
   Sequential
   Seqable
   (seq [_] (list x y z))
@@ -216,7 +216,7 @@
   (count [_] 3)
   IFn
   (invoke [_ id]
-    (case (int id)
+    (case (unchecked-int id)
       0 x
       1 y
       2 z
@@ -262,7 +262,7 @@
   (sum [_] (+ x y z))
   (permute [p [^long i1 ^long i2 ^long i3]]
     (Vec3. (p i1) (p i2) (p i3)))
-  (reciprocal [_] (Vec3. (/ 1.0 x) (/ 1.0 y) (/ 1.0 z)))
+  (reciprocal [_] (Vec3. (/ x) (/ y) (/ z)))
   (interpolate [_ v2 t f]
     (let [^Vec3 v2 v2] (Vec3. (f x (.x v2) t)
                               (f y (.y v2) t)
@@ -275,11 +275,11 @@
              (f y (.y v2) (.y v))
              (f z (.z v2) (.z v)))))
   (einterpolate [v1 v2 v] (einterpolate v1 v2 v m/lerp))
-  (econstrain [_ val1 val2] (Vec3. (m/constrain x val1 val2)
-                                   (m/constrain y val1 val2)
-                                   (m/constrain z val1 val2)))
-  (is-zero? [_] (and (zero? x) (zero? y) (zero? z)))
-  (is-near-zero? [_] (and (near-zero? x) (near-zero? y) (near-zero? z)))
+  (econstrain [_ val1 val2] (Vec3. (m/constrain x ^double val1 ^double val2)
+                                   (m/constrain y ^double val1 ^double val2)
+                                   (m/constrain z ^double val1 ^double val2)))
+  (is-zero? [_] (bool-and (zero? x) (zero? y) (zero? z)))
+  (is-near-zero? [_] (bool-and (near-zero? x) (near-zero? y) (near-zero? z)))
   (heading [v1] (angle-between v1 (Vec3. 1 0 0)))
   (cross [_ v2]
     (let [^Vec3 v2 v2
@@ -374,10 +374,10 @@
   (equals [_ v]
     (and (instance? Vec4 v)
          (let [^Vec4 v v]
-           (and (== x (.x v))
-                (== y (.y v))
-                (== z (.z v))
-                (== w (.w v))))))
+           (bool-and (== x (.x v))
+                     (== y (.y v))
+                     (== z (.z v))
+                     (== w (.w v))))))
   Sequential
   Seqable
   (seq [_] (list x y z w))
@@ -385,7 +385,7 @@
   (count [_] 4)
   IFn
   (invoke [_ id]
-    (case (int id)
+    (case (unchecked-int id)
       0 x
       1 y
       2 z
@@ -423,7 +423,7 @@
   (sum [_] (+ x y z w))
   (permute [p [^long i1 ^long i2 ^long i3 ^long i4]]
     (Vec4. (p i1) (p i2) (p i3) (p i4)))
-  (reciprocal [_] (Vec4. (/ 1.0 x) (/ 1.0 y) (/ 1.0 z) (/ 1.0 w)))
+  (reciprocal [_] (Vec4. (/ x) (/ y) (/ z) (/ w)))
   (interpolate [_ v2 t f]
     (let [^Vec4 v2 v2] (Vec4. (f x (.x v2) t)
                               (f y (.y v2) t)
@@ -438,12 +438,12 @@
              (f z (.z v2) (.z v))
              (f w (.w v2) (.w v)))))
   (einterpolate [v1 v2 v] (einterpolate v1 v2 v m/lerp))
-  (econstrain [_ val1 val2] (Vec4. (m/constrain x val1 val2)
-                                   (m/constrain y val1 val2)
-                                   (m/constrain z val1 val2)
-                                   (m/constrain w val1 val2)))
-  (is-zero? [_] (and (zero? x) (zero? y) (zero? z) (zero? w)))
-  (is-near-zero? [_] (and (near-zero? x) (near-zero? y) (near-zero? z) (near-zero? w)))
+  (econstrain [_ val1 val2] (Vec4. (m/constrain x ^double val1 ^double val2)
+                                   (m/constrain y ^double val1 ^double val2)
+                                   (m/constrain z ^double val1 ^double val2)
+                                   (m/constrain w ^double val1 ^double val2)))
+  (is-zero? [_] (bool-and (zero? x) (zero? y) (zero? z) (zero? w)))
+  (is-near-zero? [_] (bool-and (near-zero? x) (near-zero? y) (near-zero? z) (near-zero? w)))
   (heading [v1] (angle-between v1 (Vec4. 1 0 0 0))))
 
 ;; ## Common vector functions
@@ -483,7 +483,7 @@
   "Canberra distance"
   [v1 v2]
   (let [num (abs (sub v1 v2))
-        denom (applyf (add (abs v1) (abs v2)) #(if (zero? ^double %) 0.0 (/ 1.0 ^double %)))]
+        denom (applyf (add (abs v1) (abs v2)) #(if (zero? ^double %) 0.0 (/ ^double %)))]
     (sum (emult num denom))))
 
 (defn dist-emd
@@ -524,7 +524,7 @@
 
 (defn angle-between
   "Angle between two vectors"
-  [v1 v2]
+  ^double [v1 v2]
   (if (or (is-zero? v1) (is-zero? v2))
     0
     (let [^double d (dot v1 v2)
@@ -537,7 +537,7 @@
 (defn aligned?
   "Are vectors aligned (have the same direction)?"
   [v1 v2]
-  (< ^double (angle-between v1 v2) TOLERANCE))
+  (< (angle-between v1 v2) TOLERANCE))
 
 (defn faceforward
   "Flip normal"

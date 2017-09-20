@@ -3,19 +3,119 @@
 ;; Collection of math function:
 ;;
 ;; * Several constants from Java, C, Processing, etc.
-;; * Functions based on FastMath wrapped in Clojure functions (trigonometry, powers/logartihms/roots, rounding)
+;; * Functions based on FastMath exposed as macros or functions (trigonometry, powers/logartihms/roots, rounding)
+;; * Primitive operators (as in primitive-math package)
 ;; * Additional math functions (signum, constrain, interpolation)
 ;; * Statistics
 
 (ns clojure2d.math
   "Math functions"
-  (:require [primitive-math :as prim])
-  (:import net.jafama.FastMath))
+  (:refer-clojure
+   :exclude [* + - / > < >= <= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max])
+  (:import [net.jafama FastMath]
+           [clojure2d.java PrimitiveMath]
+           [clojure.lang Numbers]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
-(prim/use-primitive-operators)
+;; ## Macros
+
+(defmacro ^:private javaclass-proxy
+  "Wrapps operation into macro"
+  ([class alt-name name]
+   (let [f (symbol (str class "/" name))
+         d (str  class " "  name " function.")]
+     `(defmacro ~alt-name
+        ([x#]
+         (list '~f x#))
+        ([x# y#]
+         (list '~f x# y#))
+        ([x# y# z#]
+         (list '~f x# y# z#)))))
+  ([class name]
+   `(javaclass-proxy ~class ~name ~name)))
+
+(defmacro ^:private fastmath-proxy [& rest] `(javaclass-proxy "net.jafama.FastMath" ~@rest))
+(defmacro ^:private primitivemath-proxy [& rest] `(javaclass-proxy "clojure2d.java.PrimitiveMath" ~@rest))
+
+(defmacro ^:private variadic-proxy
+  "Creates left-associative variadic forms for any operator.
+  https://github.com/ztellman/primitive-math/blob/master/src/primitive_math.clj#L10"
+  ([name]
+   `(variadic-proxy ~name ~name))
+  ([name fn]
+   `(variadic-proxy ~name ~fn identity))
+  ([name fn single-arg-form]
+   (let [x-sym (gensym "x")
+         fname (symbol (str "clojure2d.java.PrimitiveMath/" fn))
+         doc (str "A primitive macro version of `" name "`")]
+     `(defmacro ~name
+        ~doc
+        ([~x-sym]
+         ~((eval single-arg-form) x-sym))
+        ([x# y#]
+         (list '~fname x# y#))
+        ([x# y# ~'& rest#]
+         (list* '~name (list '~name x# y#) rest#))))))
+
+(defmacro ^:private variadic-predicate-proxy
+  "Turns variadic predicates into multiple pair-wise comparisons.
+  https://github.com/ztellman/primitive-math/blob/master/src/primitive_math.clj#L27"
+  ([name]
+   `(variadic-predicate-proxy ~name ~name))
+  ([name fn]
+   `(variadic-predicate-proxy ~name ~fn (constantly true)))
+  ([name fn single-arg-form]
+   (let [x-sym (gensym "x")
+         fname (symbol (str "clojure2d.java.PrimitiveMath/" fn))
+         doc (str "A primitive macro version of `" name "`")]
+     `(defmacro ~name
+        ~doc
+        ([~x-sym]
+         ~((eval single-arg-form) x-sym))
+        ([x# y#]
+         (list '~fname x# y#))
+        ([x# y# ~'& rest#]
+         (list 'clojure2d.java.PrimitiveMath/and (list '~name x# y#) (list* '~name y# rest#)))))))
+
+;; ## Basic operations
+
+(variadic-proxy + add)
+(variadic-proxy - subtract (fn [x] `(list 'clojure2d.java.PrimitiveMath/negate ~x)))
+(variadic-proxy * multiply)
+(variadic-proxy / divide (fn [x] `(list 'clojure2d.java.PrimitiveMath/reciprocal ~x)))
+(primitivemath-proxy inc)
+(primitivemath-proxy dec)
+(primitivemath-proxy rem remainder)
+(primitivemath-proxy quot quotient)
+(primitivemath-proxy mod modulus)
+(variadic-proxy bit-and bitAnd)
+(variadic-proxy bit-or bitOr)
+(variadic-proxy bit-xor bitXor)
+(primitivemath-proxy bit-not bitNot)
+(variadic-proxy bool-and and)
+(variadic-proxy bool-or or)
+(variadic-proxy bool-xor xor)
+(primitivemath-proxy bool-not not)
+(variadic-proxy min)
+(variadic-proxy max)
+(primitivemath-proxy zero? isZero)
+(primitivemath-proxy neg? isNeg)
+(primitivemath-proxy pos? isPos)
+(primitivemath-proxy << shiftLeft)
+(primitivemath-proxy >> shiftRight)
+(primitivemath-proxy >>> unsignedShiftRight)
+(primitivemath-proxy bit-shift-left shiftLeft)
+(primitivemath-proxy bit-shift-right shiftRight)
+(primitivemath-proxy unsigned-bit-shift-right unsignedShiftRight)
+
+(variadic-predicate-proxy < lt)
+(variadic-predicate-proxy > gt)
+(variadic-predicate-proxy <= lte)
+(variadic-predicate-proxy >= gte)
+(variadic-predicate-proxy == eq)
+(variadic-predicate-proxy not== neq)
 
 ;; ## Math functions
 ;;
@@ -35,24 +135,9 @@
 (def ^:const ^double EPSILON 1.0e-10)
 
 ;; Common fractions
-(def ^:const ^double THIRD (/ 1.0 3.0))
+(def ^:const ^double THIRD (/ 3.0))
 (def ^:const ^double TWO_THIRD (/ 2.0 3.0))
-(def ^:const ^double SIXTH (/ 1.0 6.0))
-
-(defmacro ^:private fastmath-proxy
-  "Wrapps operation into macro"
-  ([alt-name name]
-   (let [f (symbol (str "net.jafama.FastMath/" name))
-         d (str "FastMath " name " function.")]
-     `(defmacro ~alt-name
-        ([x#]
-         (list '~f x#))
-        ([x# y#]
-         (list '~f x# y#))
-        ([x# y# z#]
-         (list '~f x# y# z#)))))
-  ([name]
-   `(fastmath-proxy ~name ~name)))
+(def ^:const ^double SIXTH (/ 6.0))
 
 ;; Trigonometry
 (fastmath-proxy sin)
@@ -74,8 +159,8 @@
 
 ;; Additional trigonometry functions
 (defn cot ^double [^double v] (FastMath/tan (- HALF_PI v)))
-(defn sec ^double [^double v] (/ 1.0 (FastMath/cos v)))
-(defn csc ^double [^double v] (/ 1.0 (FastMath/sin v)))
+(defn sec ^double [^double v] (/ (FastMath/cos v)))
+(defn csc ^double [^double v] (/ (FastMath/sin v)))
 
 ;; Additional cyclometric functions
 (defn acot ^double [^double v] (- HALF_PI (FastMath/atan v)))
@@ -84,19 +169,21 @@
 (fastmath-proxy atan2)
 
 ;; Additional hyperbolic functions
-(defn coth ^double [^double v] (/ 1.0 (FastMath/tanh v)))
-(defn sech ^double [^double v] (/ 1.0 (FastMath/cosh v)))
-(defn csch ^double [^double v] (/ 1.0 (FastMath/sinh v)))
+(defn coth ^double [^double v] (/ (FastMath/tanh v)))
+(defn sech ^double [^double v] (/ (FastMath/cosh v)))
+(defn csch ^double [^double v] (/ (FastMath/sinh v)))
 
 ;; Additional inverse hyperbolic functions
-(defn acoth ^double [^double v] (FastMath/atanh (/ 1.0 v)))
-(defn asech ^double [^double v] (FastMath/acosh (/ 1.0 v)))
-(defn acsch ^double [^double v] (FastMath/asinh (/ 1.0 v)))
+(defn acoth ^double [^double v] (FastMath/atanh (/ v)))
+(defn asech ^double [^double v] (FastMath/acosh (/ v)))
+(defn acsch ^double [^double v] (FastMath/asinh (/ v)))
 
 ;; exp and log
 (fastmath-proxy exp)
 (fastmath-proxy log)
 (fastmath-proxy log10)
+;; Alias for natural logarithm
+(fastmath-proxy ln log)
 
 ;; Roots (square and cubic)
 (fastmath-proxy sqrt)
@@ -119,20 +206,17 @@
     (if (< x 1.0e-5) 1.0
         (/ (FastMath/sin x) x))))
 
-;; Alias for natural logarithm
-(fastmath-proxy ln log)
-
 ;; Few logarithm constants
 ;; \\(\ln 2\\)
 (def ^:const ^double LN2 (log 2.0))
-(def ^:const ^double INV_LN2 (/ 1.0 LN2))
+(def ^:const ^double INV_LN2 (/ LN2))
 (def ^:const ^double LN2_2 (* 0.5 LN2))
 
 ;; \\(\ln 10\\)
 (def ^:const ^double LN10 (log 10.0))
 
 ;; \\(\frac{1.0}{\ln{0.5}}\\)
-(def ^:const ^double INV_LOG_HALF (/ 1.0 ^double (log 0.5)))
+(def ^:const ^double INV_LOG_HALF (/ (log 0.5)))
 
 (defn log2
   "Log with base 2"
@@ -169,7 +253,9 @@
 (defn safe-sqrt
   "Safe sqrt, for value <= 0 result is 0"
   ^double [^double value]
-  (if (neg? value) 0 (sqrt value)))
+  (if (neg? value) 0.0 (sqrt value)))
+
+;; Approximated sqrt via binary operations (error 1.0E-2)
 (fastmath-proxy qsqrt sqrtQuick)
 (fastmath-proxy rqsqrt invSqrtQuick)
 
@@ -188,15 +274,15 @@
 (fastmath-proxy iabs)
 
 ;; fractional part, always returns values from 0.0 to 1.0 (exclusive)
-(defmacro frac [v] `(abs (- ~v (double (long ~v)))))
+(defmacro frac [v] `(abs (- ~v (unchecked-long ~v))))
 
 ;; Find power of 2 exponent for double number where  
 ;; \\(2^(n-1)\leq x\leq 2^n\\)  
 ;; where n-1 is result of `low-2-exp` and n is result of `high-2-exp`
 ;; `(low-2-exp TWO_PI) => 2` \\(2^2\eq 4\leq 6.28\\)  
 ;; `(high-2-exp TWO_PI) => 3` \\(6.28\leq 2^3\eq 8\\)
-(defn low-2-exp ^long [v] (-> v log2 floor long))
-(defn high-2-exp ^long [v] (-> v log2 ceil long))
+(defn low-2-exp ^long [v] (-> v log2 floor unchecked-long))
+(defn high-2-exp ^long [v] (-> v log2 ceil unchecked-long))
 
 ;; More constants
 
@@ -215,7 +301,7 @@
 (def ^:const ^double SQRT2PI (sqrt TWO_PI))
 
 ;; Golden ratio \\(\varphi\\)
-(def ^:const ^double PHI (* (+ 1.0 SQRT5) 0.5))
+(def ^:const ^double PHI (* (inc SQRT5) 0.5))
 
 ;; math.h predefined constants names
 (def ^:const ^double M_E E)
@@ -226,11 +312,11 @@
 (def ^:const ^double M_PI PI)
 (def ^:const ^double M_PI_2 HALF_PI)
 (def ^:const ^double M_PI_4 QUARTER_PI)
-(def ^:const ^double M_1_PI (/ 1.0 PI))
+(def ^:const ^double M_1_PI (/ PI))
 (def ^:const ^double M_2_PI (/ 2.0 PI))
 (def ^:const ^double M_2_SQRTPI (/ 2.0 SQRTPI))
 (def ^:const ^double M_SQRT2 SQRT2)
-(def ^:const ^double M_SQRT1_2 (/ 1.0 SQRT2))
+(def ^:const ^double M_SQRT1_2 (/ SQRT2))
 
 (def ^:const ^double M_TWOPI TWO_PI)
 (def ^:const ^double M_3PI_4 (* PI 0.75))
@@ -238,16 +324,16 @@
 (def ^:const ^double M_LN2LO 1.9082149292705877000E-10)
 (def ^:const ^double M_LN2HI 6.9314718036912381649E-1)
 (def ^:const ^double M_SQRT3 SQRT3)
-(def ^:const ^double M_IVLN10 (/ 1.0 LN10))
+(def ^:const ^double M_IVLN10 (/ LN10))
 (def ^:const ^double M_LOG2_E LN2)
-(def ^:const ^double M_INVLN2 (/ 1.0 LN2))
+(def ^:const ^double M_INVLN2 (/ LN2))
 
 (defn signum
   "Return 1 if the specified value is > 0, 0 if it is 0, -1 otherwise"
   ^double [^double value]
   (cond (pos? value) 1.0
         (neg? value) -1.0
-        :else 0.0))
+        true 0.0))
 
 (defn sgn
   "Return -1 when value is negative, 1 otherwise"
@@ -257,33 +343,24 @@
 ;;`(constrain 0.5 1 2) => 1`  
 ;;`(constrain 1.5 1 2) => 1.5`  
 ;;`(constrain 2.5 1 2) => 2`  
-(defn constrain
+(defmacro constrain
   "Clamp value between mn and mx"
-  ^double [^double value ^double mn ^double mx]
-  (if (> value mx) 
-    mx
-    (if (< value mn) 
-      mn 
-      value)))
-
-(defn iconstrain
-  "Clamp value between mn and mx (`long` optimized version)"
-  ^long [^long value ^long mn ^long mx]
-  (if (> value mx) 
-    mx
-    (if (< value mn) 
-      mn 
-      value)))
+  [value mn mx]
+  `(max (min ~value ~mx) ~mn))
 
 ;; Map value from range `[start1,stop1]` to new range `[start2,stop2]` or if new range is not given map to `[0,1]`
+(defmacro ^:private normalize-macro
+  [v start stop]
+  `(if (== ~start ~stop)
+     (if (< ~v ~start) 0.0 1.0)
+     (/ (- ~v ~start) (- ~stop ~start))))
+
 (defn norm
   "Processing map and norm"
   ([v start1 stop1 start2 stop2] ;; map
-   (+ ^double start2 (* (- ^double stop2 ^double start2) ^double (norm v start1 stop1))))
+   (+ ^double start2 (* (- ^double stop2 ^double start2) (normalize-macro ^double v ^double start1 ^double stop1))))
   (^double [^double v ^double start ^double stop] ;; norm
-   (if (== start stop)
-     (if (< v start) 0.0 1.0)
-     (/ (- v start) (- stop start)))))
+   (normalize-macro v start stop)))
 
 (defn make-norm
   "Make type hinted map/norm function"
@@ -303,7 +380,7 @@
 (defn cnorm
   "Constrained version of norm"
   ([v start1 stop1 start2 stop2]
-   (constrain (norm v start1 stop1 start2 stop2) start2 stop2))
+   (constrain ^double (norm v start1 stop1 start2 stop2) ^double start2 ^double stop2))
   (^double [v start stop]
    (constrain (norm v start stop) 0.0 1.0)))
 
@@ -401,14 +478,14 @@
    (let [svs (sort vs)]
      (quantile p (count vs) svs (first svs) (last svs))))
   ([p c svs mn mx]
-   (let [pic (* ^double p (double (inc ^long c)))
-         k (double (round pic))
+   (let [pic (* ^double p (inc ^long c))
+         k (round pic)
          d (- pic k)
          ^double ndk (if (zero? k) mn (nth svs (dec k)))]
      (cond
        (zero? k) mn
-       (= c (dec k)) mx
-       (= c k) mx
+       (== ^long c (dec k)) mx
+       (== ^long c k) mx
        :else (+ ndk (* d (- ^double (nth svs k) ndk)))))))
 
 ;; `(median '(1 2 3 -1 -1 2 -1 11 111)) => 2.0`
@@ -421,16 +498,14 @@
 (defn mean
   "Calculate mean of a list"
   ([vs] (mean (reduce clojure.core/+ vs) (count vs)))
-  ([^double sm sz] (/ sm (double sz))))
-
-(+ 1 2)
+  ([^double sm ^long sz] (/ sm sz)))
 
 ;; `(standard-deviation '(1 2 3 -1 -1 2 -1 11 111)) => 34.43333154064031`
 (defn standard-deviation
   "Calculate standard deviation of a list"
   ([vs]
-   (standard-deviation vs (double (count vs)) (mean vs)))
-  ([vs ^double sz ^double u]
+   (standard-deviation vs (count vs) (mean vs)))
+  ([vs ^long sz ^double u]
    (sqrt (/ ^double (reduce clojure.core/+ (map #(pow (- ^double % u) 2) vs)) sz))))
 
 ;; `(median-absolute-deviation '(1 2 3 -1 -1 2 -1 11 111))  => 3.0`
@@ -516,3 +591,54 @@
         (if (= mns pmns)
           mns
           (recur (sort (map mean (vals (group-by (closest-mean-fn mns) vs)))) mns))))))
+
+
+;; ## Copy of primitive math machinery
+;;
+;;
+
+(def ^:private vars-to-exclude
+  '[* + - / > < >= <= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max bool-and bool-or bool-xor bool-not << >> >>> not==])
+
+(defn- using-primitive-operators? []
+  (= #'clojure2d.math/+ (resolve '+)))
+
+(defonce ^:private hijacked? (atom false))
+
+(defn- ns-wrapper
+  "Makes sure that if a namespace that is using primitive operators is reloaded, it will automatically
+   exclude the shadowed operators in `clojure.core`."
+  [f]
+  (fn [& x]
+    (if-not (using-primitive-operators?)
+      (apply f x)
+      (let [refer-clojure (->> x
+                               (filter #(and (sequential? %) (= :refer-clojure (first %))))
+                               first)
+            refer-clojure-clauses (update-in
+                                   (apply hash-map (rest refer-clojure))
+                                   [:exclude]
+                                   #(concat % vars-to-exclude))]
+        (apply f
+               (concat
+                (remove #{refer-clojure} x)
+                [(list* :refer-clojure (apply concat refer-clojure-clauses))]))))))
+
+(defn use-primitive-operators
+  "Replaces Clojure's arithmetic and number coercion functions with primitive equivalents.  These are
+   defined as macros, so they cannot be used as higher-order functions.  This is an idempotent operation.."
+  []
+  (when-not @hijacked?
+    (reset! hijacked? true)
+    (alter-var-root #'clojure.core/ns ns-wrapper))
+  (when-not (using-primitive-operators?)
+    (doseq [v vars-to-exclude]
+      (ns-unmap *ns* v))
+    (require (vector 'clojure2d.math :refer vars-to-exclude))))
+
+(defn unuse-primitive-operators
+  "Undoes the work of `use-primitive-operators`.  This is idempotent."
+  []
+  (doseq [v vars-to-exclude]
+    (ns-unmap *ns* v))
+  (refer 'clojure.core))

@@ -21,15 +21,14 @@
   (:require [clojure2d.color :as c]
             [clojure2d.core :as core]
             [clojure2d.math :as m]
-            [clojure2d.math.vector :as v]
-            [primitive-math :as prim])
+            [clojure2d.math.vector :as v])
   (:import clojure2d.core.Canvas
            [clojure2d.math.vector Vec2 Vec4]
            java.awt.image.BufferedImage))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
-(prim/use-primitive-operators)
+(m/use-primitive-operators)
 
 ;; `*pixels-edge*` describe what is the value of pixel when accessing from outside the image.
 ;; Possible values are:
@@ -97,7 +96,7 @@
             (>= ^long y h))
       (condp = *pixels-edge*
         :zero 0
-        :edge (get-value pixels ch (m/iconstrain x 0 (dec w)) (m/iconstrain y 0 (dec h)))
+        :edge (get-value pixels ch (m/constrain ^long x 0 (dec w)) (m/constrain ^long y 0 (dec h)))
         :wrap (get-value pixels ch (int (m/wrap 0 w x)) (int (m/wrap 0 h y)))
         *pixels-edge*)
       (get-value pixels ch (+ ^long x (* ^long y w)))))
@@ -115,7 +114,7 @@
             (>= ^long y h))
       (condp = *pixels-edge*
         :zero (Vec4. 0 0 0 255)
-        :edge (get-color pixels (m/iconstrain x 0 (dec w)) ((m/iconstrain y 0 (dec h))))
+        :edge (get-color pixels (m/constrain ^long x 0 (dec w)) ((m/constrain ^long y 0 (dec h))))
         :wrap (get-color pixels (int (m/wrap 0 w x)) (int (m/wrap 0 h y)))
         (Vec4. *pixels-edge* *pixels-edge* *pixels-edge* 255))
       (get-color pixels (+ ^long x (* ^long y w)))))
@@ -430,7 +429,7 @@
             (neg? y)
             (>= x w)
             (>= y h))
-      (local-aget-2d (m/iconstrain x 0 (dec w)) (m/iconstrain y 0 (dec h)))
+      (local-aget-2d (m/constrain x 0 (dec w)) (m/constrain y 0 (dec h)))
       (aget array (+ x (* y w))))))
 
 ;; ### Blurs
@@ -569,7 +568,7 @@
 (defn make-posterize
   "Create posterize filter"
   ([^long numlev]
-   (let [nl (m/iconstrain numlev 2 255)
+   (let [nl (m/constrain numlev 2 255)
          ^ints levels (posterize-levels nl)]
      (partial filter-channel (partial posterize-pixel levels))))
   ([]
@@ -611,7 +610,7 @@
 (defn make-quantile-filter
   "Create quantile filter for values from 0 to 8"
   [^long v]
-  (let [q (m/iconstrain v 0 8)]
+  (let [q (m/constrain v 0 8)]
     (partial filter-channel-xy (comp (partial quantile q) get-3x3))))
 
 ;; Create median filter int terms of quantile filter.
@@ -657,7 +656,7 @@
                          1 ch2
                          2 ch3
                          ch4)]
-       (filter-channel #(m/iconstrain (* (double %) chv) 0 255) ch target p))))
+       (filter-channel #(m/constrain (long (* (double %) chv)) 0 255) ch target p))))
   ([ch1 ch2 ch3]
    (make-modulate-filter ch1 ch2 ch3 1.0)))
 
@@ -821,9 +820,9 @@
                       loghit (* (m/log (inc hit)) mxlog) ;; log map for hit, result: 0.0-1.0
                       ;; loghit (m/log2 (inc (* rmx hit))) ;; log map for hit, result: 0.0-1.0
                       alpha (m/pow loghit agamma) ;; gamma for alpha
-                      col1 (aget ^doubles c/r255 (m/iconstrain (int (* rhit (aget ch1 idx))) 0 255)) ;; normalized red
-                      col2 (aget ^doubles c/r255 (m/iconstrain (int (* rhit (aget ch2 idx))) 0 255)) ;; green
-                      col3 (aget ^doubles c/r255 (m/iconstrain (int (* rhit (aget ch3 idx))) 0 255)) ;; and blue
+                      col1 (aget ^doubles c/r255 (m/constrain (* rhit (aget ch1 idx)) 0 255)) ;; normalized red
+                      col2 (aget ^doubles c/r255 (m/constrain (* rhit (aget ch2 idx)) 0 255)) ;; green
+                      col3 (aget ^doubles c/r255 (m/constrain (* rhit (aget ch3 idx)) 0 255)) ;; and blue
                       c1 (* 255.0 (+ (* intensity col1)
                                      (* rintensity (m/pow col1 cgamma)))) ;; interpolate between color and gamma(color), intensity based
                       c2 (* 255.0 (+ (* intensity col2)

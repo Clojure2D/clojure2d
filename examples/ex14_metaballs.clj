@@ -10,6 +10,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 (def ^:const ^long SIZE 600)
 
@@ -28,7 +29,7 @@
 (defn direction
   ""
   ^double [^double p ^double v]
-  (if (or (> p SIZE) (neg? p))
+  (if (bool-or (> p SIZE) (neg? p))
     (- v)
     v))
 

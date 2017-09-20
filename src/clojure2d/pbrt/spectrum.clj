@@ -6,6 +6,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 (def cie-lambda (double-array (range 360 831)))
 (def cie-x (double-array [0.0001299000   0.0001458470   0.0001638021   0.0001840037

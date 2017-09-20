@@ -20,14 +20,13 @@
             [clojure2d.core :refer :all]
             [clojure2d.math.vector :as v]
             [clojure2d.extra.signal :as s]
-            [primitive-math :as prim]
             [clojure2d.color :as c])
   (:import [clojure2d.pixels Pixels]
            [clojure2d.math.vector Vec2 Vec4]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
-(prim/use-primitive-operators)
+(m/use-primitive-operators)
 
 ;; ## Slitscan
 

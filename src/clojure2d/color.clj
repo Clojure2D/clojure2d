@@ -24,15 +24,13 @@
             [clojure.xml :as xml]
             [clojure2d.math :as m]
             [clojure2d.math.random :as r]
-            [clojure2d.math.vector :as v]
-            [primitive-math :as prim])
-  (:import [clojure2d.math.vector Vec3 Vec4]
-           [primitive_math Primitives]
+            [clojure2d.math.vector :as v])
+  (:import [clojure2d.math.vector Vec3 Vec4]           
            java.awt.Color))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
-(prim/use-primitive-operators)
+(m/use-primitive-operators)
 
 ;; ## Clamping functions
 
@@ -41,7 +39,7 @@
 (defn clamp255
   "Clamp to 0-255 integer"
   [^double a]
-  (m/iconstrain (m/round a) 0.0 255.0))
+  (m/constrain (m/round a) 0 255))
 
 (defn mod255
   "Leave 8 bits from long. Wraps input to 0-255 integer"
@@ -1314,7 +1312,7 @@
   [^double hue ^double ks ^double kv]
   (let [ks (m/constrain ks 0.0 2.0)
         kv (m/constrain kv 0.0 2.0)
-        ^double h (mod hue 360.0)
+        h (mod hue 360.0)
         upd (fn ^double [^double e ^double t] (if (<= t 1.0)
                                                 (* e t)
                                                 (+ e (* (- 1.0 e) (dec t)))))

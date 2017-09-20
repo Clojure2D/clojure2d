@@ -8,13 +8,12 @@
   (:require [clojure2d.core :as core]
             [clojure2d.math :as m]
             [clojure2d.math.random :as r]
-            [clojure2d.pixels :as p]
-            [primitive-math :as prim])
+            [clojure2d.pixels :as p])
   (:import [clojure2d.pixels Pixels]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
-(prim/use-primitive-operators)
+(m/use-primitive-operators)
 
 (defn- calc-stdev
   "Calculate standard deviation of selection 10% of random channel values"

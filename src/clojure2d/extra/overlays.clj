@@ -16,12 +16,11 @@
             [clojure2d.pixels :as p]
             [clojure2d.color :as c]
             [clojure2d.math :as m]
-            [primitive-math :as prim]
             [clojure2d.math.random :as r]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
-(prim/use-primitive-operators)
+(m/use-primitive-operators)
 
 ;; ## RGB scanlines
 
@@ -141,7 +140,7 @@
                          (c/from-linear) 
                          (* 255.0)
                          (* (if (== ch xf) mask-light mask-dark))
-                         (m/iconstrain 0 255))))]
+                         (m/constrain 0.0 255.0))))]
          (->> blurred
               (p/filter-channels (partial p/filter-channel-xy tri) nil)
               (p/image-from-pixels)))))))

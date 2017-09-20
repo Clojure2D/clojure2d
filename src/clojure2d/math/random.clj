@@ -8,9 +8,8 @@
 ;; * discrete noise function
 
 (ns clojure2d.math.random
-  (:require [clojure2d.math :refer :all]
-            [clojure2d.math.vector :as v]
-            [primitive-math :as prim])
+  (:require [clojure2d.math :as m]
+            [clojure2d.math.vector :as v])
   (:import [clojure2d.math.vector Vec2]
            [org.apache.commons.math3.random RandomGenerator ISAACRandom JDKRandomGenerator MersenneTwister
             Well512a Well1024a Well19937a Well19937c Well44497a Well44497b
@@ -19,8 +18,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
-
-(prim/use-primitive-operators)
+(m/use-primitive-operators)
 
 ;; ## Random function wrappers
 ;; 
@@ -242,8 +240,8 @@
 
 (defn- commons-math-generators
   "Generators from commons math"
-  [gen size]
-  (let [s (iconstrain size 1 4)
+  [gen ^long size]
+  (let [s (m/constrain size 1 4)
         ^RandomVectorGenerator g (case gen
                                    :halton (HaltonSequenceGenerator. s)
                                    :sobol (SobolSequenceGenerator. s)
@@ -257,8 +255,8 @@
 
 (defn- random-generators
   "Random JDK generators"
-  [gen size]
-  (let [s (iconstrain size 1 4)
+  [gen ^long size]
+  (let [s (m/constrain size 1 4)
         g (case gen
             :default drand
             :gaussian grand)
@@ -312,7 +310,7 @@
 
 ;; ### Discrete noise
 
-(def ^:const ^double AM (/ 1.0 2147483647.0))
+(def ^:const ^double AM (/ 2147483647.0))
 
 (defn discrete-noise
   "Discrete noise. Parameters:
@@ -325,8 +323,8 @@
    (let [X (unchecked-int X)
          Y (unchecked-int Y)
          n (unchecked-add-int X (unchecked-multiply-int Y 57))
-         nn (unchecked-int (bit-xor n (bit-shift-left n 13)))
+         nn (unchecked-int (bit-xor n (<< n 13)))
          nnn (unchecked-add-int 1376312589 (unchecked-multiply-int nn (unchecked-add-int 789221 (unchecked-multiply-int nn (unchecked-multiply-int nn 15731)))))]
-     (* AM (double (unchecked-int (bit-and 0x7fffffff nnn))))))
+     (* AM (unchecked-int (bit-and 0x7fffffff nnn)))))
   (^double [^long X]
    (discrete-noise X 0)))

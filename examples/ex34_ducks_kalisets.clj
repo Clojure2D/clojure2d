@@ -24,6 +24,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 (def ^:const ^int w 1000)
 (def ^:const ^int h 1000)

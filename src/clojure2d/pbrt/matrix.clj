@@ -3,9 +3,13 @@
 ;; Straightforward implementation
 
 (ns clojure2d.pbrt.matrix
-  (:require [clojure2d.math :refer :all]
+  (:require [clojure2d.math :as m]
             [clojure2d.math.vector :as v])
   (:import [clojure2d.math.vector Vec4]))
+
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 (defprotocol Matrix4x4Proto
   (transpose [m])

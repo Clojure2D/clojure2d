@@ -25,8 +25,8 @@
           (let [xt (/ (- x ww) 120.0)
                 yt (/ (- y hw) 120.0)
                 ^Vec2 n (field (Vec2. xt yt))
-                n1 (r/noise (.x n) (.y n))
-                n2 (r/noise (.y n) (.x n) 0.3)
+                ^double n1 (r/noise (.x n) (.y n))
+                ^double n2 (r/noise (.y n) (.x n) 0.3)
                 v1 (m/constrain n1 0 1)
                 v2 (m/constrain n2 0 1)]
             (set-color canvas (c/make-color (* 255.0 v1 v1) (* 255.0 v1 v2) (* 255.0 v2)))

@@ -12,6 +12,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
+(m/use-primitive-operators)
 
 (def ^:const ^long w 800)
 (def ^:const ^long h 800)
@@ -34,7 +35,7 @@
         ny (+ (.y in) (* point-step (m/qsin (.z in))))
         xx (m/norm nx 0 w -1 1)
         yy (m/norm ny 0 h -1 1)
-        ^Vec2 v (fun (v/mult (Vec2. xx yy) coord-scale))
+        v (fun (v/mult (Vec2. xx yy) coord-scale))
         ^Vec2 vv (v/add v vshift)
         angle (+ (.z in) (* angle-scale ^double (m/norm (noise (.x vv) (.y vv)) 0 1 -1 1)))]
 

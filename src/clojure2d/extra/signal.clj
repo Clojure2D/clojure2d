@@ -15,15 +15,14 @@
             [clojure2d.color :as c]
             [clojure.java.io :refer :all]
             [clojure2d.math.vector :as v]
-            [clojure2d.math.random :as r]
-            [primitive-math :as prim])
+            [clojure2d.math.random :as r])
   (:import [clojure2d.pixels Pixels]
            [clojure2d.math.vector Vec2 Vec3]
            [clojure.lang Counted]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
-(prim/use-primitive-operators)
+(m/use-primitive-operators)
 
 ;; ## Signal
 ;;
@@ -1160,7 +1159,7 @@
   (let [tri (make-wave :triangle f a p)]
     (fn ^double [^double x]
       (let [namp (* 0.5 a)]
-        (* 2.0 (m/constrain (tri x) (- namp) namp))))))
+        (* 2.0 (m/constrain ^double (tri x) (- namp) namp))))))
 
 ;; List of all oscillators
 (def oscillators [:sin :noise :saw :square :triangle :cut-triangle])
