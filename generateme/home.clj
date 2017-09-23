@@ -15,7 +15,7 @@
            [clojure2d.math.vector Vec4]
            [clojure2d.java PrimitiveMath]))
 
-(def p1 (p/load-pixels "generateme/b/b.jpg"))
+(def p1 (p/load-pixels "generateme/spam.jpg"))
 
 (def p2 (p/load-pixels "generateme/gface/2.jpg"))
 
@@ -79,7 +79,7 @@
 (do
   (def palette (make-more-colors (g/color-reducer-machine)))
   (comment println palette)
-  (p/set-canvas-pixels! canvas (p/filter-channels p/normalize-filter nil (g/color-reducer-machine palette p2))))
+  (p/set-canvas-pixels! canvas (p/filter-channels p/normalize-filter nil (g/color-reducer-machine palette p3))))
 
 ;;mirror
 (defn make-random-mirror
@@ -118,13 +118,13 @@
 
 
 ;; full process without use of filter-channels
-(time (let [effect (make-effect :dj-eq {:lo (r/drand -5 5) :mid 10 :hi (r/drand -5 5) :peak-bw 1.3 :shelf-slope 1.5 :rate (r/irand 4000 100000)})
+(time (let [effect (make-effect :dj-eq {:lo (r/drand -5 5) :mid 50 :hi (r/drand -5 5) :peak-bw 1.3 :shelf-slope 1.5 :rate (r/irand 4000 100000)})
             effect2 (make-effect :divider {:denom 2})
             effect3 (make-effect :slew-limit {:maxrise 500 :maxfall 1000}
                                  )
             inluv (p/filter-colors c/to-LUV p1)
 
-            resp (apply-effects-to-pixels effect3
+            resp (apply-effects-to-pixels effect
                                           {:layout :interleaved
                                            :channels [0 1 2]
                                            :bits 8
@@ -157,7 +157,7 @@
       (pprint field-config)
       (p/set-canvas-pixels! canvas (p/filter-channels (g/make-fold-filter f 2.01)
                                                       (g/make-fold-filter f 2.0)
-                                                      (g/make-fold-filter f 1.99) nil p5)))))
+                                                      (g/make-fold-filter f 1.99) nil p1)))))
 
 
 ;;; some speed tests
@@ -173,3 +173,11 @@
   (FastMath/sin v))
 
 (quick-bench (mapv #(+ (lsin %) (lsin %)) arr))
+
+(p/set-canvas-pixels! canvas (g/blend-images-filter {:nasmes (take 1 (drop 2 (map #(.getPath ^java.io.File %) (filter #(.isFile ^java.io.File %) (file-seq (clojure.java.io/file "generateme/bl"))))))
+                                                     :pixels [p2 p3] 
+                                                     :distance :abs
+                                                     :mode :colord} p1))
+
+(keys vv/distances)
+;; => (:euclid :euclid-sq :abs :cheb :canberra :emd :discrete)

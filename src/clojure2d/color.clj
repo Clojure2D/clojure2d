@@ -1127,6 +1127,10 @@
 ;; do nothing in reverse
 (def from-Gray identity)
 
+;; Just for a case "do nothing"
+(def to-RGB identity)
+(def from-RGB identity)
+
 ;; List of all color spaces with functions
 (def colorspaces {:CMY   [to-CMY from-CMY]
                   :OHTA  [to-OHTA from-OHTA]
@@ -1144,8 +1148,9 @@
                   :YCgCo [to-YCgCo from-YCgCo]
                   :YUV   [to-YUV from-YUV]
                   :YIQ   [to-YIQ from-YIQ]
-                  :Gray  [to-Gray identity]
-                  :sRGB  [to-sRGB from-sRGB]})
+                  :Gray  [to-Gray from-Gray]
+                  :sRGB  [to-sRGB from-sRGB]
+                  :RGB   [to-RGB from-RGB]})
 
 ;; List of color spaces names
 (def colorspaces-names (keys colorspaces))

@@ -479,6 +479,11 @@
   [v1 v2]
   (mx (abs (sub v1 v2))))
 
+(defn dist-discrete
+  "Discrete distance between 2d vectors"
+  [v1 v2]
+  (sum (applyf (sub v1 v2) #(if (zero? ^double %) 0.0 1.0))))
+
 (defn dist-canberra
   "Canberra distance"
   [v1 v2]
@@ -500,7 +505,8 @@
                 :abs dist-abs
                 :cheb dist-cheb
                 :canberra dist-canberra
-                :emd dist-emd})
+                :emd dist-emd
+                :discrete dist-discrete})
 
 (defn normalize
   "Normalize vector"

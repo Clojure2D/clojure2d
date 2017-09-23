@@ -154,7 +154,7 @@
     (fn ^long [^long ch ^long idx]
       (+ idx (* ch size)))
     (fn ^long [^long ch ^long idx]
-      (+ ch (bit-shift-left idx 2)))))
+      (+ ch (<< idx 2)))))
 
 (defn make-pixels
   "Create empty `Pixels` in given layout, sets valid channel value selector (pos) depending on layout"
@@ -190,14 +190,14 @@
   (let [f (fn ^long [^long x]
             (let [q (quot x (.size p))
                   r (rem x (.size p))]
-              (+ q (bit-shift-left r 2))))]
+              (+ q (<< r 2))))]
     (replace-pixels p (amap ^ints (.p p) idx ret (unchecked-int (aget ^ints (.p p) (unchecked-int (f idx))))) true)))
 
 (defn from-planar
   "Convert planar pixel layout to interleaved"
   [^Pixels p]
   (let [f (fn ^long [^long x]
-            (let [q (bit-shift-right x 0x2)
+            (let [q (>> x 0x2)
                   r (bit-and x 0x3)]
               (+ q (* (.size p) r))))]
     (replace-pixels p (amap ^ints (.p p) idx ret (unchecked-int (aget ^ints (.p p) (unchecked-int (f idx))))) false)))
@@ -217,8 +217,8 @@
        pixls)))
   ([b x y w h]
    (get-image-pixels b x y w h true))
-  ([^BufferedImage b planar?]
-   (get-image-pixels b 0 0 (.getWidth b) (.getHeight b) planar?))
+  ([b planar?]
+   (get-image-pixels b 0 0 (core/width b) (core/height b) planar?))
   ([b]
    (get-image-pixels b true)))
 
@@ -230,13 +230,13 @@
          (getRaster)
          (setPixels ^int x ^int y (unchecked-int (.w p)) (unchecked-int (.h p)) ^ints (.p p))))
    b)
-  ([^BufferedImage b ^Pixels p]
+  ([b p]
    (set-image-pixels! b 0 0 p)))
 
 (defn image-from-pixels
   "Create image from given pixels."
   [^Pixels p]
-  (let [^BufferedImage bimg (BufferedImage. (.w p) (.h p) BufferedImage/TYPE_INT_ARGB)]
+  (let [bimg (BufferedImage. (.w p) (.h p) BufferedImage/TYPE_INT_ARGB)]
     (set-image-pixels! bimg p)))
 
 (defn get-canvas-pixels
@@ -272,11 +272,11 @@
 ;;
 ;; Following functions are used to filter pixels in parallel way. You can filter channel values with selected filter or you can filter whole colors. It's done in parallel way using as many cores you have. Processor are immutable (which can lead to memory issues).
 
-(defn filter-colors
-  "Filter pixels color-wise with given function. Filtering function should accept and return color as `Vec4`. You can use color space conversion functions defined in `color` namespace."
+(defn filter-colors-xy
+  "Filter colors. Filtering function should accept `Vec4` color and position as x,y values and return `Vec4`."
   [f ^Pixels p]
-  (let [^Pixels target (clone-pixels p)
-        pre-step (double (max 40000 ^long (/ (.size p) core/available-tasks)))
+  (let [target (clone-pixels p)
+        pre-step (max 40000 (/ (.size p) core/available-tasks))
         step (unchecked-int (m/ceil pre-step))
         parts (range 0 (.size p) step)
         ftrs (doall
@@ -284,11 +284,17 @@
                #(future (let [end (min (+ ^long % step) (.size p))]
                           (loop [idx (unchecked-int %)]
                             (when (< idx end)
-                              (set-color target idx ^Vec4 (f (get-color p idx)))
-                              (recur (unchecked-inc idx))))))
+                              (let [^Vec2 pos (idx->pos p idx)]
+                                (set-color target idx (f (get-color p idx) (.x pos) (.y pos))))
+                              (recur (inc idx))))))
                parts))]
     (dorun (map deref ftrs))
     target))
+
+(defn filter-colors
+  "Filter pixels color-wise with given function. Filtering function should accept and return color as `Vec4`. You can use color space conversion functions defined in `color` namespace."
+  [f p]
+  (filter-colors-xy (fn [c _ _] (f c)) p))
 
 (defn filter-channel
   "Filter one channel, write result into target. Works only on planar.
@@ -411,11 +417,11 @@
 (defn get-cross-f
   "Return value from 5 (cross) values using binary functions."
   [f ch p x y]
-  (f ^int (get-value p ch x (dec ^long y))
-     (f ^int (get-value p ch (dec ^long x) y)
-        (f ^int (get-value p ch x y)
-           (f ^int (get-value p ch (inc ^long x) y)
-              ^int (get-value p ch x (inc ^long y)))))))
+  (f (get-value p ch x (dec ^long y))
+     (f (get-value p ch (dec ^long x) y)
+        (f (get-value p ch x y)
+           (f (get-value p ch (inc ^long x) y)
+              (get-value p ch x (inc ^long y)))))))
 
 ;; Create dilate and erode filters
 (def dilate-filter (partial filter-channel-xy (partial get-cross-f #(max ^int %1 ^int %2))))
@@ -425,10 +431,10 @@
   "2d `ints` array getter with `:edge` boundary."
   [^ints array ^long w ^long h]
   (fn local-aget-2d ^long [^long x ^long y]
-    (if (or (neg? x)
-            (neg? y)
-            (>= x w)
-            (>= y h))
+    (if (bool-or (neg? x)
+                 (neg? y)
+                 (>= x w)
+                 (>= y h))
       (local-aget-2d (m/constrain x 0 (dec w)) (m/constrain y 0 (dec h)))
       (aget array (+ x (* y w))))))
 

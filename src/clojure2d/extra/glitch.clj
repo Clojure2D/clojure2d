@@ -303,3 +303,34 @@
    (p/filter-colors (c/make-reduce-color-filter (:distf conf) (:palette conf)) p))
   ([p]
    (color-reducer-machine p (color-reducer-machine))))
+
+;; find best matching pixels
+
+(defn blend-images-filter
+  ""
+  [{:keys [names pixels mode distance cs]
+    :or {names [] pixels [] distance :euclid-sq mode :color cs :RGB}} ^Pixels p]
+  (let [images (concat pixels (map (comp (partial p/filter-colors (first (c/colorspaces cs))) p/get-image-pixels load-image) names))
+        ^int w (width p)
+        ^int h (height p)
+        df (v/distances distance)]
+    (if (= mode :color)
+      (p/filter-colors-xy (fn [^Vec4 c ^long x ^long y]
+                            (first (reduce (fn [curr img]
+                                             (let [nx (unchecked-int (m/norm x 0 w 0 (width img)))
+                                                   ny (unchecked-int (m/norm y 0 h 0 (height img)))
+                                                   [currc ^double currd] curr
+                                                   nc (p/get-color img nx ny)
+                                                   ^double nd (df c nc)] 
+                                               (if (< nd currd) [nc nd] curr)))
+                                           [c Double/MAX_VALUE] images))) p)
+      (p/filter-channels (partial p/filter-channel-xy (fn [ch p ^long x ^long y]
+                                                        (let [^int c (p/get-value p ch x y)]
+                                                          (first (reduce (fn [curr img]
+                                                                           (let [nx (unchecked-int (m/norm x 0 w 0 (width img)))
+                                                                                 ny (unchecked-int (m/norm y 0 h 0 (height img)))
+                                                                                 [currc ^double currd] curr
+                                                                                 ^int nc (p/get-value img ch nx ny) 
+                                                                                 nd (m/abs (- c nc))]
+                                                                             (if (< nd currd) [nc nd] curr)))
+                                                                         [c Double/MAX_VALUE] images))))) p))))

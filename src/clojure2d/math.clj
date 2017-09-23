@@ -595,7 +595,7 @@
 
 ;; ## Copy of primitive math machinery
 ;;
-;;
+;; Simplified to be used after `ns` is defined.
 
 (def ^:private vars-to-exclude
   '[* + - / > < >= <= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max bool-and bool-or bool-xor bool-not << >> >>> not==])
@@ -603,34 +603,10 @@
 (defn- using-primitive-operators? []
   (= #'clojure2d.math/+ (resolve '+)))
 
-(defonce ^:private hijacked? (atom false))
-
-(defn- ns-wrapper
-  "Makes sure that if a namespace that is using primitive operators is reloaded, it will automatically
-   exclude the shadowed operators in `clojure.core`."
-  [f]
-  (fn [& x]
-    (if-not (using-primitive-operators?)
-      (apply f x)
-      (let [refer-clojure (->> x
-                               (filter #(and (sequential? %) (= :refer-clojure (first %))))
-                               first)
-            refer-clojure-clauses (update-in
-                                   (apply hash-map (rest refer-clojure))
-                                   [:exclude]
-                                   #(concat % vars-to-exclude))]
-        (apply f
-               (concat
-                (remove #{refer-clojure} x)
-                [(list* :refer-clojure (apply concat refer-clojure-clauses))]))))))
-
 (defn use-primitive-operators
   "Replaces Clojure's arithmetic and number coercion functions with primitive equivalents.  These are
    defined as macros, so they cannot be used as higher-order functions.  This is an idempotent operation.."
   []
-  (when-not @hijacked?
-    (reset! hijacked? true)
-    (alter-var-root #'clojure.core/ns ns-wrapper))
   (when-not (using-primitive-operators?)
     (doseq [v vars-to-exclude]
       (ns-unmap *ns* v))
@@ -639,6 +615,7 @@
 (defn unuse-primitive-operators
   "Undoes the work of `use-primitive-operators`.  This is idempotent."
   []
-  (doseq [v vars-to-exclude]
-    (ns-unmap *ns* v))
-  (refer 'clojure.core))
+  (when (using-primitive-operators?)
+    (doseq [v vars-to-exclude]
+      (ns-unmap *ns* v))
+    (refer 'clojure.core)))
