@@ -288,7 +288,7 @@
                                 (set-color target idx (f (get-color p idx) (.x pos) (.y pos))))
                               (recur (inc idx))))))
                parts))]
-    (dorun (map deref ftrs))
+    (run! deref ftrs)
     target))
 
 (defn filter-colors
@@ -328,7 +328,7 @@
          ch1 (future (when f1 (f1 1 target p)))
          ch2 (future (when f2 (f2 2 target p)))
          ch3 (future (when f3 (f3 3 target p)))]
-     (dorun (map deref [ch0 ch1 ch2 ch3]))
+     (run! deref [ch0 ch1 ch2 ch3])
      target))
   ([f p]
    (filter-channels f f f f p))
@@ -365,7 +365,7 @@
          ch1 (future (when f1 (f1 1 target p1 p2)))
          ch2 (future (when f2 (f2 2 target p1 p2)))
          ch3 (future (when f3 (f3 3 target p1 p2)))]
-     (dorun (map deref [ch0 ch1 ch2 ch3]))
+     (run! deref [ch0 ch1 ch2 ch3])
      target))
   ([f p1 p2]
    (blend-channels f f f f p1 p2))

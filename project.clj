@@ -1,16 +1,16 @@
 (defproject clojure2d "0.0.5-SNAPSHOT"
   :description "Creative coding / glitch library backed by Java2D"
   :plugins [[refactor-nrepl "2.4.0-SNAPSHOT"]
-            [cider/cider-nrepl "0.15.1-SNAPSHOT"]
-            [lein-ancient "0.6.10"]
-            [lein-kibit "0.1.3"]
-            [jonase/eastwood "0.2.3"]
+            [cider/cider-nrepl "0.16.0-SNAPSHOT"]
+            [lein-ancient "0.6.12"]
+            [lein-kibit "0.1.6-beta2"]
+            [jonase/eastwood "0.2.4"]
             [lein-bikeshed "0.4.1"]
             [venantius/yagni "0.1.4"]
-            [lein-cljfmt "0.5.6"]
+            [lein-cljfmt "0.5.7"]
             [lein-deps-tree "0.1.2"]
             [lein-marginalia "0.9.0"]
-            [com.jakemccrary/lein-test-refresh "0.19.0"]
+            [com.jakemccrary/lein-test-refresh "0.21.0"]
             [lein-codox "0.10.3"]]
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"

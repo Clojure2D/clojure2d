@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file. This change
 ### Fixed
 
 - rgb scanlines bad tint values
+- subpixel accuracy for strokes included in :high canvas profile
 
 ## 0.0.4 - 2017-08-07
 

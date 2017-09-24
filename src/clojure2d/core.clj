@@ -223,7 +223,8 @@
                              RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY
                              RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY
                              RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON
-                             RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON}})
+                             RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON
+                             RenderingHints/KEY_STROKE_CONTROL      RenderingHints/VALUE_STROKE_PURE}})
 
 ;; Following functions and macro are responsible for creating and releasing `Graphics2D` object for a canvas.
 ;; You have to use `with-canvas` macro to draw on canvas. Internally it's a threading macro and accepts only list of methods which first parameter is canvas object.
@@ -316,6 +317,16 @@
    (.scale ^Graphics2D (.graphics canvas) scalex scaley)
    canvas)
   ([canvas s] (scale canvas s s)))
+
+(defn flip-x
+  "Flip canvas over x axis"
+  [canvas]
+  (scale canvas -1.0 1.0))
+
+(defn flip-y
+  "Flip canvas over y axis"
+  [canvas]
+  (scale canvas 1.0 -1.0))
 
 (defn translate
   "Translate origin"
