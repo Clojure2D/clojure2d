@@ -540,6 +540,12 @@
         (>= amt 1.0) 0
         :else (m/acos amt)))))
 
+(defn relative-angle-between
+  "Angle between two vectors reletive to each other"
+  ^double [v1 v2]
+  (- ^double (heading v2) ^double (heading v1)))
+
+
 (defn aligned?
   "Are vectors aligned (have the same direction)?"
   [v1 v2]
