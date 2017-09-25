@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file. This change
 ### Added
 
 - Vcf303, Echo and BassTreble signal processing effects + example 16 updated
+- key-released and key-typed events added
+- fractal bestiary explorer - example 37
 
 ### Changed
 

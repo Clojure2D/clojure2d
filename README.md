@@ -61,7 +61,7 @@ No tests (yet)
 Add following line as a dependency to your `project.clj`
 
 ```clojure
-[clojure2d "0.0.4-SNAPSHOT"]
+[clojure2d "0.0.5-SNAPSHOT"]
 ```
 
 ## Usage
@@ -156,6 +156,7 @@ I've prepared several examples with results where you can check current state of
 * ex34 - ducks and kalisets explorer
 * ex35 - mandelbrot and julia explorer
 * ex36 - spirograph
+* ex37 - [Fractal Bestiary](http://www.brainfillingcurves.com/) explorer
 * NOC - [Nature of Code](https://github.com/shiffman/The-Nature-of-Code-Examples/) Clojure2d version
 
 ## TODO

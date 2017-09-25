@@ -607,11 +607,13 @@
 ;; To control user activities you can use two event processing multimethods.
 ;;
 ;; * `key-pressed`
+;; * `key-released`
+;; * `key-typed`
 ;; * `mouse-event`
 ;;
 ;; Each multimethod get awt Event object and global state. Each should return new state.
 ;;
-;; #### Key event: `key-pressed` multimethod
+;; #### Key event: `key-pressed` and other `key-` multimethods
 ;;
 ;; Your dispatch value is vector with window name and pressed key (as `char`) which you want to handle.
 ;; This means you write different method for different key.
@@ -683,7 +685,7 @@
 ;;
 ;; Global atom is needed to keep current window state. Events don't know what window sends it. The only option is to get component name.
 
-(defonce global-state (atom {}))
+(def global-state (atom {}))
 
 (defn get-state
   "Get state from window"
@@ -718,6 +720,16 @@
 ;; Do nothing on default
 (defmethod key-pressed :default [_ s]  s)
 
+;; Multimethod used to process released key
+(defmulti key-released (fn [^KeyEvent e state] [(component-name e) (.getKeyChar e)]))
+;; Do nothing on default
+(defmethod key-released :default [_ s]  s)
+
+;; Multimethod used to process typed key
+(defmulti key-typed (fn [^KeyEvent e state] [(component-name e) (.getKeyChar e)]))
+;; Do nothing on default
+(defmethod key-typed :default [_ s]  s)
+
 ;; Map Java mouse event names onto keywords
 (def mouse-event-map {MouseEvent/MOUSE_CLICKED  :mouse-clicked
                       MouseEvent/MOUSE_DRAGGED  :mouse-dragged
@@ -742,7 +754,9 @@
 
 ;; Key
 (def key-processor (proxy [KeyAdapter] []
-                     (keyPressed [e] (process-state-and-event key-pressed e))))
+                     (keyPressed [e] (process-state-and-event key-pressed e))
+                     (keyReleased [e] (process-state-and-event key-released e))
+                     (keyTyped [e] (process-state-and-event key-typed e))))
 
 ;; Mouse
 (def mouse-processor (proxy [MouseAdapter] []
