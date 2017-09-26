@@ -30,7 +30,7 @@
 (def ^:const ^int first-step 500000)
 (def ^:const ^int steps-per-task 1000000)
 
-(defn unit-fn ^double [_ _] 1.0)
+(def unit-fn (constantly 1.0))
 
 (defn make-jnoise
   "Create own version of joise noise (only simplex based, no cells)"
@@ -41,15 +41,12 @@
                                  :octaves [(j/make-random-basis-module)
                                            (j/make-random-basis-module)]})))
 
-
 (defn make-random-config
   "Make random harmonograph configuration: f1-f4 frequencies, p1-p4 phases, a1-a4 amplitudes,
   nscalex/nscaley - noise scale, n1-n4 noise functions (or value 1.0), c1-c2 colors, dampsteps"
   []
   (let [rngs (r/irand 8 32)
-        fct (if (r/brand 0.5)
-              m/TWO_PI
-              (r/drand 2.0 7.0))
+        fct (r/randval m/TWO_PI (r/drand 2.0 7.0))
         freqs (map #(/ (* 5.0 fct) ^double %) (remove #(zero? ^double %) (range (- rngs) rngs (r/irand 1 rngs))))
         a1 (r/drand)
         a2 (r/drand (- 1.0 a1))
@@ -79,16 +76,16 @@
      :nscaley1 (/ 1.0 ^double (r/drand 0.05 2))
      :nscalex2 (/ 1.0 ^double (r/drand 0.05 2))
      :nscaley2 (/ 1.0 ^double (r/drand 0.05 2))
-     :n1 (if (r/brand 0.6) (rand-nth n) unit-fn)
-     :n2 (if (r/brand 0.6) (rand-nth n) unit-fn)
-     :n3 (if (r/brand 0.6) (rand-nth n) unit-fn)
-     :n4 (if (r/brand 0.6) (rand-nth n) unit-fn)
+     :n1 (r/randval 0.6 (rand-nth n) unit-fn)
+     :n2 (r/randval 0.6 (rand-nth n) unit-fn)
+     :n3 (r/randval 0.6 (rand-nth n) unit-fn)
+     :n4 (r/randval 0.6 (rand-nth n) unit-fn)
      :c1 c1
      :c2 c2
      :c3 c3
      :c4 c4
-     :dampstepsx (if (r/brand 0.5) (vec (range 0.6 1.2 (/ 1.0 (double (r/irand 1 8))))) nil)
-     :dampstepsy (if (r/brand 0.5) (vec (range 0.6 1.2 (/ 1.0 (double (r/irand 1 8))))) nil)}))
+     :dampstepsx (r/randval 0.5 (vec (range 0.6 1.2 (/ 1.0 (double (r/irand 1 8))))) nil)
+     :dampstepsy (r/randval 0.5 (vec (range 0.6 1.2 (/ 1.0 (double (r/irand 1 8))))) nil)}))
 
 (defn iterate-harmonograph
   "Read configuration and do `n` iterations starting at time `start-time`, store everything in `BinPixels`."

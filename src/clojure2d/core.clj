@@ -12,11 +12,12 @@
 (ns clojure2d.core
   "JFrame, Java2D, file io and simple session management"
   (:require [clojure.java.io :refer :all]
-            [clojure2d.color :as c])
+            [clojure2d.color :as c]
+            [clojure2d.math.vector :as v])
   (:import clojure2d.math.vector.Vec2
            [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
            [java.awt.event ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
-           [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double]
+           [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double]
            [java.awt.image BufferedImage BufferStrategy]
            java.util.Iterator
            [javax.imageio IIOImage ImageIO ImageWriteParam ImageWriter]
@@ -364,6 +365,23 @@
       (.setTransform ^Graphics2D (.graphics canvas) v)))
   canvas)
 
+(defn transform
+  "Transform given point or coordinates with current transformation."
+  ([^Canvas canvas x y]
+   (let [^Point2D p (.transform ^java.awt.geom.AffineTransform (.getTransform ^Graphics2D (.graphics canvas)) (Point2D$Double. x y) nil)]
+     (Vec2. (.getX p) (.getY p))))
+  ([canvas ^Vec2 v]
+   (transform canvas (.x v) (.y v))))
+
+(defn inv-transform
+  "Inverse transform of given point or coordinates with current transformation."
+  ([^Canvas canvas x y]
+   (let [^Point2D p (.inverseTransform ^java.awt.geom.AffineTransform (.getTransform ^Graphics2D (.graphics canvas)) (Point2D$Double. x y) nil)]
+     (Vec2. (.getX p) (.getY p))))
+  ([canvas ^Vec2 v]
+   (inv-transform canvas (.x v) (.y v))))
+
+
 (defn reset-matrix
   "Reset transformation"
   [^Canvas canvas]
@@ -480,6 +498,69 @@
    canvas)
   ([canvas vs close?] (path canvas vs close? true))
   ([canvas vs] (path canvas vs false true)))
+
+(defn calculate-bezier-control-points
+  "Calculate bezier spline control points. http://www.antigrain.com/research/bezier_interpolation/index.html"
+  [v0 v1 v2 v3]
+  (let [c1 (v/mult (v/add v0 v1) 0.5)
+        c2 (v/mult (v/add v1 v2) 0.5)
+        c3 (v/mult (v/add v2 v3) 0.5)
+        ^double len1 (v/mag c1)
+        ^double len2 (v/mag c2)
+        ^double len3 (v/mag c3)
+        k1 (/ len1 (+ len1 len2))
+        k2 (/ len2 (+ len2 len3))
+        m1 (v/add c1 (v/mult (v/sub c2 c1) k1))
+        m2 (v/add c2 (v/mult (v/sub c3 c2) k2))
+        cp1 (-> c2
+                (v/sub m1)
+                (v/add m1)
+                (v/add v1)
+                (v/sub m1))
+        cp2 (-> c2
+                (v/sub m2)
+                (v/add m2)
+                (v/add v2)
+                (v/sub m2))]
+    [cp1 cp2]))
+
+(defn path-quad
+  "Draw path from quad curves. Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines)."
+  ([^Canvas canvas vs close? stroke?]
+   (when (> (count vs) 3)
+     (let [cl? (or (not stroke?) close?)
+           ^Path2D p (Path2D$Double.)
+           ^Vec2 m0 (first vs)
+           ^Vec2 m1 (second vs)
+           m2 (nth vs 2) 
+           f0 (if cl? m0 m0)
+           ^Vec2 f1 (if cl? m1 m0)
+           f2 (if cl? m2 m1)
+           f3 (if cl? (nth vs 3) m2)
+           vs (if cl? (next vs) vs)]
+       (.moveTo p (.x f1) (.y f1))
+       (loop [v0 f0
+              v1 f1
+              ^Vec2 v2 f2
+              ^Vec2 v3 f3
+              nvs (drop 3 vs)]
+         (let [[^Vec2 cp1 ^Vec2 cp2] (calculate-bezier-control-points v0 v1 v2 v3)]
+           (.curveTo p (.x cp1) (.y cp1) (.x cp2) (.y cp2) (.x v2) (.y v2))
+           (if-not (empty? nvs)
+             (recur v1 v2 v3 (first nvs) (next nvs))
+             (if cl?
+               (let [[^Vec2 cp1 ^Vec2 cp2] (calculate-bezier-control-points v1 v2 v3 m0)
+                     [^Vec2 cp3 ^Vec2 cp4] (calculate-bezier-control-points v2 v3 m0 m1)
+                     [^Vec2 cp5 ^Vec2 cp6] (calculate-bezier-control-points v3 m0 m1 m2)]
+                 (.curveTo p (.x cp1) (.y cp1) (.x cp2) (.y cp2) (.x v3) (.y v3))
+                 (.curveTo p (.x cp3) (.y cp3) (.x cp4) (.y cp4) (.x m0) (.y m0))
+                 (.curveTo p (.x cp5) (.y cp5) (.x cp6) (.y cp6) (.x m1) (.y m1)))
+               (let [[^Vec2 cp1 ^Vec2 cp2] (calculate-bezier-control-points v1 v2 v3 v3)]
+                 (.curveTo p (.x cp1) (.y cp1) (.x cp2) (.y cp2) (.x v3) (.y v3)))))))
+       (draw-fill-or-stroke (.graphics canvas) p stroke?)))
+   canvas)
+  ([canvas vs close?] (path-quad canvas vs close? true))
+  ([canvas vs] (path-quad canvas vs false true)))
 
 (defn quad
   "Draw quad with corners at 4 positions."
@@ -685,7 +766,7 @@
 ;;
 ;; Global atom is needed to keep current window state. Events don't know what window sends it. The only option is to get component name.
 
-(def global-state (atom {}))
+(defonce global-state (atom {}))
 
 (defn get-state
   "Get state from window"

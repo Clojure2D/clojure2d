@@ -31,6 +31,9 @@
 
 ;; main algorithm
 
+(def default-recipe {:pos [0.1 0.6] :len 0.25 :grid :tri :short-line false :depth 5
+                     :recipe [[1 0 1 1] [0 1 1 1] [1 -1 1 1] [1 0 1 1]]})
+
 (defn transform-sq->tri
   "Transform square grid coordinates to triangle grid."
   [v]
@@ -42,16 +45,14 @@
                                                                           [(Vec2. -1.0 1.0) (Vec2. -0.5 s60)]
                                                                           [(Vec2. 0.0 1.0) (Vec2. 0.5 s60)]
                                                                           [(Vec2. 1.0 1.0) (Vec2. 0.5 s60)]]))] 
-    (when matched 
-      (let [[in tg] matched]
-        (v/mult tg (/ (v/mag v) (v/mag in)))))))
+    (when-let [[in tg] matched] 
+      (v/mult tg (/ (v/mag v) (v/mag in))))))
 
 (defn process-recipe
   "Process recipe from book format to angles and lengths required by method provided in this example"
-  [{:keys [grid recipe pos len short-line]
-    :or {pos [0.1 0.6] len 0.25 grid :tri short-line false
-         recipe [[1 0 1 1] [0 1 1 1] [1 -1 1 1] [1 0 1 1]]}}]
-  (let [transform (if (= grid :tri) transform-sq->tri identity)
+  [recipe]
+  (let [{:keys [grid recipe pos len short-line]} (merge default-recipe recipe)
+        transform (if (= grid :tri) transform-sq->tri identity)
         vects (map #(let [[x y] %] (transform (Vec2. x y))) recipe)
         angles (map #(v/relative-angle-between %2 %1) (cons unit vects) vects)
         rot (reduce v/add vects)]
@@ -99,7 +100,7 @@
          [px py] (v/mult pos size)]
      (with-canvas canvas
        (set-background 21 20 25)
-       (set-color :lightgrey 250)
+       (set-color :lightgrey 240)
        (set-stroke 0.8)
        (translate px py)
        (draw-beast depth (* size len) precipe)))
@@ -193,14 +194,59 @@
               :p95-gosper-curve {:grid :tri :recipe [[1 0 1 1] [0 1 -1 -1] [-1 0 -1 -1] [-1 1 1 1] [1 0 1 1] [1 0 1 1] [1 -1 -1 -1]] :pos [0.25 0.8] :depth 2}
               :p96-inner-flip-gosper {:grid :tri :recipe [[1 0 -1 1] [0 1 1 -1] [-1 0 1 -1] [-1 1 -1 1] [1 0 -1 1] [1 0 -1 1] [1 -1 1 -1]] :pos [0.25 0.8] :depth 2}
               :p97-anti-gosper {:grid :tri :recipe [[1 0 1 1] [0 1 1 1] [-1 0 -1 -1] [-1 1 -1 -1] [1 0 1 1] [1 0 -1 -1] [1 -1 -1 -1]] :pos [0.2 0.8] :depth 3}
-              :p98 {:grid :tri :recipe [[0 1 -1 -1] [-1 1 -1 -1] [1 0 1 1] [0 -1 1 1] [1 0 -1 -1] [0 1 1 1] [1 -1 -1 -1]] :pos [0.2 0.8] :depth 3}})
+              :p98 {:grid :tri :recipe [[0 1 -1 -1] [-1 1 -1 -1] [1 0 1 1] [0 -1 1 1] [1 0 -1 -1] [0 1 1 1] [1 -1 -1 -1]] :pos [0.2 0.8] :depth 3}
+              :p100 {:grid :tri :recipe [[1 0 1 1] [-1 1 1 1] [1 0 1 1] [1 -1 1 1] [-1 0 1 1] [0 1 1 1] [1 0 1 1]] :depth 2 :pos [0.1 0.65] :len 0.33}
+              :p101-root-7-yin {:grid :tri :recipe [[1 0 1 1] [1 0 -1 -1] [-1 1 1 1] [-1 1 -1 -1] [1 0 1 1] [1 0 -1 -1] [0 -1 1 1]] :depth 3 :pos [0.15 0.7] :len 0.23}
+              :p102-a {:grid :tri :recipe [[0 -1 1 -1] [1 0 -1 1] [1 0 1 -1] [-1 1 -1 1] [-1 1 1 -1] [1 0 -1 1] [1 0 1 -1]] :depth 3 :pos [0.25 0.5]}
+              :p102-b {:grid :tri :recipe [[1 0 1 -1] [1 0 -1 1] [1 0 1 -1] [1 0 -1 1] [-1 1 1 -1] [-1 1 -1 1] [0 -1 1 -1]] :depth 3 :pos [0.05 0.6] :len 0.22}
+              :p103 {:grid :tri :recipe [[1 0 1 1] [1 0 -1 -1] [1 0 1 1] [1 0 -1 -1] [-1 1 1 1] [-1 1 -1 -1] [0 -1 1 1]] :depth 3 :pos [0.05 0.6] :len 0.22}
+              :p104-a {:grid :tri :recipe [[0 -1 -1 1] [1 0 -1 1] [1 0 1 -1] [1 0 -1 1] [-1 1 -1 1] [-1 1 1 -1] [1 0 1 -1]] :depth 3 :len 0.2 :pos [0.3 0.5]}
+              :p104-b {:grid :tri :recipe [[0 -1 1 1] [1 0 1 1] [1 0 -1 -1] [1 0 1 1] [-1 1 1 1] [-1 1 -1 -1] [1 0 -1 -1]] :depth 3 :len 0.2 :pos [0.3 0.5]}
+              :p105 {:grid :tri :recipe [[0 1 1 1] [-1 1 1 1] [1 0 1 1] [0 -1 1 1] [1 -1 1 1] [1 0 1 1] [0 1 1 1]] :depth 2 :pos [0.25 0.8]}
+              :p106-a {:grid :tri :recipe [[-1 1 -1 -1] [1 0 1 1] [-1 1 -1 -1] [1 0 1 1] [1 0 1 1] [0 -1 -1 -1] [1 0 1 1]] :depth 2 :pos [0.25 0.85]}
+              :p106-b {:grid :tri :recipe [[-1 1 1 -1] [1 0 -1 1] [-1 1 1 -1] [1 0 -1 1] [1 0 -1 1] [0 -1 1 -1] [1 0 -1 1]] :depth 2 :pos [0.25 0.85]}
+              :p107-a {:grid :tri :recipe [[1 0 1 1] [0 -1 1 1] [1 0 1 1] [-1 1 1 1] [-1 1 1 1] [1 0 1 1] [1 0 1 1]] :depth 2 :pos [0.2 0.5]}
+              :p107-b {:grid :tri :recipe [[1 0 -1 -1] [0 -1 -1 -1] [1 0 -1 -1] [-1 1 -1 -1] [-1 1 -1 -1] [1 0 -1 -1] [1 0 -1 -1]] :depth 2 :pos [0.2 0.55]}
+              :p108-a {:grid :tri :recipe [[-1 1 -1 1] [1 0 1 -1] [1 0 -1 1] [0 -1 1 -1] [1 0 1 -1] [1 0 1 -1] [-1 1 -1 1]] :depth 2 :len 0.2 :pos [0.25 0.6]}
+              :p108-b {:grid :tri :recipe [[-1 1 1 1] [1 0 1 1] [1 0 -1 -1] [0 -1 -1 -1] [1 0 1 1] [1 0 1 1] [-1 1 1 1]] :depth 2 :len 0.2 :pos [0.25 0.6]}
+              :p109 {:grid :tri :recipe [[-1 1 1 -1] [-1 1 -1 1] [1 0 1 -1] [1 0 -1 1] [1 0 1 -1] [1 0 -1 1] [0 -1 1 -1]] :depth 3 :len 0.15 :pos [0.4 0.7]}
+              :p110 {:grid :tri :recipe [[1 -1 -1 -1] [1 0 1 1] [0 -1 1 1] [-1 1 1 1] [0 1 -1 -1] [1 0 1 1] [0 1 -1 -1]] :depth 2 :pos [0.2 0.45]}
+
+              ;; sqrt(8)
+              :p112 {:grid :sq :recipe [[-1 1 -1 1] [0 1 1 -1] [1 1 1 1] [1 0 -1 -1] [1 -1 1 1]] :depth 4 :len 0.165 :pos [0.4 0.75]}
+              :p113-a {:grid :sq :recipe [[1 1 1 1] [1 0 1 1] [0 -1 -1 -1] [1 1 1 1] [-1 1 1 -1]] :depth 3 :len 0.23 :pos [0.05 0.7]}
+              :p113-b {:grid :sq :recipe [[1 1 1 1] [1 -1 -1 -1] [1 1 1 1] [-1 0 1 -1] [0 1 -1 1]] :depth 3 :len 0.23 :pos [0.05 0.7]}
+              :p114 {:grid :sq :recipe [[1 0 1 -1] [0 1 -1 1] [1 -1 -1 -1] [0 2 -1 1]] :len 0.21 :pos [0.1 0.7]}
+              :p115 {:grid :sq :recipe [[1 1 1 1] [0 1 1 -1] [-1 0 -1 1] [1 1 1 1] [0 -1 1 -1] [1 0 -1 1]] :depth 2 :pos [0.3 0.9] :len 0.2}
+              :p116-a {:grid :sq :recipe [[1 -1 -1 -1] [1 1 1 1] [-1 0 -1 1] [0 1 1 -1] [1 0 -1 1] [0 1 1 -1]] :depth 2 :pos [0.2 0.55] :len 0.2}
+              :p116-b {:grid :sq :recipe [[0 2 -1 1] [1 -1 -1 -1] [0 1 -1 1] [1 0 1 -1]] :depth 3 :pos [0.5 0.8] :len 0.2}
+              :p117 {:grid :sq :recipe [[-1 1 1 1] [1 1 1 1] [1 -1 1 1] [1 0 -1 -1] [0 1 -1 -1]] :depth 3 :len 0.19 :pos [0.4 0.7]}
+              :p118-a {:grid :sq :recipe [[1 -1 1 1] [0 1 -1 -1] [-1 1 1 1] [1 0 -1 -1] [1 1 1 1]] :depth 3 :len 0.25 :pos [0.3 0.6]}
+              :p118-b {:grid :sq :recipe [[0 1 -1 -1] [1 0 1 1] [0 -1 -1 -1] [1 0 1 1] [0 -1 -1 -1] [1 0 1 1] [0 -1 -1 -1] [-1 0 1 1]] :depth 2 :len 0.189 :pos [0.2 0.4]}
+              :p118-c {:grid :sq :recipe [[0 1 1 1] [0 1 -1 -1] [-1 0 1 1] [0 1 1 1] [1 0 -1 -1] [1 0 1 1] [0 -1 -1 -1] [1 0 -1 -1]] :depth 2 :len 0.189 :pos [0.5 0.85]}
+              :p118-d {:grid :sq :recipe [[1 0 1 1] [0 1 -1 -1] [-1 0 1 1] [0 1 -1 -1] [1 0 1 1] [0 -1 -1 -1] [1 0 1 1] [0 1 -1 -1]] :depth 2 :len 0.25 :pos [0.25 0.75]}
+              :p118-e {:grid :sq :recipe [[-1 1 -1 -1] [-1 1 1 1] [1 0 -1 -1] [1 0 1 1] [1 0 -1 -1] [1 0 1 1]] :depth 4 :len 0.189 :pos [0.55 0.75]}
+              :p119-twin-twin-dragon {:grid :sq :recipe [[0 1 1 1] [0 1 1 1] [1 -1 1 1] [1 -1 -1 -1] [0 1 1 1] [0 1 -1 -1]] :depth 3 :len 0.25 :pos [0.25 0.75]}
+              :p120 {:grid :sq :recipe [[0 2 1 1] [1 -1 1 1] [1 0 1 1] [0 1 -1 -1]] :depth 3 :len 0.189 :pos [0.35 0.7]}
+              :p121 {:grid :sq :recipe [[-1 1 1 1] [1 0 1 1] [0 1 -1 -1] [1 -1 1 1] [1 0 1 1] [0 1 -1 -1]] :depth 2 :len 0.217 :pos [0.35 0.7]}
+              :p122 {:grid :sq :recipe [[1 1 -1 -1] [-1 0 -1 -1] [0 1 1 1] [2 0 1 1]] :depth 3 :len 0.217 :pos [0.3 0.8]}
+              :p123 {:grid :sq :recipe [[0 2 1 1] [1 0 1 1] [0 -1 -1 -1] [1 0 1 1] [0 1 -1 -1]] :depth 2 :len 0.217 :pos [0.35 0.75]}
+              :p124-curled-dragon-of-eve {:grid :sq :recipe [[-1 1 1 1] [0 1 1 1] [1 -1 1 1] [1 0 -1 -1] [1 1 -1 -1]] :depth 3 :len 0.189 :pos [0.4 0.7]}
+              :p125-brainfiller {:grid :sq :recipe [[0 1 -1 1] [1 0 1 -1] [0 -1 -1 1] [1 0 1 -1] [0 2 1 -1]] :depth 3 :len 0.2875 :pos [0.15 0.7]}
+
+              ;; sqrt(9)
+              :p126-square-koch {:grid :sq :recipe [[1 0 1 1] [0 1 1 1] [1 0 1 1] [0 -1 1 1] [1 0 1 1]] :depth 3}
+              :p126-original-peano-curve {:grid :sq :recipe [[1 0 1 1] [0 1 1 1] [1 0 1 1] [0 -1 1 1] [-1 0 1 1] [0 -1 1 1] [1 0 1 1] [0 1 1 1] [1 0 1 1]] :depth 2 :pos [0.1 0.5]}
+              })
+
+;; (draw-recipe (set-state! window (:p126-original-peano-curve recipes)))
 
 ;; window / events
 
-(def window-name "Fractal Bestiary - Brainfilling Curves")
+(def window-name "Fractal Bestiary - Brainfilling Curves.")
 (def window (show-window {:canvas canvas
                           :window-name window-name
-                          :state (:p98 recipes)}))
+                          :state default-recipe}))
 
 (defmethod key-released [window-name (char 0xffff)] [^KeyEvent e {depth :depth len :len :or {depth 5 len 0.25} :as state}]
   (let [ndepth (condp = (.getKeyCode e)
@@ -211,8 +257,11 @@
                KeyEvent/VK_UP (* len 1.15)
                KeyEvent/VK_DOWN (/ len 1.15)
                len)]
-    (println (str "New depth: " ndepth)) 
-    (draw-recipe (assoc state :depth ndepth :len nlen))))
+    (if (or (not= len nlen) (not= ndepth depth))
+      (do
+        (println (str "New depth: " ndepth)) 
+        (draw-recipe (assoc state :depth ndepth :len nlen)))
+      state)))
 
 (defmethod key-pressed [window-name \space] [_ _]
   (let [name (rand-nth (keys recipes))]
@@ -223,18 +272,19 @@
   (draw-recipe (assoc state :short-line (not short-line))))
 
 (defmethod key-pressed [window-name \r] [_ _]
-  (let [recipe {:grid (if (r/brand) :tri :sq)
+  (draw-recipe {:grid (if (r/brand) :tri :sq)
                 :len 0.1
                 :pos [0.5 0.5]
-                :recipe (repeatedly (r/irand 2 7) #(vector (r/irand -1 2)
-                                                           (r/irand -1 2)
-                                                           (if (r/brand) -1 1)
-                                                           (if (r/brand) -1 1)))}]
-    (draw-recipe recipe)))
+                :recipe (filter #(let [[x y] %]
+                                   (not (and (zero? x) (zero? y)))) (repeatedly (r/irand 2 9)
+                                                                                #(vector (r/irand -1 2)
+                                                                                         (r/irand -1 2)
+                                                                                         (r/randval -1 1)
+                                                                                         (r/randval -1 1))))}))
 
 (defmethod key-pressed [window-name \m] [_ {recipe :recipe :as state}]
   (draw-recipe (assoc state :recipe (map #(let [[x y a b] %]
-                                            [x y (if (r/brand) -1 1) (if (r/brand) -1 1)]) recipe))))
+                                            [x y (r/randval -1 1) (r/randval -1 1)]) recipe))))
 
 (defmethod key-pressed [window-name \w] [_ {pos :pos :or {pos [0.1 0.6]} :as state}]
   (let [[x y] pos] (draw-recipe (assoc state :pos [x (- y 0.05)]))))
@@ -249,4 +299,6 @@
   (save-canvas canvas (next-filename "results/ex37/" ".jpg"))
   state)
 
-(draw-recipe (:p98 recipes))
+(draw-recipe (get-state window))
+
+

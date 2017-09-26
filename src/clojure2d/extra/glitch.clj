@@ -42,7 +42,7 @@
   "Create list of random waves "
   ([n]
    (letfn [(f []
-             (let [r (if (r/brand 0.75) (r/irand 4) (r/irand (count freqs)))]
+             (let [r (r/randval 0.75 (r/irand 4) (r/irand (count freqs)))]
                {:wave (rand-nth s/oscillators)
                 :freq (freqs r)
                 :amp (amps r)
@@ -239,11 +239,11 @@
   "Do random blend of two pixels, use random colorspace"
   ([]
    (let [cs1 (random-blend-get-cs) ; let's convert to some colorspace (or leave rgb)
-         cs2 (if (r/brand 0.2) (random-blend-get-cs) cs1) ; maybe different cs on second image?
-         outcs (if (r/brand 0.2) (random-blend-get-cs) cs1) ; maybe some random colorspace on output?
-         bl1 (when (r/brand 0.85) (rand-nth c/blends-names)) ; ch1 blend
-         bl2 (when (r/brand 0.85) (rand-nth c/blends-names)) ; ch2 blend
-         bl3 (when (r/brand 0.85) (rand-nth c/blends-names))] ; ch3 blend
+         cs2 (r/randval 0.2 (random-blend-get-cs) cs1) ; maybe different cs on second image?
+         outcs (r/randval 0.2 (random-blend-get-cs) cs1) ; maybe some random colorspace on output?
+         bl1 (r/randval 0.85 (rand-nth c/blends-names) nil)    ; ch1 blend
+         bl2 (r/randval 0.85 (rand-nth c/blends-names) nil) ; ch2 blend
+         bl3 (r/randval 0.85 (rand-nth c/blends-names) nil)] ; ch3 blend
      {:switch (r/brand 0.5)
       :in-cs1 cs1
       :in-cs2 cs2
@@ -294,9 +294,9 @@
                   {:type :paletton
                    :conf conf
                    :palette (c/paletton-palette t h conf)}))
-         pal (if (r/brand 0.2)
-               (update bpal :palette conj (Vec4. 0.0 0.0 0.0 255.0) (Vec4. 255.0 255.0 255.0 255.0))
-               bpal)
+         pal (r/randval 0.2
+                        (update bpal :palette conj (Vec4. 0.0 0.0 0.0 255.0) (Vec4. 255.0 255.0 255.0 255.0))
+                        bpal)
          pal (assoc pal :distf (rand-nth [v/dist v/dist-abs v/dist-cheb v/dist-sq]))]
      pal))
   ([conf p]

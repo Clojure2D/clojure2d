@@ -222,6 +222,13 @@
   (^long [mx] (lrandom default-random mx))
   (^long [mn mx] (lrandom default-random mn mx)))
 
+(defmacro randval
+  "Retrun value with given probability (default 0.5)"
+  ([v1 v2]
+   `(if (brandom default-random) ~v1 ~v2))
+  ([prob v1 v2]
+   `(if (brandom default-random ~prob) ~v1 ~v2)))
+
 ;; ## Random Vector Sequences
 ;;
 ;; Couple of functions to generate sequences of numbers or vectors.
