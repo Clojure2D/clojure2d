@@ -93,9 +93,7 @@
   "Symetric random from [-mx -mn] and [mn mx]"
   ^double  [^double mn ^double mx]
   (let [rand (drand mn mx)]
-    (if (brand)
-      rand
-      (* -1.0 rand))))
+    (randval rand (* -1.0 rand))))
 
 ;; Local noise generating functions (for various noise implementations)
 
@@ -320,9 +318,7 @@
 ;; ### bTransform
 
 (make-config-method btransform {:rotate (drand m/TWO_PI)
-                                :power (if (brand 0.5)
-                                         (drand 10.0)
-                                         (irand 10.0))
+                                :power (randval 0.5 (drand 10.0) (irand 10.0))
                                 :move (drand -2.0 2.0)
                                 :split (drand -2.0 2.0)})
 
@@ -631,22 +627,22 @@
           offsety (- (.y v) roundy)
           hoffsetx (* 0.5 offsetx)
           hoffsety (* 0.5 offsety)]
-      (if (brand 0.75)
-        (Vec2. (* amount (+ roundx hoffsetx))
-               (* amount (+ roundy hoffsety)))
-        (if (>= (m/abs offsetx) (m/abs offsety))
-          
-          (if (>= offsetx 0.0)
-            (Vec2. (* amount (+ hoffsetx roundx 0.25))
-                   (* amount (+ hoffsety roundy (/ (* 0.25 offsety) offsetx))))
-            (Vec2. (* amount (- (+ hoffsetx roundx) 0.25))
-                   (* amount (- (+ hoffsety roundy) (/ (* 0.25 offsety) offsetx)))))
-          
-          (if (>= offsety 0.0)
-            (Vec2. (* amount (+ hoffsetx roundx (/ (* 0.25 offsetx) offsety)))
-                   (* amount (+ hoffsety roundy 0.25)))
-            (Vec2. (* amount (- (+ hoffsetx roundx) (/ (* 0.25 offsetx) offsety)))
-                   (* amount (- (+ hoffsety roundy) 0.25)))))))))
+      (randval 0.75
+               (Vec2. (* amount (+ roundx hoffsetx))
+                      (* amount (+ roundy hoffsety)))
+               (if (>= (m/abs offsetx) (m/abs offsety))
+                 
+                 (if (>= offsetx 0.0)
+                   (Vec2. (* amount (+ hoffsetx roundx 0.25))
+                          (* amount (+ hoffsety roundy (/ (* 0.25 offsety) offsetx))))
+                   (Vec2. (* amount (- (+ hoffsetx roundx) 0.25))
+                          (* amount (- (+ hoffsety roundy) (/ (* 0.25 offsety) offsetx)))))
+                 
+                 (if (>= offsety 0.0)
+                   (Vec2. (* amount (+ hoffsetx roundx (/ (* 0.25 offsetx) offsety)))
+                          (* amount (+ hoffsety roundy 0.25)))
+                   (Vec2. (* amount (- (+ hoffsetx roundx) (/ (* 0.25 offsetx) offsety)))
+                          (* amount (- (+ hoffsety roundy) 0.25)))))))))
 (make-var-method boarders :random)
 
 (make-config-method boarders2 {:c (drand -1.2 1.2)
@@ -671,22 +667,22 @@
             offsety (- (.y v) roundy)
             coffsetx (* c offsetx)
             coffsety (* c offsety)]
-        (if (brand cr)
-          (Vec2. (* amount (+ roundx coffsetx))
-                 (* amount (+ roundy coffsety)))
-          (if (>= (m/abs offsetx) (m/abs offsety))
-            
-            (if (>= offsetx 0.0)
-              (Vec2. (* amount (+ coffsetx roundx cl))
-                     (* amount (+ coffsety roundy (/ (* cl offsety) offsetx))))
-              (Vec2. (* amount (- (+ coffsetx roundx) cl))
-                     (* amount (- (+ coffsety roundy) (/ (* cl offsety) offsetx)))))
-            
-            (if (>= offsety 0.0)
-              (Vec2. (* amount (+ coffsetx roundx (/ (* cl offsetx) offsety)))
-                     (* amount (+ coffsety roundy cl)))
-              (Vec2. (* amount (- (+ coffsetx roundx) (/ (* cl offsetx) offsety)))
-                     (* amount (- (+ coffsety roundy) cl))))))))))
+        (randval cr
+                 (Vec2. (* amount (+ roundx coffsetx))
+                        (* amount (+ roundy coffsety)))
+                 (if (>= (m/abs offsetx) (m/abs offsety))
+                   
+                   (if (>= offsetx 0.0)
+                     (Vec2. (* amount (+ coffsetx roundx cl))
+                            (* amount (+ coffsety roundy (/ (* cl offsety) offsetx))))
+                     (Vec2. (* amount (- (+ coffsetx roundx) cl))
+                            (* amount (- (+ coffsety roundy) (/ (* cl offsety) offsetx)))))
+                   
+                   (if (>= offsety 0.0)
+                     (Vec2. (* amount (+ coffsetx roundx (/ (* cl offsetx) offsety)))
+                            (* amount (+ coffsety roundy cl)))
+                     (Vec2. (* amount (- (+ coffsetx roundx) (/ (* cl offsetx) offsety)))
+                            (* amount (- (+ coffsety roundy) cl))))))))))
 (make-var-method boarders2 :random)
 
 ;; ### Bubble
@@ -828,7 +824,7 @@
 (make-config-method checks {:x (drand -10 10)
                             :y (drand -10 10)
                             :size (drand -2.0 2.0)
-                            :rnd (if (brand) 0.0 (srandom 0.1 1))})
+                            :rnd (randval 0.0 (srandom 0.1 1))})
 
 (defn make-checks
   "Checks"
@@ -1248,9 +1244,7 @@
             b (m/safe-sqrt (- 1.0 (* a a)))
             l (m/log (+ xmax (m/safe-sqrt (dec xmax))))
             x (* -a (m/atan2 a b)) 
-            y (if (brand)
-                (* -a l)
-                (- (* -a l)))]
+            y (randval (* -a l) (- (* -a l)))]
         (Vec2. x y)))))
 (make-var-method elliptic :random)
 
@@ -1631,7 +1625,7 @@
 ;; ### JuliaN
 
 (make-config-method julian (let [r (srandom 1 10)]
-                             {:power (if (brand) r (int r))
+                             {:power (randval r (int r))
                               :dist (drand -4 4)}))
 
 (defn make-julian
@@ -1648,7 +1642,7 @@
 ;; ### JuliaScope
 
 (make-config-method juliascope (let [r (srandom 1 10)]
-                                 {:power (if (brand) r (int r))
+                                 {:power (randval r (int r))
                                   :dist (drand -4 4)}))
 
 (defn make-juliascope
@@ -2703,10 +2697,10 @@
    (let [operand (rand-nth [:comp :add :comp :add :comp :mult :comp])]
      {:type :operation :name operand :var1 f1 :var2 f2}))
   ([f]
-   (if (brand 0.1) f
-       (if (brand 0.1)
-         {:type :operation :name :deriv :var f}
-         (build-random-configuration-step f (build-random-variation-step)))))
+   (randval 0.1 f
+            (randval 0.1
+                     {:type :operation :name :deriv :var f}
+                     (build-random-configuration-step f (build-random-variation-step)))))
   ([]
    (build-random-configuration-step (build-random-variation-step) (build-random-variation-step))))
 

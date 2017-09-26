@@ -12,10 +12,10 @@
             [clojure2d.math.vector :as vv]
             [clojure.pprint :refer [pprint]])
   (:import [net.jafama FastMath]
-           [clojure2d.math.vector Vec4]
+           [clojure2d.math.vector Vec4 Vec2]
            [clojure2d.java PrimitiveMath]))
 
-(def p1 (p/load-pixels "generateme/spam.jpg"))
+(def p1 (p/load-pixels "generateme/painter/p.jpg"))
 
 (def p2 (p/load-pixels "generateme/gface/2.jpg"))
 
@@ -181,3 +181,31 @@
 
 (keys vv/distances)
 ;; => (:euclid :euclid-sq :abs :cheb :canberra :emd :discrete)
+
+
+;;;; sonification loop
+
+(let [frames (* 60 24)
+      scale (/ m/TWO_PI frames)]
+  (core/close-session)
+  (dotimes [x frames]
+    (let [cutoff (m/norm (m/sin (* x scale)) -1 1 0.01 0.99)
+          resonance (m/norm (m/sin (inc (* 2 x scale))) -1 1 0.01 0.99)
+          env-mod (m/norm (m/sin (+ 2 (* x scale))) -1 1 0.01 0.99)
+          fs (m/norm (m/cos (* x scale)) -1 1 250 100000)
+          
+          effect (make-effect :vcf303 {:rate fs :cutoff cutoff :resonance resonance :env-mod env-mod})
+          res (p/filter-channels p/normalize-filter nil (apply-effects-to-pixels effect {:signed true} {:signed true} p1))]
+      (p/set-canvas-pixels! canvas res)
+      (binding [core/*jpeg-image-quality* 0.9]
+        (core/save-canvas canvas (core/next-filename "generateme/painter/vcf303/" ".jpg"))))))
+
+
+;;; path test
+
+(def pcanvas (core/make-canvas 500 500))
+(def pwindow (core/show-window pcanvas "Path test"))
+
+(core/with-canvas pcanvas
+  (core/set-background :black)
+  (core/path-quad [(Vec2. 200 200) (Vec2. 200 300) (Vec2. 300 400) (Vec2. 300 300) (Vec2. 400 300)]))
