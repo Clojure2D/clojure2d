@@ -200,7 +200,7 @@
 (def window-name "Fractal Bestiary - Brainfilling Curves")
 (def window (show-window {:canvas canvas
                           :window-name window-name
-                          :state (:koch recipes)}))
+                          :state (:p98 recipes)}))
 
 (defmethod key-released [window-name (char 0xffff)] [^KeyEvent e {depth :depth len :len :or {depth 5 len 0.25} :as state}]
   (let [ndepth (condp = (.getKeyCode e)
