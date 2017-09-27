@@ -850,6 +850,11 @@
                               (mouseDragged [e] (process-state-and-event mouse-event e))
                               (mouseMoved [e] (process-state-and-event mouse-event e))))
 
+(defn close-window
+  "Close window programatically"
+  [window]
+  (.dispatchEvent ^JFrame (:frame window) (java.awt.event.WindowEvent. (:frame window) java.awt.event.WindowEvent/WINDOW_CLOSING)))
+
 ;; ### Frame machinery functions
 ;;
 ;; Window is JFrame with panel (as java.awt.Canvas object) which is used to draw clojure2d canvas on it.
@@ -868,7 +873,7 @@
 
 ;; Function used to close and dispose window. As a side effect `active?` atom is set to false and global state for window is cleared.
 
-(defn- close-window
+(defn- close-window-fn
   "Close window frame"
   [^JFrame frame active? windowname]
   (reset! active? false)
@@ -882,7 +887,7 @@
   "Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event."
   [^JFrame frame ^java.awt.Canvas panel active? windowname width height]
   (let [closer (proxy [WindowAdapter] []
-                 (windowClosing [^WindowEvent e] (close-window frame active? windowname)))]
+                 (windowClosing [^WindowEvent e] (close-window-fn frame active? windowname)))]
     (doto frame
       (.setIconImages window-icons)
       (.add panel)

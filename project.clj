@@ -6,16 +6,17 @@
             [lein-kibit "0.1.6-beta2"]
             [jonase/eastwood "0.2.4"]
             [lein-bikeshed "0.4.1"]
-            [venantius/yagni "0.1.4"]
-            [lein-cljfmt "0.5.7"]
             [lein-deps-tree "0.1.2"]
             [lein-marginalia "0.9.0"]
+            [lein-expectations "0.0.8"]
+            [lein-autoexpect "1.9.0"]
             [com.jakemccrary/lein-test-refresh "0.21.0"]
             [lein-codox "0.10.3"]]
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
-  :dependencies [[org.clojure/clojure "1.9.0-beta1"] 
+  :dependencies [[org.clojure/clojure "1.9.0-beta1"]
+                 [expectations "2.2.0-rc1"]
                  [net.jafama/jafama "2.1.0"]
                  [org.apache.commons/commons-math3 "3.6.1"]
                  [com.flowpowered/flow-noise "1.0.0"]
