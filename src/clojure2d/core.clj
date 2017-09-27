@@ -197,7 +197,8 @@
                  hints
                  ^long w
                  ^long h
-                 transform-stack]
+                 transform-stack
+                 font]
   ImageProto
   (get-image [_] buffer)
   (width [_] w)
@@ -243,6 +244,7 @@
   [^Canvas canvas]
   (let [^Graphics2D ng (.createGraphics ^BufferedImage (.buffer canvas))]
     (.setRenderingHints ng (or (.hints canvas) (rendering-hints :high)))
+    (when-let [f (.font canvas)] (.setFont ng f))
     (Canvas. ng
              (.buffer canvas)
              (.line-obj canvas)
@@ -251,7 +253,8 @@
              (.hints canvas)
              (.w canvas)
              (.h canvas)
-             (atom []))))
+             (atom [])
+             (.font canvas))))
 
 (defmacro with-canvas
   "Threading macro which takes care to create and destroy `Graphics2D` object for drawings on canvas. Macro returns result of last call."
@@ -271,7 +274,7 @@
 
 (defn create-canvas
   "Create and return canvas with `width`, `height` and quality hint name (keyword). Default hint is `:high`."
-  ([^long width ^long height hint]
+  ([^long width ^long height hint ^String font]
    (let
        [^BufferedImage buffer (.. GraphicsEnvironment 
                                   (getLocalGraphicsEnvironment)
@@ -285,12 +288,15 @@
                         (Ellipse2D$Double.)
                         (rendering-hints (or (some #{hint} (keys rendering-hints)) :high))
                         width height
-                        nil)]
+                        nil
+                        (when font (java.awt.Font/getFont font)))]
      (with-canvas result
        (set-background Color/black)
        (set-stroke))))
   ([width height]
-   (create-canvas width height :high)))
+   (create-canvas width height :high nil))
+  ([width height hint]
+   (create-canvas width height :high nil)))
 
 ;; alias for create-canvas
 (def make-canvas create-canvas)
@@ -380,7 +386,6 @@
      (Vec2. (.getX p) (.getY p))))
   ([canvas ^Vec2 v]
    (inv-transform canvas (.x v) (.y v))))
-
 
 (defn reset-matrix
   "Reset transformation"
@@ -576,6 +581,30 @@
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
    (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false)))
+
+(defn set-font
+  "Set font by name"
+  [^Canvas canvas ^String fontname]
+  (let [f (java.awt.Font/getFont fontname)]
+    (.setFont ^Graphics2D (.graphics canvas) f)
+    canvas))
+
+(defn set-font-attributes
+  "Set current font size"
+  ([^Canvas canvas ^double size style]
+   (let [s (or (style {:bold 1 :italic 2 :bold-italic 3}) 0)
+         f (.deriveFont ^java.awt.Font (.getFont ^Graphics2D (.graphics canvas)) (int s) (float size))]
+     (.setFont ^Graphics2D (.graphics canvas) f)
+     canvas))
+  ([^Canvas canvas ^double size]
+   (let [f (.deriveFont ^java.awt.Font (.getFont ^Graphics2D (.graphics canvas)) (float size))]
+     (.setFont ^Graphics2D (.graphics canvas) f)
+     canvas)))
+
+(defn text
+  "Draw text with default setting"
+  [^Canvas canvas ^String s ^long x ^long y]
+  (.drawString ^Graphics2D (.graphics canvas) s x y))
 
 (defn set-stroke
   "Set stroke (line) attributes like `cap`, `join` and size. Default `CAP_ROUND` and `JOIN_MITER` is used. Default size is `1.0`."
@@ -795,6 +824,8 @@
   "Returns name of the component. Used to dispatch events."
   [^ComponentEvent e]
   (.getName ^Component (.getComponent e)))
+
+(def ^:const virtual-key (char 0xffff))
 
 ;; Multimethod used to process pressed key
 (defmulti key-pressed (fn [^KeyEvent e state] [(component-name e) (.getKeyChar e)]))

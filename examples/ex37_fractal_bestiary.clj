@@ -248,7 +248,7 @@
                           :window-name window-name
                           :state default-recipe}))
 
-(defmethod key-released [window-name (char 0xffff)] [^KeyEvent e {depth :depth len :len :or {depth 5 len 0.25} :as state}]
+(defmethod key-released [window-name virtual-key] [^KeyEvent e {depth :depth len :len :or {depth 5 len 0.25} :as state}]
   (let [ndepth (condp = (.getKeyCode e)
                  KeyEvent/VK_RIGHT (min 20 (inc depth))
                  KeyEvent/VK_LEFT (max 0 (dec depth)) 
