@@ -8,12 +8,17 @@ All notable changes to this project will be documented in this file. This change
 - Vcf303, Echo and BassTreble signal processing effects + example 16 updated
 - key-released and key-typed events added
 - fractal bestiary explorer - example 37
+- path-bezier - bezier spline
+- text and font functions
+- Java2D convolution filters (via (convolve ...)), returning image
+- Expectations Tests
 
 ### Changed
 
 - Overlays API changed to image + configuration map
 - Switched from clojure math to primitive math library
 - FastMath bindings changed to macros for several methods
+- Saving picture moved to image protocol, replaced save-canvas and save-pixels removed (call (save canvas name)).
 
 ### Fixed
 

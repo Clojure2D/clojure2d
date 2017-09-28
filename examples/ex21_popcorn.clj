@@ -89,7 +89,7 @@
       
       (defmethod key-pressed ["popcorn" \space] [_ _]
         (binding [*jpeg-image-quality* 0.9]
-          (save-canvas canvas (next-filename "results/ex21/" ".jpg"))))
+          (save canvas (next-filename "results/ex21/" ".jpg"))))
 
       (println field-config)
       

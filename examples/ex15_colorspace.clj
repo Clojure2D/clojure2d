@@ -15,7 +15,7 @@
 (def window (show-window canvas "Colorspace" 15 nil))
 
 (defmethod key-pressed ["Colorspace" \space] [_ _]
-  (save-canvas canvas (next-filename "results/ex15/" ".jpg")))
+  (save canvas (next-filename "results/ex15/" ".jpg")))
 
 (p/set-canvas-pixels! canvas (p/filter-colors c/to-OHTA img))
 (p/set-canvas-pixels! canvas (p/filter-colors c/to-CMY img))

@@ -177,7 +177,7 @@
       (draw-julia matrix-maker (matrix-maker nx ny)))))
 
 (defmethod key-pressed ["Mandelbrot" \s] [_ s]
-  (save-canvas canvas (next-filename "results/ex35/mandelbrot" ".jpg"))
-  (save-canvas jcanvas (next-filename "results/ex35/julia" ".jpg"))
+  (save canvas (next-filename "results/ex35/mandelbrot" ".jpg"))
+  (save jcanvas (next-filename "results/ex35/julia" ".jpg"))
   s)
 

@@ -296,7 +296,7 @@
   (let [[x y] pos] (draw-recipe (assoc state :pos [(+ x 0.05) y]))))
 
 (defmethod key-pressed [window-name \f] [_ state]
-  (save-canvas canvas (next-filename "results/ex37/" ".jpg"))
+  (save canvas (next-filename "results/ex37/" ".jpg"))
   state)
 
 (draw-recipe (get-state window))

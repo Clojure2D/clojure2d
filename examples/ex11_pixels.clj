@@ -17,7 +17,7 @@
 (def window (core/show-window canvas "Pixels" 15 nil))
 
 (defmethod core/key-pressed ["Pixels" \space] [_ _]
-  (core/save-canvas canvas (core/next-filename "results/ex11/" ".jpg")))
+  (core/saves canvas (core/next-filename "results/ex11/" ".jpg")))
 
 ;; now let's process pixels with defined pixels
 

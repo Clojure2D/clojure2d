@@ -15,7 +15,7 @@
 (def display (show-window canvas "waves"))
 
 (defmethod key-pressed ["waves" \space] [_ _]
-  (save-canvas canvas (next-filename "results/ex18/" ".jpg")))
+  (save canvas (next-filename "results/ex18/" ".jpg")))
 
 ;; frequencies and amplitudes
 (def f (mapv #(bit-shift-left 1 ^long %) (range 16)))

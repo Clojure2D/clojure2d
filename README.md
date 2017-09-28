@@ -1,6 +1,6 @@
 # clojure2d [![Build Status](https://travis-ci.org/Clojure2D/clojure2d.svg?branch=master)](https://travis-ci.org/Clojure2D/clojure2d)
 
-Clojure2D is a lightweight library supporting generative coding or glitching. It's based on Java2D directly. It's Clojure only, no ClojureScript version.
+Clojure2D is a library supporting generative coding or glitching. It's based on Java2D directly. It's Clojure only, no ClojureScript version.
 
 ![ex10](results/small/ex10.jpg "Example 10")
 ![ex21](results/small/ex21.jpg "Example 21")
@@ -66,7 +66,7 @@ Add following line as a dependency to your `project.clj`
 
 ## Usage
 
-Since still no docs are available, check out prepared examples. All available packages are described below.
+Since still no tutorials are available, check out prepared examples. All namespaces are described below.
 
 ### clojure2d.core [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.core.html)
 
@@ -74,7 +74,8 @@ This is main namespace with functions in three groups:
 
 * image file oparations (load/save); jpg, png and bmp
 * canvas operations (wrapper for Java2D BufferedImage and Graphics2D)
-* display and event operations (JFrame wrapper)
+* window and event operations (JFrame wrapper)
+* global state (one per window)
 * session handling (logger + unique, sequential filename generator)
 
 ### clojure2d.pixels [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.pixels.html)
@@ -83,9 +84,9 @@ Pixels type as a representation of channel values of the image plus operations o
 Defines also:
 
 * pixel filters (blur, erode, dilate, median, threshold, posterize, tint)
-* blending (composing) function of two Pixels
-* functions which operate on Pixels parallelly (filter-channels, blend-channels)
-* accumulation bins (smooth rendering helper)
+* composing Pixels
+* higher order functions which operate on Pixels parallelly (filter-channels, blend-channels)
+* accumulation bins (smooth rendering canvas)
 
 ### clojure2d.color [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.color.html)
 
@@ -96,6 +97,7 @@ Defines also:
 ### clojure2d.math [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.math.html)
 
 * FastMath (jafama) bindings
+* PrimitiveMath operations (built in)
 * statistic functions
 
 Additionally in following namespaces:
@@ -120,6 +122,7 @@ This is namespace for common generative/glitch specific libraries:
 
 I've prepared several examples with results where you can check current state of the library and learn how it works. 
 
+* ex00 - Hello World! - basic script
 * ex01 - display window and process basic events (key and mouse)
 * ex02 - simulate Processing draw() function
 * ex03 - simple generative example
@@ -163,8 +166,8 @@ I've prepared several examples with results where you can check current state of
 
 ### High priority
 
-* Marginalia docs + github.io page - in progress
-* Cleaning, optimizations - still in progress (more profiling, boxed math)
+* ~~Marginalia docs + github.io page - in progress~~
+* Cleaning, optimizations - still in progress (more profiling, boxed math removal)
 * ~~Parallel color operations on Pixels~~
 * ~~Color namespace cleaning~~
 * ~~Colorspace converters~~
@@ -173,17 +176,18 @@ I've prepared several examples with results where you can check current state of
   - variations
   - glitch filters in extra namespace (moved from Processing)
   - analog filters (for sonification part)
-* Canvas drawing functions (PShape implementation - partially done)
+* More canvas drawing functions (PShape implementation - partially done)
 * ~~Session handling (saving results in session, logging actions) - done, not tested~~
 * Sanity tests
+* Tutorials
 
 ### Low priority or ideas
 
 * Cheat sheet
-* More window events
+* ~~More window events~~
 * Deeper joise bindings
 * Wavelets bindings
-* Tests...
+* Tests... (in progress)
 
 ## Community
 

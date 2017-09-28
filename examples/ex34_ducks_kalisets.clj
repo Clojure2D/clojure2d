@@ -192,7 +192,7 @@
   (new-fractal))
 
 (defmethod key-pressed [title \space] [_ state]
-  (save-canvas canvas (next-filename "results/ex34/" ".jpg"))
+  (save canvas (next-filename "results/ex34/" ".jpg"))
   state)
 
 (defn scale-bounds

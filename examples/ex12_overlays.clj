@@ -15,7 +15,7 @@
 (def window (core/show-window canvas "Overlays" 15 nil))
 
 (defmethod core/key-pressed ["Overlays" \space] [_ _]
-  (core/save-canvas canvas (core/next-filename "results/ex12/" ".jpg")))
+  (core/save canvas (core/next-filename "results/ex12/" ".jpg")))
 
 ;; image
 (core/with-canvas canvas

@@ -74,7 +74,7 @@
         window (show-window canvas "folds" 15 nil)]
 
     (defmethod key-pressed ["folds" \space] [_ _]
-      (save-canvas canvas (next-filename "results/ex08/" ".jpg")))
+      (save canvas (next-filename "results/ex08/" ".jpg")))
 
     [canvas window]))
 

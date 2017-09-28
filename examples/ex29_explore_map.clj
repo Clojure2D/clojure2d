@@ -15,7 +15,7 @@
 
 (defmethod key-pressed ["Explore map" \space] [_ _]
   (binding [*jpeg-image-quality* 0.9]
-    (save-canvas canvas (next-filename "results/ex29/" ".jpg"))))
+    (save canvas (next-filename "results/ex29/" ".jpg"))))
 
 (defn make-standard-map
   "Standard Map"

@@ -20,7 +20,7 @@
 (def window (core/show-window canvas "Segmentation" 15 nil))
 
 (defmethod core/key-pressed ["Segmentation" \space] [_ _]
-  (core/save-canvas canvas (core/next-filename "results/ex13/" ".jpg")))
+  (core/save canvas (core/next-filename "results/ex13/" ".jpg")))
 
 (defn example-13
   "segment image based on selected channel, color segments and save"

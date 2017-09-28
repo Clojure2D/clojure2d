@@ -66,9 +66,14 @@
 ;; Pixels type implements also `ImageProto` from core namespace
 (deftype Pixels [^ints p ^long w ^long h planar? ^long size pos]
   core/ImageProto
-  (get-image [t] (image-from-pixels t))
+  (get-image [p] (image-from-pixels p))
   (width [_] w)
   (height [_] h)
+  (save [p n]
+    (core/save-image (image-from-pixels p) n)
+    p)
+  (convolve [p t]
+    (core/convolve (image-from-pixels p) t))
   PixelsProto
 
   (get-channel [_ ch]
@@ -261,12 +266,6 @@
   "Load pixels from file"
   [n]
   (get-image-pixels (core/load-image n)))
-
-(defn save-pixels
-  "Save pixels to file"
-  [p n]
-  (core/save-image (image-from-pixels p) n)
-  p)
 
 ;; ## Processors
 ;;
@@ -844,9 +843,11 @@
   (to-pixels [t background] (to-pixels t background {}))
   (to-pixels [t] (to-pixels t (Vec4. 0.0 0.0 0.0 0.0) {}))
   core/ImageProto
-  (get-image [t] (core/get-image (to-pixels t)))
+  (get-image [b] (core/get-image (to-pixels b)))
   (width [_] sizex)
-  (height [_] sizey))
+  (height [_] sizey)
+  (save [b n] (core/save (to-pixels b) n))
+  (convolve [b t] (core/convolve (to-pixels b) t)))
 
 (defn make-binpixels 
   "Create BinPixels object"

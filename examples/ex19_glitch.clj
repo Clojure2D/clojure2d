@@ -18,7 +18,7 @@
 (def window (show-window canvas "Glitch"))
 
 (defmethod key-pressed ["Glitch" \space] [_ _]
-  (save-canvas canvas (next-filename "results/ex19/" ".jpg")))
+  (save canvas (next-filename "results/ex19/" ".jpg")))
 
 ;; slitscan
 

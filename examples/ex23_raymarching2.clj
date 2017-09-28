@@ -20,7 +20,7 @@
 (def window (show-window canvas "raymarching2" 15 nil))
 
 (defmethod key-pressed ["raymarching2" \space] [_ _]
-  (save-canvas canvas "results/ex23/scene.jpg"))
+  (save canvas "results/ex23/scene.jpg"))
 
 (do
   (def ^:const ^double max-depth 20.0)

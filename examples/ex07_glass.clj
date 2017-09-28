@@ -42,7 +42,7 @@
         window (show-window canvas "glass" 15 nil)]
 
     (defmethod key-pressed ["glass" \space] [_ _]
-      (save-canvas canvas (next-filename "results/ex07/" ".jpg")))
+      (save canvas (next-filename "results/ex07/" ".jpg")))
 
 
     (with-canvas canvas

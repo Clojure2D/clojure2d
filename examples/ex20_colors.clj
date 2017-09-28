@@ -17,7 +17,7 @@
 (def window (show-window canvas "Colors" 15 nil))
 
 (defmethod key-pressed ["Colors" \space] [_ _]
-  (save-canvas canvas (next-filename "results/ex20/" ".jpg")))
+  (save canvas (next-filename "results/ex20/" ".jpg")))
 
 ;; colourlovers
 (p/set-canvas-pixels! canvas (p/filter-colors (c/make-reduce-color-filter (rand-nth c/colourlovers-palettes)) img))

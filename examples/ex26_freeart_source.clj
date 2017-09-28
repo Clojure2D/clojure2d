@@ -184,4 +184,4 @@
 (comment do
          (close-session)
          (dotimes [s number-of-frames]
-           (save-canvas (canvases s) (next-filename "results/ex26/" ".jpg"))))
+           (save (canvases s) (next-filename "results/ex26/" ".jpg"))))

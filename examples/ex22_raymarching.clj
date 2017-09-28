@@ -24,7 +24,7 @@
 (def window (show-window canvas "raymarching" 15 nil))
 
 (defmethod key-pressed ["raymarching" \space] [_ _]
-  (save-canvas canvas "results/ex22/scene.jpg"))
+  (save canvas "results/ex22/scene.jpg"))
 
 (def ^:const ^double mint 0.01) ;; minimum ray distance 
 (def ^:const ^double maxt 30.0) ;; maximum ray distance

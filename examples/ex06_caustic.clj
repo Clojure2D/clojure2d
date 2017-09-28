@@ -51,7 +51,7 @@
         window (show-window canvas "caustic" 15 nil)]
 
     (defmethod key-pressed ["caustic" \space] [_ _]
-      (save-canvas canvas (next-filename "results/ex06/" ".jpg")))
+      (save canvas (next-filename "results/ex06/" ".jpg")))
 
     (with-canvas canvas
       (set-color 10 20 40 30)

@@ -18,7 +18,7 @@
 (def window (show-window canvas "grid" 10 nil))
 
 (defmethod key-pressed ["grid" \space] [_ _]
-  (save-canvas canvas (next-filename "results/ex17/" ".jpg")))
+  (save canvas (next-filename "results/ex17/" ".jpg")))
 
 (def dark (c/make-awt-color 2 22 52))
 (def light (c/make-awt-color 232 221 203))

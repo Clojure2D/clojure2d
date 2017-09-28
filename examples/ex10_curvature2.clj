@@ -67,7 +67,7 @@
                                   canvas)))]    
       
       (defmethod key-pressed ["curvature2" \space] [_ _]
-        (save-canvas canvas (next-filename "results/ex10/" ".jpg")))
+        (save canvas (next-filename "results/ex10/" ".jpg")))
 
       (pprint field-config)
 

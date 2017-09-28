@@ -148,7 +148,7 @@
                   window (show-window canvas "Harmonograph" 800 800 5)]
 
               (defmethod key-pressed ["Harmonograph" \space] [_ _]
-                (save-canvas canvas (next-filename "results/ex32/" ".png")))
+                (save canvas (next-filename "results/ex32/" ".png")))
 
               (pprint config)
               

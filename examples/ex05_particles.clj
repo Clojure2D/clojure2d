@@ -65,7 +65,7 @@
                                   canvas)))]
       
       (defmethod key-pressed ["particles" \space] [_ _]
-        (save-canvas canvas (next-filename "results/ex05/" ".jpg")))
+        (save canvas (next-filename "results/ex05/" ".jpg")))
 
       (pprint field-config)
 

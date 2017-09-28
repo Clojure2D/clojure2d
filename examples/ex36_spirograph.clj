@@ -48,4 +48,4 @@
   (draw-spirograph (make-spirograph) (r/drand 10000 200000)))
 
 (defmethod key-pressed [title \space] [_ _]
-  (save-canvas canvas (next-filename "results/ex36/" ".jpg")))
+  (save canvas (next-filename "results/ex36/" ".jpg")))

@@ -13,13 +13,14 @@
   "JFrame, Java2D, file io and simple session management"
   (:require [clojure.java.io :refer :all]
             [clojure2d.color :as c]
-            [clojure2d.math.vector :as v])
+            [clojure2d.math.vector :as v]
+            [clojure2d.math :as m])
   (:import clojure2d.math.vector.Vec2
            [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
            [java.awt.event ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
            [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double]
-           [java.awt.image BufferedImage BufferStrategy]
-           java.util.Iterator
+           [java.awt.image BufferedImage BufferStrategy Kernel ConvolveOp]
+           [java.util Iterator]
            [javax.imageio IIOImage ImageIO ImageWriteParam ImageWriter]
            [javax.swing ImageIcon JFrame SwingUtilities]))
 
@@ -177,16 +178,43 @@
 
 ;; Let's define protocol to equip Canvas and Window types (or any type with image inside) with `get-image` function. `get-image` extracts image. Additionally define width/height getters.
 (defprotocol ImageProto 
-  (get-image [t] "Return BufferedImage")
-  (width [t])
-  (height [t]))
+  (get-image [i] "Return BufferedImage")
+  (width [i])
+  (height [i])
+  (save [i n])
+  (convolve [i t]))
+
+(def convolution-matrices {:shadow (Kernel. 3 3 (float-array [0 1 2 -1 0 1 -2 -1 0]))
+                           :emboss (Kernel. 3 3 (float-array [0 2 4 -2 1 2 -4 -2 0]))
+                           :edges-1 (Kernel. 3 3 (float-array [1 2 1 2 -12 2 1 2 1]))
+                           :edges-2 (Kernel. 3 3 (float-array [1 0 -1 0 0 0 -1 0 1]))
+                           :edges-3 (Kernel. 3 3 (float-array [0 1 0 1 -4 1 0 1 0]))
+                           :edges-4 (Kernel. 3 3 (float-array [-1 -1 -1 -1 8 -1 -1 -1 -1]))
+                           :sharpen (Kernel. 3 3 (float-array [0 -1 0 -1 5 -1 0 -1 0]))
+                           :sobel-x (Kernel. 3 3 (float-array [1 0 -1 2 0 -2 1 0 -1]))
+                           :sobel-y (Kernel. 3 3 (float-array [1 2 1 0 0 0 -1 -2 -1]))
+                           :gradient-x (Kernel. 3 3 (float-array [-1 0 1 -1 0 1 -1 0 1]))
+                           :gradient-y (Kernel. 3 3 (float-array [-1 -1 -1 0 0 0 1 1 1]))
+                           :box-blur (Kernel. 3 3 (float-array (map #(/ (int %) 9.0) [1 1 1 1 1 1 1 1 1])))
+                           :gaussian-blur-3 (Kernel. 3 3 (float-array (map #(/ (int %) 16.0) [1 2 1 2 4 2 1 2 1])))
+                           :gaussian-blur-5 (Kernel. 5 5 (float-array (map #(/ (int %) 256.0) [1 4 6 4 1 4 16 24 16 4 6 24 36 24 6 4 16 24 16 4 1 4 6 4 1])))
+                           :unsharp (Kernel. 5 5 (float-array (map #(/ (int %) -256.0) [1 4 6 4 1 4 16 24 16 4 6 24 -476 24 6 4 16 24 16 4 1 4 6 4 1])))})
 
 ;; Add ImageProto functions to BufferedImage
 (extend BufferedImage
   ImageProto
   {:get-image identity
    :width (fn [^BufferedImage i] (.getWidth i))
-   :height (fn [^BufferedImage i] (.getHeight i))})
+   :height (fn [^BufferedImage i] (.getHeight i))
+   :save #(do
+            (save-image %1 %2)
+            %1)
+   :convolve (fn [^BufferedImage i t]
+               (let [kernel (if (keyword? t)
+                              (t convolution-matrices)
+                              (let [s (int (m/sqrt (count t)))]
+                                (Kernel. s s (float-array t))))]
+                 (.filter ^ConvolveOp (ConvolveOp. kernel) i nil)))})
 
 ;; Canvas type. Use `get-image` to extract image (`BufferedImage`).
 (deftype Canvas [^Graphics2D graphics
@@ -202,7 +230,10 @@
   ImageProto
   (get-image [_] buffer)
   (width [_] w)
-  (height [_] h))
+  (height [_] h)
+  (save [c n] (save-image buffer n) c)
+  (convolve [_ t]
+    (convolve buffer t)))
 
 ;; Let's define three rendering quality options: `:low`, `:mid` and `:high`. Where `:low` is fastest but has poor quality and `:high` has best quality but may be slow. Rendering options are used when you create canvas.
 (def rendering-hints {:low {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF
@@ -307,11 +338,6 @@
   (let [ncanvas (create-canvas width height (.hints canvas))]
     (with-canvas ncanvas
       (image (get-image canvas)))))
-
-(defn save-canvas
-  "Save canvas to the file"
-  [^Canvas canvas filename]
-  (save-image (get-image canvas) filename))
 
 ;; ### Transformations
 ;;
@@ -529,7 +555,7 @@
                 (v/sub m2))]
     [cp1 cp2]))
 
-(defn path-quad
+(defn path-bezier
   "Draw path from quad curves. Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines)."
   ([^Canvas canvas vs close? stroke?]
    (when (> (count vs) 3)
@@ -564,8 +590,8 @@
                  (.curveTo p (.x cp1) (.y cp1) (.x cp2) (.y cp2) (.x v3) (.y v3)))))))
        (draw-fill-or-stroke (.graphics canvas) p stroke?)))
    canvas)
-  ([canvas vs close?] (path-quad canvas vs close? true))
-  ([canvas vs] (path-quad canvas vs false true)))
+  ([canvas vs close?] (path-bezier canvas vs close? true))
+  ([canvas vs] (path-bezier canvas vs false true)))
 
 (defn quad
   "Draw quad with corners at 4 positions."
@@ -764,6 +790,8 @@
   (get-image [_] (get-image @buffer))
   (width [_] w)
   (height [_] h)
+  (save [w n] (save-image (get-image @buffer) n) w)
+  (convolve [w n] (convolve @buffer n))
   MouseXYProto
   (mouse-pos [_]
     (let [^java.awt.Point p (.getMousePosition panel)]

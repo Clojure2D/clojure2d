@@ -16,7 +16,7 @@
 
 (defmethod key-pressed ["Generators" \space] [_ _]
   (binding [*jpeg-image-quality* 0.9]
-    (save-canvas canvas "results/ex30/result.jpg")))
+    (save canvas "results/ex30/result.jpg")))
 
 (defn draw-random-rect
   "Draw random rectangle from dots from random sequence"

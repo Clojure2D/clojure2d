@@ -20,7 +20,10 @@
   (rect 100 100 400 400) ;; draw rectangle
   (set-color 50 50 60) ;; set another color
   (set-stroke 2.0) ;; set line width
-  (line 50 300 550 300)) ;; draw line
+  (line 50 300 550 300)
+  (set-font-attributes 30)
+  (set-color :maroon)
+  (text "Hello World!" 110 130)) ;; draw line
 
 ;; now lets define drawing function
 ;; type hints to avoid boxed operations
