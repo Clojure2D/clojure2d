@@ -106,11 +106,11 @@
         (get-image @window))
 
 ;; Test event
-(expect true (:key-pressed (get-state @window)))
-(expect true (:a-pressed (get-state @window)))
+(expect :key-pressed (in (keys (get-state @window))))
+(expect :a-pressed (in (keys (get-state @window))))
 
 ;; check state
-(expect false (nil? (:fps (get-state @window)))) ; draw function sets state to current fps, should be positive
+(expect :fps (in (keys (get-state @window)))) ; draw function sets state to current fps, should be positive
 (expect true (window-active? @window))
 (expect false (window-active? window-closed))
 (expect 1 (count @global-state))

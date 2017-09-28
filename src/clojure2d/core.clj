@@ -327,7 +327,7 @@
   ([width height]
    (create-canvas width height :high nil))
   ([width height hint]
-   (create-canvas width height :high nil)))
+   (create-canvas width height hint nil)))
 
 ;; alias for create-canvas
 (def make-canvas create-canvas)
