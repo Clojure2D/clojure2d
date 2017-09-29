@@ -99,7 +99,9 @@
   (let [vehicles (or state (repeatedly vehicles-no make-vehicle))]
     (-> canvas
         (set-background :linen)
-        (set-color :black 100)
+        (set-color :black)
+        (text "Click to change flow field." 10 (- h 10))
+        (set-color :black 100) 
         (translate (* 0.5 resolution)
                    (* 0.5 resolution))
         (draw-field (get-state window))

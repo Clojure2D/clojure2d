@@ -37,4 +37,3 @@
         (branch 120.0 theta))))
 
 (def window (show-window canvas "Tree 8_6" draw))
-

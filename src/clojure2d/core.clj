@@ -630,7 +630,8 @@
 (defn text
   "Draw text with default setting"
   [^Canvas canvas ^String s ^long x ^long y]
-  (.drawString ^Graphics2D (.graphics canvas) s x y))
+  (.drawString ^Graphics2D (.graphics canvas) s x y)
+  canvas)
 
 (defn set-stroke
   "Set stroke (line) attributes like `cap`, `join` and size. Default `CAP_ROUND` and `JOIN_MITER` is used. Default size is `1.0`."

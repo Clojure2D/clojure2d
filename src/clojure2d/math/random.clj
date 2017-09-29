@@ -119,7 +119,8 @@
   (lrandom [t] [t mx] [t mn mx] "long random")
   (frandom [t] [t mx] [t mn mx] "float random")
   (grandom [t] [t std] [t mean std] "gaussian random")
-  (brandom [t] [t thr] "boolean random, with probability option"))
+  (brandom [t] [t thr] "boolean random, with probability option")
+  (seed [t v] "set seed"))
 
 ;; Extend RandomGenerator interface with functions created by macro `next-random-value-fn`. This way all RNG classes are enriched with new, more convenient functions.
 ;;
@@ -137,7 +138,8 @@
               ([t ^double mean ^double std] (next-random-value-gaussian t mean (+ mean std))))
    :brandom (fn
               ([^RandomGenerator t] (.nextBoolean t))
-              ([t ^double thr] (< (next-random-value-double t) thr)))})
+              ([t ^double thr] (< (next-random-value-double t) thr)))
+   :seed #(.setSeed ^RandomGenerator %1 (long %2))})
 
 ;; Helper macro which creates RNG object of given class and/or seed.
 (defmacro create-object-with-seed

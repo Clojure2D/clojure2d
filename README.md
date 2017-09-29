@@ -160,7 +160,20 @@ I've prepared several examples with results where you can check current state of
 * ex35 - mandelbrot and julia explorer
 * ex36 - spirograph
 * ex37 - [Fractal Bestiary](http://www.brainfillingcurves.com/) explorer
-* NOC - [Nature of Code](https://github.com/shiffman/The-Nature-of-Code-Examples/) Clojure2d version
+* NOC - [Nature of Code](https://github.com/shiffman/The-Nature-of-Code-Examples/) Clojure2d version. Most interesting:
+  * ch02/attraction-many-2-7.clj
+  * ch02/fluidresistance-2-5.clj
+  * ch02/forces-mutual-attraction-boundaries.clj
+  * ch03/excercise-cannon-3-2.clj
+  * ch03/exercise-additive-wave-3-9.clj
+  * ch04/particlesystemsmoke-4-8.clj
+  * ch06/flocking-6-9.clj
+  * ch06/flowfield-6-4.clj
+  * ch07/gameoflifesimple-7-2.clj
+  * ch07/wolframca-figures-7-1.clj
+  * ch08/treestochastic-8-7.clj
+  * ch08/lsystem-8-9.clj
+  * ch08/treestochasticnoise-8-10
 
 ## TODO
 
