@@ -56,3 +56,6 @@
 
 (def canvas (make-canvas bw bh :mid))
 (def window (show-window canvas "Oldschool fire" (* 2 bw) (* 2 bh) 60 draw))
+
+(defmethod key-pressed [(:window-name window) \space] [_ _]
+  (save canvas (next-filename "results/ex40/" ".jpg")))

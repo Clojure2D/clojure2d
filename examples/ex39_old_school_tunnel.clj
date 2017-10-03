@@ -63,3 +63,6 @@
 
 (def canvas (make-canvas w h :low))
 (def window (show-window canvas "Oldschool tunnel" 600 600 60 #(draw %1 %2 %3 %4)))
+
+(defmethod key-pressed [(:window-name window) \space] [_ _]
+  (save canvas (next-filename "results/ex39/" ".jpg")))

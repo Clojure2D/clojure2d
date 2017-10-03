@@ -33,3 +33,6 @@
         (draw-rings sa ca))))
 
 (def window (show-window canvas "Oldschool XOR" #(draw %1 %2 %3 %4)))
+
+(defmethod key-pressed [(:window-name window) \space] [_ _]
+  (save canvas (next-filename "results/ex38/" ".jpg")))
