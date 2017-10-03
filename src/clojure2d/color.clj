@@ -104,7 +104,10 @@
            (.getBlue c)
            (.getAlpha c)))
   (to-awt-color [c] c)
-  (to-luma ^double [^Color c] (to-luma-fn (.getRed c) (.getGreen c) (.getBlue c))))
+  (to-luma ^double [^Color c] (to-luma-fn (.getRed c) (.getGreen c) (.getBlue c)))
+  nil
+  (to-color [_] nil)
+  (to-awt-color [_] nil))
 
 (defn set-alpha
   "Set alpha channel and return `Vec4` representation."

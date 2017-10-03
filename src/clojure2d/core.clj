@@ -680,11 +680,23 @@
     (pop-matrix canvas))
   canvas)
 
+(defn set-awt-xor-mode
+  "Set XOR graphics mode. If color is set to nil"
+  [^Canvas canvas c]
+  (let [^Graphics2D g (.graphics canvas)]
+    (if c
+      (.setXORMode g c)
+      (.setPaintMode g)))
+  canvas)
+
 ;; Set color for primitive
 (def set-color (partial set-color-with-fn set-awt-color))
 
 ;; Set background color
 (def set-background (partial set-color-with-fn set-awt-background))
+
+;; Set XOR mode
+(def set-xor-mode (partial set-color-with-fn set-awt-xor-mode))
 
 (defn image
   "Draw an image. You can specify position and size of the image. Default it's placed on whole canvas."
@@ -978,7 +990,7 @@
       (loop []
         (let [^Graphics2D graphics-context (.getDrawGraphics strategy)
               ^BufferedImage b (.buffer canvas)]
-          (.setRenderingHints graphics-context (:mid rendering-hints))
+          (.setRenderingHints graphics-context (or (.hints canvas) (rendering-hints :high)))
           (.drawImage graphics-context b 0 0 (.getWidth panel) (.getHeight panel) nil)
           (.dispose graphics-context))
         (when (.contentsRestored strategy) (recur)))
