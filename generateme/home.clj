@@ -10,6 +10,7 @@
             [clojure2d.extra.signal :refer :all]
             [criterium.core :refer :all]
             [clojure2d.math.vector :as vv]
+            [clojure2d.math.commons :as com]
             [clojure.pprint :refer [pprint]])
   (:import [net.jafama FastMath]
            [clojure2d.math.vector Vec4 Vec2]
@@ -53,7 +54,7 @@
 
 (core/save-canvas canvas (core/next-filename "generateme/b/aaa" ".png"))
 
-(p/set-canvas-pixels! canvas p3)
+(p/set-canvas-pixels! canvas p1)
 
 (def p2 (p/get-canvas-pixels canvas))
 
@@ -209,3 +210,5 @@
 (core/with-canvas pcanvas
   (core/set-background :black)
   (core/path-quad [(Vec2. 200 200) (Vec2. 200 300) (Vec2. 300 400) (Vec2. 300 300) (Vec2. 400 300)]))
+
+;;

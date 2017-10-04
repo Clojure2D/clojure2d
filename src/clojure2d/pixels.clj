@@ -675,7 +675,7 @@
                        currmn (long 1000)
                        currmx (long -1000)]
                   (if (< idx sz)
-                    (let [^long v (get-value p ch idx)]
+                    (let [^int v (get-value p ch idx)]
                       (recur (unchecked-inc idx)
                              (min v currmn)
                              (max v currmx)))

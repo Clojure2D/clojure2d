@@ -282,43 +282,45 @@
 
 (defn signal-to-pixels
   "Main entry point for `Signal` to `Pixels` conversions according to configuration."
-  [^Pixels target ^Signal sig conf]
-  (let [config (merge pixels-default-configuration conf) ;; prepare configuration
-        channels (if (= :all (:channels config)) [0 1 2 3] (:channels config)) ;; list and order of channels
-        ^long b (:bits config) ;; number of bits in signal
-        e (:little-endian config) ;; endianness
-        s (:signed config) ;; sign
-        nb (>> b 3) ;; number of values)
-        ^doubles buff (.signal sig) ;; extract signal
-        ^ints layout (int-array (* (count channels) (.size target))) ;; prepare layout
-        limit (- (alength layout) (dec nb)) ;; number of values to process
-        coding (condp = (:coding config) ;; find encoding function
-                 :none identity
-                 :alaw alaw
-                 :ulaw ulaw
-                 :alaw-rev alaw-rev
-                 :ulaw-rev ulaw-rev)]
+  ([^Pixels target ^Signal sig conf]
+   (let [config (merge pixels-default-configuration conf) ;; prepare configuration
+         channels (if (= :all (:channels config)) [0 1 2 3] (:channels config)) ;; list and order of channels
+         ^long b (:bits config) ;; number of bits in signal
+         e (:little-endian config) ;; endianness
+         s (:signed config) ;; sign
+         nb (>> b 3) ;; number of values)
+         ^doubles buff (.signal sig) ;; extract signal
+         ^ints layout (int-array (* (count channels) (.size target))) ;; prepare layout
+         limit (- (alength layout) (dec nb)) ;; number of values to process
+         coding (condp = (:coding config) ;; find encoding function
+                  :none identity
+                  :alaw alaw
+                  :ulaw ulaw
+                  :alaw-rev alaw-rev
+                  :ulaw-rev ulaw-rev)]
 
-    (loop [idx (int 0) ;; decode and extract ints from doubles 
-           bidx (int 0)]
-      (when (< idx limit)
-        (let [v (coding (aget ^doubles buff bidx))]
-          (condp = nb
-            1 (aset ^ints layout idx ^int (double-to-ints 8 v e s)) ;; boxed math
-            2 (let [^Vec2 v (double-to-ints 16 v e s)]
-                (aset ^ints layout idx (int (.x v)))
-                (aset ^ints layout (inc idx) (int (.y v))))
-            3 (let [^Vec3 v (double-to-ints 24 v e s)]
-                (aset ^ints layout idx (int (.x v)))
-                (aset ^ints layout (inc idx) (int (.y v)))
-                (aset ^ints layout (+ 2 idx) (int (.z v))))))
-        (recur (+ idx nb) (inc bidx))))
+     (loop [idx (int 0) ;; decode and extract ints from doubles 
+            bidx (int 0)]
+       (when (< idx limit)
+         (let [v (coding (aget ^doubles buff bidx))]
+           (condp = nb
+             1 (aset ^ints layout idx ^int (double-to-ints 8 v e s)) ;; boxed math
+             2 (let [^Vec2 v (double-to-ints 16 v e s)]
+                 (aset ^ints layout idx (int (.x v)))
+                 (aset ^ints layout (inc idx) (int (.y v))))
+             3 (let [^Vec3 v (double-to-ints 24 v e s)]
+                 (aset ^ints layout idx (int (.x v)))
+                 (aset ^ints layout (inc idx) (int (.y v)))
+                 (aset ^ints layout (+ 2 idx) (int (.z v))))))
+         (recur (+ idx nb) (inc bidx))))
 
-    (if (= :planar (:layout config)) ;; store restored values into target (`Pixels`).
-      (pre-layout-planar false target channels layout)
-      (pre-layout-interleaved false target channels layout))
+     (if (= :planar (:layout config)) ;; store restored values into target (`Pixels`).
+       (pre-layout-planar false target channels layout)
+       (pre-layout-interleaved false target channels layout))
 
-    target))
+     target))
+  ([target sig]
+   (signal-to-pixels target sig {})))
 
 ;; ## Signal processing
 ;;

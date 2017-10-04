@@ -32,11 +32,12 @@ This project is the answer to personal needs to optimize my own workflow for gen
 * weak or no support for parallelism
 * more minor...
 
-### Why not use...
+### Is it replacement for...
 
 ... quil, thi.ng, clisk, possibly other?
 
-The main reason was that I wanted to learn Clojure making something from the scratch. Quil is still Processing. Thi.ng was to complex to me at the beginning (but I plan to investigate what can be usable).
+No, rather no. The closest is quil, which is really great library (both Clojure and Clojurescript, great documentation and webpage, functional mode, 3d support etc.).
+`Clojure2d` emphasises math, color and pixels operations and adds a lot of ready to use effects/filters (see `extra` namespaces`).
 
 ### What's special in this library then?
 
@@ -44,7 +45,7 @@ In points:
 
 * Almost decoupled display and canvas (decoupled drawing and refreshing) - you can have as many windows as you want, you can have as many canvases as you want. Display repaints selected canvas automaticaly in separate thread. This way you can operate on canvas in your pace.
 * Processing way is still possible (you can attach draw() function to your Display). However main benefit here: draw function keeps context between invocations, this way you can avoid global state (atoms etc.) and write more functional way. The same is for events, each Window has assigned state which is passed through event calls.
-* Easy live coding possible (Emacs/Cider/REPL), 'notebook' way of making
+* Easy live coding possible (Emacs/Cider/REPL)
 * FastMath as main math library
 * Main focus on higher level generative/glitch concepts (like sonification support, vector field functions, colorspace operations, things like pixelsorting, slitscan etc. See my Processing sketches, link below)
 

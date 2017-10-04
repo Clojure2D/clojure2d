@@ -26,6 +26,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 ;; how many tasks we can run (one less than available cores)?
 (def ^:const ^long available-cores (.availableProcessors (Runtime/getRuntime)))
@@ -1006,11 +1007,13 @@
   (let [stime (/ 1000.0 ^double (.fps window))]
     (loop [cnt (long 0)
            result nil]
-      (let [new-result (when draw-fun 
+      (let [ct (System/currentTimeMillis)
+            new-result (when draw-fun 
                          (with-canvas @(.buffer window)
-                           (draw-fun window cnt result)))]
-        (Thread/sleep stime)
-        (repaint (.panel window) @(.buffer window)) 
+                           (draw-fun window cnt result)))] 
+        (repaint (.panel window) @(.buffer window))
+        (let [delay (- stime (- (System/currentTimeMillis) ct))]
+          (when (pos? delay) (Thread/sleep delay)))
         (when @(.active? window) (recur (unchecked-inc cnt) new-result))))))
 
 ;; You may want to replace canvas to the other one. To make it pass result of `show-window` function and new canvas.
@@ -1114,7 +1117,7 @@
   "Create counter function, each call returns next number."
   ([^long v]
    (let [tick (atom (dec v))]
-     #(swap! tick inc)))
+     (fn [] (swap! tick #(inc ^long %)))))
   ([]
    (make-counter 0)))
 
