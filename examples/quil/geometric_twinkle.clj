@@ -1,3 +1,6 @@
+;; original: http://quil.info/sketches/show/example_geometric-twinkle
+;; author: Jeremy Kross
+
 (ns examples.quil.geometric-twinkle
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
@@ -36,11 +39,14 @@
 
 (defn draw-state
   [canvas _ fps state]
-  (let [state (or state (setup))]
-    (set-background canvas :black)
-    (set-color canvas :white)
-    (doseq [c (:circles state)]
-      (ellipse canvas (:x c) (:y c) (:r c) (:r c)))
-    (update-state state fps)))
+  (set-background canvas :black)
+  (set-color canvas :white)
+  (doseq [c (:circles state)]
+    (ellipse canvas (:x c) (:y c) (:r c) (:r c)))
+  (update-state state fps))
 
-(def window (show-window (make-canvas w h) "Geometric twinkle" 30 draw-state))
+(def window (show-window {:canvas (make-canvas w h)
+                          :window-name "Geometric twinkle"
+                          :fps 30
+                          :draw-fn draw-state
+                          :draw-state (setup)}))

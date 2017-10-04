@@ -1,4 +1,5 @@
-;; http://quil.info/sketches/show/example_game-of-life
+;; Original: http://quil.info/sketches/show/example_game-of-life
+;; Author: Mauro De Giorgi
 
 (ns examples.quil.game-of-life
   (:require [clojure2d.core :refer :all]

@@ -1003,10 +1003,10 @@
   "Repaint canvas on window with set FPS.
 
   * Input: frame, active? atom, function to run before repaint, canvas and sleep time."
-  [^Window window draw-fun]
+  [^Window window draw-fun draw-state]
   (let [stime (/ 1000.0 ^double (.fps window))]
     (loop [cnt (long 0)
-           result nil]
+           result draw-state]
       (let [ct (System/currentTimeMillis)
             new-result (when draw-fun 
                          (with-canvas @(.buffer window)
@@ -1047,7 +1047,7 @@
   * :fps
   * :draw-fn
   * :state"
-  ([canvas wname width height fps draw-fun state]
+  ([canvas wname width height fps draw-fun state draw-state]
    (let [active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
@@ -1062,27 +1062,28 @@
                           wname)]
      (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
      (change-state! wname state)
-     (future (refresh-screen-task window draw-fun))
+     (future (refresh-screen-task window draw-fun draw-state))
      window))
   ([canvas wname]
    (show-window canvas wname nil))
   ([canvas wname draw-fn]
    (show-window canvas wname 60 draw-fn))
   ([canvas wname fps draw-fn]
-   (show-window canvas wname (width canvas) (height canvas) fps draw-fn nil))
+   (show-window canvas wname (width canvas) (height canvas) fps draw-fn nil nil))
   ([canvas wname w h fps]
-   (show-window canvas wname w h fps nil nil))
+   (show-window canvas wname w h fps nil nil nil))
   ([canvas wname w h fps draw-fun]
-   (show-window canvas wname w h fps draw-fun nil))
-  ([{:keys [canvas window-name w h fps draw-fn state]
+   (show-window canvas wname w h fps draw-fun nil nil))
+  ([{:keys [canvas window-name w h fps draw-fn state draw-state]
      :or {canvas (make-canvas 100 100)
           window-name (str "Clojure2D - " (to-hex (rand-int (Integer/MAX_VALUE)) 8))
           w (width canvas)
           h (height canvas)
           fps 60
           draw-fn nil
-          state nil}}]
-   (show-window canvas window-name w h fps draw-fn state))
+          state nil
+          draw-state nil}}]
+   (show-window canvas window-name w h fps draw-fn state draw-state))
   ([] (show-window {})))
 
 ;; ## Utility functions

@@ -1,3 +1,6 @@
+;; Original: http://quil.info/sketches/show/example_waves
+;; Author: Erik Svedäng
+
 (ns examples.quil.waves
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
@@ -26,8 +29,8 @@
 
 (defn draw
   "Draw frames"
-  [canvas _ ^long fps _]
-  (let [t (* fps 0.05)]
+  [canvas window ^long fps _]
+  (let [t (/ fps ^double (:fps window))]
     (set-background canvas 250 250 250)
     (let [move-down (/ h 5)
           amp (/ h 8)]
@@ -40,5 +43,4 @@
               (set-color :white 250)
               (path wv)))))))
 
-(def window (show-window (make-canvas w h) "Waves" draw))
-
+(def window (show-window (make-canvas w h) "Waves" 30 draw))
