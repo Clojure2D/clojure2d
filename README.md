@@ -178,6 +178,7 @@ I've prepared several examples with results where you can check current state of
   * ch08/treestochastic-8-7.clj
   * ch08/lsystem-8-9.clj
   * ch08/treestochasticnoise-8-10
+* quil - [Quil](http://quil.info/examples) examples ported to Clojure2d
 
 ## TODO
 
