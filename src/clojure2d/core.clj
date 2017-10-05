@@ -921,7 +921,7 @@
 
 ;; Private method which extracts the name of your window (set when `show-window` is called).
 
-(defn- component-name
+(defn event-window-name
   "Returns name of the component. Used to dispatch events."
   [^ComponentEvent e]
   (.getName ^Component (.getComponent e)))
@@ -929,17 +929,17 @@
 (def ^:const virtual-key (char 0xffff))
 
 ;; Multimethod used to process pressed key
-(defmulti key-pressed (fn [^KeyEvent e state] [(component-name e) (.getKeyChar e)]))
+(defmulti key-pressed (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))
 ;; Do nothing on default
 (defmethod key-pressed :default [_ s]  s)
 
 ;; Multimethod used to process released key
-(defmulti key-released (fn [^KeyEvent e state] [(component-name e) (.getKeyChar e)]))
+(defmulti key-released (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))
 ;; Do nothing on default
 (defmethod key-released :default [_ s]  s)
 
 ;; Multimethod used to process typed key
-(defmulti key-typed (fn [^KeyEvent e state] [(component-name e) (.getKeyChar e)]))
+(defmulti key-typed (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))
 ;; Do nothing on default
 (defmethod key-typed :default [_ s]  s)
 
@@ -951,7 +951,7 @@
                       MouseEvent/MOUSE_MOVED    :mouse-moved})
 
 ;; Multimethod used to processed mouse events
-(defmulti mouse-event (fn [^MouseEvent e state] [(component-name e) (mouse-event-map (.getID e))]))
+(defmulti mouse-event (fn [^MouseEvent e state] [(event-window-name e) (mouse-event-map (.getID e))]))
 ;; Do nothing on default
 (defmethod mouse-event :default [_ s] s)
 
@@ -962,7 +962,7 @@
 (defn- process-state-and-event 
   "For given event call provided multimethod passing state. Save new state."
   [ef e]
-  (let [window-name (component-name e)]
+  (let [window-name (event-window-name e)]
     (change-state! window-name (ef e (@global-state window-name)))))
 
 ;; Key

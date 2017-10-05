@@ -12,7 +12,7 @@
 
 (def ^:const ^int w 500)
 (def ^:const ^int h 500)
-(def ^:const ^double mult (m/norm w 700 200 0.01 0.03))
+(def ^:const ^double mult (m/cnorm w 700 200 0.01 0.03))
 
 (def ^:const start (v/vec2 0 h))
 (def ^:const end (v/vec2 w h))

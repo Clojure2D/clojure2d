@@ -2877,13 +2877,16 @@ net.brehaut.ClojureTools = (function (SH) {
 </ul>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.math.random
-  (:require [clojure2d.math :refer :all]
+  (:require [clojure2d.math :as m]
             [clojure2d.math.vector :as v])
   (:import [clojure2d.math.vector Vec2]
            [org.apache.commons.math3.random RandomGenerator ISAACRandom JDKRandomGenerator MersenneTwister
             Well512a Well1024a Well19937a Well19937c Well44497a Well44497b
             RandomVectorGenerator HaltonSequenceGenerator SobolSequenceGenerator UnitSphereRandomVectorGenerator]
-           [com.flowpowered.noise.module.source Perlin]))</pre></td></tr><tr><td class="docs"><h2>Random function wrappers</h2>
+           [com.flowpowered.noise.module.source Perlin]))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)</pre></td></tr><tr><td class="docs"><h2>Random function wrappers</h2>
 
 <p>RNG wrapper for various RNG source.
 As a RNG source <a href="http://commons.apache.org/proper/commons-math/apidocs/org/apache/commons/math3/random/package-summary.html">Apache Commons Math</a> project was chosen.</p>
@@ -2994,7 +2997,8 @@ As a RNG source <a href="http://commons.apache.org/proper/commons-math/apidocs/o
   (lrandom [t] [t mx] [t mn mx] &quot;long random&quot;)
   (frandom [t] [t mx] [t mn mx] &quot;float random&quot;)
   (grandom [t] [t std] [t mean std] &quot;gaussian random&quot;)
-  (brandom [t] [t thr] &quot;boolean random, with probability option&quot;))</pre></td></tr><tr><td class="docs"><p>Extend RandomGenerator interface with functions created by macro <code>next-random-value-fn</code>. This way all RNG classes are enriched with new, more convenient functions.</p>
+  (brandom [t] [t thr] &quot;boolean random, with probability option&quot;)
+  (seed [t v] &quot;set seed&quot;))</pre></td></tr><tr><td class="docs"><p>Extend RandomGenerator interface with functions created by macro <code>next-random-value-fn</code>. This way all RNG classes are enriched with new, more convenient functions.</p>
 
 <p>Note that <code>grandom</code> is under special care due to different [mn mx] range meaning.</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
@@ -3010,7 +3014,8 @@ As a RNG source <a href="http://commons.apache.org/proper/commons-math/apidocs/o
               ([t ^double mean ^double std] (next-random-value-gaussian t mean (+ mean std))))
    :brandom (fn
               ([^RandomGenerator t] (.nextBoolean t))
-              ([t ^double thr] (&lt; (next-random-value-double t) thr)))})</pre></td></tr><tr><td class="docs"><p>Create object of the class with (or not) given seed</p>
+              ([t ^double thr] (&lt; (next-random-value-double t) thr)))
+   :seed #(.setSeed ^RandomGenerator %1 (long %2))})</pre></td></tr><tr><td class="docs"><p>Create object of the class with (or not) given seed</p>
 
 <p>Helper macro which creates RNG object of given class and/or seed.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmacro create-object-with-seed
@@ -3082,7 +3087,12 @@ As a RNG source <a href="http://commons.apache.org/proper/commons-math/apidocs/o
 </td><td class="codes"><pre class="brush: clojure">(defn lrand
   (^long [] (lrandom default-random))
   (^long [mx] (lrandom default-random mx))
-  (^long [mn mx] (lrandom default-random mn mx)))</pre></td></tr><tr><td class="docs"><h2>Random Vector Sequences</h2>
+  (^long [mn mx] (lrandom default-random mn mx)))</pre></td></tr><tr><td class="docs"><p>Retrun value with given probability (default 0.5)</p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro randval
+  ([v1 v2]
+   `(if (brandom default-random) ~v1 ~v2))
+  ([prob v1 v2]
+   `(if (brandom default-random ~prob) ~v1 ~v2)))</pre></td></tr><tr><td class="docs"><h2>Random Vector Sequences</h2>
 
 <p>Couple of functions to generate sequences of numbers or vectors.
 You can generate sequence of <code>double</code>, <code>Vec2</code>, <code>Vec3</code> or <code>Vec4</code> types. Just pass the size to creator function.</p>
@@ -3101,8 +3111,8 @@ Following generators are available:</p>
 <p>After creation you get function equivalent to <code>(repeatedly fn)</code></p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Generators from commons math</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- commons-math-generators
-  [gen size]
-  (let [s (iconstrain size 1 4)
+  [gen ^long size]
+  (let [s (m/constrain size 1 4)
         ^RandomVectorGenerator g (case gen
                                    :halton (HaltonSequenceGenerator. s)
                                    :sobol (SobolSequenceGenerator. s)
@@ -3114,8 +3124,8 @@ Following generators are available:</p>
              4 #(v/array-&gt;vec4 (.nextVector g)))]
     #(repeatedly gf)))</pre></td></tr><tr><td class="docs"><p>Random JDK generators</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- random-generators
-  [gen size]
-  (let [s (iconstrain size 1 4)
+  [gen ^long size]
+  (let [s (m/constrain size 1 4)
         g (case gen
             :default drand
             :gaussian grand)
@@ -3160,7 +3170,7 @@ Following generators are available:</p>
      (partial with-noise n))))</pre></td></tr><tr><td class="docs"><p>default noise function with random seed and default octave numbers</p>
 </td><td class="codes"><pre class="brush: clojure">(def noise (make-perlin-noise))</pre></td></tr><tr><td class="docs"><h3>Discrete noise</h3>
 </td><td class="codes"></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double AM (/ 1.0 2147483647.0))</pre></td></tr><tr><td class="docs"><p>Discrete noise. Parameters:</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double AM (/ 2147483647.0))</pre></td></tr><tr><td class="docs"><p>Discrete noise. Parameters:</p>
 
 <ul>
 <li>X (long)</li>
@@ -3173,7 +3183,7 @@ Following generators are available:</p>
    (let [X (unchecked-int X)
          Y (unchecked-int Y)
          n (unchecked-add-int X (unchecked-multiply-int Y 57))
-         nn (unchecked-int (bit-xor n (bit-shift-left n 13)))
+         nn (unchecked-int (bit-xor n (&lt;&lt; n 13)))
          nnn (unchecked-add-int 1376312589 (unchecked-multiply-int nn (unchecked-add-int 789221 (unchecked-multiply-int nn (unchecked-multiply-int nn 15731)))))]
      (* AM (unchecked-int (bit-and 0x7fffffff nnn)))))
   (^double [^long X]

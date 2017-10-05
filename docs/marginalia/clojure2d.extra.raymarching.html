@@ -2874,7 +2874,8 @@ cheap&amp;dirty ray marching helper library</p>
             [clojure2d.math.vector :as v])
   (:import [clojure2d.math.vector Vec2 Vec3]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* true)</pre></td></tr><tr><td class="docs">
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def ^Vec3 vzero (Vec3. 0.0 0.0 0.0))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(deftype Material [^Vec3 color ^double diffusion ^double specular ^double specularf0 ^double specularpow ^double reflection])
 (deftype HitData [^double d ^Material mat])</pre></td></tr><tr><td class="docs"><p>Create material information:
@@ -2907,17 +2908,17 @@ cheap&amp;dirty ray marching helper library</p>
 </td><td class="codes"><pre class="brush: clojure">(defmethod make-primitive :sphere [_ mat conf]
   (let [^double s (:r conf)]
     (fn [p]
-      (HitData. (- (v/mag p) s) mat))))</pre></td></tr><tr><td class="docs">
+      (HitData. (- ^double (v/mag p) s) mat))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmethod make-primitive :plane [_ mat conf]
   (let [n (v/normalize (:normal conf))
         ^double dist (:dist-from-origin conf)]
     (fn [p]
-      (HitData. (+ dist (v/dot p n)) mat))))</pre></td></tr><tr><td class="docs">
+      (HitData. (+ dist ^double (v/dot p n)) mat))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmethod make-primitive :box [_ mat conf]
   (let [b (:box conf)]
     (fn [p]
       (let [d (v/sub (v/abs p) b)]
-        (HitData. (+ (v/mag (v/emx d vzero)) (min 0.0 (v/mx d))) mat)))))</pre></td></tr><tr><td class="docs">
+        (HitData. (+ ^double (v/mag (v/emx d vzero)) (min 0.0 ^double (v/mx d))) mat)))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defmethod make-primitive :torus [_ mat conf]
   (let [^double small-radius (:small-radius conf)
         ^double large-radius (:large-radius conf)]
@@ -3078,7 +3079,7 @@ http://www.pouet.net/topic.php?which=6675</p>
     (loop [i (int 0)
            occ 0.0
            pw 1.0]
-      (let [ik (* i k)
+      (let [ik (* (double i) k)
             sh (if (odd? i) ik (- ik))
             yshift (v/mult (Vec3. sh ik (- sh)) 0.2) ;; vary a normal a little bit
             fac (+ 0.01 ik)
@@ -3149,7 +3150,7 @@ http://www.pouet.net/topic.php?which=6675</p>
            (if (or (&gt; i steps)
                    (&lt; dist precision)
                    (&gt; t tmax))
-             [(HitData. t (if (&gt; t tmax) background m)) (- 1.0 (/ (double i) steps))]
+             [(HitData. t (if (&gt; t tmax) background m)) (- 1.0 (/ (double i) (double steps)))]
              (recur (+ t (* stepf dist))
                     (unchecked-inc i)
                     (.mat d))))))))
@@ -3162,10 +3163,10 @@ http://renderwonk.com/publications/s2010-shading-course/gotanda/course<em>note</
   (fn [^Material mat shadow-f N D pos]
     (let [shadow (shadow-f scene ^Vec3 pos L)
           E (v/sub D)
-          NL (max 0.0 (v/dot N L))
+          NL (max 0.0 ^double (v/dot N L))
           H (v/normalize (v/add L E))
-          NH (max 0.0 (v/dot N H))
-          EH (max 0.0 (v/dot E H))
+          NH (max 0.0 ^double (v/dot N H))
+          EH (max 0.0 ^double (v/dot E H))
           Ff0 (+ (.specularf0 mat) (* (- 1.0 (.specularf0 mat)) (m/pow (- 1.0 EH) 5.0)))
           diffuse (v/mult diff-color (* (.diffusion mat) NL))
           specular (v/mult spec-color (* (.specular mat) (* Ff0 NL (m/pow NH (.specularpow mat)))))

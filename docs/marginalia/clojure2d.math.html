@@ -2871,15 +2871,107 @@ net.brehaut.ClojureTools = (function (SH) {
 
 <ul>
 <li>Several constants from Java, C, Processing, etc.</li>
-<li>Functions based on FastMath wrapped in Clojure functions (trigonometry, powers/logartihms/roots, rounding)</li>
+<li>Functions based on FastMath exposed as macros or functions (trigonometry, powers/logartihms/roots, rounding)</li>
+<li>Primitive operators (as in primitive-math package)</li>
 <li>Additional math functions (signum, constrain, interpolation)</li>
 <li>Statistics</li>
 </ul>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Math functions</p>
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.math
-  (:import net.jafama.FastMath))</pre></td></tr><tr><td class="docs">
+  (:refer-clojure
+   :exclude [* + - / &gt; &lt; &gt;= &lt;= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max])
+  (:import [net.jafama FastMath]
+           [clojure2d.java PrimitiveMath]
+           [clojure.lang Numbers]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><h2>Math functions</h2>
+(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><h2>Macros</h2>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Wrapps operation into macro</p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro ^:private javaclass-proxy
+  ([class alt-name name]
+   (let [f (symbol (str class &quot;/&quot; name))
+         d (str  class &quot; &quot;  name &quot; function.&quot;)]
+     `(defmacro ~alt-name
+        ([x#]
+         (list '~f x#))
+        ([x# y#]
+         (list '~f x# y#))
+        ([x# y# z#]
+         (list '~f x# y# z#)))))
+  ([class name]
+   `(javaclass-proxy ~class ~name ~name)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmacro ^:private fastmath-proxy [&amp; rest] `(javaclass-proxy &quot;net.jafama.FastMath&quot; ~@rest))
+(defmacro ^:private primitivemath-proxy [&amp; rest] `(javaclass-proxy &quot;clojure2d.java.PrimitiveMath&quot; ~@rest))</pre></td></tr><tr><td class="docs"><p>Creates left-associative variadic forms for any operator.
+  https://github.com/ztellman/primitive-math/blob/master/src/primitive_math.clj#L10</p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro ^:private variadic-proxy
+  ([name]
+   `(variadic-proxy ~name ~name))
+  ([name fn]
+   `(variadic-proxy ~name ~fn identity))
+  ([name fn single-arg-form]
+   (let [x-sym (gensym &quot;x&quot;)
+         fname (symbol (str &quot;clojure2d.java.PrimitiveMath/&quot; fn))
+         doc (str &quot;A primitive macro version of `&quot; name &quot;`&quot;)]
+     `(defmacro ~name
+        ~doc
+        ([~x-sym]
+         ~((eval single-arg-form) x-sym))
+        ([x# y#]
+         (list '~fname x# y#))
+        ([x# y# ~'&amp; rest#]
+         (list* '~name (list '~name x# y#) rest#))))))</pre></td></tr><tr><td class="docs"><p>Turns variadic predicates into multiple pair-wise comparisons.
+  https://github.com/ztellman/primitive-math/blob/master/src/primitive_math.clj#L27</p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro ^:private variadic-predicate-proxy
+  ([name]
+   `(variadic-predicate-proxy ~name ~name))
+  ([name fn]
+   `(variadic-predicate-proxy ~name ~fn (constantly true)))
+  ([name fn single-arg-form]
+   (let [x-sym (gensym &quot;x&quot;)
+         fname (symbol (str &quot;clojure2d.java.PrimitiveMath/&quot; fn))
+         doc (str &quot;A primitive macro version of `&quot; name &quot;`&quot;)]
+     `(defmacro ~name
+        ~doc
+        ([~x-sym]
+         ~((eval single-arg-form) x-sym))
+        ([x# y#]
+         (list '~fname x# y#))
+        ([x# y# ~'&amp; rest#]
+         (list 'clojure2d.java.PrimitiveMath/and (list '~name x# y#) (list* '~name y# rest#)))))))</pre></td></tr><tr><td class="docs"><h2>Basic operations</h2>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(variadic-proxy + add)
+(variadic-proxy - subtract (fn [x] `(list 'clojure2d.java.PrimitiveMath/negate ~x)))
+(variadic-proxy * multiply)
+(variadic-proxy / divide (fn [x] `(list 'clojure2d.java.PrimitiveMath/reciprocal ~x)))
+(primitivemath-proxy inc)
+(primitivemath-proxy dec)
+(primitivemath-proxy rem remainder)
+(primitivemath-proxy quot quotient)
+(primitivemath-proxy mod modulus)
+(variadic-proxy bit-and bitAnd)
+(variadic-proxy bit-or bitOr)
+(variadic-proxy bit-xor bitXor)
+(primitivemath-proxy bit-not bitNot)
+(variadic-proxy bool-and and)
+(variadic-proxy bool-or or)
+(variadic-proxy bool-xor xor)
+(primitivemath-proxy bool-not not)
+(variadic-proxy min)
+(variadic-proxy max)
+(primitivemath-proxy zero? isZero)
+(primitivemath-proxy neg? isNeg)
+(primitivemath-proxy pos? isPos)
+(primitivemath-proxy &lt;&lt; shiftLeft)
+(primitivemath-proxy &gt;&gt; shiftRight)
+(primitivemath-proxy &gt;&gt;&gt; unsignedShiftRight)
+(primitivemath-proxy bit-shift-left shiftLeft)
+(primitivemath-proxy bit-shift-right shiftRight)
+(primitivemath-proxy unsigned-bit-shift-right unsignedShiftRight)</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(variadic-predicate-proxy &lt; lt)
+(variadic-predicate-proxy &gt; gt)
+(variadic-predicate-proxy &lt;= lte)
+(variadic-predicate-proxy &gt;= gte)
+(variadic-predicate-proxy == eq)
+(variadic-predicate-proxy not== neq)</pre></td></tr><tr><td class="docs"><h2>Math functions</h2>
 
 <p>FastMath functions type hinted wrapped in processing function (to allow composition etc.).
 All functions operate and return <code>double</code> or in some cases <code>long</code>.</p>
@@ -2892,42 +2984,43 @@ All functions operate and return <code>double</code> or in some cases <code>long
 (def ^:const ^double TAU TWO_PI)
 (def ^:const ^double E Math/E)</pre></td></tr><tr><td class="docs"><p>Very small number \(\varepsilon\)</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double EPSILON 1.0e-10)</pre></td></tr><tr><td class="docs"><p>Common fractions</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double THIRD (/ 1.0 3.0))
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double THIRD (/ 3.0))
 (def ^:const ^double TWO_THIRD (/ 2.0 3.0))
-(def ^:const ^double SIXTH (/ 1.0 6.0))</pre></td></tr><tr><td class="docs"><p>Trigonometry</p>
-</td><td class="codes"><pre class="brush: clojure">(defn sin ^double [^double v] (FastMath/sin v))
-(defn cos ^double [^double v] (FastMath/cos v))
-(defn tan ^double [^double v] (FastMath/tan v))
-(defn asin ^double [^double v] (FastMath/asin v))
-(defn acos ^double [^double v] (FastMath/acos v))
-(defn atan ^double [^double v] (FastMath/atan v))
-(defn sinh ^double [^double v] (FastMath/sinh v))
-(defn cosh ^double [^double v] (FastMath/cosh v))
-(defn tanh ^double [^double v] (FastMath/tanh v))
-(defn asinh ^double [^double v] (FastMath/asinh v))
-(defn acosh ^double [^double v] (FastMath/acosh v))
-(defn atanh ^double [^double v] (FastMath/atanh v))</pre></td></tr><tr><td class="docs"><p>Quick and less accurate <code>sin</code> and <code>cos</code></p>
-</td><td class="codes"><pre class="brush: clojure">(defn qsin ^double [^double v] (FastMath/sinQuick v))
-(defn qcos ^double [^double v] (FastMath/cosQuick v))</pre></td></tr><tr><td class="docs"><p>Additional trigonometry functions</p>
+(def ^:const ^double SIXTH (/ 6.0))</pre></td></tr><tr><td class="docs"><p>Trigonometry</p>
+</td><td class="codes"><pre class="brush: clojure">(fastmath-proxy sin)
+(fastmath-proxy cos)
+(fastmath-proxy tan)
+(fastmath-proxy asin)
+(fastmath-proxy acos)
+(fastmath-proxy atan)
+(fastmath-proxy sinh)
+(fastmath-proxy cosh)
+(fastmath-proxy tanh)
+(fastmath-proxy asinh)
+(fastmath-proxy acosh)
+(fastmath-proxy atanh)</pre></td></tr><tr><td class="docs"><p>Quick and less accurate <code>sin</code> and <code>cos</code></p>
+</td><td class="codes"><pre class="brush: clojure">(fastmath-proxy qsin sinQuick)
+(fastmath-proxy qcos cosQuick)</pre></td></tr><tr><td class="docs"><p>Additional trigonometry functions</p>
 </td><td class="codes"><pre class="brush: clojure">(defn cot ^double [^double v] (FastMath/tan (- HALF_PI v)))
-(defn sec ^double [^double v] (/ 1.0 (FastMath/cos v)))
-(defn csc ^double [^double v] (/ 1.0 (FastMath/sin v)))</pre></td></tr><tr><td class="docs"><p>Additional cyclometric functions</p>
+(defn sec ^double [^double v] (/ (FastMath/cos v)))
+(defn csc ^double [^double v] (/ (FastMath/sin v)))</pre></td></tr><tr><td class="docs"><p>Additional cyclometric functions</p>
 </td><td class="codes"><pre class="brush: clojure">(defn acot ^double [^double v] (- HALF_PI (FastMath/atan v)))
 (defn asec ^double [^double v] (FastMath/acos (/ 1.0 v)))
 (defn acsc ^double [^double v] (FastMath/asin (/ 1.0 v)))
-(defn atan2 ^double [^double v1 ^double v2] (FastMath/atan2 v1 v2))</pre></td></tr><tr><td class="docs"><p>Additional hyperbolic functions</p>
-</td><td class="codes"><pre class="brush: clojure">(defn coth ^double [^double v] (/ 1.0 (FastMath/tanh v)))
-(defn sech ^double [^double v] (/ 1.0 (FastMath/cosh v)))
-(defn csch ^double [^double v] (/ 1.0 (FastMath/sinh v)))</pre></td></tr><tr><td class="docs"><p>Additional inverse hyperbolic functions</p>
-</td><td class="codes"><pre class="brush: clojure">(defn acoth ^double [^double v] (FastMath/atanh (/ 1.0 v)))
-(defn asech ^double [^double v] (FastMath/acosh (/ 1.0 v)))
-(defn acsch ^double [^double v] (FastMath/asinh (/ 1.0 v)))</pre></td></tr><tr><td class="docs"><p>exp and log</p>
-</td><td class="codes"><pre class="brush: clojure">(defn exp ^double [^double v] (FastMath/exp v))
-(defn log ^double [^double v] (FastMath/log v))
-(defn log10 ^double [^double v] (FastMath/log10 v))</pre></td></tr><tr><td class="docs"><p>Roots (square and cubic)</p>
-</td><td class="codes"><pre class="brush: clojure">(defn sqrt ^double [^double v] (FastMath/sqrt v))
-(defn cbrt ^double [^double v] (FastMath/cbrt v))</pre></td></tr><tr><td class="docs"><p>Quick version of exponential \(e^x\)</p>
-</td><td class="codes"><pre class="brush: clojure">(defn qexp ^double [^double v] (FastMath/expQuick v))</pre></td></tr><tr><td class="docs"><p>Radians to degrees (and opposite) conversions</p>
+(fastmath-proxy atan2)</pre></td></tr><tr><td class="docs"><p>Additional hyperbolic functions</p>
+</td><td class="codes"><pre class="brush: clojure">(defn coth ^double [^double v] (/ (FastMath/tanh v)))
+(defn sech ^double [^double v] (/ (FastMath/cosh v)))
+(defn csch ^double [^double v] (/ (FastMath/sinh v)))</pre></td></tr><tr><td class="docs"><p>Additional inverse hyperbolic functions</p>
+</td><td class="codes"><pre class="brush: clojure">(defn acoth ^double [^double v] (FastMath/atanh (/ v)))
+(defn asech ^double [^double v] (FastMath/acosh (/ v)))
+(defn acsch ^double [^double v] (FastMath/asinh (/ v)))</pre></td></tr><tr><td class="docs"><p>exp and log</p>
+</td><td class="codes"><pre class="brush: clojure">(fastmath-proxy exp)
+(fastmath-proxy log)
+(fastmath-proxy log10)</pre></td></tr><tr><td class="docs"><p>Alias for natural logarithm</p>
+</td><td class="codes"><pre class="brush: clojure">(fastmath-proxy ln log)</pre></td></tr><tr><td class="docs"><p>Roots (square and cubic)</p>
+</td><td class="codes"><pre class="brush: clojure">(fastmath-proxy sqrt)
+(fastmath-proxy cbrt)</pre></td></tr><tr><td class="docs"><p>Quick version of exponential \(e^x\)</p>
+</td><td class="codes"><pre class="brush: clojure">(fastmath-proxy qexp expQuick)</pre></td></tr><tr><td class="docs"><p>Radians to degrees (and opposite) conversions</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double rad-in-deg (/ 180.0 PI))
 (def ^:const ^double deg-in-rad (/ PI 180.0))
 (defn radians ^double [^double deg] (* deg-in-rad deg))
@@ -2938,14 +3031,13 @@ All functions operate and return <code>double</code> or in some cases <code>long
   ^double [^double v]
   (let [x (* PI (FastMath/abs v))]
     (if (&lt; x 1.0e-5) 1.0
-        (/ (FastMath/sin x) x))))</pre></td></tr><tr><td class="docs"><p>Alias for natural logarithm</p>
-</td><td class="codes"><pre class="brush: clojure">(def ln log)</pre></td></tr><tr><td class="docs"><p>Few logarithm constants
+        (/ (FastMath/sin x) x))))</pre></td></tr><tr><td class="docs"><p>Few logarithm constants
 \(\ln 2\)</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double LN2 (log 2.0))
-(def ^:const ^double INV_LN2 (/ 1.0 LN2))
+(def ^:const ^double INV_LN2 (/ LN2))
 (def ^:const ^double LN2_2 (* 0.5 LN2))</pre></td></tr><tr><td class="docs"><p>\(\ln 10\)</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double LN10 (log 10.0))</pre></td></tr><tr><td class="docs"><p>\(\frac{1.0}{\ln{0.5}}\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double INV_LOG_HALF (/ 1.0 ^double (log 0.5)))</pre></td></tr><tr><td class="docs"><p>Log with base 2</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double INV_LOG_HALF (/ (log 0.5)))</pre></td></tr><tr><td class="docs"><p>Log with base 2</p>
 </td><td class="codes"><pre class="brush: clojure">(defn log2
   ^double [^double v]
   (* (FastMath/log v) INV_LN2))</pre></td></tr><tr><td class="docs"><p>Logarithm with base</p>
@@ -2954,40 +3046,35 @@ All functions operate and return <code>double</code> or in some cases <code>long
 </td><td class="codes"><pre class="brush: clojure">(defn logb
   ^double [^double base ^double v]
   (/ (FastMath/log v) (FastMath/log base)))</pre></td></tr><tr><td class="docs"><p>Quick logarithm</p>
-</td><td class="codes"><pre class="brush: clojure">(defn qlog ^double [^double v] (FastMath/logQuick v))</pre></td></tr><tr><td class="docs"><p>\(\log_2 e\)</p>
+</td><td class="codes"><pre class="brush: clojure">(fastmath-proxy qlog logQuick)</pre></td></tr><tr><td class="docs"><p>\(\log_2 e\)</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double LOG2E (log2 E))</pre></td></tr><tr><td class="docs"><p>\(\log_{10} e\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double LOG10E (log10 E))</pre></td></tr><tr><td class="docs"><p>Powers (normal, quick and fast)</p>
-</td><td class="codes"><pre class="brush: clojure">(defn pow ^double [^double v1 ^double v2] (FastMath/pow v1 v2))
-(defn qpow ^double [^double v1 ^double v2] (FastMath/powQuick v1 v2))</pre></td></tr><tr><td class="docs"><p>Fast version of power, second parameter should be integer</p>
-</td><td class="codes"><pre class="brush: clojure">(defn fpow ^double [^double v1 ^double v2] (FastMath/powFast v1 v2))</pre></td></tr><tr><td class="docs"><p>Square and cubic</p>
-</td><td class="codes"><pre class="brush: clojure">(defn sq ^double [^double v] (FastMath/pow2 v))
-(def pow2 sq)
-(defn pow3 ^double [^double v] (FastMath/pow3 v))</pre></td></tr><tr><td class="docs"><p>Safe sqrt, for value &lt;= 0 result is 0</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double LOG10E (log10 E))</pre></td></tr><tr><td class="docs"><p>Powers (normal, quick)</p>
+</td><td class="codes"><pre class="brush: clojure">(fastmath-proxy pow)
+(fastmath-proxy qpow powQuick)</pre></td></tr><tr><td class="docs"><p>Fast version of power, second parameter should be integer</p>
+</td><td class="codes"><pre class="brush: clojure">(fastmath-proxy fpow powFast)</pre></td></tr><tr><td class="docs"><p>Square and cubic</p>
+</td><td class="codes"><pre class="brush: clojure">(defn sq ^double [^double v] (* v v))
+(defn pow2 ^double [^double v] (* v v))
+(defn pow3 ^double [^double v] (* v (* v v)))</pre></td></tr><tr><td class="docs"><p>Safe sqrt, for value &lt;= 0 result is 0</p>
 </td><td class="codes"><pre class="brush: clojure">(defn safe-sqrt
   ^double [^double value]
-  (if (neg? value) 0 (sqrt value)))
-(defn qsqrt ^double [^double v] (FastMath/sqrtQuick v))</pre></td></tr><tr><td class="docs"><p>Hyponetuse</p>
-
-<p>\(\sqrt{x^2+y^2}\) and \(\sqrt{x^2+y^2+z^2}\)</p>
-</td><td class="codes"><pre class="brush: clojure">(defn hypot
-  (^double [^double x ^double y]
-   (FastMath/hypot x y))
-  (^double [^double x ^double y ^double z]
-   (FastMath/hypot x y z)))</pre></td></tr><tr><td class="docs"><p>Rounding functions</p>
+  (if (neg? value) 0.0 (sqrt value)))</pre></td></tr><tr><td class="docs"><p>Approximated sqrt via binary operations (error 1.0E-2)</p>
+</td><td class="codes"><pre class="brush: clojure">(fastmath-proxy qsqrt sqrtQuick)
+(fastmath-proxy rqsqrt invSqrtQuick)</pre></td></tr><tr><td class="docs"><p>\(\sqrt{x^2+y^2}\) and \(\sqrt{x^2+y^2+z^2}\)</p>
+</td><td class="codes"><pre class="brush: clojure">(fastmath-proxy hypot)</pre></td></tr><tr><td class="docs"><p>Rounding functions</p>
 </td><td class="codes"><pre class="brush: clojure">(defn floor ^double [^double v] (FastMath/floor v))
 (defn ceil ^double [^double v] (FastMath/ceil v))
 (defn round ^long [^double v] (FastMath/round v))
-(defn rint ^double [^double v] (FastMath/rint v))</pre></td></tr><tr><td class="docs"><p>fractional part, always returns values from 0.0 to 1.0 (exclusive)</p>
-</td><td class="codes"><pre class="brush: clojure">(defn frac ^double [^double v] (FastMath/abs (- v (long v))))</pre></td></tr><tr><td class="docs"><p>Find power of 2 exponent for double number where <br />
+(fastmath-proxy rint)</pre></td></tr><tr><td class="docs"><p>Modulo and abs</p>
+</td><td class="codes"><pre class="brush: clojure">(fastmath-proxy remainder)
+(defn abs ^double [^double v] (FastMath/abs v))
+(fastmath-proxy iabs)</pre></td></tr><tr><td class="docs"><p>fractional part, always returns values from 0.0 to 1.0 (exclusive)</p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro frac [v] `(abs (- ~v (unchecked-long ~v))))</pre></td></tr><tr><td class="docs"><p>Find power of 2 exponent for double number where <br />
 \(2^(n-1)\leq x\leq 2^n\) <br />
 where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-exp</code>
 <code>(low-2-exp TWO_PI) =&gt; 2</code> \(2^2\eq 4\leq 6.28\) <br />
 <code>(high-2-exp TWO_PI) =&gt; 3</code> \(6.28\leq 2^3\eq 8\)</p>
-</td><td class="codes"><pre class="brush: clojure">(defn low-2-exp ^long [v] (-&gt; v log2 floor long))
-(defn high-2-exp ^long [v] (-&gt; v log2 ceil long))</pre></td></tr><tr><td class="docs"><p>Modulo and abs</p>
-</td><td class="codes"><pre class="brush: clojure">(defn remainder ^double [^double v1 ^double v2] (FastMath/remainder v1 v2))
-(defn abs ^double [^double v] (FastMath/abs v))
-(defn iabs ^long [^long v] (FastMath/abs v))</pre></td></tr><tr><td class="docs"><p>More constants</p>
+</td><td class="codes"><pre class="brush: clojure">(defn low-2-exp ^long [v] (-&gt; v log2 floor unchecked-long))
+(defn high-2-exp ^long [v] (-&gt; v log2 ceil unchecked-long))</pre></td></tr><tr><td class="docs"><p>More constants</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>\(\sqrt{2}\)</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double SQRT2 (sqrt 2.0))
 (def ^:const ^double SQRT2_2 (* 0.5 SQRT2))</pre></td></tr><tr><td class="docs"><p>\(\sqrt{3}\)</p>
@@ -2995,7 +3082,7 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double SQRT5 (sqrt 5.0))</pre></td></tr><tr><td class="docs"><p>\(\sqrt{\pi}\)</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double SQRTPI (sqrt PI))
 (def ^:const ^double SQRT2PI (sqrt TWO_PI))</pre></td></tr><tr><td class="docs"><p>Golden ratio \(\varphi\)</p>
-</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double PHI (* (+ 1.0 SQRT5) 0.5))</pre></td></tr><tr><td class="docs"><p>math.h predefined constants names</p>
+</td><td class="codes"><pre class="brush: clojure">(def ^:const ^double PHI (* (inc SQRT5) 0.5))</pre></td></tr><tr><td class="docs"><p>math.h predefined constants names</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double M_E E)
 (def ^:const ^double M_LOG2E LOG2E)
 (def ^:const ^double M_LOG10E LOG10E)
@@ -3004,25 +3091,25 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
 (def ^:const ^double M_PI PI)
 (def ^:const ^double M_PI_2 HALF_PI)
 (def ^:const ^double M_PI_4 QUARTER_PI)
-(def ^:const ^double M_1_PI (/ 1.0 PI))
+(def ^:const ^double M_1_PI (/ PI))
 (def ^:const ^double M_2_PI (/ 2.0 PI))
 (def ^:const ^double M_2_SQRTPI (/ 2.0 SQRTPI))
 (def ^:const ^double M_SQRT2 SQRT2)
-(def ^:const ^double M_SQRT1_2 (/ 1.0 SQRT2))</pre></td></tr><tr><td class="docs">
+(def ^:const ^double M_SQRT1_2 (/ SQRT2))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^double M_TWOPI TWO_PI)
 (def ^:const ^double M_3PI_4 (* PI 0.75))
 (def ^:const ^double M_SQRT_PI SQRTPI)
 (def ^:const ^double M_LN2LO 1.9082149292705877000E-10)
 (def ^:const ^double M_LN2HI 6.9314718036912381649E-1)
 (def ^:const ^double M_SQRT3 SQRT3)
-(def ^:const ^double M_IVLN10 (/ 1.0 LN10))
+(def ^:const ^double M_IVLN10 (/ LN10))
 (def ^:const ^double M_LOG2_E LN2)
-(def ^:const ^double M_INVLN2 (/ 1.0 LN2))</pre></td></tr><tr><td class="docs"><p>Return 1 if the specified value is > 0, 0 if it is 0, -1 otherwise</p>
+(def ^:const ^double M_INVLN2 (/ LN2))</pre></td></tr><tr><td class="docs"><p>Return 1 if the specified value is > 0, 0 if it is 0, -1 otherwise</p>
 </td><td class="codes"><pre class="brush: clojure">(defn signum
   ^double [^double value]
   (cond (pos? value) 1.0
         (neg? value) -1.0
-        :else 0.0))</pre></td></tr><tr><td class="docs"><p>Return -1 when value is negative, 1 otherwise</p>
+        true 0.0))</pre></td></tr><tr><td class="docs"><p>Return -1 when value is negative, 1 otherwise</p>
 </td><td class="codes"><pre class="brush: clojure">(defn sgn
   ^double [^double value]
   (if (neg? value) -1.0 1.0))</pre></td></tr><tr><td class="docs"><p>Clamp value between mn and mx</p>
@@ -3030,29 +3117,19 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
 <p><code>(constrain 0.5 1 2) =&gt; 1</code> <br />
 <code>(constrain 1.5 1 2) =&gt; 1.5</code> <br />
 <code>(constrain 2.5 1 2) =&gt; 2</code>  </p>
-</td><td class="codes"><pre class="brush: clojure">(defn constrain
-  ^double [^double value ^double mn ^double mx]
-  (if (&gt; value mx) 
-    mx
-    (if (&lt; value mn) 
-      mn 
-      value)))</pre></td></tr><tr><td class="docs"><p>Clamp value between mn and mx (<code>long</code> optimized version)</p>
-</td><td class="codes"><pre class="brush: clojure">(defn iconstrain
-  ^long [^long value ^long mn ^long mx]
-  (if (&gt; value mx) 
-    mx
-    (if (&lt; value mn) 
-      mn 
-      value)))</pre></td></tr><tr><td class="docs"><p>Processing map and norm</p>
-
-<p>Map value from range <code>[start1,stop1]</code> to new range <code>[start2,stop2]</code> or if new range is not given map to <code>[0,1]</code></p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro constrain
+  [value mn mx]
+  `(max (min ~value ~mx) ~mn))</pre></td></tr><tr><td class="docs"><p>Map value from range <code>[start1,stop1]</code> to new range <code>[start2,stop2]</code> or if new range is not given map to <code>[0,1]</code></p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro ^:private normalize-macro
+  [v start stop]
+  `(if (== ~start ~stop)
+     (if (&lt; ~v ~start) 0.0 1.0)
+     (/ (- ~v ~start) (- ~stop ~start))))</pre></td></tr><tr><td class="docs"><p>Processing map and norm</p>
 </td><td class="codes"><pre class="brush: clojure">(defn norm
   ([v start1 stop1 start2 stop2] ;; map
-   (+ ^double start2 (* (- ^double stop2 ^double start2) ^double (norm v start1 stop1))))
+   (+ ^double start2 (* (- ^double stop2 ^double start2) (normalize-macro ^double v ^double start1 ^double stop1))))
   (^double [^double v ^double start ^double stop] ;; norm
-   (if (== start stop)
-     (if (&lt; v start) 0.0 1.0)
-     (/ (- v start) (- stop start)))))</pre></td></tr><tr><td class="docs"><p>Make type hinted map/norm function</p>
+   (normalize-macro v start stop)))</pre></td></tr><tr><td class="docs"><p>Make type hinted map/norm function</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-norm
   ([^double start ^double stop]
    (let [r (- stop start)]
@@ -3069,7 +3146,7 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
 <code>(cnorm 1.5 0 1 100 200) =&gt; 200</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn cnorm
   ([v start1 stop1 start2 stop2]
-   (constrain (norm v start1 stop1 start2 stop2) start2 stop2))
+   (constrain ^double (norm v start1 stop1 start2 stop2) ^double start2 ^double stop2))
   (^double [v start stop]
    (constrain (norm v start stop) 0.0 1.0)))</pre></td></tr><tr><td class="docs"><p>Interpolation functions</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Lerp function (same as in Processing)</p>
@@ -3115,7 +3192,12 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
            (/ (- value from))
            (floor)
            (* cycle)
-           (- value)))))</pre></td></tr><tr><td class="docs"><h3>Statistics</h3>
+           (- value)))))</pre></td></tr><tr><td class="docs"><p>Primitive math equality helper for doubles</p>
+
+<p>Primitive math eq</p>
+</td><td class="codes"><pre class="brush: clojure">(defn eq 
+  [^double a ^double b]
+  (== a b))</pre></td></tr><tr><td class="docs"><h3>Statistics</h3>
 
 <p>Whole code is taken from public GIST: https://gist.github.com/scottdw/2960070</p>
 
@@ -3153,8 +3235,8 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
          ^double ndk (if (zero? k) mn (nth svs (dec k)))]
      (cond
        (zero? k) mn
-       (= c (dec k)) mx
-       (= c k) mx
+       (== ^long c (dec k)) mx
+       (== ^long c k) mx
        :else (+ ndk (* d (- ^double (nth svs k) ndk)))))))</pre></td></tr><tr><td class="docs"><p>Calculate median of a list</p>
 
 <p><code>(median '(1 2 3 -1 -1 2 -1 11 111)) =&gt; 2.0</code></p>
@@ -3164,15 +3246,15 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
 
 <p><code>(mean '(1 2 3 -1 -1 2 -1 11 111)) =&gt; 14.11111111111111</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn mean
-  ([vs] (mean (reduce + vs) (count vs)))
-  ([^double sm sz] (/ sm (double sz))))</pre></td></tr><tr><td class="docs"><p>Calculate standard deviation of a list</p>
+  ([vs] (mean (reduce clojure.core/+ vs) (count vs)))
+  ([^double sm ^long sz] (/ sm sz)))</pre></td></tr><tr><td class="docs"><p>Calculate standard deviation of a list</p>
 
 <p><code>(standard-deviation '(1 2 3 -1 -1 2 -1 11 111)) =&gt; 34.43333154064031</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn standard-deviation
   ([vs]
-   (standard-deviation vs (double (count vs)) (mean vs)))
-  ([vs ^double sz ^double u]
-   (sqrt (/ ^double (reduce + (map #(pow (- ^double % u) 2) vs)) sz))))</pre></td></tr><tr><td class="docs"><p>Calculate MAD</p>
+   (standard-deviation vs (count vs) (mean vs)))
+  ([vs ^long sz ^double u]
+   (sqrt (/ ^double (reduce clojure.core/+ (map #(pow (- ^double % u) 2) vs)) sz))))</pre></td></tr><tr><td class="docs"><p>Calculate MAD</p>
 
 <p><code>(median-absolute-deviation '(1 2 3 -1 -1 2 -1 11 111))  =&gt; 3.0</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn median-absolute-deviation
@@ -3185,10 +3267,10 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
    (let [q1 (quantile 0.25 vs)
          m (median vs)
          q3 (quantile 0.75 vs)]
-       (lower-adjacent-value (sort vs) m (- q3 q1))))
+     (lower-adjacent-value (sort vs) m (- q3 q1))))
   ([svs ^double m ^double qd]
-     (let [l (- m qd)]
-       (first (filter (partial &lt; l) svs)))))</pre></td></tr><tr><td class="docs"><p><code>(upper-adjacent-value '(1 2 3 -1 -1 2 -1 11 111)) =&gt; 3</code></p>
+   (let [l (- m qd)]
+     (first (filter (partial clojure.core/&lt; l) svs)))))</pre></td></tr><tr><td class="docs"><p><code>(upper-adjacent-value '(1 2 3 -1 -1 2 -1 11 111)) =&gt; 3</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn upper-adjacent-value
   ([vs]
      (let [q1 (quantile 0.25 vs)
@@ -3203,36 +3285,36 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
 <code>=&gt; {:MAD 3.0, :Max 111, :Size 9, :LAV -1, :Mode -1, :Mean 14.11111111111111, :Q1 -1.0, :Q3 7.0, :Min -1, :Total 127, :SD 34.43333154064031, :UAV 3, :Median 2.0}</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn stats-map
   ([vs]
-     (let [sz (count vs)
-           svs (sort vs)
-           rsvs (reverse svs)
-           mn (first svs)
-           mx (first rsvs)
-           sm (reduce + vs)
-           u (mean sm sz)
-           mdn (median sz svs mn mx)
-           q1 (quantile 0.25 sz svs mn mx)
-           q3 (quantile 0.75 sz svs mn mx)
-           sd (standard-deviation vs sz u)
-           mad (median-absolute-deviation vs mdn)
-           qd (- ^double q3 ^double q1)
-           lav (lower-adjacent-value svs mdn qd)
-           uav (upper-adjacent-value rsvs mdn qd)]
-       {:Size sz
-        :Min mn
-        :Max mx
-        :Mean u
-        :Median mdn
-        :Mode (mode vs)
-        :Q1 q1
-        :Q3 q3
-        :Total sm
-        :SD sd
-        :MAD mad
-        :LAV lav
-        :UAV uav}))
+   (let [sz (count vs)
+         svs (sort vs)
+         rsvs (reverse svs)
+         mn (first svs)
+         mx (first rsvs)
+         sm (reduce clojure.core/+ vs)
+         u (mean sm sz)
+         mdn (median sz svs mn mx)
+         q1 (quantile 0.25 sz svs mn mx)
+         q3 (quantile 0.75 sz svs mn mx)
+         sd (standard-deviation vs sz u)
+         mad (median-absolute-deviation vs mdn)
+         qd (- ^double q3 ^double q1)
+         lav (lower-adjacent-value svs mdn qd)
+         uav (upper-adjacent-value rsvs mdn qd)]
+     {:Size sz
+      :Min mn
+      :Max mx
+      :Mean u
+      :Median mdn
+      :Mode (mode vs)
+      :Q1 q1
+      :Q3 q3
+      :Total sm
+      :SD sd
+      :MAD mad
+      :LAV lav
+      :UAV uav}))
   ([ks vs]
-     (zipmap ks (map (stats-map vs) ks))))</pre></td></tr><tr><td class="docs">
+   (zipmap ks (map (stats-map vs) ks))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- closest-mean-fn
   [means]
   (fn [^double v] (reduce (partial min-key #(sq (- v ^double %))) means)))</pre></td></tr><tr><td class="docs"><p>k-means clustering</p>
@@ -3248,7 +3330,27 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
              pmns (repeat k Double/NaN)]
         (if (= mns pmns)
           mns
-          (recur (sort (map mean (vals (group-by (closest-mean-fn mns) vs)))) mns))))))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
+          (recur (sort (map mean (vals (group-by (closest-mean-fn mns) vs)))) mns))))))</pre></td></tr><tr><td class="docs"><h2>Copy of primitive math machinery</h2>
+
+<p>Simplified to be used after <code>ns</code> is defined.</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def ^:private vars-to-exclude
+  '[* + - / &gt; &lt; &gt;= &lt;= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max bool-and bool-or bool-xor bool-not &lt;&lt; &gt;&gt; &gt;&gt;&gt; not==])</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn- using-primitive-operators? []
+  (= #'clojure2d.math/+ (resolve '+)))</pre></td></tr><tr><td class="docs"><p>Replaces Clojure's arithmetic and number coercion functions with primitive equivalents.  These are
+   defined as macros, so they cannot be used as higher-order functions.  This is an idempotent operation..</p>
+</td><td class="codes"><pre class="brush: clojure">(defn use-primitive-operators
+  []
+  (when-not (using-primitive-operators?)
+    (doseq [v vars-to-exclude]
+      (ns-unmap *ns* v))
+    (require (vector 'clojure2d.math :refer vars-to-exclude))))</pre></td></tr><tr><td class="docs"><p>Undoes the work of <code>use-primitive-operators</code>.  This is idempotent.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn unuse-primitive-operators
+  []
+  (when (using-primitive-operators?)
+    (doseq [v vars-to-exclude]
+      (ns-unmap *ns* v))
+    (refer 'clojure.core)))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
 SyntaxHighlighter.all();
 
 // hackity hack

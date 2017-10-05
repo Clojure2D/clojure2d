@@ -2872,7 +2872,8 @@ net.brehaut.ClojureTools = (function (SH) {
             [clojure2d.color :as c])
   (:import [clojure2d.math.vector Vec3]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs">
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def cie-lambda (double-array (range 360 831)))
 (def cie-x (double-array [0.0001299000   0.0001458470   0.0001638021   0.0001840037
                           0.0002066902   0.0002321000   0.0002607280   0.0002930750

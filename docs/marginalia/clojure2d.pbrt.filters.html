@@ -2872,7 +2872,8 @@ net.brehaut.ClojureTools = (function (SH) {
             [clojure2d.math.vector :as v])
   (:import [clojure2d.math.vector Vec2]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><p>Windowed sinc function</p>
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)</pre></td></tr><tr><td class="docs"><p>Windowed sinc function</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- windowed-sinc
   ^double [^double v ^double radius ^double rtau]
   (let [x (m/abs v)]

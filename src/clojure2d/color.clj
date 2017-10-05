@@ -20,11 +20,11 @@
 ;;
 
 (ns clojure2d.color
-  (:require [clojure.java.io :as io]
-            [clojure.xml :as xml]
+  (:require [clojure.xml :as xml]
             [clojure2d.math :as m]
             [clojure2d.math.random :as r]
-            [clojure2d.math.vector :as v])
+            [clojure2d.math.vector :as v]
+            [clojure.java.io :refer :all])
   (:import [clojure2d.math.vector Vec3 Vec4]           
            java.awt.Color))
 
@@ -1188,8 +1188,8 @@
 
 ;; Read and parse 200 best palettes taken from http://www.colourlovers.com/ (stored locally)
 (def colourlovers-palettes
-  (let [p1 (xml/parse (-> (io/resource "cl1.xml.gz") io/input-stream java.util.zip.GZIPInputStream.))
-        p2 (xml/parse (-> (io/resource "cl2.xml.gz") io/input-stream java.util.zip.GZIPInputStream.))
+  (let [p1 (xml/parse (-> (resource "cl1.xml.gz") input-stream java.util.zip.GZIPInputStream.))
+        p2 (xml/parse (-> (resource "cl2.xml.gz") input-stream java.util.zip.GZIPInputStream.))
         f (fn [xml-in] (map (fn [x] (map #((:content %) 0) (:content (first (filter #(= (:tag %) :colors) (:content ((:content xml-in) x))))))) (range 100)))
         l1 (f p1)
         l2 (f p2)]

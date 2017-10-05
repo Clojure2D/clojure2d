@@ -15,7 +15,8 @@
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
-  :dependencies [[org.clojure/clojure "1.9.0-beta1"]
+  :dependencies [[org.clojure/clojure "1.8.0"]
+                 ;; [org.clojure/clojure "1.9.0-beta1"]
                  [expectations "2.2.0-rc1"]
                  [net.jafama/jafama "2.1.0"]
                  [org.apache.commons/commons-math3 "3.6.1"]

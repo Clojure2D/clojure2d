@@ -2893,23 +2893,24 @@ net.brehaut.ClojureTools = (function (SH) {
   (:import [clojure2d.pixels Pixels]
            [clojure2d.math.vector Vec2 Vec4]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><h2>Slitscan</h2>
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)</pre></td></tr><tr><td class="docs"><h2>Slitscan</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><h3>Simple slitscan</h3>
 
 <p>Pixels are shifted by value returned by wave function. You have to provide separate wave functions for x and y axises.
 Random setup is based on sum of oscillators defined in <code>signal</code> namespace.</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def freqs (vec (map #(bit-shift-left 1 ^long %) (range 16))))
-(def amps (mapv #(/ 1.0 ^long %) freqs))</pre></td></tr><tr><td class="docs"><p>Create list of random waves </p>
+</td><td class="codes"><pre class="brush: clojure">(def freqs (mapv #(&lt;&lt; 1 ^long %) (range 8)))
+(def amps (mapv #(/ ^long %) freqs))</pre></td></tr><tr><td class="docs"><p>Create list of random waves </p>
 </td><td class="codes"><pre class="brush: clojure">(defn slitscan-random-setup
   ([n]
-   (let [f (fn []
-             (let [r (r/irand 4)]
+   (letfn [(f []
+             (let [r (r/randval 0.75 (r/irand 4) (r/irand (count freqs)))]
                {:wave (rand-nth s/oscillators)
                 :freq (freqs r)
                 :amp (amps r)
                 :phase (r/drand)}))]
-     (filter (fn [_] (r/brand 0.8)) (repeatedly n f))))
+     (repeatedly n f)))
   ([]
    (slitscan-random-setup (r/irand 2 6))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-slitscan-waves
@@ -2919,12 +2920,14 @@ Random setup is based on sum of oscillators defined in <code>signal</code> names
    (make-slitscan-waves (slitscan-random-setup))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn slitscan
   [fx fy ch ^Pixels p x y]
-  (let [sx (/ 1.0 (.w p))
-        sy (/ 1.0 (.h p))
-        shiftx (* 0.5 (.w p) ^double (fx (* ^long x sx)))
-        shifty (* 0.5 (.h p) ^double (fy (* ^long y sy)))
-        xx (rem (int (+ ^long x (.w p) shiftx)) (.w p))
-        yy (rem (int (+ ^long y (.h p) shifty)) (.h p))]
+  (let [wp (.w p)
+        hp (.h p)
+        sx (/ 1.0 wp)
+        sy (/ 1.0 hp)
+        shiftx (* 0.3 wp ^double (fx (* ^int x sx)))
+        shifty (* 0.3 hp ^double (fy (* ^int y sy)))
+        xx (m/wrap 0.0 wp (+ ^int x shiftx))
+        yy (m/wrap 0.0 hp (+ ^int y shifty))]
     (p/get-value p ch xx yy)))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn make-slitscan-filter
   ([]
@@ -2949,8 +2952,8 @@ Random setup is based on sum of oscillators defined in <code>signal</code> names
                    v1 (f (Vec2. r- yv))
                    v2 (f (Vec2. r yv))
                    ^Vec2 vv (v/interpolate v1 v2 xlerp)
-                   xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
-                   yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
+                   xx (unchecked-int (m/norm (.x vv) r- r 0.0 (.w p)))
+                   yy (unchecked-int (m/norm (.y vv) r- r 0.0 (.h p)))]
                (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
   ([f]
    (make-slitscan2-filter f 2.0)))</pre></td></tr><tr><td class="docs"><p>f: Vec2 -> Vec2 (use variation)
@@ -2964,8 +2967,8 @@ Random setup is based on sum of oscillators defined in <code>signal</code> names
            (dotimes [x (.w p)]
              (let [^double xv (m/norm x 0.0 (.w p) r- r)
                    ^Vec2 vv (f (Vec2. xv yv))
-                   xx (int (m/norm (.x vv) r- r 0.0 (.w p)))
-                   yy (int (m/norm (.y vv) r- r 0.0 (.h p)))]
+                   xx (unchecked-int (m/norm (.x vv) r- r 0.0 (.w p)))
+                   yy (unchecked-int (m/norm (.y vv) r- r 0.0 (.h p)))]
                (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
   ([f]
    (make-fold-filter f 2.0)))</pre></td></tr><tr><td class="docs"><p>mirrorimage</p>
@@ -2978,14 +2981,14 @@ Random setup is based on sum of oscillators defined in <code>signal</code> names
    (p/set-value target ch newx newy (p/get-value source ch oldx oldy))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- mi-do-horizontal
   [t ch target ^Pixels source]
-  (dotimes [y (/ (.h source) 2.0)]
+  (dotimes [y (/ (.h source) 2)]
     (dotimes [x (.w source)]
       (if t
         (mi-draw-point ch target source x y x (- (.h source) y 1))
         (mi-draw-point ch target source x (- (.h source) y 1) x y)))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- mi-do-vertical
   [t ch target ^Pixels source]
-  (dotimes [x (/ (.w source) 2.0)]
+  (dotimes [x (/ (.w source) 2)]
     (dotimes [y (.h source)]
       (if t
         (mi-draw-point ch target source x y (- (.w source) x 1) y)
@@ -2998,7 +3001,7 @@ Random setup is based on sum of oscillators defined in <code>signal</code> names
         ty (if shift? (- (.h source) size) 0)]
     (dotimes [y size]
       (dotimes [x (inc y)]
-        (condp == t
+        (condp m/eq t
           0 (mi-draw-point ch target source x y y x tx ty)
           1 (mi-draw-point ch target source y x x y tx ty)
           2 (mi-draw-point ch target source x y (- size x 1) (- size y 1) tx ty)
@@ -3012,12 +3015,12 @@ Random setup is based on sum of oscillators defined in <code>signal</code> names
     (dotimes [y size]
       (loop [x (int (dec size))]
         (when (&gt;= x (- size y 1))
-          (condp == t
+          (condp m/eq t
             0 (mi-draw-point ch target source x y (- size y 1) (- size x 1) tx ty)
             1 (mi-draw-point ch target source (- size y 1) (- size x 1) x y tx ty)
             2 (mi-draw-point ch target source x y (- size x 1) (- size y 1) tx ty)
             3 (mi-draw-point ch target source (- size x 1) (- size y 1) x y tx ty))
-          (recur (unchecked-dec x)))))))</pre></td></tr><tr><td class="docs">
+          (recur (dec x)))))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- mi-do-diag-rect
   [t l ch target ^Pixels source]
   (dotimes [y (.h source)]
@@ -3063,11 +3066,11 @@ Random setup is based on sum of oscillators defined in <code>signal</code> names
 </td><td class="codes"><pre class="brush: clojure">(defn blend-machine
   ([]
    (let [cs1 (random-blend-get-cs) ; let's convert to some colorspace (or leave rgb)
-         cs2 (if (r/brand 0.2) (random-blend-get-cs) cs1) ; maybe different cs on second image?
-         outcs (if (r/brand 0.2) (random-blend-get-cs) cs1) ; maybe some random colorspace on output?
-         bl1 (when (r/brand 0.85) (rand-nth c/blends-names)) ; ch1 blend
-         bl2 (when (r/brand 0.85) (rand-nth c/blends-names)) ; ch2 blend
-         bl3 (when (r/brand 0.85) (rand-nth c/blends-names))] ; ch3 blend
+         cs2 (r/randval 0.2 (random-blend-get-cs) cs1) ; maybe different cs on second image?
+         outcs (r/randval 0.2 (random-blend-get-cs) cs1) ; maybe some random colorspace on output?
+         bl1 (r/randval 0.85 (rand-nth c/blends-names) nil)    ; ch1 blend
+         bl2 (r/randval 0.85 (rand-nth c/blends-names) nil) ; ch2 blend
+         bl3 (r/randval 0.85 (rand-nth c/blends-names) nil)] ; ch3 blend
      {:switch (r/brand 0.5)
       :in-cs1 cs1
       :in-cs2 cs2
@@ -3088,7 +3091,7 @@ Random setup is based on sum of oscillators defined in <code>signal</code> names
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Randomize color reducing filter, random method, random colors</p>
 </td><td class="codes"><pre class="brush: clojure">(defn color-reducer-machine
   ([]
-   (let [bpal (condp &gt; (r/drand 1.0)
+   (let [bpal (condp #(&gt; ^double %1 ^double %2) (r/drand 1.0)
                 0.1 (let [num (r/irand 5 20)]
                       {:type :iq
                        :palette (c/make-iq-random-palette num)})
@@ -3115,15 +3118,43 @@ Random setup is based on sum of oscillators defined in <code>signal</code> names
                   {:type :paletton
                    :conf conf
                    :palette (c/paletton-palette t h conf)}))
-         pal (if (r/brand 0.2)
-               (update bpal :palette conj (Vec4. 0.0 0.0 0.0 255.0) (Vec4. 255.0 255.0 255.0 255.0))
-               bpal)
+         pal (r/randval 0.2
+                        (update bpal :palette conj (Vec4. 0.0 0.0 0.0 255.0) (Vec4. 255.0 255.0 255.0 255.0))
+                        bpal)
          pal (assoc pal :distf (rand-nth [v/dist v/dist-abs v/dist-cheb v/dist-sq]))]
      pal))
   ([conf p]
    (p/filter-colors (c/make-reduce-color-filter (:distf conf) (:palette conf)) p))
   ([p]
-   (color-reducer-machine p (color-reducer-machine))))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
+   (color-reducer-machine p (color-reducer-machine))))</pre></td></tr><tr><td class="docs"><p>find best matching pixels</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn blend-images-filter
+  [{:keys [names pixels mode distance cs]
+    :or {names [] pixels [] distance :euclid-sq mode :color cs :RGB}} ^Pixels p]
+  (let [images (concat pixels (map (comp (partial p/filter-colors (first (c/colorspaces cs))) p/get-image-pixels load-image) names))
+        ^int w (width p)
+        ^int h (height p)
+        df (v/distances distance)]
+    (if (= mode :color)
+      (p/filter-colors-xy (fn [^Vec4 c ^long x ^long y]
+                            (first (reduce (fn [curr img]
+                                             (let [nx (unchecked-int (m/norm x 0 w 0 (width img)))
+                                                   ny (unchecked-int (m/norm y 0 h 0 (height img)))
+                                                   [currc ^double currd] curr
+                                                   nc (p/get-color img nx ny)
+                                                   ^double nd (df c nc)] 
+                                               (if (&lt; nd currd) [nc nd] curr)))
+                                           [c Double/MAX_VALUE] images))) p)
+      (p/filter-channels (partial p/filter-channel-xy (fn [ch p ^long x ^long y]
+                                                        (let [^int c (p/get-value p ch x y)]
+                                                          (first (reduce (fn [curr img]
+                                                                           (let [nx (unchecked-int (m/norm x 0 w 0 (width img)))
+                                                                                 ny (unchecked-int (m/norm y 0 h 0 (height img)))
+                                                                                 [currc ^double currd] curr
+                                                                                 ^int nc (p/get-value img ch nx ny) 
+                                                                                 nd (m/abs (- c nc))]
+                                                                             (if (&lt; nd currd) [nc nd] curr)))
+                                                                         [c Double/MAX_VALUE] images))))) p))))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/gdeer81/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
 SyntaxHighlighter.all();
 
 // hackity hack

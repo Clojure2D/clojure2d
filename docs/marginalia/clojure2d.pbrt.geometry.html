@@ -2872,7 +2872,8 @@ net.brehaut.ClojureTools = (function (SH) {
   (:import [clojure2d.math.vector Vec2 Vec3]
            [clojure.lang IFn]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs">
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defprotocol BoundsProto
   (diagonal [b])
   (area [b])

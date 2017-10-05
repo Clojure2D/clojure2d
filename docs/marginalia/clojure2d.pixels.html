@@ -2897,7 +2897,8 @@ To operate on pixels you have several methods:</p>
            [clojure2d.math.vector Vec2 Vec4]
            java.awt.image.BufferedImage))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><p><code>*pixels-edge*</code> describe what is the value of pixel when accessing from outside the image.
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)</pre></td></tr><tr><td class="docs"><p><code>*pixels-edge*</code> describe what is the value of pixel when accessing from outside the image.
 Possible values are:</p>
 
 <ul>
@@ -2930,9 +2931,14 @@ Possible values are:</p>
 <p>Pixels type implements also <code>ImageProto</code> from core namespace</p>
 </td><td class="codes"><pre class="brush: clojure">(deftype Pixels [^ints p ^long w ^long h planar? ^long size pos]
   core/ImageProto
-  (get-image [t] (image-from-pixels t))
+  (get-image [p] (image-from-pixels p))
   (width [_] w)
   (height [_] h)
+  (save [p n]
+    (core/save-image (image-from-pixels p) n)
+    p)
+  (convolve [p t]
+    (core/convolve (image-from-pixels p) t))
   PixelsProto
   (get-channel [_ ch]
     (let [^ints res (int-array size)
@@ -2940,7 +2946,7 @@ Possible values are:</p>
       (if planar?
         (System/arraycopy p off res 0 size)
         (dotimes [idx size]
-          (aset res idx (aget p (+ ^long ch (bit-shift-left idx 2))))))
+          (aset res idx (aget p (+ ^long ch (&lt;&lt; idx 2))))))
       res))
   (set-channel [_ ch v]
     (let [off (* ^long ch size)]
@@ -2956,8 +2962,8 @@ Possible values are:</p>
             (&gt;= ^long y h))
       (condp = *pixels-edge*
         :zero 0
-        :edge (get-value pixels ch (m/iconstrain x 0 (dec w)) (m/iconstrain y 0 (dec h)))
-        :wrap (get-value pixels ch (int (m/wrap 0 w x)) (int (m/wrap 0 h y)))
+        :edge (get-value pixels ch (m/constrain ^long x 0 (dec w)) (m/constrain ^long y 0 (dec h)))
+        :wrap (get-value pixels ch (unchecked-int (m/wrap 0 w x)) (unchecked-int (m/wrap 0 h y)))
         *pixels-edge*)
       (get-value pixels ch (+ ^long x (* ^long y w)))))
   (get-color [_ idx]
@@ -2972,21 +2978,21 @@ Possible values are:</p>
             (&gt;= ^long y h))
       (condp = *pixels-edge*
         :zero (Vec4. 0 0 0 255)
-        :edge (get-color pixels (m/iconstrain x 0 (dec w)) ((m/iconstrain y 0 (dec h))))
-        :wrap (get-color pixels (int (m/wrap 0 w x)) (int (m/wrap 0 h y)))
+        :edge (get-color pixels (m/constrain ^long x 0 (dec w)) ((m/constrain ^long y 0 (dec h))))
+        :wrap (get-color pixels (unchecked-int (m/wrap 0 w x)) (unchecked-int (m/wrap 0 h y)))
         (Vec4. *pixels-edge* *pixels-edge* *pixels-edge* 255))
       (get-color pixels (+ ^long x (* ^long y w)))))
   (set-value [_ ch idx v]
-    (aset ^ints p (int (pos ch idx)) (int v))
+    (aset ^ints p (unchecked-int (pos ch idx)) (unchecked-int v))
     p)
   (set-value [pixels ch x y v]
     (set-value pixels ch (+ ^long x (* ^long y w)) v))
   (set-color [_ idx v] 
     (let [^Vec4 v v]
-      (aset ^ints p ^long (pos 0 idx) (int (.x v)))
-      (aset ^ints p ^long (pos 1 idx) (int (.y v)))
-      (aset ^ints p ^long (pos 2 idx) (int (.z v)))
-      (aset ^ints p ^long (pos 3 idx) (int (.w v))))
+      (aset ^ints p ^long (pos 0 idx) (unchecked-int (.x v)))
+      (aset ^ints p ^long (pos 1 idx) (unchecked-int (.y v)))
+      (aset ^ints p ^long (pos 2 idx) (unchecked-int (.z v)))
+      (aset ^ints p ^long (pos 3 idx) (unchecked-int (.w v))))
     p)
   (set-color [pixels x y v]
     (set-color pixels (+ ^long x (* ^long y w)) v))
@@ -3003,7 +3009,7 @@ Possible values are:</p>
     (fn ^long [^long ch ^long idx]
       (+ idx (* ch size)))
     (fn ^long [^long ch ^long idx]
-      (+ ch (bit-shift-left idx 2)))))</pre></td></tr><tr><td class="docs"><p>Create empty <code>Pixels</code> in given layout, sets valid channel value selector (pos) depending on layout</p>
+      (+ ch (&lt;&lt; idx 2)))))</pre></td></tr><tr><td class="docs"><p>Create empty <code>Pixels</code> in given layout, sets valid channel value selector (pos) depending on layout</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-pixels
   ([^ints a ^long w ^long h planar?]
    (let [size (* w h)
@@ -3030,15 +3036,15 @@ Possible values are:</p>
   (let [f (fn ^long [^long x]
             (let [q (quot x (.size p))
                   r (rem x (.size p))]
-              (+ q (bit-shift-left r 2))))]
-    (replace-pixels p (amap ^ints (.p p) idx ret (int (aget ^ints (.p p) (int (f idx))))) true)))</pre></td></tr><tr><td class="docs"><p>Convert planar pixel layout to interleaved</p>
+              (+ q (&lt;&lt; r 2))))]
+    (replace-pixels p (amap ^ints (.p p) idx ret (unchecked-int (aget ^ints (.p p) (unchecked-int (f idx))))) true)))</pre></td></tr><tr><td class="docs"><p>Convert planar pixel layout to interleaved</p>
 </td><td class="codes"><pre class="brush: clojure">(defn from-planar
   [^Pixels p]
   (let [f (fn ^long [^long x]
-            (let [q (bit-shift-right x 0x2)
+            (let [q (&gt;&gt; x 0x2)
                   r (bit-and x 0x3)]
               (+ q (* (.size p) r))))]
-    (replace-pixels p (amap ^ints (.p p) idx ret (int (aget ^ints (.p p) (int (f idx))))) false)))</pre></td></tr><tr><td class="docs"><h2>Pixels converters</h2>
+    (replace-pixels p (amap ^ints (.p p) idx ret (unchecked-int (aget ^ints (.p p) (unchecked-int (f idx))))) false)))</pre></td></tr><tr><td class="docs"><h2>Pixels converters</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Create Pixels from image, convert to planar layout on default</p>
 </td><td class="codes"><pre class="brush: clojure">(defn get-image-pixels
   ([^BufferedImage b x y w h planar?]
@@ -3052,8 +3058,8 @@ Possible values are:</p>
        pixls)))
   ([b x y w h]
    (get-image-pixels b x y w h true))
-  ([^BufferedImage b planar?]
-   (get-image-pixels b 0 0 (.getWidth b) (.getHeight b) planar?))
+  ([b planar?]
+   (get-image-pixels b 0 0 (core/width b) (core/height b) planar?))
   ([b]
    (get-image-pixels b true)))</pre></td></tr><tr><td class="docs"><p>Set pixels to image, mutating it</p>
 </td><td class="codes"><pre class="brush: clojure">(defn set-image-pixels!
@@ -3061,13 +3067,13 @@ Possible values are:</p>
    (let [^Pixels p (if (.planar? pin) (from-planar pin) pin)] 
      (.. b
          (getRaster)
-         (setPixels ^int x ^int y (int (.w p)) (int (.h p)) ^ints (.p p))))
+         (setPixels ^int x ^int y (unchecked-int (.w p)) (unchecked-int (.h p)) ^ints (.p p))))
    b)
-  ([^BufferedImage b ^Pixels p]
+  ([b p]
    (set-image-pixels! b 0 0 p)))</pre></td></tr><tr><td class="docs"><p>Create image from given pixels.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn image-from-pixels
   [^Pixels p]
-  (let [^BufferedImage bimg (BufferedImage. (.w p) (.h p) BufferedImage/TYPE_INT_ARGB)]
+  (let [bimg (BufferedImage. (.w p) (.h p) BufferedImage/TYPE_INT_ARGB)]
     (set-image-pixels! bimg p)))</pre></td></tr><tr><td class="docs"><p>Get pixels from canvas</p>
 </td><td class="codes"><pre class="brush: clojure">(defn get-canvas-pixels
   ([^Canvas canvas x y w h planar?]
@@ -3085,37 +3091,37 @@ Possible values are:</p>
    (set-image-pixels! (.buffer canvas) p)))</pre></td></tr><tr><td class="docs"><p>Load pixels from file</p>
 </td><td class="codes"><pre class="brush: clojure">(defn load-pixels
   [n]
-  (get-image-pixels (core/load-image n)))</pre></td></tr><tr><td class="docs"><p>Save pixels to file</p>
-</td><td class="codes"><pre class="brush: clojure">(defn save-pixels
-  [p n]
-  (core/save-image (image-from-pixels p) n)
-  p)</pre></td></tr><tr><td class="docs"><h2>Processors</h2>
+  (get-image-pixels (core/load-image n)))</pre></td></tr><tr><td class="docs"><h2>Processors</h2>
 
 <p>Following functions are used to filter pixels in parallel way. You can filter channel values with selected filter or you can filter whole colors. It's done in parallel way using as many cores you have. Processor are immutable (which can lead to memory issues).</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Filter pixels color-wise with given function. Filtering function should accept and return color as <code>Vec4</code>. You can use color space conversion functions defined in <code>color</code> namespace.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn filter-colors
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Filter colors. Filtering function should accept <code>Vec4</code> color and position as x,y values and return <code>Vec4</code>.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn filter-colors-xy
   [f ^Pixels p]
-  (let [^Pixels target (clone-pixels p)
-        pre-step (max 40000 ^long (/ (.size p) core/available-tasks))
-        step (int (m/ceil pre-step))
+  (let [target (clone-pixels p)
+        pre-step (max 40000 (/ (.size p) core/available-tasks))
+        step (unchecked-int (m/ceil pre-step))
         parts (range 0 (.size p) step)
         ftrs (doall
               (map
                #(future (let [end (min (+ ^long % step) (.size p))]
-                          (loop [idx (int %)]
+                          (loop [idx (unchecked-int %)]
                             (when (&lt; idx end)
-                              (set-color target idx ^Vec4 (f (get-color p idx)))
-                              (recur (unchecked-inc idx))))))
+                              (let [^Vec2 pos (idx-&gt;pos p idx)]
+                                (set-color target idx (f (get-color p idx) (.x pos) (.y pos))))
+                              (recur (inc idx))))))
                parts))]
-    (dorun (map deref ftrs))
-    target))</pre></td></tr><tr><td class="docs"><p>Filter one channel, write result into target. Works only on planar.
+    (run! deref ftrs)
+    target))</pre></td></tr><tr><td class="docs"><p>Filter pixels color-wise with given function. Filtering function should accept and return color as <code>Vec4</code>. You can use color space conversion functions defined in <code>color</code> namespace.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn filter-colors
+  [f p]
+  (filter-colors-xy (fn [c _ _] (f c)) p))</pre></td></tr><tr><td class="docs"><p>Filter one channel, write result into target. Works only on planar.
    Passed function should accept and return <code>int</code>.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn filter-channel
   [f ^long ch ^Pixels target ^Pixels p]
   (let [size (.size target)
         start (* ch size)
         stop (* (inc ch) size)]
-    (loop [idx (int start)]
+    (loop [idx (unchecked-int start)]
       (when (&lt; idx stop)
         (aset ^ints (.p target) idx ^int (f (aget ^ints (.p p) idx)))
         (recur (unchecked-inc idx))))
@@ -3136,7 +3142,7 @@ Possible values are:</p>
          ch1 (future (when f1 (f1 1 target p)))
          ch2 (future (when f2 (f2 2 target p)))
          ch3 (future (when f3 (f3 3 target p)))]
-     (dorun (map deref [ch0 ch1 ch2 ch3]))
+     (run! deref [ch0 ch1 ch2 ch3])
      target))
   ([f p]
    (filter-channels f f f f p))
@@ -3147,8 +3153,8 @@ Possible values are:</p>
 </td><td class="codes"><pre class="brush: clojure">(defn blend-channel
   [f ch ^Pixels target ^Pixels p1 ^Pixels p2]
   (let [size (.size target)
-        start (int (* ^long ch size))
-        stop (int (* (inc ^long ch) size))]
+        start (* ^long ch size)
+        stop (* (inc ^long ch) size)]
     (loop [idx start]
       (when (&lt; idx stop)
         (aset ^ints (.p target) idx ^int (f (aget ^ints (.p p1) idx) (aget ^ints (.p p2) idx)))
@@ -3167,7 +3173,7 @@ Possible values are:</p>
          ch1 (future (when f1 (f1 1 target p1 p2)))
          ch2 (future (when f2 (f2 2 target p1 p2)))
          ch3 (future (when f3 (f3 3 target p1 p2)))]
-     (dorun (map deref [ch0 ch1 ch2 ch3]))
+     (run! deref [ch0 ch1 ch2 ch3])
      target))
   ([f p1 p2]
    (blend-channels f f f f p1 p2))
@@ -3195,7 +3201,7 @@ Possible values are:</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><h3>Value accessors</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Return 9 channel values around given position.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn get-3x3
-  [ch ^Pixels p ^long x ^long y]
+  [ch p ^long x ^long y]
   [(get-value p ch (dec x) (dec y))
    (get-value p ch x  (dec y))
    (get-value p ch (inc x) (dec y))
@@ -3206,22 +3212,22 @@ Possible values are:</p>
    (get-value p ch x  (inc y))
    (get-value p ch (inc x) (inc y))])</pre></td></tr><tr><td class="docs"><p>Return value from 5 (cross) values using binary functions.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn get-cross-f
-  [f ch ^Pixels p x y]
-  (f ^int (get-value p ch x (dec ^long y))
-     (f ^int (get-value p ch (dec ^long x) y)
-        (f ^int (get-value p ch x y)
-           (f ^int (get-value p ch (inc ^long x) y)
-              ^int (get-value p ch x (inc ^long y)))))))</pre></td></tr><tr><td class="docs"><p>Create dilate and erode filters</p>
-</td><td class="codes"><pre class="brush: clojure">(def dilate-filter (partial filter-channel-xy (partial get-cross-f max)))
-(def erode-filter (partial filter-channel-xy (partial get-cross-f min)))</pre></td></tr><tr><td class="docs"><p>2d <code>ints</code> array getter with <code>:edge</code> boundary.</p>
+  [f ch p x y]
+  (f (get-value p ch x (dec ^long y))
+     (f (get-value p ch (dec ^long x) y)
+        (f (get-value p ch x y)
+           (f (get-value p ch (inc ^long x) y)
+              (get-value p ch x (inc ^long y)))))))</pre></td></tr><tr><td class="docs"><p>Create dilate and erode filters</p>
+</td><td class="codes"><pre class="brush: clojure">(def dilate-filter (partial filter-channel-xy (partial get-cross-f #(max ^int %1 ^int %2))))
+(def erode-filter (partial filter-channel-xy (partial get-cross-f #(min ^int %1 ^int %2))))</pre></td></tr><tr><td class="docs"><p>2d <code>ints</code> array getter with <code>:edge</code> boundary.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- make-aget-2d
   [^ints array ^long w ^long h]
   (fn local-aget-2d ^long [^long x ^long y]
-    (if (or (neg? x)
-            (neg? y)
-            (&gt;= x w)
-            (&gt;= y h))
-      (local-aget-2d (m/iconstrain x 0 (dec w)) (m/iconstrain y 0 (dec h)))
+    (if (bool-or (neg? x)
+                 (neg? y)
+                 (&gt;= x w)
+                 (&gt;= y h))
+      (local-aget-2d (m/constrain x 0 (dec w)) (m/constrain y 0 (dec h)))
       (aget array (+ x (* y w))))))</pre></td></tr><tr><td class="docs"><h3>Blurs</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Algorithm based on http://blog.ivank.net/fastest-gaussian-blur.html</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Vertical pass for blur.</p>
@@ -3231,7 +3237,7 @@ Possible values are:</p>
       (let [aget-2d (make-aget-2d in w h)
             size (* w h)
             ^ints target (int-array size)
-            iarr (/ 1.0 (inc (+ r r)))
+            iarr (/ (inc (+ r r)))
             r+ (inc r)
             rang (range (- r+) r)]
         (dotimes [x w]
@@ -3241,7 +3247,7 @@ Possible values are:</p>
               (when (&lt; y h)
                 (let [nv (- (+ v ^long (aget-2d x (+ y r)))
                             ^long (aget-2d x (- y r+)))]
-                  (aset ^ints target (+ x (* w y)) (int (* nv iarr)))
+                  (aset ^ints target (+ x (* w y)) (unchecked-int (* (double nv) iarr)))
                   (recur (unchecked-inc y) nv))))))
         target)))</pre></td></tr><tr><td class="docs"><p>Horizontal pass for blur.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn box-blur-h
@@ -3250,7 +3256,7 @@ Possible values are:</p>
       (let [aget-2d (make-aget-2d in w h)
             size (* w h)
             ^ints target (int-array size)
-            iarr (/ 1.0 (inc (+ r r)))
+            iarr (/ (inc (+ r r)))
             r+ (inc r)
             rang (range (- r+) r)]
         (dotimes [y h]
@@ -3261,7 +3267,7 @@ Possible values are:</p>
               (when (&lt; x w)
                 (let [nv (- (+ v ^long (aget-2d (+ x r) y))
                             ^long (aget-2d (- x r+) y))]
-                  (aset ^ints target (+ x off) (int (* nv iarr)))
+                  (aset ^ints target (+ x off) (unchecked-int (* (double nv) iarr)))
                   (recur (unchecked-inc x) nv))))))
         target)))</pre></td></tr><tr><td class="docs"><p>Box blur two passes for given radius.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn box-blur
@@ -3281,19 +3287,19 @@ Possible values are:</p>
 (def box-blur-3 (make-box-blur 3))
 (def box-blur-5 (make-box-blur 5))</pre></td></tr><tr><td class="docs"><p>Calculate radius for gaussian blur.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn radius-for-gauss
-  [^double sigma ^long n]
-  (let [sigma* (* 12 sigma sigma)
+  [^double sigma ^double n]
+  (let [sigma* (* 12.0 sigma sigma)
         w-ideal (-&gt; sigma*
                     (/ n)
                     (inc)
                     (m/sqrt)
                     (m/floor))
-        wl (if (even? (int w-ideal)) (dec w-ideal) w-ideal)
-        wu (+ wl 2)
-        m-ideal (/ (- sigma* (* n (m/sq wl)) (* 4 n wl) (* 3 n))
-                   (- (* -4 wl) 4))
+        wl (if (even? (unchecked-int w-ideal)) (dec w-ideal) w-ideal)
+        wu (+ wl 2.0)
+        m-ideal (/ (- sigma* (* n (m/sq wl)) (* 4.0 n wl) (* 3.0 n))
+                   (- (* -4.0 wl) 4.0))
         m (m/round m-ideal)]
-    (vec (map #(int (/ (dec (if (&lt; ^int % m) wl wu)) 2)) (range n)))))</pre></td></tr><tr><td class="docs">
+    (vec (map #(int (/ (dec (if (&lt; ^long % m) wl wu)) 2.0)) (range n)))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def radius-for-gauss-memo (memoize radius-for-gauss))</pre></td></tr><tr><td class="docs"><p>Proceed with Gaussian Blur on channel, save result to target for given radius</p>
 </td><td class="codes"><pre class="brush: clojure">(defn gauss-blur
   [r ch ^Pixels target ^Pixels p]
@@ -3318,7 +3324,7 @@ Possible values are:</p>
   [^long numlev]
   (let [f (fn ^long [^long idx] (-&gt; idx
                                     (* numlev)
-                                    (bit-shift-right 8)
+                                    (&gt;&gt; 8)
                                     (* 255)
                                     (/ (dec numlev))))
         ^ints tmp (int-array 256)]
@@ -3326,10 +3332,10 @@ Possible values are:</p>
 </td><td class="codes"><pre class="brush: clojure">(def posterize-levels (memoize posterize-levels-fun))</pre></td></tr><tr><td class="docs"><p>Posterize one pixel</p>
 </td><td class="codes"><pre class="brush: clojure">(defn posterize-pixel
   [levels v]
-  (aget ^ints levels (int v)))</pre></td></tr><tr><td class="docs"><p>Create posterize filter</p>
+  (aget ^ints levels (unchecked-int v)))</pre></td></tr><tr><td class="docs"><p>Create posterize filter</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-posterize
   ([^long numlev]
-   (let [nl (m/iconstrain numlev 2 255)
+   (let [nl (m/constrain numlev 2 255)
          ^ints levels (posterize-levels nl)]
      (partial filter-channel (partial posterize-pixel levels))))
   ([]
@@ -3343,7 +3349,7 @@ Possible values are:</p>
   (if (&lt; v thr) 255 0))</pre></td></tr><tr><td class="docs"><p>Create threshold filter for given value.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-threshold
   ([^double thr]
-   (let [t (long (* 256 thr))]
+   (let [t (unchecked-long (* 256.0 thr))]
      (partial filter-channel (partial threshold-pixel t))))
   ([]
    (make-threshold 0.5)))</pre></td></tr><tr><td class="docs"><p>Create 3 threshold filters for 0.25, 0.5 and 0.75 threshold values.</p>
@@ -3357,17 +3363,17 @@ Possible values are:</p>
     (vss n)))</pre></td></tr><tr><td class="docs"><p>Create quantile filter for values from 0 to 8</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-quantile-filter
   [^long v]
-  (let [q (m/iconstrain v 0 8)]
+  (let [q (m/constrain v 0 8)]
     (partial filter-channel-xy (comp (partial quantile q) get-3x3))))</pre></td></tr><tr><td class="docs"><p>Create median filter int terms of quantile filter.</p>
 </td><td class="codes"><pre class="brush: clojure">(def median-filter (make-quantile-filter 4))</pre></td></tr><tr><td class="docs"><h3>Tint</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Calculate tint</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- calc-tint
   ^long [^long a ^long b]
-  (bit-shift-right (bit-and 0xff00 (* a b)) 8))</pre></td></tr><tr><td class="docs"><p>Create tint lookup tables.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn make-tint-map
+  (&gt;&gt; (bit-and 0xff00 (* a b)) 8))</pre></td></tr><tr><td class="docs"><p>Create tint lookup tables.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- make-tint-map
   [r g b a]
   (vec (map #(amap ^ints (int-array 256) idx ret ^long (calc-tint idx %)) [r g b a])))</pre></td></tr><tr><td class="docs"><p>Lookup wrapper</p>
-</td><td class="codes"><pre class="brush: clojure">(defn make-tinter
+</td><td class="codes"><pre class="brush: clojure">(defn- make-tinter
   [^ints a]
   (fn [v] (aget ^ints a ^int v)))</pre></td></tr><tr><td class="docs"><p>Create tint filter</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-tint-filter
@@ -3377,7 +3383,21 @@ Possible values are:</p>
        (let [tinter (make-tinter (tm ch))]
          (filter-channel tinter ch target p)))))
   ([r g b]
-   (make-tint-filter r g b 256)))</pre></td></tr><tr><td class="docs"><h3>Normalize</h3>
+   (make-tint-filter r g b 256)))</pre></td></tr><tr><td class="docs"><h3>Modulate filter</h3>
+
+<p>Multiply color channels by specified values from 0-2</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn make-modulate-filter
+  ([ch1 ch2 ch3 ch4]
+   (fn [^long ch target p]
+     (let [chv (case ch
+                 0 ch1
+                 1 ch2
+                 2 ch3
+                 ch4)]
+       (filter-channel #(m/constrain (* (double %) ^long chv) 0.0 255.0) ch target p))))
+  ([ch1 ch2 ch3]
+   (make-modulate-filter ch1 ch2 ch3 1.0)))</pre></td></tr><tr><td class="docs"><h3>Normalize</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Normalize channel values to whole (0-255) range</p>
 </td><td class="codes"><pre class="brush: clojure">(defn normalize
   [ch target ^Pixels p]
@@ -3386,7 +3406,7 @@ Possible values are:</p>
                        currmn (long 1000)
                        currmx (long -1000)]
                   (if (&lt; idx sz)
-                    (let [^long v (get-value p ch idx)]
+                    (let [^int v (get-value p ch idx)]
                       (recur (unchecked-inc idx)
                              (min v currmn)
                              (max v currmx)))
@@ -3400,7 +3420,7 @@ Possible values are:</p>
   [ch ^Pixels p]
   (let [^doubles hist (double-array 256 0.0)
         sz (.size p)
-        d (double (/ 1.0 (.size p)))]
+        d (/ (.size p))]
     (loop [idx (int 0)]
       (if (&lt; idx sz)
         (let [c (get-value p ch idx)]
@@ -3412,10 +3432,10 @@ Possible values are:</p>
   (let [^ints lookup (int-array 256 0)]
     (loop [currmn Integer/MAX_VALUE
            currmx Integer/MIN_VALUE
-           sum (double 0.0)
-           idx (int 0)]
+           sum 0.0
+           idx 0]
       (if (&lt; idx 256)
-        (let [currsum (+ sum ^double (aget ^doubles hist idx))
+        (let [currsum (+ sum (aget ^doubles hist idx))
               val (m/round (m/constrain (* sum 255.0) 0.0 255.0))]
           (aset ^ints lookup idx val)
           (recur (min val currmn)
@@ -3516,9 +3536,9 @@ Configuration is a map of values:</p>
                       loghit (* (m/log (inc hit)) mxlog) ;; log map for hit, result: 0.0-1.0
                       ;; loghit (m/log2 (inc (* rmx hit))) ;; log map for hit, result: 0.0-1.0
                       alpha (m/pow loghit agamma) ;; gamma for alpha
-                      col1 (aget ^doubles c/r255 (m/iconstrain (int (* rhit (aget ch1 idx))) 0 255)) ;; normalized red
-                      col2 (aget ^doubles c/r255 (m/iconstrain (int (* rhit (aget ch2 idx))) 0 255)) ;; green
-                      col3 (aget ^doubles c/r255 (m/iconstrain (int (* rhit (aget ch3 idx))) 0 255)) ;; and blue
+                      col1 (aget ^doubles c/r255 (m/constrain (* rhit (aget ch1 idx)) 0 255)) ;; normalized red
+                      col2 (aget ^doubles c/r255 (m/constrain (* rhit (aget ch2 idx)) 0 255)) ;; green
+                      col3 (aget ^doubles c/r255 (m/constrain (* rhit (aget ch3 idx)) 0 255)) ;; and blue
                       c1 (* 255.0 (+ (* intensity col1)
                                      (* rintensity (m/pow col1 cgamma)))) ;; interpolate between color and gamma(color), intensity based
                       c2 (* 255.0 (+ (* intensity col2)
@@ -3526,17 +3546,19 @@ Configuration is a map of values:</p>
                       c3 (* 255.0 (+ (* intensity col3)
                                      (* rintensity (m/pow col3 cgamma))))
                       color (v/applyf (Vec4. c1 c2 c3 255.0) c/clamp255)
-                      color (if (and (== 1.0 saturation) (== 1.0 brightness))
+                      color (if (bool-and (== 1.0 saturation) (== 1.0 brightness))
                               color
-                              (c/from-HSB (v/emult multiplier (c/to-HSB color))))] ;; apply brightness, saturation factors
+                              (c/from-HSB (v/applyf (v/emult multiplier (c/to-HSB color)) c/clamp255)))] ;; apply brightness, saturation factors
                   (set-color p (+ x row) (v/interpolate background color alpha)))))))) ;; store!
       p))
   (to-pixels [t background] (to-pixels t background {}))
   (to-pixels [t] (to-pixels t (Vec4. 0.0 0.0 0.0 0.0) {}))
   core/ImageProto
-  (get-image [t] (core/get-image (to-pixels t)))
+  (get-image [b] (core/get-image (to-pixels b)))
   (width [_] sizex)
-  (height [_] sizey))</pre></td></tr><tr><td class="docs"><p>Create BinPixels object</p>
+  (height [_] sizey)
+  (save [b n] (core/save (to-pixels b) n))
+  (convolve [b t] (core/convolve (to-pixels b) t)))</pre></td></tr><tr><td class="docs"><p>Create BinPixels object</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-binpixels 
   ^BinPixels [[^double rminx ^double rmaxx ^double rminy ^double rmaxy] ^long sizex ^long sizey]
   (let [sizex+ (inc sizex)

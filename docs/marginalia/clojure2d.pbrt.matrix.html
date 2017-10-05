@@ -2870,9 +2870,12 @@ net.brehaut.ClojureTools = (function (SH) {
 <p>Straightforward implementation</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.pbrt.matrix
-  (:require [clojure2d.math :refer :all]
+  (:require [clojure2d.math :as m]
             [clojure2d.math.vector :as v])
   (:import [clojure2d.math.vector Vec4]))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defprotocol Matrix4x4Proto
   (transpose [m])
   (inverse [m])

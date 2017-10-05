@@ -2875,7 +2875,8 @@ Implementation based on Apache Commons Math</p>
             [clojure2d.math.vector :as v])
   (:import [clojure2d.math.vector Vec2]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs">
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def ^:const I (Vec2. 0.0 1.0))
 (def ^:const I- (Vec2. 0.0 -1.0))
 (def ^:const ONE (Vec2. 1.0 0.0))

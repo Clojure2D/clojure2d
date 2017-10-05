@@ -2880,17 +2880,21 @@ In brief:</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>JFrame, Java2D, file io and simple session management</p>
 </td><td class="codes"><pre class="brush: clojure">(ns clojure2d.core
   (:require [clojure.java.io :refer :all]
-            [clojure2d.color :as c])
+            [clojure2d.color :as c]
+            [clojure2d.math.vector :as v]
+            [clojure2d.math :as m]
+            [clojure.reflect :as ref])
   (:import clojure2d.math.vector.Vec2
            [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
-           [java.awt.event ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
-           [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double]
-           [java.awt.image BufferedImage BufferStrategy]
-           java.util.Iterator
+           [java.awt.event InputEvent ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
+           [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double]
+           [java.awt.image BufferedImage BufferStrategy Kernel ConvolveOp]
+           [java.util Iterator]
            [javax.imageio IIOImage ImageIO ImageWriteParam ImageWriter]
            [javax.swing ImageIcon JFrame SwingUtilities]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
-(set! *unchecked-math* :warn-on-boxed)</pre></td></tr><tr><td class="docs"><p>how many tasks we can run (one less than available cores)?</p>
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)</pre></td></tr><tr><td class="docs"><p>how many tasks we can run (one less than available cores)?</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:const ^long available-cores (.availableProcessors (Runtime/getRuntime)))
 (def ^:const ^long available-tasks (inc available-cores))</pre></td></tr><tr><td class="docs"><h2>Image</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Let's start with setting dynamic variable which defines quality of the saved jpeg file. Values are from <code>0.0</code> to <code>1.0</code>.
@@ -3018,14 +3022,40 @@ Canvas should be accelerated by Java and your video card.
 Reminder: Drawing on canvas is single threaded.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Let's define protocol to equip Canvas and Window types (or any type with image inside) with <code>get-image</code> function. <code>get-image</code> extracts image. Additionally define width/height getters.</p>
 </td><td class="codes"><pre class="brush: clojure">(defprotocol ImageProto 
-  (get-image [t] &quot;Return BufferedImage&quot;)
-  (width [t])
-  (height [t]))</pre></td></tr><tr><td class="docs"><p>Add ImageProto functions to BufferedImage</p>
+  (get-image [i] &quot;Return BufferedImage&quot;)
+  (width [i])
+  (height [i])
+  (save [i n])
+  (convolve [i t]))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def convolution-matrices {:shadow (Kernel. 3 3 (float-array [0 1 2 -1 0 1 -2 -1 0]))
+                           :emboss (Kernel. 3 3 (float-array [0 2 4 -2 1 2 -4 -2 0]))
+                           :edges-1 (Kernel. 3 3 (float-array [1 2 1 2 -12 2 1 2 1]))
+                           :edges-2 (Kernel. 3 3 (float-array [1 0 -1 0 0 0 -1 0 1]))
+                           :edges-3 (Kernel. 3 3 (float-array [0 1 0 1 -4 1 0 1 0]))
+                           :edges-4 (Kernel. 3 3 (float-array [-1 -1 -1 -1 8 -1 -1 -1 -1]))
+                           :sharpen (Kernel. 3 3 (float-array [0 -1 0 -1 5 -1 0 -1 0]))
+                           :sobel-x (Kernel. 3 3 (float-array [1 0 -1 2 0 -2 1 0 -1]))
+                           :sobel-y (Kernel. 3 3 (float-array [1 2 1 0 0 0 -1 -2 -1]))
+                           :gradient-x (Kernel. 3 3 (float-array [-1 0 1 -1 0 1 -1 0 1]))
+                           :gradient-y (Kernel. 3 3 (float-array [-1 -1 -1 0 0 0 1 1 1]))
+                           :box-blur (Kernel. 3 3 (float-array (map #(/ (int %) 9.0) [1 1 1 1 1 1 1 1 1])))
+                           :gaussian-blur-3 (Kernel. 3 3 (float-array (map #(/ (int %) 16.0) [1 2 1 2 4 2 1 2 1])))
+                           :gaussian-blur-5 (Kernel. 5 5 (float-array (map #(/ (int %) 256.0) [1 4 6 4 1 4 16 24 16 4 6 24 36 24 6 4 16 24 16 4 1 4 6 4 1])))
+                           :unsharp (Kernel. 5 5 (float-array (map #(/ (int %) -256.0) [1 4 6 4 1 4 16 24 16 4 6 24 -476 24 6 4 16 24 16 4 1 4 6 4 1])))})</pre></td></tr><tr><td class="docs"><p>Add ImageProto functions to BufferedImage</p>
 </td><td class="codes"><pre class="brush: clojure">(extend BufferedImage
   ImageProto
   {:get-image identity
    :width (fn [^BufferedImage i] (.getWidth i))
-   :height (fn [^BufferedImage i] (.getHeight i))})</pre></td></tr><tr><td class="docs"><p>Canvas type. Use <code>get-image</code> to extract image (<code>BufferedImage</code>).</p>
+   :height (fn [^BufferedImage i] (.getHeight i))
+   :save #(do
+            (save-image %1 %2)
+            %1)
+   :convolve (fn [^BufferedImage i t]
+               (let [kernel (if (keyword? t)
+                              (t convolution-matrices)
+                              (let [s (int (m/sqrt (count t)))]
+                                (Kernel. s s (float-array t))))]
+                 (.filter ^ConvolveOp (ConvolveOp. kernel) i nil)))})</pre></td></tr><tr><td class="docs"><p>Canvas type. Use <code>get-image</code> to extract image (<code>BufferedImage</code>).</p>
 </td><td class="codes"><pre class="brush: clojure">(deftype Canvas [^Graphics2D graphics
                  ^BufferedImage buffer
                  ^Line2D line-obj
@@ -3034,11 +3064,15 @@ Reminder: Drawing on canvas is single threaded.</p>
                  hints
                  ^long w
                  ^long h
-                 transform-stack]
+                 transform-stack
+                 font]
   ImageProto
   (get-image [_] buffer)
   (width [_] w)
-  (height [_] h))</pre></td></tr><tr><td class="docs"><p>Let's define three rendering quality options: <code>:low</code>, <code>:mid</code> and <code>:high</code>. Where <code>:low</code> is fastest but has poor quality and <code>:high</code> has best quality but may be slow. Rendering options are used when you create canvas.</p>
+  (height [_] h)
+  (save [c n] (save-image buffer n) c)
+  (convolve [_ t]
+    (convolve buffer t)))</pre></td></tr><tr><td class="docs"><p>Let's define three rendering quality options: <code>:low</code>, <code>:mid</code> and <code>:high</code>. Where <code>:low</code> is fastest but has poor quality and <code>:high</code> has best quality but may be slow. Rendering options are used when you create canvas.</p>
 </td><td class="codes"><pre class="brush: clojure">(def rendering-hints {:low {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF
                             RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR
                             RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
@@ -3059,7 +3093,8 @@ Reminder: Drawing on canvas is single threaded.</p>
                              RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY
                              RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY
                              RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON
-                             RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON}})</pre></td></tr><tr><td class="docs"><p>Following functions and macro are responsible for creating and releasing <code>Graphics2D</code> object for a canvas.
+                             RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON
+                             RenderingHints/KEY_STROKE_CONTROL      RenderingHints/VALUE_STROKE_PURE}})</pre></td></tr><tr><td class="docs"><p>Following functions and macro are responsible for creating and releasing <code>Graphics2D</code> object for a canvas.
 You have to use <code>with-canvas</code> macro to draw on canvas. Internally it's a threading macro and accepts only list of methods which first parameter is canvas object.
 Please do not use <code>flush-graphics</code> and <code>make-graphics</code> functions directly. Use <code>with-canvas</code> macro instead. I do not check state of <code>Graphics2D</code> anywhere.
 There is one exception: <code>draw</code> function associated with Window is already wrapped in <code>with-canvas</code> and you can freely use canvas object inside.
@@ -3072,6 +3107,7 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
   [^Canvas canvas]
   (let [^Graphics2D ng (.createGraphics ^BufferedImage (.buffer canvas))]
     (.setRenderingHints ng (or (.hints canvas) (rendering-hints :high)))
+    (when-let [f (.font canvas)] (.setFont ng f))
     (Canvas. ng
              (.buffer canvas)
              (.line-obj canvas)
@@ -3080,7 +3116,8 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
              (.hints canvas)
              (.w canvas)
              (.h canvas)
-             (atom []))))</pre></td></tr><tr><td class="docs"><p>Threading macro which takes care to create and destroy <code>Graphics2D</code> object for drawings on canvas. Macro returns result of last call.</p>
+             (atom [])
+             (.font canvas))))</pre></td></tr><tr><td class="docs"><p>Threading macro which takes care to create and destroy <code>Graphics2D</code> object for drawings on canvas. Macro returns result of last call.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmacro with-canvas
   [canvas &amp; body]  
   `(let [newcanvas# (make-graphics ~canvas)
@@ -3094,7 +3131,7 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
 (declare set-stroke)
 (declare image)</pre></td></tr><tr><td class="docs"><p>Create and return canvas with <code>width</code>, <code>height</code> and quality hint name (keyword). Default hint is <code>:high</code>.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn create-canvas
-  ([^long width ^long height hint]
+  ([^long width ^long height hint ^String font]
    (let
        [^BufferedImage buffer (.. GraphicsEnvironment 
                                   (getLocalGraphicsEnvironment)
@@ -3108,21 +3145,21 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
                         (Ellipse2D$Double.)
                         (rendering-hints (or (some #{hint} (keys rendering-hints)) :high))
                         width height
-                        nil)]
+                        nil
+                        (when font (java.awt.Font/getFont font)))]
      (with-canvas result
        (set-background Color/black)
        (set-stroke))))
   ([width height]
-   (create-canvas width height :high)))</pre></td></tr><tr><td class="docs"><p>alias for create-canvas</p>
+   (create-canvas width height :high nil))
+  ([width height hint]
+   (create-canvas width height hint nil)))</pre></td></tr><tr><td class="docs"><p>alias for create-canvas</p>
 </td><td class="codes"><pre class="brush: clojure">(def make-canvas create-canvas)</pre></td></tr><tr><td class="docs"><p>Resize canvas to new dimensions. Creates and returns new canvas.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn resize-canvas
   [^Canvas canvas width height]
   (let [ncanvas (create-canvas width height (.hints canvas))]
     (with-canvas ncanvas
-      (image (get-image canvas)))))</pre></td></tr><tr><td class="docs"><p>Save canvas to the file</p>
-</td><td class="codes"><pre class="brush: clojure">(defn save-canvas
-  [^Canvas canvas filename]
-  (save-image (get-image canvas) filename))</pre></td></tr><tr><td class="docs"><h3>Transformations</h3>
+      (image (get-image canvas)))))</pre></td></tr><tr><td class="docs"><h3>Transformations</h3>
 
 <p>You can transform your working area with couple of functions on canvas. They act exactly the same as in Processing. Transformation context is bound to canvas wrapped to <code>with-canvas</code> macro. Each <code>with-canvas</code> cleans all transformations.
 Transformations are concatenated.</p>
@@ -3131,11 +3168,19 @@ Transformations are concatenated.</p>
   ([^Canvas canvas ^double scalex ^double scaley]
    (.scale ^Graphics2D (.graphics canvas) scalex scaley)
    canvas)
-  ([canvas s] (scale canvas s s)))</pre></td></tr><tr><td class="docs"><p>Translate origin</p>
+  ([canvas s] (scale canvas s s)))</pre></td></tr><tr><td class="docs"><p>Flip canvas over x axis</p>
+</td><td class="codes"><pre class="brush: clojure">(defn flip-x
+  [canvas]
+  (scale canvas -1.0 1.0))</pre></td></tr><tr><td class="docs"><p>Flip canvas over y axis</p>
+</td><td class="codes"><pre class="brush: clojure">(defn flip-y
+  [canvas]
+  (scale canvas 1.0 -1.0))</pre></td></tr><tr><td class="docs"><p>Translate origin</p>
 </td><td class="codes"><pre class="brush: clojure">(defn translate
-  [^Canvas canvas ^double tx ^double ty]
-  (.translate ^Graphics2D (.graphics canvas) tx ty)
-  canvas)</pre></td></tr><tr><td class="docs"><p>Rotate canvas</p>
+  ([^Canvas canvas ^double tx ^double ty]
+   (.translate ^Graphics2D (.graphics canvas) tx ty)
+   canvas)
+  ([canvas ^Vec2 v]
+   (translate canvas (.x v) (.y v))))</pre></td></tr><tr><td class="docs"><p>Rotate canvas</p>
 </td><td class="codes"><pre class="brush: clojure">(defn rotate
   [^Canvas canvas ^double angle]
   (.rotate ^Graphics2D (.graphics canvas) angle)
@@ -3155,7 +3200,19 @@ Transformations are concatenated.</p>
     (let [v (peek @(.transform-stack canvas))]
       (swap! (.transform-stack canvas) pop)
       (.setTransform ^Graphics2D (.graphics canvas) v)))
-  canvas)</pre></td></tr><tr><td class="docs"><p>Reset transformation</p>
+  canvas)</pre></td></tr><tr><td class="docs"><p>Transform given point or coordinates with current transformation.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn transform
+  ([^Canvas canvas x y]
+   (let [^Point2D p (.transform ^java.awt.geom.AffineTransform (.getTransform ^Graphics2D (.graphics canvas)) (Point2D$Double. x y) nil)]
+     (Vec2. (.getX p) (.getY p))))
+  ([canvas ^Vec2 v]
+   (transform canvas (.x v) (.y v))))</pre></td></tr><tr><td class="docs"><p>Inverse transform of given point or coordinates with current transformation.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn inv-transform
+  ([^Canvas canvas x y]
+   (let [^Point2D p (.inverseTransform ^java.awt.geom.AffineTransform (.getTransform ^Graphics2D (.graphics canvas)) (Point2D$Double. x y) nil)]
+     (Vec2. (.getX p) (.getY p))))
+  ([canvas ^Vec2 v]
+   (inv-transform canvas (.x v) (.y v))))</pre></td></tr><tr><td class="docs"><p>Reset transformation</p>
 </td><td class="codes"><pre class="brush: clojure">(defn reset-matrix
   [^Canvas canvas]
   (.setTransform ^Graphics2D (.graphics canvas) (java.awt.geom.AffineTransform.))
@@ -3253,7 +3310,66 @@ Transformations are concatenated.</p>
        (draw-fill-or-stroke (.graphics canvas) p stroke?)))
    canvas)
   ([canvas vs close?] (path canvas vs close? true))
-  ([canvas vs] (path canvas vs false true)))</pre></td></tr><tr><td class="docs"><p>Draw quad with corners at 4 positions.</p>
+  ([canvas vs] (path canvas vs false true)))</pre></td></tr><tr><td class="docs"><p>Calculate bezier spline control points. http://www.antigrain.com/research/bezier_interpolation/index.html</p>
+</td><td class="codes"><pre class="brush: clojure">(defn calculate-bezier-control-points
+  [v0 v1 v2 v3]
+  (let [c1 (v/mult (v/add v0 v1) 0.5)
+        c2 (v/mult (v/add v1 v2) 0.5)
+        c3 (v/mult (v/add v2 v3) 0.5)
+        ^double len1 (v/mag c1)
+        ^double len2 (v/mag c2)
+        ^double len3 (v/mag c3)
+        k1 (/ len1 (+ len1 len2))
+        k2 (/ len2 (+ len2 len3))
+        m1 (v/add c1 (v/mult (v/sub c2 c1) k1))
+        m2 (v/add c2 (v/mult (v/sub c3 c2) k2))
+        cp1 (-&gt; c2
+                (v/sub m1)
+                (v/add m1)
+                (v/add v1)
+                (v/sub m1))
+        cp2 (-&gt; c2
+                (v/sub m2)
+                (v/add m2)
+                (v/add v2)
+                (v/sub m2))]
+    [cp1 cp2]))</pre></td></tr><tr><td class="docs"><p>Draw path from quad curves. Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).</p>
+</td><td class="codes"><pre class="brush: clojure">(defn path-bezier
+  ([^Canvas canvas vs close? stroke?]
+   (when (&gt; (count vs) 3)
+     (let [cl? (or (not stroke?) close?)
+           ^Path2D p (Path2D$Double.)
+           ^Vec2 m0 (first vs)
+           ^Vec2 m1 (second vs)
+           m2 (nth vs 2) 
+           f0 (if cl? m0 m0)
+           ^Vec2 f1 (if cl? m1 m0)
+           f2 (if cl? m2 m1)
+           f3 (if cl? (nth vs 3) m2)
+           vs (if cl? (next vs) vs)]
+       (.moveTo p (.x f1) (.y f1))
+       (loop [v0 f0
+              v1 f1
+              ^Vec2 v2 f2
+              ^Vec2 v3 f3
+              nvs (drop 3 vs)]
+         (let [[^Vec2 cp1 ^Vec2 cp2] (calculate-bezier-control-points v0 v1 v2 v3)]
+           (.curveTo p (.x cp1) (.y cp1) (.x cp2) (.y cp2) (.x v2) (.y v2))
+           (if-not (empty? nvs)
+             (recur v1 v2 v3 (first nvs) (next nvs))
+             (if cl?
+               (let [[^Vec2 cp1 ^Vec2 cp2] (calculate-bezier-control-points v1 v2 v3 m0)
+                     [^Vec2 cp3 ^Vec2 cp4] (calculate-bezier-control-points v2 v3 m0 m1)
+                     [^Vec2 cp5 ^Vec2 cp6] (calculate-bezier-control-points v3 m0 m1 m2)]
+                 (.curveTo p (.x cp1) (.y cp1) (.x cp2) (.y cp2) (.x v3) (.y v3))
+                 (.curveTo p (.x cp3) (.y cp3) (.x cp4) (.y cp4) (.x m0) (.y m0))
+                 (.curveTo p (.x cp5) (.y cp5) (.x cp6) (.y cp6) (.x m1) (.y m1)))
+               (let [[^Vec2 cp1 ^Vec2 cp2] (calculate-bezier-control-points v1 v2 v3 v3)]
+                 (.curveTo p (.x cp1) (.y cp1) (.x cp2) (.y cp2) (.x v3) (.y v3)))))))
+       (draw-fill-or-stroke (.graphics canvas) p stroke?)))
+   canvas)
+  ([canvas vs close?] (path-bezier canvas vs close? true))
+  ([canvas vs] (path-bezier canvas vs false true)))</pre></td></tr><tr><td class="docs"><p>Draw quad with corners at 4 positions.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn quad
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
    (let [^Path2D p (Path2D$Double.)]
@@ -3266,7 +3382,26 @@ Transformations are concatenated.</p>
      (draw-fill-or-stroke (.graphics canvas) p stroke?))
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
-   (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false)))</pre></td></tr><tr><td class="docs"><p>Set stroke (line) attributes like <code>cap</code>, <code>join</code> and size. Default <code>CAP_ROUND</code> and <code>JOIN_MITER</code> is used. Default size is <code>1.0</code>.</p>
+   (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false)))</pre></td></tr><tr><td class="docs"><p>Set font by name</p>
+</td><td class="codes"><pre class="brush: clojure">(defn set-font
+  [^Canvas canvas ^String fontname]
+  (let [f (java.awt.Font/getFont fontname)]
+    (.setFont ^Graphics2D (.graphics canvas) f)
+    canvas))</pre></td></tr><tr><td class="docs"><p>Set current font size</p>
+</td><td class="codes"><pre class="brush: clojure">(defn set-font-attributes
+  ([^Canvas canvas ^double size style]
+   (let [s (or (style {:bold 1 :italic 2 :bold-italic 3}) 0)
+         f (.deriveFont ^java.awt.Font (.getFont ^Graphics2D (.graphics canvas)) (int s) (float size))]
+     (.setFont ^Graphics2D (.graphics canvas) f)
+     canvas))
+  ([^Canvas canvas ^double size]
+   (let [f (.deriveFont ^java.awt.Font (.getFont ^Graphics2D (.graphics canvas)) (float size))]
+     (.setFont ^Graphics2D (.graphics canvas) f)
+     canvas)))</pre></td></tr><tr><td class="docs"><p>Draw text with default setting</p>
+</td><td class="codes"><pre class="brush: clojure">(defn text
+  [^Canvas canvas ^String s ^long x ^long y]
+  (.drawString ^Graphics2D (.graphics canvas) s x y)
+  canvas)</pre></td></tr><tr><td class="docs"><p>Set stroke (line) attributes like <code>cap</code>, <code>join</code> and size. Default <code>CAP_ROUND</code> and <code>JOIN_MITER</code> is used. Default size is <code>1.0</code>.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn set-stroke
   ([^Canvas canvas size cap join]
    (.setStroke ^Graphics2D (.graphics canvas) (BasicStroke. size cap join))
@@ -3306,15 +3441,25 @@ Transformations are concatenated.</p>
       (.fillRect 0 0 (.w canvas) (.h canvas))
       (.setColor currc))
     (pop-matrix canvas))
+  canvas)</pre></td></tr><tr><td class="docs"><p>Set XOR graphics mode. If color is set to nil</p>
+</td><td class="codes"><pre class="brush: clojure">(defn set-awt-xor-mode
+  [^Canvas canvas c]
+  (let [^Graphics2D g (.graphics canvas)]
+    (if c
+      (.setXORMode g c)
+      (.setPaintMode g)))
   canvas)</pre></td></tr><tr><td class="docs"><p>Set color for primitive</p>
 </td><td class="codes"><pre class="brush: clojure">(def set-color (partial set-color-with-fn set-awt-color))</pre></td></tr><tr><td class="docs"><p>Set background color</p>
-</td><td class="codes"><pre class="brush: clojure">(def set-background (partial set-color-with-fn set-awt-background))</pre></td></tr><tr><td class="docs"><p>Draw an image. You can specify position and size of the image. Default it's placed on whole canvas.</p>
+</td><td class="codes"><pre class="brush: clojure">(def set-background (partial set-color-with-fn set-awt-background))</pre></td></tr><tr><td class="docs"><p>Set XOR mode</p>
+</td><td class="codes"><pre class="brush: clojure">(def set-xor-mode (partial set-color-with-fn set-awt-xor-mode))</pre></td></tr><tr><td class="docs"><p>Draw an image. You can specify position and size of the image. Default it's placed on whole canvas.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn image
   ([^Canvas canvas ^BufferedImage img x y w h]
    (.drawImage ^Graphics2D (.graphics canvas) img x y w h nil)
    canvas)
   ([^Canvas canvas img]
-   (image canvas img 0 0 (.w canvas) (.h canvas))))</pre></td></tr><tr><td class="docs"><h2>Display window</h2>
+   (image canvas img 0 0 (.w canvas) (.h canvas)))
+  ([^Canvas canvas img x y]
+   (image canvas img x y (width img) (height img))))</pre></td></tr><tr><td class="docs"><h2>Display window</h2>
 
 <p>You can find here a couple of functions which help to display your canvas and build interaction with user.
 Display window is just a Swing <code>JFrame</code> with <code>java.awt.Canvas</code> as panel.
@@ -3369,16 +3514,28 @@ Use this information via <code>window-active?</code> function to control (and po
 
 <ul>
 <li><code>key-pressed</code></li>
+<li><code>key-released</code></li>
+<li><code>key-typed</code></li>
 <li><code>mouse-event</code></li>
 </ul>
 
 <p>Each multimethod get awt Event object and global state. Each should return new state.</p>
 
-<h4>Key event: `key-pressed` multimethod</h4>
+<h4>Key event: `key-pressed` and other `key-` multimethods</h4>
 
 <p>Your dispatch value is vector with window name and pressed key (as <code>char</code>) which you want to handle.
 This means you write different method for different key.
 As a function parameters you get <code>KeyEvent</code> object <a href="https://docs.oracle.com/javase/7/docs/api/java/awt/event/KeyEvent.html">java.awt.KeyEvent</a> and global state attached to the Window.</p>
+
+<p><code>KeyEvent</code> is enriched by <code>KeyEventProto</code> with functions:</p>
+
+<ul>
+<li><code>key-code</code> - key code mapped to keyword. Eg. <code>VK_UP</code> -> <code>:up</code> or <code>VK_CONTROL</code> -> <code>:control</code></li>
+<li><code>key-raw</code> - raw key code value (integer)</li>
+<li><code>key-char</code> - char representation (for special keys char is equal <code>virtual-key</code> or <code>0xffff</code> value</li>
+</ul>
+
+<p>If you want to dispatch on special keys (like arrows), dispatch on <code>(char 0xffff)</code> or <code>virtual-key</code> and read <code>(key-code e)</code> to get key pressed.</p>
 
 <h4>Mouse event</h4>
 
@@ -3395,11 +3552,35 @@ As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseX
 </ul>
 
 <p>To get mouse position call <code>(mouse-x e)</code> and <code>(mouse-y e)</code> where <code>e</code> is MouseEvent object.</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Access to mouse position.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Extract all keycodes from <code>KeyEvent</code> object and pack it to the map</p>
+</td><td class="codes"><pre class="brush: clojure">(def keycodes-map (-&gt;&gt; KeyEvent
+                       (ref/reflect)
+                       (:members)
+                       (filter #(instance? clojure.reflect.Field %))
+                       (map #(str (:name %)))
+                       (filter #(re-matches #&quot;VK_.*&quot; %))
+                       (reduce #(assoc %1
+                                       (clojure.lang.Reflector/getStaticField &quot;java.awt.event.KeyEvent&quot; ^String %2)
+                                       (-&gt; %2
+                                           (subs 3)
+                                           (clojure.string/lower-case)
+                                           (keyword))) {})))</pre></td></tr><tr><td class="docs"><p>Access to mouse position.</p>
 </td><td class="codes"><pre class="brush: clojure">(defprotocol MouseXYProto
   (mouse-x [m] &quot;x position&quot;)
   (mouse-y [m] &quot;y position&quot;)
-  (mouse-pos [m] &quot;combined position&quot;))</pre></td></tr><tr><td class="docs"><p><code>Window</code> type definition, equiped with <code>get-image</code> method returning bound canvas' image.</p>
+  (mouse-pos [m] &quot;combined position&quot;))</pre></td></tr><tr><td class="docs"><p>Get mouse button status</p>
+</td><td class="codes"><pre class="brush: clojure">(defprotocol MouseProto
+  (mouse-button [m] &quot;get mouse button status :left :right :center or :none&quot;))</pre></td></tr><tr><td class="docs"><p>Access to event data</p>
+</td><td class="codes"><pre class="brush: clojure">(defprotocol KeyEventProto
+  (key-code [e] &quot;keycode mapped to keyword&quot;)
+  (key-char [e] &quot;key char&quot;)
+  (key-raw [e] &quot;raw value for key (integer)&quot;))</pre></td></tr><tr><td class="docs"><p>Get state of modifiers</p>
+</td><td class="codes"><pre class="brush: clojure">(defprotocol ModifiersProto
+  (control-down? [e])
+  (alt-down? [e])
+  (meta-down? [e])
+  (shift-down? [e])
+  (alt-gr-down? [e]))</pre></td></tr><tr><td class="docs"><p><code>Window</code> type definition, equiped with <code>get-image</code> method returning bound canvas' image.</p>
 </td><td class="codes"><pre class="brush: clojure">(defrecord Window [^JFrame frame
                    active?
                    buffer
@@ -3412,6 +3593,8 @@ As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseX
   (get-image [_] (get-image @buffer))
   (width [_] w)
   (height [_] h)
+  (save [w n] (save-image (get-image @buffer) n) w)
+  (convolve [w n] (convolve @buffer n))
   MouseXYProto
   (mouse-pos [_]
     (let [^java.awt.Point p (.getMousePosition panel)]
@@ -3425,10 +3608,28 @@ As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseX
     (let [^java.awt.Point p (.getMousePosition panel)]
       (if (nil? p) -1 (.y p)))))</pre></td></tr><tr><td class="docs"><h3>Events function</h3>
 </td><td class="codes"><pre class="brush: clojure">(extend MouseEvent
+  MouseProto
+  {:mouse-button #(condp = (.getButton ^MouseEvent %)
+                    MouseEvent/BUTTON1 :left
+                    MouseEvent/BUTTON2 :center
+                    MouseEvent/BUTTON3 :right
+                    :none)}
   MouseXYProto
   {:mouse-x #(.getX ^MouseEvent %)
    :mouse-y #(.getY ^MouseEvent %)
-   :mouse-pos #(Vec2. (mouse-x %) (mouse-y %))})</pre></td></tr><tr><td class="docs"><h3>Window type helper functions</h3>
+   :mouse-pos #(Vec2. (mouse-x %) (mouse-y %))})</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(extend KeyEvent
+  KeyEventProto
+  {:key-code #(keycodes-map (.getKeyCode ^KeyEvent %))
+   :key-char #(.getKeyChar ^KeyEvent %)
+   :key-raw #(.getKeyCode ^KeyEvent %)})</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(extend InputEvent
+  ModifiersProto
+  {:control-down? #(.isControlDown ^InputEvent %)
+   :alt-down? #(.isAltDown ^InputEvent %)
+   :meta-down? #(.isMetaDown ^InputEvent %)
+   :shift-down? #(.isShiftDown ^InputEvent %)
+   :alt-gr-down? #(.isAltGraphDown ^InputEvent %)})</pre></td></tr><tr><td class="docs"><h3>Window type helper functions</h3>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Helper function, check if window is active</p>
 </td><td class="codes"><pre class="brush: clojure">(defn window-active?
   [^Window window]
@@ -3436,7 +3637,7 @@ As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseX
 
 <p>Global atom is needed to keep current window state. Events don't know what window sends it. The only option is to get component name.</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(def global-state (atom {}))</pre></td></tr><tr><td class="docs"><p>Get state from window</p>
+</td><td class="codes"><pre class="brush: clojure">(defonce global-state (atom {}))</pre></td></tr><tr><td class="docs"><p>Get state from window</p>
 </td><td class="codes"><pre class="brush: clojure">(defn get-state
   [^Window window]
   (@global-state (.window-name window)))</pre></td></tr><tr><td class="docs"><p>Change state for Window (by name)</p>
@@ -3447,37 +3648,47 @@ As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseX
 </td><td class="codes"><pre class="brush: clojure">(defn- clear-state!
   [window-name]
   (swap! global-state dissoc window-name))</pre></td></tr><tr><td class="docs"><p>Changle global state for Window.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn change-global-state!
+</td><td class="codes"><pre class="brush: clojure">(defn set-state!
   [^Window w state]
   (change-state! (.window-name w) state))</pre></td></tr><tr><td class="docs"><p>Private method which extracts the name of your window (set when <code>show-window</code> is called).</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Returns name of the component. Used to dispatch events.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn- component-name
+</td><td class="codes"><pre class="brush: clojure">(defn event-window-name
   [^ComponentEvent e]
-  (.getName ^Component (.getComponent e)))</pre></td></tr><tr><td class="docs"><p>Multimethod used to process pressed key</p>
-</td><td class="codes"><pre class="brush: clojure">(defmulti key-pressed (fn [^KeyEvent e state] [(component-name e) (.getKeyChar e)]))</pre></td></tr><tr><td class="docs"><p>Do nothing on default</p>
-</td><td class="codes"><pre class="brush: clojure">(defmethod key-pressed :default [_ s] s)</pre></td></tr><tr><td class="docs"><p>Map Java mouse event names onto keywords</p>
+  (.getName ^Component (.getComponent e)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def ^:const virtual-key (char 0xffff))</pre></td></tr><tr><td class="docs"><p>Multimethod used to process pressed key</p>
+</td><td class="codes"><pre class="brush: clojure">(defmulti key-pressed (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))</pre></td></tr><tr><td class="docs"><p>Do nothing on default</p>
+</td><td class="codes"><pre class="brush: clojure">(defmethod key-pressed :default [_ s]  s)</pre></td></tr><tr><td class="docs"><p>Multimethod used to process released key</p>
+</td><td class="codes"><pre class="brush: clojure">(defmulti key-released (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))</pre></td></tr><tr><td class="docs"><p>Do nothing on default</p>
+</td><td class="codes"><pre class="brush: clojure">(defmethod key-released :default [_ s]  s)</pre></td></tr><tr><td class="docs"><p>Multimethod used to process typed key</p>
+</td><td class="codes"><pre class="brush: clojure">(defmulti key-typed (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))</pre></td></tr><tr><td class="docs"><p>Do nothing on default</p>
+</td><td class="codes"><pre class="brush: clojure">(defmethod key-typed :default [_ s]  s)</pre></td></tr><tr><td class="docs"><p>Map Java mouse event names onto keywords</p>
 </td><td class="codes"><pre class="brush: clojure">(def mouse-event-map {MouseEvent/MOUSE_CLICKED  :mouse-clicked
                       MouseEvent/MOUSE_DRAGGED  :mouse-dragged
                       MouseEvent/MOUSE_PRESSED  :mouse-pressed
                       MouseEvent/MOUSE_RELEASED :mouse-released
                       MouseEvent/MOUSE_MOVED    :mouse-moved})</pre></td></tr><tr><td class="docs"><p>Multimethod used to processed mouse events</p>
-</td><td class="codes"><pre class="brush: clojure">(defmulti mouse-event (fn [^MouseEvent e state] [(component-name e) (mouse-event-map (.getID e))]))</pre></td></tr><tr><td class="docs"><p>Do nothing on default</p>
-</td><td class="codes"><pre class="brush: clojure">(defmethod mouse-event :default [_ s]  s)</pre></td></tr><tr><td class="docs"><p>Event adapter objects.</p>
+</td><td class="codes"><pre class="brush: clojure">(defmulti mouse-event (fn [^MouseEvent e state] [(event-window-name e) (mouse-event-map (.getID e))]))</pre></td></tr><tr><td class="docs"><p>Do nothing on default</p>
+</td><td class="codes"><pre class="brush: clojure">(defmethod mouse-event :default [_ s] s)</pre></td></tr><tr><td class="docs"><p>Event adapter objects.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>General function which manipulates state and calls proper event multimethod</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>For given event call provided multimethod passing state. Save new state.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- process-state-and-event 
   [ef e]
-  (let [window-name (component-name e)]
+  (let [window-name (event-window-name e)]
     (change-state! window-name (ef e (@global-state window-name)))))</pre></td></tr><tr><td class="docs"><p>Key</p>
 </td><td class="codes"><pre class="brush: clojure">(def key-processor (proxy [KeyAdapter] []
-                     (keyPressed [e] (process-state-and-event key-pressed e))))</pre></td></tr><tr><td class="docs"><p>Mouse</p>
+                     (keyPressed [e] (process-state-and-event key-pressed e))
+                     (keyReleased [e] (process-state-and-event key-released e))
+                     (keyTyped [e] (process-state-and-event key-typed e))))</pre></td></tr><tr><td class="docs"><p>Mouse</p>
 </td><td class="codes"><pre class="brush: clojure">(def mouse-processor (proxy [MouseAdapter] []
                        (mouseClicked [e] (process-state-and-event mouse-event e))
                        (mousePressed [e] (process-state-and-event mouse-event e))
                        (mouseReleased [e] (process-state-and-event mouse-event e))))</pre></td></tr><tr><td class="docs"><p>Mouse drag and move</p>
 </td><td class="codes"><pre class="brush: clojure">(def mouse-motion-processor (proxy [MouseMotionAdapter] []
                               (mouseDragged [e] (process-state-and-event mouse-event e))
-                              (mouseMoved [e] (process-state-and-event mouse-event e))))</pre></td></tr><tr><td class="docs"><h3>Frame machinery functions</h3>
+                              (mouseMoved [e] (process-state-and-event mouse-event e))))</pre></td></tr><tr><td class="docs"><p>Close window programatically</p>
+</td><td class="codes"><pre class="brush: clojure">(defn close-window
+  [window]
+  (.dispatchEvent ^JFrame (:frame window) (java.awt.event.WindowEvent. (:frame window) java.awt.event.WindowEvent/WINDOW_CLOSING)))</pre></td></tr><tr><td class="docs"><h3>Frame machinery functions</h3>
 
 <p>Window is JFrame with panel (as java.awt.Canvas object) which is used to draw clojure2d canvas on it.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Create panel which displays canvas. Attach mouse events, give a name (same as window), set size etc.</p>
@@ -3492,7 +3703,7 @@ As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseX
       (.setIgnoreRepaint true)
       (.setPreferredSize (Dimension. width height)))))</pre></td></tr><tr><td class="docs"><p>Function used to close and dispose window. As a side effect <code>active?</code> atom is set to false and global state for window is cleared.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Close window frame</p>
-</td><td class="codes"><pre class="brush: clojure">(defn- close-window
+</td><td class="codes"><pre class="brush: clojure">(defn- close-window-fn
   [^JFrame frame active? windowname]
   (reset! active? false)
   (clear-state! windowname)
@@ -3501,7 +3712,7 @@ As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseX
 </td><td class="codes"><pre class="brush: clojure">(defn- build-frame
   [^JFrame frame ^java.awt.Canvas panel active? windowname width height]
   (let [closer (proxy [WindowAdapter] []
-                 (windowClosing [^WindowEvent e] (close-window frame active? windowname)))]
+                 (windowClosing [^WindowEvent e] (close-window-fn frame active? windowname)))]
     (doto frame
       (.setIconImages window-icons)
       (.add panel)
@@ -3531,7 +3742,7 @@ As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseX
       (loop []
         (let [^Graphics2D graphics-context (.getDrawGraphics strategy)
               ^BufferedImage b (.buffer canvas)]
-          (.setRenderingHints graphics-context (:mid rendering-hints))
+          (.setRenderingHints graphics-context (or (.hints canvas) (rendering-hints :high)))
           (.drawImage graphics-context b 0 0 (.getWidth panel) (.getHeight panel) nil)
           (.dispose graphics-context))
         (when (.contentsRestored strategy) (recur)))
@@ -3543,15 +3754,17 @@ As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseX
 <li>Input: frame, active? atom, function to run before repaint, canvas and sleep time.</li>
 </ul>
 </td><td class="codes"><pre class="brush: clojure">(defn- refresh-screen-task
-  [^Window window draw-fun]
+  [^Window window draw-fun draw-state]
   (let [stime (/ 1000.0 ^double (.fps window))]
     (loop [cnt (long 0)
-           result nil]
-      (let [new-result (when draw-fun 
+           result draw-state]
+      (let [ct (System/currentTimeMillis)
+            new-result (when draw-fun 
                          (with-canvas @(.buffer window)
-                           (draw-fun window cnt result)))]
-        (Thread/sleep stime)
-        (repaint (.panel window) @(.buffer window)) 
+                           (draw-fun window cnt result)))] 
+        (repaint (.panel window) @(.buffer window))
+        (let [delay (- stime (- (System/currentTimeMillis) ct))]
+          (when (pos? delay) (Thread/sleep delay)))
         (when @(.active? window) (recur (unchecked-inc cnt) new-result))))))</pre></td></tr><tr><td class="docs"><p>You may want to replace canvas to the other one. To make it pass result of <code>show-window</code> function and new canvas.
 Internally it just resets buffer atom for another canvas.
 See examples/ex01_events.clj to see how it works.</p>
@@ -3581,7 +3794,7 @@ See examples/ex01_events.clj to see how it works.</p>
 <li>:state</li>
 </ul>
 </td><td class="codes"><pre class="brush: clojure">(defn show-window
-  ([canvas wname width height fps draw-fun state]
+  ([canvas wname width height fps draw-fun state draw-state]
    (let [active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
@@ -3596,27 +3809,28 @@ See examples/ex01_events.clj to see how it works.</p>
                           wname)]
      (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
      (change-state! wname state)
-     (future (refresh-screen-task window draw-fun))
+     (future (refresh-screen-task window draw-fun draw-state))
      window))
   ([canvas wname]
    (show-window canvas wname nil))
   ([canvas wname draw-fn]
    (show-window canvas wname 60 draw-fn))
   ([canvas wname fps draw-fn]
-   (show-window canvas wname (width canvas) (height canvas) fps draw-fn nil))
+   (show-window canvas wname (width canvas) (height canvas) fps draw-fn nil nil))
   ([canvas wname w h fps]
-   (show-window canvas wname w h fps nil nil))
+   (show-window canvas wname w h fps nil nil nil))
   ([canvas wname w h fps draw-fun]
-   (show-window canvas wname w h fps draw-fun nil))
-  ([{:keys [canvas window-name w h fps draw-fn state]
+   (show-window canvas wname w h fps draw-fun nil nil))
+  ([{:keys [canvas window-name w h fps draw-fn state draw-state]
      :or {canvas (make-canvas 100 100)
           window-name (str &quot;Clojure2D - &quot; (to-hex (rand-int (Integer/MAX_VALUE)) 8))
           w (width canvas)
           h (height canvas)
           fps 60
           draw-fn nil
-          state nil}}]
-   (show-window canvas window-name w h fps draw-fn state))
+          state nil
+          draw-state nil}}]
+   (show-window canvas window-name w h fps draw-fn state draw-state))
   ([] (show-window {})))</pre></td></tr><tr><td class="docs"><h2>Utility functions</h2>
 
 <p>Now we have a part with some utilities (I had no idea where to put them).</p>
@@ -3645,7 +3859,7 @@ Use cases are:</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-counter
   ([^long v]
    (let [tick (atom (dec v))]
-     #(swap! tick inc)))
+     (fn [] (swap! tick #(inc ^long %)))))
   ([]
    (make-counter 0)))</pre></td></tr><tr><td class="docs"><p>Store date format in variable</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^java.text.SimpleDateFormat simple-date-format (java.text.SimpleDateFormat. &quot;yyyyMMddHHmmss&quot;))
@@ -3676,7 +3890,7 @@ Session is a type of:</p>
 </td><td class="codes"><pre class="brush: clojure">(defrecord SessionType [logger
                         name
                         counter])</pre></td></tr><tr><td class="docs"><p>Session is stored in agent</p>
-</td><td class="codes"><pre class="brush: clojure">(def session-agent (agent (map-&gt;SessionType {})))</pre></td></tr><tr><td class="docs"><p>Logging to file is turned off by default.</p>
+</td><td class="codes"><pre class="brush: clojure">(defonce session-agent (agent (map-&gt;SessionType {})))</pre></td></tr><tr><td class="docs"><p>Logging to file is turned off by default.</p>
 </td><td class="codes"><pre class="brush: clojure">(def ^:dynamic *log-to-file* false)</pre></td></tr><tr><td class="docs"><p>Close current session</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- close-session-fn
   [s]
