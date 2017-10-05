@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file. This change
 - Switched from clojure math to primitive math library
 - FastMath bindings changed to macros for several methods
 - Saving picture moved to image protocol, replaced save-canvas and save-pixels removed (call (save canvas name)).
+- KeyEvent protocols
 
 ### Fixed
 
