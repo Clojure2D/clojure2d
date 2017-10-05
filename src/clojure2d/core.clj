@@ -14,10 +14,11 @@
   (:require [clojure.java.io :refer :all]
             [clojure2d.color :as c]
             [clojure2d.math.vector :as v]
-            [clojure2d.math :as m])
+            [clojure2d.math :as m]
+            [clojure.reflect :as ref])
   (:import clojure2d.math.vector.Vec2
            [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
-           [java.awt.event ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
+           [java.awt.event InputEvent ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
            [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double]
            [java.awt.image BufferedImage BufferStrategy Kernel ConvolveOp]
            [java.util Iterator]
@@ -769,7 +770,13 @@
 ;; This means you write different method for different key.
 ;; As a function parameters you get `KeyEvent` object [java.awt.KeyEvent](https://docs.oracle.com/javase/7/docs/api/java/awt/event/KeyEvent.html) and global state attached to the Window.
 ;;
-;; If you want to dispatch on special keys (like arrows), dispatch on `(char 0xffff)` and read `(.keyCode e)` to get key pressed.
+;; `KeyEvent` is enriched by `KeyEventProto` with functions:
+;;
+;; * `key-code` - key code mapped to keyword. Eg. `VK_UP` -> `:up` or `VK_CONTROL` -> `:control`
+;; * `key-raw` - raw key code value (integer)
+;; * `key-char` - char representation (for special keys char is equal `virtual-key` or `0xffff` value
+;;
+;; If you want to dispatch on special keys (like arrows), dispatch on `(char 0xffff)` or `virtual-key` and read `(key-code e)` to get key pressed.
 ;;
 ;; #### Mouse event
 ;;
@@ -785,11 +792,43 @@
 ;;
 ;; To get mouse position call `(mouse-x e)` and `(mouse-y e)` where `e` is MouseEvent object.
 
+;; Extract all keycodes from `KeyEvent` object and pack it to the map
+(def keycodes-map (->> KeyEvent
+                       (ref/reflect)
+                       (:members)
+                       (filter #(instance? clojure.reflect.Field %))
+                       (map #(str (:name %)))
+                       (filter #(re-matches #"VK_.*" %))
+                       (reduce #(assoc %1
+                                       (clojure.lang.Reflector/getStaticField "java.awt.event.KeyEvent" ^String %2)
+                                       (-> %2
+                                           (subs 3)
+                                           (clojure.string/lower-case)
+                                           (keyword))) {})))
+
 (defprotocol MouseXYProto
   "Access to mouse position."
   (mouse-x [m] "x position")
   (mouse-y [m] "y position")
   (mouse-pos [m] "combined position"))
+
+(defprotocol MouseProto
+  "Get mouse button status"
+  (mouse-button [m] "get mouse button status :left :right :center or :none"))
+
+(defprotocol KeyEventProto
+  "Access to event data"
+  (key-code [e] "keycode mapped to keyword")
+  (key-char [e] "key char")
+  (key-raw [e] "raw value for key (integer)"))
+
+(defprotocol ModifiersProto
+  "Get state of modifiers"
+  (control-down? [e])
+  (alt-down? [e])
+  (meta-down? [e])
+  (shift-down? [e])
+  (alt-gr-down? [e]))
 
 ;; `Window` type definition, equiped with `get-image` method returning bound canvas' image.
 (defrecord Window [^JFrame frame
@@ -821,10 +860,30 @@
 
 ;; ### Events function
 (extend MouseEvent
+  MouseProto
+  {:mouse-button #(condp = (.getButton ^MouseEvent %)
+                    MouseEvent/BUTTON1 :left
+                    MouseEvent/BUTTON2 :center
+                    MouseEvent/BUTTON3 :right
+                    :none)}
   MouseXYProto
   {:mouse-x #(.getX ^MouseEvent %)
    :mouse-y #(.getY ^MouseEvent %)
    :mouse-pos #(Vec2. (mouse-x %) (mouse-y %))})
+
+(extend KeyEvent
+  KeyEventProto
+  {:key-code #(keycodes-map (.getKeyCode ^KeyEvent %))
+   :key-char #(.getKeyChar ^KeyEvent %)
+   :key-raw #(.getKeyCode ^KeyEvent %)})
+
+(extend InputEvent
+  ModifiersProto
+  {:control-down? #(.isControlDown ^InputEvent %)
+   :alt-down? #(.isAltDown ^InputEvent %)
+   :meta-down? #(.isMetaDown ^InputEvent %)
+   :shift-down? #(.isShiftDown ^InputEvent %)
+   :alt-gr-down? #(.isAltGraphDown ^InputEvent %)})
 
 ;; ### Window type helper functions
 

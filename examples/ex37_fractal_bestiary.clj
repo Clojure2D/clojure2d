@@ -16,8 +16,7 @@
             [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
             [clojure2d.math.random :as r])
-  (:import [clojure2d.math.vector Vec2]
-           [java.awt.event KeyEvent]))
+  (:import [clojure2d.math.vector Vec2]))
 
 (def ^:const ^int size 800)
 
@@ -248,14 +247,14 @@
                           :window-name window-name
                           :state default-recipe}))
 
-(defmethod key-released [window-name virtual-key] [^KeyEvent e {depth :depth len :len :or {depth 5 len 0.25} :as state}]
-  (let [ndepth (condp = (.getKeyCode e)
-                 KeyEvent/VK_RIGHT (min 20 (inc depth))
-                 KeyEvent/VK_LEFT (max 0 (dec depth)) 
+(defmethod key-released [window-name virtual-key] [e {depth :depth len :len :or {depth 5 len 0.25} :as state}]
+  (let [ndepth (condp = (key-code e)
+                 :right (min 20 (inc depth))
+                 :left (max 0 (dec depth)) 
                  depth)
-        nlen (condp = (.getKeyCode e)
-               KeyEvent/VK_UP (* len 1.15)
-               KeyEvent/VK_DOWN (/ len 1.15)
+        nlen (condp = (key-code e)
+               :up (* len 1.15)
+               :down (/ len 1.15)
                len)]
     (if (or (not= len nlen) (not= ndepth depth))
       (do

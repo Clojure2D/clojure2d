@@ -2,8 +2,7 @@
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
             [clojure2d.math.vector :as v])
-  (:import [clojure2d.math.vector Vec2]
-           [java.awt.event KeyEvent]))
+  (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -85,10 +84,10 @@
                           :draw-fn draw
                           :state {:angle (- m/QUARTER_PI)}}))
 
-(defmethod key-pressed ["Exercise cannon 3_2" (char 0xffff)] [^KeyEvent e {:keys [^double angle shoot]}]
-  {:angle (condp = (.getKeyCode e)
-            KeyEvent/VK_RIGHT (+ angle 0.1)
-            KeyEvent/VK_LEFT (- angle 0.1)
+(defmethod key-pressed ["Exercise cannon 3_2" virtual-key] [e {:keys [^double angle shoot]}]
+  {:angle (condp = (key-code e)
+            :right (+ angle 0.1)
+            :left (- angle 0.1)
             angle)
    :shoot shoot})
 
