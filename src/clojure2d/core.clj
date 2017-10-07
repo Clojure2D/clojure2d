@@ -71,16 +71,13 @@
 ;;
 ;; We have two types here. First is whether file format accepts alpha channel (jpgs, bmps don't) and second is quality settings (for jpg only). In the first case we have to properly flatten the image with `flatten-image` function. In the second case we set quality attributes.
 
-(defn- file-extension-int
+(defn file-extension
   "Extract extension from filename.
 
   * Input: image filename
   * Returns extension (without dot)"
   [filename]
   (second (re-find #"\.(\w+)$" filename)))
-
-;; Memoize above function (in case you'll be saving file very often).
-(def file-extension (memoize file-extension-int))
 
 (defn- ^ImageWriter get-image-writer
   "Returns image writer of image type based on extension."
@@ -702,8 +699,8 @@
 
 (defn image
   "Draw an image. You can specify position and size of the image. Default it's placed on whole canvas."
-  ([^Canvas canvas ^BufferedImage img x y w h]
-   (.drawImage ^Graphics2D (.graphics canvas) img x y w h nil)
+  ([^Canvas canvas img x y w h]
+   (.drawImage ^Graphics2D (.graphics canvas) (get-image img) x y w h nil)
    canvas)
   ([^Canvas canvas img]
    (image canvas img 0 0 (.w canvas) (.h canvas)))
