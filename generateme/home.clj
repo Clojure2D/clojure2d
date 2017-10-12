@@ -16,7 +16,7 @@
            [clojure2d.math.vector Vec4 Vec2]
            [clojure2d.java PrimitiveMath]))
 
-(def p1 (p/load-pixels "generateme/painter/p.jpg"))
+(def p1 (p/load-pixels "generateme/fubar1.jpg"))
 
 (def p2 (p/load-pixels "generateme/gface/2.jpg"))
 
@@ -40,7 +40,7 @@
                                                                      (g/blend-machine p4 p3 b)))))
 
 (core/with-canvas canvas
-  (core/image (o/render-rgb-scanlines (p/image-from-pixels p5))))
+  (core/image (o/render-rgb-scanlines p1)))
 
 (core/with-canvas canvas
   (core/image (-> (p/image-from-pixels p5)
@@ -118,27 +118,38 @@
 
 
 
-;; full process without use of filter-channels
-(time (let [effect (make-effect :dj-eq {:lo (r/drand -5 5) :mid 50 :hi (r/drand -5 5) :peak-bw 1.3 :shelf-slope 1.5 :rate (r/irand 4000 100000)})
-            effect2 (make-effect :divider {:denom 2})
-            effect3 (make-effect :slew-limit {:maxrise 500 :maxfall 1000}
-                                 )
-            inluv (p/filter-colors c/to-LUV p1)
+(defn sonify
+  [^long frame]
+  ;; full process without use of filter-channels
+  (time (let [t (m/norm frame 0 (* 60 25) 0 m/TWO_PI)
+              st (- (* 10.0 (m/sin t)) 3)
+              ct (- (* 10.0 (m/cos t)) 3)
+              ;; effect (make-effect :simple-lowpass {:cutoff st})
+              effect (make-effect :dj-eq {:lo st :mid ct :hi 0 :peak-bw 1.3 :shelf-slope 1.5 :rate 44100})
+              ;; effect2 (make-effect :divider {:denom 2})
+              ;; effect3 (make-effect :slew-limit {:maxrise 500 :maxfall 1000})
+              ;; inluv (p/filter-colors c/to-LUV p1)
 
-            resp (apply-effects-to-pixels effect
-                                          {:layout :interleaved
-                                           :channels [0 1 2]
-                                           :bits 8
-                                           :coding :none
-                                           :signed true}
-                                          {:channels [0 1 2]
-                                           :layout :interleaved
-                                           :bits 8
-                                           :coding :none
-                                           :signed true} inluv)]
-        (p/set-canvas-pixels! canvas (p/filter-channels p/equalize-filter nil resp
-                                                        ;; (p/filter-colors c/from-LUV resp)
-                                                        ))))
+              resp (apply-effects-to-pixels effect
+                                            {:layout :planar
+                                             :channels [0 1 2]
+                                             :bits 8
+                                             :coding :none
+                                             :signed false}
+                                            {:channels [0 1 2]
+                                             :layout :planar
+                                             :bits 8
+                                             :coding :none
+                                             :signed false} p1)]
+          (p/set-canvas-pixels! canvas resp;
+                                ;; (p/filter-channels p/equalize-filter nil resp)
+                                ))))
+
+(do
+  (core/close-session)
+  (dotimes [x (* 60 25)]
+    (sonify x)
+    (core/save canvas (core/next-filename "generateme/fubar/fr" ".jpg"))))
 
 ;; fold
 

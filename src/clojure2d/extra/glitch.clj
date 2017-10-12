@@ -252,8 +252,8 @@
       :blend-ch2 bl2
       :blend-ch3 bl3}))
   ([p1 p2]
-   (blend-machine p1 p2 (blend-machine)))
-  ([p1 p2 {:keys [switch in-cs1 in-cs2 out-cs blend-ch1 blend-ch2 blend-ch3]}]
+   (blend-machine (blend-machine) p1 p2))
+  ([{:keys [switch in-cs1 in-cs2 out-cs blend-ch1 blend-ch2 blend-ch3]} p1 p2]
    (let [[p1 p2] (if switch [p2 p1] [p1 p2]) ; switch images
          result (p/compose-channels blend-ch1 blend-ch2 blend-ch3 nil
                                     (if in-cs1 (p/filter-colors (first (in-cs1 c/colorspaces)) p1) p1)

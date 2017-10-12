@@ -973,7 +973,7 @@
     (let [^double h (m/norm (.x c) 1.0 255.0 0.0 6.0)
           v (- 1.0 (/ (.z c) 255.0))
           w (/ (.y c) 255.0)
-          i (m/floor h)
+          i (unchecked-int (m/floor h))
           f (- h i)
           f (if (odd? (int i)) (- 1.0 f) f)
           n (+ w (* f (- v w)))

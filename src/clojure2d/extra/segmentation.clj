@@ -36,7 +36,7 @@
 (defn segment-pixels
   "Decompose channel into segments where mins is minimum size of segment, maxs is maximum size, thr is accuracy (minimum std dev of pixel values to make decision about subdivision."
   [^Pixels p ch {:keys [^long min-size ^long max-size ^double threshold]
-                 :or {mins 4 maxs 256 thr 15.0}}]
+                 :or {min-size 4 max-size 256 threshold 15.0}}]
   (let [ww (<< 1 (m/high-2-exp (.w p)))
         hh (<< 1 (m/high-2-exp (.h p)))
         mins (max 2 min-size)

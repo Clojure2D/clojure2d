@@ -169,6 +169,12 @@
       (.dispose))
     target))
 
+(defn subimage
+  "Get subimage of give image"
+  [^BufferedImage source x y w h]
+  (.getSubimage source x y w h))
+
+
 ;; ## Canvas
 ;;
 ;; Canvas is an object you can draw on and which can be displayed in the window. Technically it's a type cosisting of `Graphics2D` object which is internally used to draw on the image, image (`BufferedImage` object), rendering quality hints and singletons for primitives. What is important: to draw on canvas you have to wrap your operations in `with-canvas` macro. `with-canvas` is responsible for creating and releasing `Graphics2D` object. Initially `Graphics2D` is set to `nil`.

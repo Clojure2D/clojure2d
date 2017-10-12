@@ -53,8 +53,9 @@
 
 (defn render-rgb-scanlines
   "Blurs and renders rgb stripes on the image, returns new image. Scale parameter (default 1.6) controls amount of blur. Resulting image is sligtly lighter and desaturated. Correct with normalize filter if necessary."
-  ([p {:keys [^double scale] :or {scale 1.6}}]
-   (let [^int w (width p)
+  ([p {:keys [^double scale] :or {scale 1.6}}] 
+   (let [p (get-image p)
+         ^int w (width p)
          ^int h (height p)
          rimg (-> p
                   (resize-image (unchecked-int (/ w scale)) (unchecked-int (/ h scale)))
@@ -95,7 +96,8 @@
   ([img] (render-crt-scanlines img {}))
   ([img {:keys [^double resolution ^double hardpix ^double hardscan ^double mask-dark ^double mask-light ^int mask-mult]
          :or {resolution 6.0 hardpix -4.0 hardscan -12.0 mask-dark 1.0 mask-light 1.0 mask-mult 3.0}}]
-   (let [^int w (width img)
+   (let [img (get-image img)
+         ^int w (width img)
          ^int h (height img)
          p (p/get-image-pixels img)]
 
@@ -164,7 +166,8 @@
 (defn render-noise
   "Render noise on image"
   ([img noise]
-   (let [w (width img)
+   (let [img (get-image img)
+         w (width img)
          h (height img)
          canvas (with-canvas (create-canvas w h)
                   (image img)
@@ -228,7 +231,8 @@
 (defn render-spots
   "Render spots on image. Returns image."
   ([img spots]
-   (let [w (width img)
+   (let [img (get-image img)
+         w (width img)
          h (height img)
          canvas (with-canvas (create-canvas w h)
                   (apply-images img spots))]     
