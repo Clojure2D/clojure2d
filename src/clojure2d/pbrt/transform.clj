@@ -12,14 +12,24 @@
 (m/use-primitive-operators)
 
 (defprotocol TransformProto
-  (mult [t1 t2]))
+  (mult [t1 t2])
+  (swaps-handedness? [t]))
 
 (deftype Transform [^Matrix4x4 m ^Matrix4x4 minv]
+  Object
+  (toString [_] (str m minv))
   TransformProto
   (mult [_ t2]
     (let [^Transform t2 t2]
       (Transform. (mat/mult m (.m t2))
-                  (mat/mult (.minv t2) minv)))))
+                  (mat/mult (.minv t2) minv))))
+  (swaps-handedness? [_]
+    (neg? (+ (- (* (.m00 m) (- (* (.m11 m) (.m22 m))
+                               (* (.m12 m) (.m21 m))))
+                (* (.m01 m) (- (* (.m10 m) (.m22 m))
+                               (* (.m12 m) (.m20 m)))))
+             (* (.m02 m) (- (* (.m10 m) (.m21 m))
+                            (* (.m11 m) (.m20 m))))))))
 
 (defmulti make-transform
   "Create various transformations" (fn [a & b] a))
@@ -31,14 +41,7 @@
 
 (defmethod make-transform :translate
   ([_ ^Vec3 v]
-   (Transform. (Matrix4x4. 1.0 0.0 0.0 (.x v)
-                           0.0 1.0 0.0 (.y v)
-                           0.0 0.0 1.0 (.z v)
-                           0.0 0.0 0.0 1.0)
-               (Matrix4x4. 1.0 0.0 0.0 (- (.x v))
-                           0.0 1.0 0.0 (- (.y v))
-                           0.0 0.0 1.0 (- (.z v))
-                           0.0 0.0 0.0 1.0)))
+   (make-transform :translate (.x v) (.y v) (.z v)))
   ([_ ^double x ^double y ^double z]
    (Transform. (Matrix4x4. 1.0 0.0 0.0 x
                            0.0 1.0 0.0 y
@@ -51,14 +54,7 @@
 
 (defmethod make-transform :scale
   ([_ ^Vec3 v]
-   (Transform. (Matrix4x4. (.x v) 0.0 0.0 0.0
-                           0.0 (.y v) 0.0 0.0
-                           0.0 0.0 (.z v) 0.0
-                           0.0 0.0 0.0 1.0)
-               (Matrix4x4. (/ 1.0 (.x v)) 0.0 0.0 0.0
-                           0.0 (/ 1.0 (.y v)) 0.0 0.0
-                           0.0 0.0 (/ 1.0 (.z v)) 0.0
-                           0.0 0.0 0.0 1.0)))
+   (make-transform :scale (.x v) (.y v) (.z v)))
   ([_ ^double x ^double y ^double z]
    (Transform. (Matrix4x4. x 0.0 0.0 0.0
                            0.0 y 0.0 0.0

@@ -23,17 +23,17 @@
                     ^double m20 ^double m21 ^double m22 ^double m23
                     ^double m30 ^double m31 ^double m32 ^double m33]
   Object
-  (toString [_] (str "[" m00 ", " m01 ", " m02 ", " m03 "]\n"
+  (toString [_] (str "\n[" m00 ", " m01 ", " m02 ", " m03 "]\n"
                      "[" m10 ", " m11 ", " m12 ", " m13 "]\n"
                      "[" m20 ", " m21 ", " m22 ", " m23 "]\n"
                      "[" m30 ", " m31 ", " m32 ", " m33 "]\n"))
   (equals [_ v]
-    (and (instance? Matrix4x4 v)
-         (let [^Matrix4x4 v v]
-           (and (== m00 (.m00 v)) (== m01 (.m01 v)) (== m02 (.m02 v)) (== m03 (.m03 v))
-                (== m10 (.m10 v)) (== m11 (.m11 v)) (== m12 (.m12 v)) (== m13 (.m13 v))
-                (== m20 (.m20 v)) (== m21 (.m21 v)) (== m22 (.m22 v)) (== m23 (.m23 v))
-                (== m30 (.m30 v)) (== m31 (.m31 v)) (== m32 (.m32 v)) (== m33 (.m33 v))))))
+    (bool-and (instance? Matrix4x4 v)
+              (let [^Matrix4x4 v v]
+                (bool-and (== m00 (.m00 v)) (== m01 (.m01 v)) (== m02 (.m02 v)) (== m03 (.m03 v))
+                          (== m10 (.m10 v)) (== m11 (.m11 v)) (== m12 (.m12 v)) (== m13 (.m13 v))
+                          (== m20 (.m20 v)) (== m21 (.m21 v)) (== m22 (.m22 v)) (== m23 (.m23 v))
+                          (== m30 (.m30 v)) (== m31 (.m31 v)) (== m32 (.m32 v)) (== m33 (.m33 v))))))
   Matrix4x4Proto
   (transpose [_] (Matrix4x4. m00 m10 m20 m30
                              m01 m11 m21 m31

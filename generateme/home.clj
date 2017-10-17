@@ -10,13 +10,12 @@
             [clojure2d.extra.signal :refer :all]
             [criterium.core :refer :all]
             [clojure2d.math.vector :as vv]
-            [clojure2d.math.commons :as com]
             [clojure.pprint :refer [pprint]])
   (:import [net.jafama FastMath]
            [clojure2d.math.vector Vec4 Vec2]
            [clojure2d.java PrimitiveMath]))
 
-(def p1 (p/load-pixels "generateme/fubar1.jpg"))
+(def p1 (p/load-pixels "generateme/hedge/miles.jpg"))
 
 (def p2 (p/load-pixels "generateme/gface/2.jpg"))
 
@@ -37,7 +36,7 @@
   (comment println b2)
   (p/set-canvas-pixels! canvas (p/filter-channels p/equalize-filter false 
                                                   (p/filter-channels p/normalize-filter false
-                                                                     (g/blend-machine p4 p3 b)))))
+                                                                     (g/blend-machine b p1 p3)))))
 
 (core/with-canvas canvas
   (core/image (o/render-rgb-scanlines p1)))
@@ -48,13 +47,13 @@
                   (o/render-spots spots-overlay))))
 
 (core/with-canvas canvas
-  (core/image (o/render-crt-scanlines (p/image-from-pixels p3) {:resolution 2})))
+  (core/image (o/render-crt-scanlines (p/image-from-pixels p3) {:resolution 3})))
 
 (core/close-session)
 
-(core/save-canvas canvas (core/next-filename "generateme/b/aaa" ".png"))
+(core/save canvas (core/next-filename "generateme/hedge/aaa" ".png"))
 
-(p/set-canvas-pixels! canvas p1)
+(p/set-canvas-pixels! canvas p2)
 
 (def p2 (p/get-canvas-pixels canvas))
 
@@ -78,9 +77,9 @@
     (assoc palette :palette np)))
 
 (do
-  (def palette (make-more-colors (g/color-reducer-machine)))
+  (def palette (g/color-reducer-machine))
   (comment println palette)
-  (p/set-canvas-pixels! canvas (p/filter-channels p/normalize-filter nil (g/color-reducer-machine palette p3))))
+  (p/set-canvas-pixels! canvas (p/filter-channels p/normalize-filter nil (g/color-reducer-machine palette p2))))
 
 ;;mirror
 (defn make-random-mirror
@@ -92,7 +91,7 @@
            (g/make-mirror-filter (rand-nth (keys g/mirror-types)))
            nil))
 
-(p/set-canvas-pixels! canvas (->> p1
+(p/set-canvas-pixels! canvas (->> p5
                                   ((make-random-mirror))
                                   ((make-random-mirror))))
 
@@ -103,7 +102,7 @@
                                         ;v2name (rand-nth v/variation-list-not-random)
                                         ;v1 (v/make-variation v1name 1.0 {})
                                         ;v2 (v/make-variation v2name 1.0 {})
-        field-config (v/make-random-configuration 3)
+        field-config (v/make-random-configuration 2)
         field (v/make-combination field-config)
                                         ;f (comp v1 v2)
         f field]

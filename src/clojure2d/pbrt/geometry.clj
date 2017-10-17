@@ -29,12 +29,12 @@
   (equals [_ b]
     (and (instance? Bounds2 b)
          (let [^Bounds2 b b]
-           (and (= pmin (.pmin b))
-                (= pmax (.pmax b))))))
+           (bool-and (= pmin (.pmin b))
+                     (= pmax (.pmax b))))))
   BoundsProto
   (diagonal [_] (v/sub pmax pmin))
   (area [b]
-    (let [^Vec2 d (diagonal ^Bounds2 b)]
+    (let [^Vec2 d (diagonal b)]
       (* (.x d) (.y d))))
   (lerp [_ v] (v/einterpolate pmin pmax v))
   (offset [_ v]
@@ -43,8 +43,8 @@
              (if (> (.y pmax) (.y pmin)) (/ (.y o) (- (.y pmax) (.y pmin))) (.y o)))))
   (inside [_ v]
     (let [^Vec2 v v]
-      (and (<= (.x pmin) (.x v) (.x pmax))
-           (<= (.y pmin) (.y v) (.y pmax)))))
+      (bool-and (<= (.x pmin) (.x v) (.x pmax))
+                (<= (.y pmin) (.y v) (.y pmax)))))
   (union-vec [_ v]
     (Bounds2. (v/emn pmin v) (v/emx pmax v)))
   (union-bound [_ b]
@@ -55,9 +55,9 @@
       (Bounds2. (v/emx pmin (.pmin b)) (v/emn pmax (.pmax b)))))
   (overlaps [_ b]
     (let [^Bounds2 b b
-          x (and (>= (.x pmax) (.x ^Vec2 (.pmin b))) (<= (.x pmin) (.x ^Vec2 (.pmax b))))
-          y (and (>= (.y pmax) (.y ^Vec2 (.pmin b))) (<= (.y pmin) (.y ^Vec2 (.pmax b))))]
-      (and x y)))
+          x (bool-and (>= (.x pmax) (.x ^Vec2 (.pmin b))) (<= (.x pmin) (.x ^Vec2 (.pmax b))))
+          y (bool-and (>= (.y pmax) (.y ^Vec2 (.pmin b))) (<= (.y pmin) (.y ^Vec2 (.pmax b))))]
+      (bool-and x y)))
   (expand [_ delta]
     (Bounds2. (v/sub pmin (Vec2. delta delta))
               (v/add pmax (Vec2. delta delta))))
@@ -91,10 +91,10 @@
   BoundsProto
   (diagonal [_] (v/sub pmax pmin))
   (area [b]
-    (let [^Vec3 d (diagonal ^Bounds3 b)]
+    (let [^Vec3 d (diagonal b)]
       (* 2.0 ^double (v/magsq d))))
   (volume [b]
-    (let [^Vec3 d (diagonal ^Bounds3 b)]
+    (let [^Vec3 d (diagonal b)]
       (* (.x d) (.y d) (.z d))))
   (lerp [_ v] (v/einterpolate pmin pmax v))
   (offset [_ v]
@@ -104,9 +104,9 @@
              (if (> (.z pmax) (.z pmin)) (/ (.z o) (- (.z pmax) (.z pmin))) (.z o)))))
   (inside [_ v]
     (let [^Vec3 v v]
-      (and (<= (.x pmin) (.x v) (.x pmax))
-           (<= (.y pmin) (.y v) (.y pmax))
-           (<= (.z pmin) (.z v) (.z pmax)))))
+      (bool-and (<= (.x pmin) (.x v) (.x pmax))
+                (<= (.y pmin) (.y v) (.y pmax))
+                (<= (.z pmin) (.z v) (.z pmax)))))
   (union-vec [_ v]
     (Bounds3. (v/emn pmin v) (v/emx pmax v)))
   (union-bound [_ b]
@@ -117,10 +117,10 @@
       (Bounds3. (v/emx pmin (.pmin b)) (v/emn pmax (.pmax b)))))
   (overlaps [_ b]
     (let [^Bounds3 b b
-          x (and (>= (.x pmax) (.x ^Vec3 (.pmin b))) (<= (.x pmin) (.x ^Vec3 (.pmax b))))
-          y (and (>= (.y pmax) (.y ^Vec3 (.pmin b))) (<= (.y pmin) (.y ^Vec3 (.pmax b))))
-          z (and (>= (.z pmax) (.z ^Vec3 (.pmin b))) (<= (.z pmin) (.z ^Vec3 (.pmax b))))]
-      (and x y z)))
+          x (bool-and (>= (.x pmax) (.x ^Vec3 (.pmin b))) (<= (.x pmin) (.x ^Vec3 (.pmax b))))
+          y (bool-and (>= (.y pmax) (.y ^Vec3 (.pmin b))) (<= (.y pmin) (.y ^Vec3 (.pmax b))))
+          z (bool-and (>= (.z pmax) (.z ^Vec3 (.pmin b))) (<= (.z pmin) (.z ^Vec3 (.pmax b))))]
+      (bool-and x y z)))
   (expand [_ delta]
     (Bounds3. (v/sub pmin (Vec3. delta delta delta))
               (v/add pmax (Vec3. delta delta delta))))

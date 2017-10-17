@@ -369,6 +369,37 @@
 (def ^:const ^double cie-y-integral 106.856895)
 (def ^:const ^int n-cie-samples (alength ^doubles cie-lambda))
 
+(def ^:const ^double hc (* 299792458.0 6.62606957e-34))
+(def ^:const ^double h2cc (* 2.0 hc 299792458.0))
+
+(defn blackbody-val
+  "Blackbody emitted radiance for single value."
+  ^double [^double v ^double t]
+  (let [l (* 1.0e-9 v)
+        lambda2 (* l l)]
+    (/ h2cc (* lambda2 lambda2 l (dec (m/exp (/ hc (* l t 1.3806488e-23))))))))
+
+(defn blackbody-val-normalized
+  "Normalized blackbody for single value"
+  ^double [^double v ^double t]
+  (let [le (blackbody-val v t) 
+        maxl (blackbody-val (* 1.0e9 (/ 2.8977721e-3 t)) t)]
+    (/ le maxl)))
+
+(defn blackbody
+  "Blackbody emitted radiance for given temperature"
+  [lambda ^double t]
+  (if (pos? t)
+    (amap ^doubles lambda idx ret (blackbody-val (aget ^doubles lambda idx) t))
+    (double-array (alength ^doubles lambda) 0.0)))
+
+(defn blackbody-normalized
+  "Normalized blackbody"
+  [lambda ^double t]
+  (let [^doubles le (blackbody lambda t)
+        maxl (blackbody-val (* 1.0e9 (/ 2.8977721e-3 t)) t)]
+    (amap le idx ret (/ (aget le idx) maxl))))
+
 (defprotocol SpectrumProto
   (y [v])
   (to-rgb [v])
