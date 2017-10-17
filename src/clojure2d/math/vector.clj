@@ -81,8 +81,12 @@
    :magsq (fn [v] (reduce #(+ (double %1) (* (double %2) (double %2))) v))
    :mag #(m/sqrt (magsq %))
    :dot #(reduce clojure.core/+ (map clojure.core/* %1 %2))
-   :add #(mapv clojure.core/+ %1 %2)
-   :sub #(mapv clojure.core/- %1 %2)
+   :add (fn
+          ([v] v)
+          ([v1 v2] (mapv clojure.core/+ v1 v2)))
+   :sub (fn
+          ([v] (mapv clojure.core/- v))
+          ([v1 v2] (mapv clojure.core/- v1 v2)))
    :mult (fn [v1 v] (map #(clojure.core/* (double %) ^double v) v1))
    :emult #(mapv clojure.core/* %1 %2)
    :div #(mult %1 (/ (double %2)))
@@ -107,6 +111,68 @@
    :econstrain (fn [v val1 val2] (mapv #(m/constrain ^double %1 ^double val1 ^double val2)) v)
    :is-zero? #(every? clojure.core/zero? %)
    :is-near-zero? #(every? near-zero? %)})
+
+(defn- aevery?
+  "Array version of every"
+  [^doubles array pred]
+  (let [s (alength array)]
+    (loop [idx (unchecked-long 0)]
+      (if (< idx s)
+        (if (pred (aget array idx))
+          (recur (inc idx))
+          false)
+        true))))
+
+
+;; Array Vector
+(deftype ArrayVec [^doubles array]
+  Object
+  (toString [_] (str (vec array)))
+  (equals [_ v]
+    (let [s (alength ^doubles array)]
+      (bool-and (== s (alength ^doubles v))
+                (loop [idx (unchecked-long 0)]
+                  (if (< idx s)
+                    (if (== (aget array idx) ^double (v idx))
+                      (recur (inc idx))
+                      false)
+                    true)))))
+  IFn
+  (invoke [_ n]
+    (aget array ^long n))
+  Counted
+  (count [_] (alength array))
+  VectorProto
+  (to-vec [_] (vec array))
+  (applyf [_ f] (ArrayVec. (amap array idx ret ^double (f (aget array idx)))))
+  (magsq [_] (areduce array idx ret (double 0.0) (+ ret (m/sq (aget array idx)))))
+  (mag [v1] (m/sqrt (magsq v1)))
+  (dot [_ v2] (areduce array idx ret (double 0.0) (+ ret (* (aget array idx) ^double (v2 idx)))))
+  (add [v] v)
+  (add [_ v2] (ArrayVec. (amap array idx ret (+ (aget array idx) ^double (v2 idx)))))
+  (sub [_] (ArrayVec. (amap array idx ret (- (aget array idx)))))
+  (sub [v1 v2] (ArrayVec. (amap array idx ret (- (aget array idx) ^double (v2 idx)))))
+  (mult [_ v] (ArrayVec. (amap array idx ret (* (aget array idx) ^double v))))
+  (emult [_ v2] (ArrayVec. (amap array idx ret (* (aget array idx) ^double (v2 idx)))))
+  (div [_ v] (ArrayVec. (amap array idx ret (/ (aget array idx) ^double v))))
+  (abs [_] (ArrayVec. (amap array idx ret (m/abs (aget array idx)))))
+  (mx [_] (areduce array idx ret (Double/MIN_VALUE) (max ret (aget array idx))))
+  (mn [_] (areduce array idx ret (Double/MAX_VALUE) (min ret (aget array idx))))
+  (emx [_ v2] (ArrayVec. (amap array idx ret (max (aget array idx) ^double (v2 idx)))))
+  (emn [_ v2] (ArrayVec. (amap array idx ret (min (aget array idx) ^double (v2 idx)))))
+  (sum [_] (areduce array idx ret (double 0.0) (+ ret (aget array idx)))) 
+  (reciprocal [_] (ArrayVec. (amap array idx ret (/ (aget array idx)))))
+  (interpolate [v1 v2 t]
+    (interpolate v1 v2 t m/lerp))
+  (interpolate [_ v2 t f]
+    (ArrayVec. (amap array idx ret ^double (f (aget array idx) (v2 idx) t)))) 
+  (einterpolate [v1 v2 v]
+    (einterpolate v1 v2 v m/lerp))
+  (einterpolate [_ v2 v f]
+    (ArrayVec. (amap array idx ret ^double (f (aget array idx) (v2 idx) (v idx)))))
+  (econstrain [_ val1 val2] (ArrayVec. (amap array idx ret ^double (m/constrain ^double (aget array idx) ^double val1 ^double val2))))
+  (is-zero? [_] (aevery? array #(zero? ^double %)))
+  (is-near-zero? [_] (aevery? array near-zero?)))
 
 ;; Create Vec2 and add all necessary protocols
 (deftype Vec2 [^double x ^double y]
@@ -135,7 +201,7 @@
   (mag [_] (m/hypot x y))
   (dot [_ v2] 
     (let [^Vec2 v2 v2] (+ (* x (.x v2)) (* y (.y v2)))))
-  (add [_] (Vec2. x y))
+  (add [v] v)
   (add [_ v2] 
     (let [^Vec2 v2 v2] (Vec2. (+ x (.x v2)) (+ y (.y v2)))))
   (sub [_] (Vec2. (- x) (- y)))
@@ -228,7 +294,7 @@
   (mag [_] (m/hypot x y z))
   (dot [_ v2]
     (let [^Vec3 v2 v2] (+ (* x (.x v2)) (* y (.y v2)) (* z (.z v2)))))
-  (add [_] (Vec3. x y z))
+  (add [v] v)
   (add [_ v2] 
     (let [^Vec3 v2 v2] (Vec3. (+ x (.x v2)) (+ y (.y v2)) (+ z (.z v2)))))
   (sub [_] (Vec3. (- x) (- y) (- z)))
@@ -398,7 +464,7 @@
   (mag [v1] (m/sqrt (magsq v1)))
   (dot [_ v2]
     (let [^Vec4 v2 v2] (+ (* x (.x v2)) (* y (.y v2)) (* z (.z v2)) (* w (.w v2)))))
-  (add [_] (Vec4. x y z w))
+  (add [v] v)
   (add [_ v2]
     (let [^Vec4 v2 v2] (Vec4. (+ x (.x v2)) (+ y (.y v2)) (+ z (.z v2)) (+ w (.w v2)))))
   (sub [_] (Vec4. (- x) (- y) (- z) (- w)))
@@ -608,3 +674,8 @@
 (defn vec2
   "Make Vec2 vector"
   [x y] (Vec2. x y))
+
+(defn array-vec
+  "Make ArrayVec type"
+  [lst]
+  (ArrayVec. (double-array lst)))
