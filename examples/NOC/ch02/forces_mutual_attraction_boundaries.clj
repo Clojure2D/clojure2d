@@ -45,7 +45,7 @@
                                              (> (.y position) (- h 50)) -1.0
                                              :else 0.0)]
                                     (-> (Vec2. fx fy)
-                                        (v/scale 0.1))))) 
+                                        (v/set-mag 0.1))))) 
           nvelocity (v/add velocity acceleration)
           ^Vec2 nposition (v/add position nvelocity)
           s (* 24.0 mass)]

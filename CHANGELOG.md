@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file. This change
 - text and font functions
 - Java2D convolution filters (via (convolve ...)), returning image
 - Expectations Tests
+- ArrayVec type - doubles array vector representation (for speed gain)
 
 ### Changed
 
@@ -20,6 +21,8 @@ All notable changes to this project will be documented in this file. This change
 - FastMath bindings changed to macros for several methods
 - Saving picture moved to image protocol, replaced save-canvas and save-pixels removed (call (save canvas name)).
 - KeyEvent protocols
+- vector scale -> set-mag
+- fixes after tests
 
 ### Fixed
 

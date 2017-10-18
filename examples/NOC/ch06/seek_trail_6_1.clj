@@ -17,7 +17,7 @@
   [target position velocity]
   (let [acceleration (-> target
                          (v/sub position)
-                         (v/scale maxspeed)
+                         (v/set-mag maxspeed)
                          (v/sub velocity)
                          (v/limit maxforce))
         nvelocity (-> velocity

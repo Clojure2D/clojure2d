@@ -63,7 +63,7 @@
 (defn- find-idx-reducer-fn 
   "Helper function for reduce to find index for maximum/minimum value in vector."
   [f]
-  #(let [[^double midx ^double curr v] %1]
+  #(let [[^long midx ^long curr v] %1]
      (if (f %2 v)
        [curr (inc curr) %2]
        [midx (inc curr) v])))
@@ -78,7 +78,7 @@
   VectorProto
   {:to-vec identity
    :applyf #(mapv %2 %1)
-   :magsq (fn [v] (reduce #(+ (double %1) (* (double %2) (double %2))) v))
+   :magsq (fn [v] (reduce #(+ ^double %1 (* ^double %2 ^double %2)) (double 0) v))
    :mag #(m/sqrt (magsq %))
    :dot #(reduce clojure.core/+ (map clojure.core/* %1 %2))
    :add (fn
@@ -95,8 +95,8 @@
    :mn #(reduce clojure.core/min %)
    :emx #(mapv clojure.core/max %1 %2)
    :emn #(mapv clojure.core/min %1 %2)
-   :maxdim #(first (reduce (find-idx-reducer-fn clojure.core/>) [0.0 0.0 (first %)] %))
-   :mindim #(first (reduce (find-idx-reducer-fn clojure.core/<) [0.0 0.0 (first %)] %))
+   :maxdim #(first (reduce (find-idx-reducer-fn clojure.core/>) [0 0 (first %)] %))
+   :mindim #(first (reduce (find-idx-reducer-fn clojure.core/<) [0 0 (first %)] %))
    :sum #(reduce clojure.core/+ %)
    :permute #(mapv (fn [idx] (%1 idx)) %2)
    :reciprocal #(mapv (fn [^double v] (/ v)) %)
@@ -108,7 +108,7 @@
                    ([v1 v2 v f]
                     (mapv #(f %1 %2 %3) v1 v2 v))
                    ([v1 v2 v] (einterpolate v1 v2 v m/lerp)))
-   :econstrain (fn [v val1 val2] (mapv #(m/constrain ^double %1 ^double val1 ^double val2)) v)
+   :econstrain (fn [v val1 val2] (mapv #(m/constrain ^double %1 ^double val1 ^double val2) v))
    :is-zero? #(every? clojure.core/zero? %)
    :is-near-zero? #(every? near-zero? %)})
 
@@ -129,8 +129,8 @@
   Object
   (toString [_] (str (vec array)))
   (equals [_ v]
-    (let [s (alength ^doubles array)]
-      (bool-and (== s (alength ^doubles v))
+    (let [s (alength array)]
+      (bool-and (== s (count v))
                 (loop [idx (unchecked-long 0)]
                   (if (< idx s)
                     (if (== (aget array idx) ^double (v idx))
@@ -244,6 +244,9 @@
   (is-zero? [_] (bool-and (zero? x) (zero? y)))
   (is-near-zero? [_] (m/bool-and (near-zero? x) (near-zero? y)))
   (heading [_] (m/atan2 y x))
+  (cross [_ v]
+    (let [^Vec2 v v]
+      (- (* x (.y v)) (* y (.x v)))))
   (rotate [_ angle]
     (let [sa (m/sin angle)
           ca (m/cos angle)
@@ -262,8 +265,6 @@
   (from-polar [_]
     (Vec2. (* x (m/cos y))
            (* x (m/sin y)))))
-
-
 
 ;; Create Vec3 and add all necessary protocols
 (deftype Vec3 [^double x ^double y ^double z]
@@ -522,7 +523,7 @@
 (defn average-vectors
   "Average / centroid of vectors. Input: initial vector (optional), list of vectors"
   ([init vs]
-   (div (reduce add init vs) (count vs)))
+   (div (reduce add init vs) (inc (count vs))))
   ([vs] (average-vectors (first vs) (rest vs))))
 
 (defn dist
@@ -565,6 +566,11 @@
                         n (- (+ a l) b)]
                     [(+ s (m/abs l)) n]) [0.0 0.0] (map vector v1 v2))))
 
+(defn dist-cos
+  "Cosine distance"
+  [v1 v2]
+  (- 1.0 (/ ^double (dot v1 v2) (* ^double (mag v1) ^double (mag v2)))))
+
 ;; List of distance fn
 (def distances {:euclid dist
                 :euclid-sq dist-sq
@@ -572,6 +578,7 @@
                 :cheb dist-cheb
                 :canberra dist-canberra
                 :emd dist-emd
+                :cosine dist-cos
                 :discrete dist-discrete})
 
 (defn normalize
@@ -582,8 +589,8 @@
       (Vec2. 0.0 0.0)
       (div v m))))
 
-(defn scale
-  "Create new vector with given length"
+(defn set-mag
+  "Set length of the vector"
   [v len]
   (mult (normalize v) len))
 
@@ -591,7 +598,7 @@
   "Limit length of the vector by given value"
   [v ^double len]
   (if (> ^double (magsq v) (* len len))
-    (scale v len)
+    (set-mag v len)
     v))
 
 (defn angle-between
@@ -610,7 +617,6 @@
   "Angle between two vectors reletive to each other"
   ^double [v1 v2]
   (- ^double (heading v2) ^double (heading v1)))
-
 
 (defn aligned?
   "Are vectors aligned (have the same direction)?"

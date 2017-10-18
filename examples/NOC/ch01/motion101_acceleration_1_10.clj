@@ -18,7 +18,7 @@
   (update-mover [_ window]
     (let [acceleration (-> (mouse-pos window)
                            (v/sub position)
-                           (v/scale 0.2))
+                           (v/set-mag 0.2))
           nvelocity (-> velocity
                         (v/add acceleration)
                         (v/limit topspeed))

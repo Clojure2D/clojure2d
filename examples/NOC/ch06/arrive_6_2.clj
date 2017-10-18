@@ -18,9 +18,9 @@
   (let [desired (v/sub target position)
         ^double d (v/mag desired)
         acceleration (-> desired 
-                         (v/scale (if (< d 100.0)
-                                    (m/norm d 0 100 0 maxspeed)
-                                    maxspeed))
+                         (v/set-mag (if (< d 100.0)
+                                      (m/norm d 0 100 0 maxspeed)
+                                      maxspeed))
                          (v/sub velocity)
                          (v/limit maxforce))
         nvelocity (-> velocity
