@@ -14,7 +14,8 @@
    :exclude [* + - / > < >= <= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max])
   (:import [net.jafama FastMath]
            [clojure2d.java PrimitiveMath]
-           [clojure.lang Numbers]))
+           [clojure.lang Numbers]
+           [org.apache.commons.math3.special Erf]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -38,6 +39,7 @@
 
 (defmacro ^:private fastmath-proxy [& rest] `(javaclass-proxy "net.jafama.FastMath" ~@rest))
 (defmacro ^:private primitivemath-proxy [& rest] `(javaclass-proxy "clojure2d.java.PrimitiveMath" ~@rest))
+(defmacro ^:private erf-proxy [& rest] `(javaclass-proxy "org.apache.commons.math3.special.Erf" ~@rest))
 
 (defmacro ^:private variadic-proxy
   "Creates left-associative variadic forms for any operator.
@@ -134,6 +136,10 @@
 ;; Very small number \\(\varepsilon\\)
 (def ^:const ^double EPSILON 1.0e-10)
 
+(def ^:const ^double MACHINE-EPSILON (* 0.5 (double (loop [d (double 1.0)]
+                                                      (if (not== 1.0 (+ 1.0 (* d 0.5)))
+                                                        (recur (* d 0.5))
+                                                        d)))))
 ;; Common fractions
 (def ^:const ^double THIRD (/ 3.0))
 (def ^:const ^double TWO_THIRD (/ 2.0 3.0))
@@ -197,6 +203,12 @@
 (def ^:const ^double deg-in-rad (/ PI 180.0))
 (defn radians ^double [^double deg] (* deg-in-rad deg))
 (defn degrees ^double [^double rad] (* rad-in-deg rad))
+
+;; Erf
+(erf-proxy erf)
+(erf-proxy erfc)
+(erf-proxy inv-erf erfInv)
+(erf-proxy inv-erfc erfcInv)
 
 ;; Sinc
 (defn sinc
@@ -283,6 +295,37 @@
 ;; `(high-2-exp TWO_PI) => 3` \\(6.28\leq 2^3\eq 8\\)
 (defn low-2-exp ^long [v] (-> v log2 floor unchecked-long))
 (defn high-2-exp ^long [v] (-> v log2 ceil unchecked-long))
+
+(defn round-up-pow2
+  "Round long to the next power of 2"
+  ^long [^long v]
+  (as-> (dec v) v
+    (bit-or v (>> v 1))
+    (bit-or v (>> v 2))
+    (bit-or v (>> v 4))
+    (bit-or v (>> v 8))
+    (bit-or v (>> v 16))
+    (bit-or v (>> v 32))
+    (inc v)))
+
+(defn next-float-up
+  "Next double value."
+  (^double [^double v]
+   (let [ui (Double/doubleToRawLongBits (if (zero? v) 0.0 v))]
+     (Double/longBitsToDouble (if (neg? v) (dec ui) (inc ui)))))
+  (^double [^double v ^long delta]
+   (let [ui (Double/doubleToRawLongBits (if (zero? v) 0.0 v))]
+     (Double/longBitsToDouble (if (neg? v) (- ui delta) (+ ui delta))))))
+
+(defn next-float-down
+  "Prev double value."
+  (^double [^double v]
+   (let [ui (Double/doubleToRawLongBits (if (zero? v) 0.0 v))]
+     (Double/longBitsToDouble (if (pos? v) (dec ui) (inc ui)))))
+  (^double [^double v ^long delta]
+   (let [ui (Double/doubleToRawLongBits (if (zero? v) 0.0 v))]
+     (Double/longBitsToDouble (if (pos? v) (- ui delta) (+ ui delta))))))
+
 
 ;; More constants
 
