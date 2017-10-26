@@ -520,6 +520,23 @@
   ([canvas vs]
    (triangle-strip canvas vs false)))
 
+(defn triangle-fan
+  "Draw triangle fan. Implementation of `Processing` `FAN` shape.
+
+  Input: list of vertices as Vec2 vectors"
+  ([canvas vs stroke?]
+   (when (> (count vs) 2)
+     (let [^Vec2 v1 (first vs)]
+       (loop [^Vec2 v2 (second vs)
+              vss (nnext vs)]
+         (when vss
+           (let [^Vec2 v3 (first vss)]
+             (triangle canvas (.x v1) (.y v1) (.x v2) (.y v2) (.x v3) (.y v3) stroke?)
+             (recur v3 (next vss)))))))
+   canvas)
+  ([canvas vs]
+   (triangle-strip canvas vs false)))
+
 (defn path
   "Draw path from lines. Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines)."
   ([^Canvas canvas vs close? stroke?]
@@ -894,6 +911,12 @@
   "Helper function, check if window is active"
   [^Window window]
   @(.active? window))
+
+(defn mouse-in-window?
+  "Check if mouse is inside window"
+  [window]
+  (bool-and (>= ^int (mouse-x window) 0.0)
+            (>= ^int (mouse-y window) 0.0)))
 
 ;; ### Global state management
 ;;

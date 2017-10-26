@@ -17,19 +17,21 @@
       (line 0 (mod fps 100) 100 (mod fps 100))))
 
 (def window (atom nil))
+(def window-closed (atom nil))
+
 (defmethod key-pressed [window-name \s] [_ state]
   (assoc state :key-pressed true))
 (defmethod key-pressed [window-name \a] [_ state]
   (assoc state :a-pressed true))
-(def window-closed (show-window canvas "Testing clojure.core closed"))
 
 (defn build-up
   "Prepare data, events, etc."
   {:expectations-options :before-run}
   []
-  (reset! window (show-window canvas window-name 50 50 60 draw))
+  (reset! window (show-window canvas window-name 50 50 60 draw)) 
   (set-state! @window {:a 1})
-  (close-window window-closed)
+  (reset! window-closed (show-window canvas "Testing clojure.core closed"))
+  (close-window @window-closed)
   (.dispatchEvent (:frame @window) (java.awt.event.KeyEvent. (:panel @window)
                                                              java.awt.event.KeyEvent/KEY_PRESSED
                                                              1 0
@@ -45,7 +47,8 @@
   "Close window, remove files"
   {:expectations-options :after-run}
   []
-  (close-window @window))
+  (close-window @window)
+  (when (window-active? @window-closed) (close-window @window-closed)))
 
 ;; test filenames
 (expect (file-extension "test.jpg") "jpg")
@@ -69,8 +72,7 @@
 (expect [:high :low :mid] (sort (keys rendering-hints)))
 
 ;; resize canvas
-(expect (more-> 4 width
-                44 height)
+(expect (more-> 4 width                44 height)
         (resize-canvas canvas 4 44))
 
 ;; test transformations
@@ -112,7 +114,7 @@
 ;; check state
 (expect :fps (in (keys (get-state @window)))) ; draw function sets state to current fps, should be positive
 (expect true (window-active? @window))
-(expect false (window-active? window-closed))
+(expect false (window-active? @window-closed))
 (expect 1 (count @global-state))
 
 ;; various functions
