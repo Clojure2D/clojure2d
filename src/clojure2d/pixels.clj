@@ -24,7 +24,8 @@
             [clojure2d.math.vector :as v])
   (:import clojure2d.core.Canvas
            [clojure2d.math.vector Vec2 Vec4]
-           java.awt.image.BufferedImage))
+           java.awt.image.BufferedImage
+           [clojure.lang Counted]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -74,6 +75,9 @@
     p)
   (convolve [p t]
     (core/convolve (image-from-pixels p) t))
+  Counted
+  (count [_] size)
+  
   PixelsProto
 
   (get-channel [_ ch]

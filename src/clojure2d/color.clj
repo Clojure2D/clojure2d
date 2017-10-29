@@ -62,7 +62,11 @@
 (defprotocol ColorProto
   (to-color [c])
   (to-awt-color [c]) 
-  (to-luma [c]))
+  (to-luma [c])
+  (red [c])
+  (green [c])
+  (blue [c])
+  (alpha [c]))
 
 (defn- to-luma-fn
   "Local luma conversion function"
@@ -85,6 +89,10 @@
             (clamp255 (.y c))
             (clamp255 (.z c))))
   (to-luma ^double [^Vec3 c] (to-luma-fn (.x c) (.y c) (.z c)))
+  (red [^Vec3 c] (.x c))
+  (green [^Vec3 c] (.y c))
+  (blue [^Vec3 c] (.z c))
+  (alpha [_] 255.0)
   Vec4
   (to-color [c] c)
   (to-awt-color [^Vec4 c]
@@ -93,10 +101,18 @@
              (clamp255 (.z c))
              (clamp255 (.w c))))
   (to-luma ^double [^Vec4 c] (to-luma-fn (.x c) (.y c) (.z c)))
+  (red [^Vec4 c] (.x c))
+  (green [^Vec4 c] (.y c))
+  (blue [^Vec4 c] (.z c))
+  (alpha [^Vec4 c] (.w c))
   clojure.lang.Keyword
   (to-color [n] (html-color n))
   (to-awt-color [n] (html-awt-color n))
   (to-luma [n] (to-luma (html-color n)))
+  (red [n] (red (html-color n)))
+  (green [n] (green (html-color n)))
+  (blue [n] (blue (html-color n)))
+  (alpha [n] (alpha (html-color n)))
   Color
   (to-color [^Color c]
     (Vec4. (.getRed c)
@@ -105,6 +121,10 @@
            (.getAlpha c)))
   (to-awt-color [c] c)
   (to-luma ^double [^Color c] (to-luma-fn (.getRed c) (.getGreen c) (.getBlue c)))
+  (red [^Color c] (.getRed c))
+  (green [^Color c] (.getGreen c))
+  (blue [^Color c] (.getBlue c))
+  (alpha [^Color c] (.getAlpha c))
   nil
   (to-color [_] nil)
   (to-awt-color [_] nil))
