@@ -660,6 +660,8 @@
   ([^Canvas canvas size cap join]
    (.setStroke ^Graphics2D (.graphics canvas) (BasicStroke. size cap join))
    canvas)
+  ([canvas size cap]
+   (set-stroke canvas size cap BasicStroke/JOIN_MITER))
   ([canvas size]
    (set-stroke canvas size BasicStroke/CAP_ROUND BasicStroke/JOIN_MITER))
   ([canvas]
@@ -719,6 +721,18 @@
 
 ;; Set XOR mode
 (def set-xor-mode (partial set-color-with-fn set-awt-xor-mode))
+
+;; ### Gradient
+
+(defn set-gradient
+  "Set paint mode to gradient. Call with canvas only to reset."
+  ([^Canvas canvas x1 y1 color1 x2 y2 color2]
+   (let [gp (java.awt.GradientPaint. x1 y1 (c/make-awt-color color1) x2 y2 (c/make-awt-color color2))
+         ^Graphics2D g (.graphics canvas)]
+     (.setPaint g gp)
+     canvas)))
+
+;; ### Image
 
 (defn image
   "Draw an image. You can specify position and size of the image. Default it's placed on whole canvas."

@@ -15,13 +15,21 @@
            [clojure2d.math.vector Vec4 Vec2]
            [clojure2d.java PrimitiveMath]))
 
-(def p1 (p/filter-colors c/to-HSB (p/load-pixels "generateme/pic1.jpg")))
+(def p1 (p/load-pixels "generateme/hedge/miles.jpg"))
+
+(time
+ (let [oa (object-array (map #(p/get-color p1 %) (range (count p1))))]
+   (sort #(< (c/green %1) (c/green %2)) oa)
+   (dotimes [x (count p1)]
+     (p/set-color p1 x (aget oa x)))))
+
+(time (dorun (map-indexed #(p/set-color p1 %1 %2) (sort #(< (c/green %1) (c/green %2)) (map #(p/get-color p1 %) (range (count p1)))))))
 
 (def oa (object-array (map #(p/get-color p1 %) (range (count p1)))))
 
 (def oasorter (sort #(< (c/red %1) (c/red %2)) oa))
 
-(dorun (map-indexed #(p/set-color p1 %1 %2) oasorter))
+(dorun (map-indexed #(p/set-color p1 %1 %2) oa))
 
 (aget oa 3000)
 
@@ -63,7 +71,7 @@
 
 (core/save canvas (core/next-filename "generateme/hedge/aaa" ".png"))
 
-(p/set-canvas-pixels! canvas (p/filter-colors c/from-HSB p1))
+(p/set-canvas-pixels! canvas (p/sort-colors p1 c/red))
 
 (def p2 (p/get-canvas-pixels canvas))
 
