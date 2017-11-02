@@ -187,7 +187,8 @@
   (width [i])
   (height [i])
   (save [i n])
-  (convolve [i t]))
+  (convolve [i t])
+  (get-pixel [i x y] "Retruns color"))
 
 (def convolution-matrices {:shadow (Kernel. 3 3 (float-array [0 1 2 -1 0 1 -2 -1 0]))
                            :emboss (Kernel. 3 3 (float-array [0 2 4 -2 1 2 -4 -2 0]))
@@ -219,7 +220,24 @@
                               (t convolution-matrices)
                               (let [s (int (m/sqrt (count t)))]
                                 (Kernel. s s (float-array t))))]
-                 (.filter ^ConvolveOp (ConvolveOp. kernel) i nil)))})
+                 (.filter ^ConvolveOp (ConvolveOp. kernel) i nil)))
+   :get-pixel (fn [^BufferedImage i ^long x ^long y]
+                (if (bool-or (< x 0)
+                             (< y 0)
+                             (>= x (.getWidth i))
+                             (>= y (.getHeight i)))
+                  (c/make-color 0 0 0)
+                  (let [b (int-array 1)
+                        ^java.awt.image.Raster raster (.getRaster i)]
+                    (.getDataElements raster x y b)
+                    (let [v (aget b 0)
+                          b (bit-and v 0xff)
+                          g (bit-and (>> v 8) 0xff)
+                          r (bit-and (>> v 16) 0xff)
+                          a (bit-and (>> v 24) 0xff)]
+                      (if (== (.getNumBands raster) 3)
+                        (c/make-color r g b)
+                        (c/make-color r g b a))))))})
 
 ;; Canvas type. Use `get-image` to extract image (`BufferedImage`).
 (deftype Canvas [^Graphics2D graphics
@@ -238,7 +256,8 @@
   (height [_] h)
   (save [c n] (save-image buffer n) c)
   (convolve [_ t]
-    (convolve buffer t)))
+    (convolve buffer t))
+  (get-pixel [_ x y] (get-pixel buffer x y)))
 
 ;; Let's define three rendering quality options: `:low`, `:mid` and `:high`. Where `:low` is fastest but has poor quality and `:high` has best quality but may be slow. Rendering options are used when you create canvas.
 (def rendering-hints {:low {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF
@@ -879,6 +898,7 @@
   (height [_] h)
   (save [w n] (save-image (get-image @buffer) n) w)
   (convolve [w n] (convolve @buffer n))
+  (get-pixel [_ x y] (get-pixel @buffer x y))
   MouseXYProto
   (mouse-pos [_]
     (let [^java.awt.Point p (.getMousePosition panel)]

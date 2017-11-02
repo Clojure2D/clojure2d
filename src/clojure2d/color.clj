@@ -1188,6 +1188,19 @@
   [cs]
   ((cs colorspaces) 1))
 
+(defn make-color-converter
+  "Create fn which converts provided color and scale values from provided range (to simulate Processing `colorMode` fn)"
+  ([colorspace-fn ch1-scale ch2-scale ch3-scale ch4-scale]
+   (fn [^Vec4 v]
+     (let [ch1 (* 255.0 (/ (.x v) ^double ch1-scale))
+           ch2 (* 255.0 (/ (.y v) ^double ch2-scale))
+           ch3 (* 255.0 (/ (.z v) ^double ch3-scale))
+           ch4 (* 255.0 (/ (.w v) ^double ch4-scale))]
+       (colorspace-fn (Vec4. ch1 ch2 ch3 ch4)))))
+  ([colorspace-fn ch1-scale ch2-scale ch3-scale] (make-color-converter colorspace-fn ch1-scale ch2-scale ch3-scale 255.0))
+  ([colorspace-fn ch-scale] (make-color-converter colorspace-fn ch-scale ch-scale ch-scale ch-scale))
+  ([colorspace-fn] #(colorspace-fn %)))
+
 ;; ## Palettes
 
 (defn hex-to-vec

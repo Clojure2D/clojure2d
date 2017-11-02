@@ -75,6 +75,7 @@
     p)
   (convolve [p t]
     (core/convolve (image-from-pixels p) t))
+  (get-pixel [p x y] (get-color p x y))
   Counted
   (count [_] size)
   
@@ -851,7 +852,8 @@
   (width [_] sizex)
   (height [_] sizey)
   (save [b n] (core/save (to-pixels b) n))
-  (convolve [b t] (core/convolve (to-pixels b) t)))
+  (convolve [b t] (core/convolve (to-pixels b) t))
+  (get-pixel [b x y] (core/get-pixel (to-pixels b) x y)))
 
 (defn make-binpixels 
   "Create BinPixels object"

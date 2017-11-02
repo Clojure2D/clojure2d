@@ -1,7 +1,8 @@
 (ns clojure2d.core-test
   (:require [expectations :refer :all]
             [clojure2d.math.vector :as v]
-            [clojure2d.core :refer :all]))
+            [clojure2d.core :refer :all]
+            [clojure2d.color :as c]))
 
 ;; global variables
 (def ^:const window-name "Testing clojure.core")
@@ -14,7 +15,10 @@
   (set-state! window (assoc (get-state window) :fps fps))
   (-> canvas
       (set-background :black)
-      (line 0 (mod fps 100) 100 (mod fps 100))))
+      (set-color :white)
+      (line 0 (inc (mod fps 100)) 100 (inc (mod fps 100)))
+      (set-color :maroon)
+      (ellipse 50 50 10 10)))
 
 (def window (atom nil))
 (def window-closed (atom nil))
@@ -68,11 +72,14 @@
                 java.awt.image.BufferedImage get-image)
         (get-image canvas))
 
+(expect (c/to-color :maroon) (get-pixel canvas 50 50))
+(expect (c/to-color :black) (get-pixel canvas 0 0))
+
 ;; rendering hints available
 (expect [:high :low :mid] (sort (keys rendering-hints)))
 
 ;; resize canvas
-(expect (more-> 4 width                44 height)
+(expect (more-> 4 width 44 height)
         (resize-canvas canvas 4 44))
 
 ;; test transformations
