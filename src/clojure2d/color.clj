@@ -142,7 +142,7 @@
     (Color. (.getRed cc)
             (.getGreen cc)
             (.getBlue cc)
-            (clamp255 a))))
+            (m/round (clamp255 a)))))
 
 (defn make-awt-color
   "Create java.awt.Color object. Use with `core/set-awt-color` or `core/set-awt-background`."
@@ -559,6 +559,9 @@
 (def blends-names (keys blends))
 
 ;; ## Colorspace functions
+;;
+;; Conversion from RGB to specific color space always converts to range 0-255
+;; Reverse conversion is not normalized and can exceed 0-255 range
 
 (defn- test-colors
   "to remove, check ranges"
@@ -582,8 +585,7 @@
           nmxb (if (> (.z res) mxb) (.z res) mxb)]
       (if (< cc 0x1000000)
         (recur (inc cc) (double nmnr) (double nmxr) (double nmng) (double nmxg) (double nmnb) (double nmxb))
-        [nmnr nmxr nmng nmxg nmnb nmxb]))))
-
+        {:min-r nmnr :max-r nmxr :min-g nmng :max-g nmxg :min-b nmnb :max-b nmxb}))))
 
 ;; ### CMY
 
@@ -602,9 +604,9 @@
 (defn to-OHTA
   "RGB -> OHTA, normalized"
   [^Vec4 c]
-  (let [i1 (clamp255 (/ (+ (.x c) (.y c) (.z c)) 3.0))
-        i2 (clamp255 (/ (+ 255.0 (- (.x c) (.z c))) 2.0))
-        i3 (clamp255 (/ (+ 510.0 (.x c) (.z c) (- (+ (.y c) (.y c)))) 4.0))]
+  (let [i1 (/ (+ (.x c) (.y c) (.z c)) 3.0)
+        i2 (/ (+ 255.0 (- (.x c) (.z c))) 2.0)
+        i3 (/ (+ 510.0 (.x c) (.z c) (- (+ (.y c) (.y c)))) 4.0)]
     (Vec4. i1 i2 i3 (.w c))))
 
 (def ^:const ^double c46 (/ 4.0 6.0))
@@ -615,9 +617,9 @@
   (let [i1 (.x c) ; divided by 3
         i2 (- (.y c) 127.5) ; divided by 2
         i3 (- (* c46 (.z c)) 85.0) ; divided by 6
-        r (clamp255 (+ i1 i2 i3))
-        g (clamp255 (- i1 i3 i3))
-        b (clamp255 (- (+ i1 i3) i2))]
+        r (+ i1 i2 i3)
+        g (- i1 i3 i3)
+        b (- (+ i1 i3) i2)]
     (Vec4. r g b (.w c))))
 
 ;; ### sRGB
@@ -642,18 +644,18 @@
   "Linear RGB to non-linear sRGB"
   [^Vec4 c]
   (v/vec4 (-> (Vec3. (.x c) (.y c) (.z c))
-              (v/applyf (comp from-linear get-r255))
-              (v/mult 255.0)
-              (v/applyf clamp255))
+              (v/div 255.0)
+              (v/applyf from-linear)
+              (v/mult 255.0))
           (.w c)))
 
 (defn from-sRGB
   "Non-linear sRGB to linear RGB"
   [^Vec4 c]
   (v/vec4 (-> (Vec3. (.x c) (.y c) (.z c))
-              (v/applyf (comp to-linear get-r255))
-              (v/mult 255.0)
-              (v/applyf clamp255))
+              (v/div 255.0)
+              (v/applyf to-linear)
+              (v/mult 255.0))
           (.w c)))
 
 ;; ### XYZ
@@ -673,16 +675,17 @@
   "RGB->XYZ with corrections"
   [^Vec4 c]
   (let [xyz-raw (to-XYZ-raw (-> (Vec3. (.x c) (.y c) (.z c))
-                                (v/applyf (comp to-linear get-r255))))]
+                                (v/div 255.0)
+                                (v/applyf to-linear)))]
     (v/vec4 xyz-raw (.w c))))
 
 (defn to-XYZ
   "Normlized RGB->XYZ"
   [c]
   (let [^Vec4 cc (to-XYZ- c)]
-    (Vec4. (clamp255 (m/norm (.x cc) 0.0 xyz-xmax 0.0 255.0))
-           (clamp255 (m/norm (.y cc) 0.0 xyz-ymax 0.0 255.0))
-           (clamp255 (m/norm (.z cc) 0.0 xyz-zmax 0.0 255.0))
+    (Vec4. (m/norm (.x cc) 0.0 xyz-xmax 0.0 255.0)
+           (m/norm (.y cc) 0.0 xyz-ymax 0.0 255.0)
+           (m/norm (.z cc) 0.0 xyz-zmax 0.0 255.0)
            (.w cc))))
 
 (defn from-XYZ-raw
@@ -703,9 +706,8 @@
   [^Vec4 c]
   (let [x (m/norm (.x c) 0.0 255.0 0.0 xyz-xmax)
         y (m/norm (.y c) 0.0 255.0 0.0 xyz-ymax)
-        z (m/norm (.z c) 0.0 255.0 0.0 xyz-zmax)
-        ^Vec4 rgb (from-XYZ- (Vec4. x y z (.w c)))]
-    (v/applyf rgb clamp255)))
+        z (m/norm (.z c) 0.0 255.0 0.0 xyz-zmax)]
+    (from-XYZ- (Vec4. x y z (.w c)))))
 
 ;; ### LUV
 
@@ -738,9 +740,9 @@
         L (/ L 100.0)
         u (/ (+ u 134.0) 354.0)
         v (/ (+ v 140.0) 262.0)]
-    (Vec4. (clamp255 (m/norm L 0.0 0.9999833859065517 0.0 255.0)) 
-           (clamp255 (m/norm u 0.1438470144487729 0.8730615053231279 0.0 255.0))
-           (clamp255 (m/norm v 0.022447496915761492 0.944255184334379 0.0 255.0))
+    (Vec4. (m/norm L 0.0 0.9999833859065517 0.0 255.0) 
+           (m/norm u 0.1438470144487729 0.8730615053231279 0.0 255.0)
+           (m/norm v 0.022447496915761492 0.944255184334379 0.0 255.0)
            (.w c))))
 
 (def ^:const ^double CIEK2Epsilon (* CIEK CIEEpsilon))
@@ -762,9 +764,8 @@
                  dec
                  (/ 3.0))
         X (/ (+ Y5 (* Y (- (/ (* 39.0 L) (+ v (* L13 D65FY-9))) 5.0))) (+ L13u OneThird))
-        Z (- (* X L13u) Y5)
-        ^Vec4 rgb (from-XYZ- (Vec4. X Y Z (.w c)))]
-    (v/applyf rgb clamp255)))
+        Z (- (* X L13u) Y5)]
+    (from-XYZ- (Vec4. X Y Z (.w c)))))
 
 ;; ### LAB
 
@@ -788,9 +789,9 @@
         L (/ (- (* y 116.0) 16.0) 100.0)
         a (+ 0.5 (/ (* 500.0 (- x y)) 255.0))
         b (+ 0.5 (/ (* 200.0 (- y z)) 255.0))]
-    (Vec4. (clamp255 (m/norm L 0.0 0.9999833859065517 0.0 255.0))
-           (clamp255 (m/norm a 0.16203039020156618 0.8853278445843099 0.0 255.0))
-           (clamp255 (m/norm b 0.07698923890750631 0.8705163895243013 0.0 255.0)) 
+    (Vec4. (m/norm L 0.0 0.9999833859065517 0.0 255.0)
+           (m/norm a 0.16203039020156618 0.8853278445843099 0.0 255.0)
+           (m/norm b 0.07698923890750631 0.8705163895243013 0.0 255.0) 
            (.w c))))
 
 (defn from-lab-correct
@@ -813,9 +814,8 @@
         y3 (* y y y)
         y (if (> y3 CIEEpsilon)
             y3
-            (/ L CIEK))
-        ^Vec4 rgb (from-XYZ- (Vec4. x y z (.w c)))]
-    (v/applyf rgb clamp255)))
+            (/ L CIEK))]
+    (from-XYZ- (Vec4. x y z (.w c)))))
 
 ;; ### YXy (xyY)
 
@@ -827,7 +827,7 @@
         Y (m/norm (.y xyz) 0.0 0.9999570331323426 0.0 255.0)
         x (m/norm (/ (.x xyz) d) 0.150011724420108 0.6400884809339611 0.0 255.0)
         y (m/norm (/ (.y xyz) d) 0.060007548576610774 0.6000064972148145 0.0 255.0)]
-    (v/applyf (Vec4. Y x y (.w c)) clamp255)))
+    (Vec4. Y x y (.w c))))
 
 (defn from-YXY
   "YXY->RGB"
@@ -837,9 +837,7 @@
         ^double y (m/norm (.z c) 0.0 255.0 0.060007548576610774 0.6000064972148145)
         Yy (/ Y y)
         X (* x Yy)
-        Z (* (- 1.0 x y) Yy)
-        ^Vec4 rgb (from-XYZ- (Vec4. X Y Z (.w c)))]
-    (v/applyf rgb clamp255)))
+        Z (* (- 1.0 x y) Yy)] (from-XYZ- (Vec4. X Y Z (.w c)))))
 
 ;; ### HCL
 
@@ -855,7 +853,7 @@
                               (+ 2.0 (/ (- (.z c) (.x c)) chr))
                               (+ 4.0 (/ (- (.x c) (.y c)) chr))))) 6.0))
         luma (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))]
-    (v/applyf (Vec4. h chr luma (.w c)) clamp255)))
+    (Vec4. h chr luma (.w c))))
 
 (defn from-HCL
   "HCL->RGB"
@@ -872,7 +870,7 @@
                     (and (<= 4.0 h) (< h 5.0)) (Vec3. x 0.0 chr)
                     :else                      (Vec3. chr 0.0 x))
         m (- l (* 0.298839 (.x rgb)) (* 0.586811 (.y rgb)) (* 0.114350 (.z rgb)))]
-    (v/applyf (Vec4. (+ (.x rgb) m) (+ (.y rgb) m) (+ (.z rgb) m) (.w c)) clamp255)))
+    (Vec4. (+ (.x rgb) m) (+ (.y rgb) m) (+ (.z rgb) m) (.w c))))
 
 ;; ### HSB
 
@@ -890,7 +888,7 @@
                                  (if (== mx (.y c))
                                    (+ 2.0 (/ (- (.z c) (.x c)) delta))
                                    (+ 4.0 (/ (- (.x c) (.y c)) delta)))) 6.0))]
-                  (v/applyf (Vec3. (* 255.0 (if (neg? h) (inc h) h)) s mx) clamp255)))]
+                  (Vec3. (* 255.0 (if (neg? h) (inc h) h)) s mx)))]
     (v/vec4 hsb (.w c))))
 
 (defn from-HSB
@@ -912,13 +910,11 @@
                   3 (Vec3. p q b)
                   4 (Vec3. t p b)
                   5 (Vec3. b p q))            ]
-        (v/vec4 (v/applyf (v/mult rgb 255.0) clamp255) (.w c)))))
+        (v/vec4 (v/mult rgb 255.0)(.w c)))))
 
 ;; ### HSI
 
-(def ^:const ^double to-hsi-const (-> 180.0
-                                      (/ m/PI)
-                                      (/ 360.0)))
+(def ^:const ^double to-hsi-const (/ m/TWO_PI))
 
 (defn to-HSI
   "RGB->HSI"
@@ -930,15 +926,14 @@
               beta (* 0.8660254037844385 (- (.y c) (.z c)))
               hue (* to-hsi-const (m/atan2 beta alpha))
               hue (if (neg? hue) (inc hue) hue)]
-          (v/applyf (Vec4. (* 255.0 hue) (* 255.0 s) i (.w c)) clamp255)))))
+          (Vec4. (* 255.0 hue) (* 255.0 s) i (.w c))))))
 
 (def ^:const ^double from-hsi-const (/ m/PI 180.0))
 
 (defn from-hsi-helper
   ""
   ^double [^Vec4 cc ^double h]
-  (* (.z cc) (-> cc
-                 .y
+  (* (.z cc) (-> (.y cc) 
                  (* (m/cos (* h from-hsi-const)))
                  (/ (m/cos (* (- 60.0 h) from-hsi-const)))
                  inc)))
@@ -963,7 +958,7 @@
                           b (from-hsi-helper cc (- h 240.0))
                           r (- (* 3.0 (.z cc)) g b)]
                       (Vec3. r g b)))]
-    (v/vec4 (v/applyf (v/mult rgb 255.0) clamp255) (.w c))))
+    (v/vec4 (v/mult rgb 255.0) (.w c))))
 
 ;; ### HWB
 
@@ -982,7 +977,7 @@
                                 (.y c) 5.0
                                 (.z c) 1.0)]
                 (m/norm (/ (- p (/ f (- v w))) 6.0) 0.0 1.0 1.0 255.0)))]
-    (v/applyf (Vec4. h w (- 255.0 v) (.w c)) clamp255)))
+    (Vec4. h w (- 255.0 v) (.w c))))
 
 (defn from-HWB
   "HWB->RGB"
@@ -1005,7 +1000,75 @@
                 4 (Vec3. n w v)
                 5 (Vec3. v w n)
                 6 (Vec3. v n w))]
-      (v/vec4 (v/applyf (v/mult rgb 255.0) clamp255) (.w c)))))
+      (v/vec4 (v/mult rgb 255.0) (.w c)))))
+
+;; ### GLHS
+;;
+;; Color Theory and Modeling for Computer Graphics, Visualization, and Multimedia Applications (The Springer International Series in Engineering and Computer Science) by Haim Levkowitz
+
+;; Page 79, minimizer
+(def ^:const ^double weight-max 0.7)
+(def ^:const ^double weight-mid 0.1)
+(def ^:const ^double weight-min 0.2)
+
+(defn to-GLHS
+  "RGB->GLHS"
+  [^Vec4 c]
+  (let [mx (max (.x c) (.y c) (.z c))
+        md (m/med (.x c) (.y c) (.z c))
+        mn (min (.x c) (.y c) (.z c))]
+    (if (== mx mn)
+      (Vec4. mx 0 0 (.w c))
+      (let [l (+ (* weight-max mx) (* weight-mid md) (* weight-min mn))
+            r (/ (- mx mn))
+            e (* (- md mn) r)
+            ^long k (cond
+                      (bool-and (> (.x c) (.y c)) (>= (.y c) (.z c))) 0
+                      (bool-and (>= (.y c) (.x c)) (> (.x c) (.z c))) 1
+                      (bool-and (> (.y c) (.z c)) (>= (.z c) (.x c))) 2
+                      (bool-and (>= (.z c) (.y c)) (> (.y c) (.x c))) 3
+                      (bool-and (> (.z c) (.x c)) (>= (.x c) (.y c))) 4
+                      :else 5)
+            f (if (even? k)
+                e
+                (* (- mx md) r))
+            h (* 255.0 (/ (+ k f) 6.0))
+            lq (* (+ (* weight-mid e) weight-max) 255.0)
+            s (* 255.0 (if (<= l lq)
+                         (/ (- l mn) l)
+                         (/ (- mx l) (- 255.0 l))))]
+        (Vec4. l h s (.w c))))))
+
+(defn from-GLHS
+  "GLHS->RGB"
+  [^Vec4 c]
+  (if (zero? (.z c))
+    (Vec4. (.x c) (.x c) (.x c) (.w c))
+    (let [h (* 6.0 (/ (.y c) 255.0))
+          k (long (m/floor h))
+          f (- h k)
+          fp (if (even? k) f (- 1.0 f))
+          wfw (+ (* weight-mid fp) weight-max)
+          lq (* 255.0 wfw)
+          s (/ (.z c) 255.0)
+          ^Vec3 rgb (if (<= (.x c) lq)
+                      (let [mn (* (- 1.0 s) (.x c))
+                            md (/ (+ (* fp (.x c)) (* mn (- (* (- 1.0 fp) weight-max) (* fp weight-min)))) wfw)
+                            mx (/ (- (- (.x c) (* md weight-mid)) (* mn weight-min)) weight-max)]
+                        (Vec3. mn md mx))
+                      (let [mx (+ (.z c) (* (- 1.0 s) (.x c)))
+                            md (/ (- (* (- 1.0 fp) (.x c)) (* mx (- (* (- 1.0 fp) weight-max) (* fp weight-min))))
+                                  (+ (* (- 1.0 fp) weight-mid) weight-min))
+                            mn (/ (- (- (.x c) (* mx weight-max)) (* md weight-mid)) weight-min)]
+                        (Vec3. mn md mx)))]
+      (case k
+        0 (Vec4. (.z rgb) (.y rgb) (.x rgb) (.w c))
+        1 (Vec4. (.y rgb) (.z rgb) (.x rgb) (.w c))
+        2 (Vec4. (.x rgb) (.z rgb) (.y rgb) (.w c))
+        3 (Vec4. (.x rgb) (.y rgb) (.z rgb) (.w c))
+        4 (Vec4. (.y rgb) (.x rgb) (.z rgb) (.w c))
+        5 (Vec4. (.z rgb) (.x rgb) (.y rgb) (.w c))
+        6 (Vec4. (.z rgb) (.y rgb) (.x rgb) (.w c))))))
 
 ;; ### YPbPr
 
@@ -1015,17 +1078,17 @@
   (let [y (+ (* 0.2126 (.x c))
              (* 0.7152 (.y c))
              (* 0.0722 (.z c)))
-        pb (clamp255 (m/norm (- (.z c) y) -237.0 237.0 0.0 255.0))
-        pr (clamp255 (m/norm (- (.x c) y) -201.0 201.0 0.0 255.0))]
-    (Vec4. (clamp255 y) pb pr (.w c))))
+        pb (m/norm (- (.z c) y) -236.589 236.589 0.0 255.0)
+        pr (m/norm (- (.x c) y) -200.787 200.787 0.0 255.0)]
+    (Vec4. y pb pr (.w c))))
 
 (defn from-YPbPr
   "YPbPr -> RGB"
   [^Vec4 c]
-  (let [b (+ (.x c) ^double (m/norm (.y c) 0.0 255.0 -237.0 237.0))
-        r (+ (.x c) ^double (m/norm (.z c) 0.0 255.0 -201.0 201.0))
+  (let [b (+ (.x c) ^double (m/norm (.y c) 0.0 255.0 -236.589 236.589))
+        r (+ (.x c) ^double (m/norm (.z c) 0.0 255.0 -200.787 200.787))
         g (/ (- (.x c) (* 0.2126 r) (* 0.0722 b)) 0.7152)]
-    (v/applyf (Vec4. r g b (.w c)) clamp255)))
+    (Vec4. r g b (.w c))))
 
 ;; ### YDbDr
 
@@ -1035,10 +1098,10 @@
   (let [Y (+ (* 0.299 (.x c)) (* 0.587 (.y c)) (* 0.114 (.z c)))
         Db (+ (* -0.45 (.x c)) (* -0.883 (.y c)) (* 1.333 (.z c)))
         Dr (+ (* -1.333 (.x c)) (* 1.116 (.y c)) (* 0.217 (.z c)))]
-    (v/applyf (Vec4. Y
-                     (m/norm Db -339.91499999999996 339.91499999999996 0.0 255.0)
-                     (m/norm Dr -339.91499999999996 339.915 0.0 255.0)
-                     (.w c)) clamp255)))
+    (Vec4. Y
+           (m/norm Db -339.91499999999996 339.91499999999996 0.0 255.0)
+           (m/norm Dr -339.91499999999996 339.915 0.0 255.0)
+           (.w c))))
 
 (defn from-YDbDr
   "YDbDr->RGB"
@@ -1049,7 +1112,7 @@
         r (+ Y (* 9.2303716147657e-05 Db) (* -0.52591263066186533 Dr))
         g (+ Y (* -0.12913289889050927 Db) (* 0.26789932820759876 Dr))
         b (+ Y (* 0.66467905997895482 Db) (* -7.9202543533108e-05 Dr))]
-    (v/applyf (Vec4. r g b (.w c)) clamp255)))
+    (Vec4. r g b (.w c))))
 
 ;; ### YCbCr
 
@@ -1061,7 +1124,7 @@
   (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
         Cb (+ 127.5 (* -0.168736 (.x c)) (* -0.331264 (.y c)) (* 0.5 (.z c)))
         Cr (+ 127.5 (* 0.5 (.x c)) (* -0.418688 (.y c)) (* -0.081312 (.z c)))]
-    (v/applyf (Vec4. Y Cb Cr (.w c)) clamp255)))
+    (Vec4. Y Cb Cr (.w c))))
 
 (defn from-YCbCr
   "YCbCr->RGB"
@@ -1071,7 +1134,7 @@
         r (+ (* 0.99999999999914679361 (.x c)) (* -1.2188941887145875e-06 Cb) (* 1.4019995886561440468 Cr))
         g (+ (* 0.99999975910502514331 (.x c)) (* -0.34413567816504303521 Cb) (* -0.71413649331646789076 Cr))
         b (+ (* 1.00000124040004623180 (.x c)) (* 1.77200006607230409200 Cb) (* 2.1453384174593273e-06 Cr))]
-    (v/applyf (Vec4. r g b (.w c)) clamp255)))
+    (Vec4. r g b (.w c))))
 
 ;; ### YUV
 
@@ -1081,10 +1144,10 @@
   (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
         U (+ (* -0.147 (.x c)) (* -0.289 (.y c)) (* 0.436 (.z c)))
         V (+ (* 0.615 (.x c)) (* -0.515 (.y c)) (* -0.1 (.z c)))]
-    (v/applyf (Vec4. Y 
-                     (m/norm U -111.17999999999999 111.17999999999999 0.0 255.0)
-                     (m/norm V -156.82500000000002 156.825 0.0 255.0)
-                     (.w c)) clamp255)))
+    (Vec4. Y 
+           (m/norm U -111.17999999999999 111.17999999999999 0.0 255.0)
+           (m/norm V -156.82500000000002 156.825 0.0 255.0)
+           (.w c))))
 
 (defn from-YUV
   "YUV->RGB"
@@ -1095,7 +1158,7 @@
         r (+ Y (* -3.945707070708279e-05 U) (* 1.1398279671717170825 V))
         g (+ Y (* -0.3946101641414141437 U) (* -0.5805003156565656797 V))
         b (+ Y (* 2.0319996843434342537 U) (* -4.813762626262513e-04 V))]
-    (v/applyf (Vec4. r g b (.w c)) clamp255)))
+    (Vec4. r g b (.w c))))
 
 ;; ### YIQ
 
@@ -1105,10 +1168,10 @@
   (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
         I (+ (* 0.595716 (.x c)) (* -0.274453 (.y c)) (* -0.321263 (.z c)))
         Q (+ (* 0.211456 (.x c)) (* -0.522591 (.y c)) (* 0.311135 (.z c)))]
-    (v/applyf (Vec4. Y 
-                     (m/norm I -151.90758 151.90758 0.0 255.0)
-                     (m/norm Q -133.260705 133.260705 0.0 255.0)
-                     (.w c)) clamp255)))
+    (Vec4. Y 
+           (m/norm I -151.90758 151.90758 0.0 255.0)
+           (m/norm Q -133.260705 133.260705 0.0 255.0)
+           (.w c))))
 
 (defn from-YIQ
   "YIQ->RGB"
@@ -1119,7 +1182,7 @@
         r (+ Y (* +0.9562957197589482261 I) (* 0.6210244164652610754 Q))
         g (+ Y (* -0.2721220993185104464 I) (* -0.6473805968256950427 Q))
         b (+ Y (* -1.1069890167364901945 I) (* 1.7046149983646481374 Q))]
-    (v/applyf (Vec4. r g b (.w c)) clamp255)))
+    (Vec4. r g b (.w c))))
 
 ;; ### YCgCo
 
@@ -1129,7 +1192,7 @@
   (let [Y (+ (* 0.25 (.x c)) (* 0.5 (.y c)) ( * 0.25 (.z c)))
         Cg (+ 127.5 (+ (* -0.25 (.x c)) (* 0.5 (.y c)) ( * -0.25 (.z c))))
         Co (+ 127.5 (+ (* 0.5 (.x c)) (* -0.5 (.z c))))]
-    (v/applyf (Vec4. Y Cg Co (.w c)) clamp255)))
+    (Vec4. Y Cg Co (.w c))))
 
 (defn from-YCgCo
   "YCgCo->RGB"
@@ -1137,7 +1200,7 @@
   (let [Cg (- (.y c) 127.5)
         Co (- (.z c) 127.5)
         tmp (- (.x c) Cg)]
-    (v/applyf (Vec4. (+ Co tmp) (+ (.x c) Cg) (- tmp Co) (.w c)) clamp255)))
+    (Vec4. (+ Co tmp) (+ (.x c) Cg) (- tmp Co) (.w c))))
 
 ;; ### Grayscale
 
@@ -1165,6 +1228,7 @@
                   :HSB   [to-HSB from-HSB]
                   :HSI   [to-HSI from-HSI]
                   :HWB   [to-HWB from-HWB]
+                  :GLHS  [to-GLHS from-GLHS]
                   :YPbPr [to-YPbPr from-YPbPr]
                   :YDbDr [to-YDbDr from-YDbDr]
                   :YCbCr [to-YCbCr from-YCbCr]

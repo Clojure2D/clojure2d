@@ -11,7 +11,7 @@
 (ns clojure2d.math
   "Math functions"
   (:refer-clojure
-   :exclude [* + - / > < >= <= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max])
+   :exclude [* + - / > < >= <= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max even? odd?])
   (:import [net.jafama FastMath]
            [clojure2d.java PrimitiveMath]
            [clojure.lang Numbers]
@@ -105,6 +105,8 @@
 (primitivemath-proxy zero? isZero)
 (primitivemath-proxy neg? isNeg)
 (primitivemath-proxy pos? isPos)
+(primitivemath-proxy even? isEven)
+(primitivemath-proxy odd? isOdd)
 (primitivemath-proxy << shiftLeft)
 (primitivemath-proxy >> shiftRight)
 (primitivemath-proxy >>> unsignedShiftRight)
@@ -489,6 +491,11 @@
   [^double a ^double b]
   (== a b))
 
+(defn med
+  "MMedian of three values."
+  ^double [^double a ^double b ^double c]
+  (max (min a b) (min (max a b) c)))
+
 ;; ### Statistics
 ;;
 ;; Whole code is taken from public GIST: https://gist.github.com/scottdw/2960070
@@ -641,7 +648,7 @@
 ;; Simplified to be used after `ns` is defined.
 
 (def ^:private vars-to-exclude
-  '[* + - / > < >= <= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max bool-and bool-or bool-xor bool-not << >> >>> not==])
+  '[* + - / > < >= <= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max even? odd? bool-and bool-or bool-xor bool-not << >> >>> not==])
 
 (defn- using-primitive-operators? []
   (= #'clojure2d.math/+ (resolve '+)))

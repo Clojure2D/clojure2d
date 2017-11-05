@@ -138,10 +138,10 @@
 
   (set-color [_ idx v] 
     (let [^Vec4 v v]
-      (aset ^ints p ^long (pos 0 idx) (unchecked-int (.x v)))
-      (aset ^ints p ^long (pos 1 idx) (unchecked-int (.y v)))
-      (aset ^ints p ^long (pos 2 idx) (unchecked-int (.z v)))
-      (aset ^ints p ^long (pos 3 idx) (unchecked-int (.w v))))
+      (aset ^ints p ^long (pos 0 idx) (c/clamp255 (.x v)))
+      (aset ^ints p ^long (pos 1 idx) (c/clamp255 (.y v)))
+      (aset ^ints p ^long (pos 2 idx) (c/clamp255 (.z v)))
+      (aset ^ints p ^long (pos 3 idx) (c/clamp255 (.w v))))
     p)
 
   (set-color [pixels x y v]

@@ -109,4 +109,7 @@ public final class PrimitiveMath {
     public static double max(double a, long b) { return a>b?a:b; }
     public static double max(long a, double b) { return a>b?a:b; }
     public static double max(double a, double b) { return a>b?a:b; }
+
+    public static boolean isEven(long a) { return (a&1)==0; }
+    public static boolean isOdd(long a) { return (a&1)==1; }
 }

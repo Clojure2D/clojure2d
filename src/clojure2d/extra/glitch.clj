@@ -248,18 +248,24 @@
       :in-cs1 cs1
       :in-cs2 cs2
       :out-cs outcs
+      :cs1-to (r/brand 0.5)
+      :cs2-to (r/brand 0.5)
+      :cs-to (r/brand 0.5)
       :blend-ch1 bl1
       :blend-ch2 bl2
       :blend-ch3 bl3}))
   ([p1 p2]
    (blend-machine (blend-machine) p1 p2))
-  ([{:keys [switch in-cs1 in-cs2 out-cs blend-ch1 blend-ch2 blend-ch3]} p1 p2]
+  ([{:keys [switch in-cs1 in-cs2 out-cs cs1-to cs2-to cs-to blend-ch1 blend-ch2 blend-ch3]} p1 p2]
    (let [[p1 p2] (if switch [p2 p1] [p1 p2]) ; switch images
+         cs1-sel (if cs1-to first second)
+         cs2-sel (if cs2-to first second)
+         cs-sel (if cs-to first second)
          result (p/compose-channels blend-ch1 blend-ch2 blend-ch3 nil
-                                    (if in-cs1 (p/filter-colors (first (in-cs1 c/colorspaces)) p1) p1)
-                                    (if in-cs2 (p/filter-colors (first (in-cs2 c/colorspaces)) p2) p2))]
+                                    (if in-cs1 (p/filter-colors (cs1-sel (in-cs1 c/colorspaces)) p1) p1)
+                                    (if in-cs2 (p/filter-colors (cs2-sel (in-cs2 c/colorspaces)) p2) p2))]
      (if out-cs
-       (p/filter-colors (second (out-cs c/colorspaces)) result)
+       (p/filter-colors (cs-sel (out-cs c/colorspaces)) result)
        result))))
 
 ;; color reducer machine
