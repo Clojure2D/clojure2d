@@ -142,7 +142,7 @@
     (Color. (.getRed cc)
             (.getGreen cc)
             (.getBlue cc)
-            (m/round (clamp255 a)))))
+            (clamp255 a))))
 
 (defn make-awt-color
   "Create java.awt.Color object. Use with `core/set-awt-color` or `core/set-awt-background`."
