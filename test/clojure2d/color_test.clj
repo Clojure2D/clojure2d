@@ -56,7 +56,7 @@
 (expect cv4 (make-color 245 245 220 255))
 
 ;; hue
-(expect (double (m/round (/ (* 255 60) 360))) (get-hue (make-color :beige)))
+(expect (/ (* 255.0 60.0) 360.0) (get-hue (make-color :beige)))
 
 ;; double array
 (let [r (r/irand 256)]

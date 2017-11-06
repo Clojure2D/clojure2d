@@ -8,6 +8,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
+(m/use-primitive-operators)
 
 (def ^:const ^long min-size 4) ; minimal block size
 (def ^:const ^long max-size 32) ; maximum block size
