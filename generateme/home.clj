@@ -15,7 +15,7 @@
            [clojure2d.math.vector Vec4 Vec2]
            [clojure2d.java PrimitiveMath]))
 
-(def p1 (p/load-pixels "generateme/hedge/miles.jpg"))
+(def p1 (p/load-pixels "generateme/js/jsres.jpg"))
 
 (time
  (let [oa (object-array (map #(p/get-color p1 %) (range (count p1))))]
@@ -24,7 +24,6 @@
      (p/set-color p1 x (aget oa x)))))
 
 (time (dorun (map-indexed #(p/set-color p1 %1 %2) (sort #(< (c/green %1) (c/green %2)) (map #(p/get-color p1 %) (range (count p1)))))))
-
 (def oa (object-array (map #(p/get-color p1 %) (range (count p1)))))
 
 (def oasorter (sort #(< (c/red %1) (c/red %2)) oa))
@@ -35,7 +34,7 @@
 
 (nth oasorter 1)
 
-(def p2 (p/load-pixels "generateme/gface/2.jpg"))
+(def p2 (p/load-pixels "generateme/js/ajs_000000.png"))
 
 (def p3 (p/load-pixels "generateme/ooo/ooo.jpg"))
 
@@ -44,7 +43,7 @@
 
 (def canvas (core/create-canvas (core/width p1) (core/height p1)))
 
-(def scale (double 0.5))
+(def scale (double 1.0))
 
 (def windows (core/show-window canvas "glitch" (* scale (core/width p1)) (* scale (core/height p1)) 10))
 
@@ -54,13 +53,13 @@
   (comment println b2)
   (p/set-canvas-pixels! canvas (p/filter-channels p/equalize-filter false 
                                                   (p/filter-channels p/normalize-filter false
-                                                                     (g/blend-machine b p1 p3)))))
+                                                                     (g/blend-machine b p1 p2)))))
 
 (core/with-canvas canvas
-  (core/image (o/render-rgb-scanlines p1)))
+  (core/image (o/render-rgb-scanlines (core/get-image canvas))))
 
 (core/with-canvas canvas
-  (core/image (-> (p/image-from-pixels p5)
+  (core/image (-> (core/get-image canvas)
                   (o/render-noise noise-overlay)
                   (o/render-spots spots-overlay))))
 
@@ -69,7 +68,7 @@
 
 (core/close-session)
 
-(core/save canvas (core/next-filename "generateme/hedge/aaa" ".png"))
+(core/save canvas (core/next-filename "generateme/js/res" ".png"))
 
 (p/set-canvas-pixels! canvas (p/sort-colors p1 c/red))
 
@@ -97,7 +96,7 @@
 (do
   (def palette (g/color-reducer-machine))
   (comment println palette)
-  (p/set-canvas-pixels! canvas (p/filter-channels p/normalize-filter nil (g/color-reducer-machine palette p2))))
+  (p/set-canvas-pixels! canvas (p/filter-channels p/normalize-filter nil (g/color-reducer-machine palette p4))))
 
 ;;mirror
 (defn make-random-mirror
@@ -109,7 +108,7 @@
            (g/make-mirror-filter (rand-nth (keys g/mirror-types)))
            nil))
 
-(p/set-canvas-pixels! canvas (->> p5
+(p/set-canvas-pixels! canvas (->> p2
                                   ((make-random-mirror))
                                   ((make-random-mirror))))
 
