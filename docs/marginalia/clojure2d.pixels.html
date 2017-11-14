@@ -2895,7 +2895,8 @@ To operate on pixels you have several methods:</p>
             [clojure2d.math.vector :as v])
   (:import clojure2d.core.Canvas
            [clojure2d.math.vector Vec2 Vec4]
-           java.awt.image.BufferedImage))</pre></td></tr><tr><td class="docs">
+           java.awt.image.BufferedImage
+           [clojure.lang Counted]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)</pre></td></tr><tr><td class="docs"><p><code>*pixels-edge*</code> describe what is the value of pixel when accessing from outside the image.
@@ -2939,6 +2940,9 @@ Possible values are:</p>
     p)
   (convolve [p t]
     (core/convolve (image-from-pixels p) t))
+  (get-pixel [p x y] (get-color p x y))
+  Counted
+  (count [_] size)
   PixelsProto
   (get-channel [_ ch]
     (let [^ints res (int-array size)
@@ -2989,10 +2993,10 @@ Possible values are:</p>
     (set-value pixels ch (+ ^long x (* ^long y w)) v))
   (set-color [_ idx v] 
     (let [^Vec4 v v]
-      (aset ^ints p ^long (pos 0 idx) (unchecked-int (.x v)))
-      (aset ^ints p ^long (pos 1 idx) (unchecked-int (.y v)))
-      (aset ^ints p ^long (pos 2 idx) (unchecked-int (.z v)))
-      (aset ^ints p ^long (pos 3 idx) (unchecked-int (.w v))))
+      (aset ^ints p ^long (pos 0 idx) (c/clamp255 (.x v)))
+      (aset ^ints p ^long (pos 1 idx) (c/clamp255 (.y v)))
+      (aset ^ints p ^long (pos 2 idx) (c/clamp255 (.z v)))
+      (aset ^ints p ^long (pos 3 idx) (c/clamp255 (.w v))))
     p)
   (set-color [pixels x y v]
     (set-color pixels (+ ^long x (* ^long y w)) v))
@@ -3558,7 +3562,8 @@ Configuration is a map of values:</p>
   (width [_] sizex)
   (height [_] sizey)
   (save [b n] (core/save (to-pixels b) n))
-  (convolve [b t] (core/convolve (to-pixels b) t)))</pre></td></tr><tr><td class="docs"><p>Create BinPixels object</p>
+  (convolve [b t] (core/convolve (to-pixels b) t))
+  (get-pixel [b x y] (core/get-pixel (to-pixels b) x y)))</pre></td></tr><tr><td class="docs"><p>Create BinPixels object</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-binpixels 
   ^BinPixels [[^double rminx ^double rmaxx ^double rminy ^double rmaxy] ^long sizex ^long sizey]
   (let [sizex+ (inc sizex)

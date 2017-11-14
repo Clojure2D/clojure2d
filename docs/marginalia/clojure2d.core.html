@@ -2935,10 +2935,9 @@ You can freely change this setting with <code>binding</code> macro. Default is 9
 <li>Input: image filename</li>
 <li>Returns extension (without dot)</li>
 </ul>
-</td><td class="codes"><pre class="brush: clojure">(defn- file-extension-int
+</td><td class="codes"><pre class="brush: clojure">(defn file-extension
   [filename]
-  (second (re-find #&quot;\.(\w+)$&quot; filename)))</pre></td></tr><tr><td class="docs"><p>Memoize above function (in case you'll be saving file very often).</p>
-</td><td class="codes"><pre class="brush: clojure">(def file-extension (memoize file-extension-int))</pre></td></tr><tr><td class="docs"><p>Returns image writer of image type based on extension.</p>
+  (second (re-find #&quot;\.(\w+)$&quot; filename)))</pre></td></tr><tr><td class="docs"><p>Returns image writer of image type based on extension.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- ^ImageWriter get-image-writer
   [filename]
   (let [ext (file-extension filename)
@@ -3015,7 +3014,10 @@ You can freely change this setting with <code>binding</code> macro. Default is 9
       (.setRenderingHint RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON)
       (.drawImage img 0 0 width height nil)
       (.dispose))
-    target))</pre></td></tr><tr><td class="docs"><h2>Canvas</h2>
+    target))</pre></td></tr><tr><td class="docs"><p>Get subimage of give image</p>
+</td><td class="codes"><pre class="brush: clojure">(defn subimage
+  [^BufferedImage source x y w h]
+  (.getSubimage source x y w h))</pre></td></tr><tr><td class="docs"><h2>Canvas</h2>
 
 <p>Canvas is an object you can draw on and which can be displayed in the window. Technically it's a type cosisting of <code>Graphics2D</code> object which is internally used to draw on the image, image (<code>BufferedImage</code> object), rendering quality hints and singletons for primitives. What is important: to draw on canvas you have to wrap your operations in <code>with-canvas</code> macro. <code>with-canvas</code> is responsible for creating and releasing <code>Graphics2D</code> object. Initially <code>Graphics2D</code> is set to <code>nil</code>.
 Canvas should be accelerated by Java and your video card.
@@ -3026,7 +3028,8 @@ Reminder: Drawing on canvas is single threaded.</p>
   (width [i])
   (height [i])
   (save [i n])
-  (convolve [i t]))</pre></td></tr><tr><td class="docs">
+  (convolve [i t])
+  (get-pixel [i x y] &quot;Retruns color&quot;))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def convolution-matrices {:shadow (Kernel. 3 3 (float-array [0 1 2 -1 0 1 -2 -1 0]))
                            :emboss (Kernel. 3 3 (float-array [0 2 4 -2 1 2 -4 -2 0]))
                            :edges-1 (Kernel. 3 3 (float-array [1 2 1 2 -12 2 1 2 1]))
@@ -3055,7 +3058,24 @@ Reminder: Drawing on canvas is single threaded.</p>
                               (t convolution-matrices)
                               (let [s (int (m/sqrt (count t)))]
                                 (Kernel. s s (float-array t))))]
-                 (.filter ^ConvolveOp (ConvolveOp. kernel) i nil)))})</pre></td></tr><tr><td class="docs"><p>Canvas type. Use <code>get-image</code> to extract image (<code>BufferedImage</code>).</p>
+                 (.filter ^ConvolveOp (ConvolveOp. kernel) i nil)))
+   :get-pixel (fn [^BufferedImage i ^long x ^long y]
+                (if (bool-or (&lt; x 0)
+                             (&lt; y 0)
+                             (&gt;= x (.getWidth i))
+                             (&gt;= y (.getHeight i)))
+                  (c/make-color 0 0 0)
+                  (let [b (int-array 1)
+                        ^java.awt.image.Raster raster (.getRaster i)]
+                    (.getDataElements raster x y b)
+                    (let [v (aget b 0)
+                          b (bit-and v 0xff)
+                          g (bit-and (&gt;&gt; v 8) 0xff)
+                          r (bit-and (&gt;&gt; v 16) 0xff)
+                          a (bit-and (&gt;&gt; v 24) 0xff)]
+                      (if (== (.getNumBands raster) 3)
+                        (c/make-color r g b)
+                        (c/make-color r g b a))))))})</pre></td></tr><tr><td class="docs"><p>Canvas type. Use <code>get-image</code> to extract image (<code>BufferedImage</code>).</p>
 </td><td class="codes"><pre class="brush: clojure">(deftype Canvas [^Graphics2D graphics
                  ^BufferedImage buffer
                  ^Line2D line-obj
@@ -3072,7 +3092,8 @@ Reminder: Drawing on canvas is single threaded.</p>
   (height [_] h)
   (save [c n] (save-image buffer n) c)
   (convolve [_ t]
-    (convolve buffer t)))</pre></td></tr><tr><td class="docs"><p>Let's define three rendering quality options: <code>:low</code>, <code>:mid</code> and <code>:high</code>. Where <code>:low</code> is fastest but has poor quality and <code>:high</code> has best quality but may be slow. Rendering options are used when you create canvas.</p>
+    (convolve buffer t))
+  (get-pixel [_ x y] (get-pixel buffer x y)))</pre></td></tr><tr><td class="docs"><p>Let's define three rendering quality options: <code>:low</code>, <code>:mid</code> and <code>:high</code>. Where <code>:low</code> is fastest but has poor quality and <code>:high</code> has best quality but may be slow. Rendering options are used when you create canvas.</p>
 </td><td class="codes"><pre class="brush: clojure">(def rendering-hints {:low {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF
                             RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR
                             RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
@@ -3146,7 +3167,7 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
                         (rendering-hints (or (some #{hint} (keys rendering-hints)) :high))
                         width height
                         nil
-                        (when font (java.awt.Font/getFont font)))]
+                        (when font (java.awt.Font/decode font)))]
      (with-canvas result
        (set-background Color/black)
        (set-stroke))))
@@ -3297,6 +3318,21 @@ Transformations are concatenated.</p>
            (recur v2 v3 (next vss))))))
    canvas)
   ([canvas vs]
+   (triangle-strip canvas vs false)))</pre></td></tr><tr><td class="docs"><p>Draw triangle fan. Implementation of <code>Processing</code> <code>FAN</code> shape.</p>
+
+<p>  Input: list of vertices as Vec2 vectors</p>
+</td><td class="codes"><pre class="brush: clojure">(defn triangle-fan
+  ([canvas vs stroke?]
+   (when (&gt; (count vs) 2)
+     (let [^Vec2 v1 (first vs)]
+       (loop [^Vec2 v2 (second vs)
+              vss (nnext vs)]
+         (when vss
+           (let [^Vec2 v3 (first vss)]
+             (triangle canvas (.x v1) (.y v1) (.x v2) (.y v2) (.x v3) (.y v3) stroke?)
+             (recur v3 (next vss)))))))
+   canvas)
+  ([canvas vs]
    (triangle-strip canvas vs false)))</pre></td></tr><tr><td class="docs"><p>Draw path from lines. Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).</p>
 </td><td class="codes"><pre class="brush: clojure">(defn path
   ([^Canvas canvas vs close? stroke?]
@@ -3406,6 +3442,8 @@ Transformations are concatenated.</p>
   ([^Canvas canvas size cap join]
    (.setStroke ^Graphics2D (.graphics canvas) (BasicStroke. size cap join))
    canvas)
+  ([canvas size cap]
+   (set-stroke canvas size cap BasicStroke/JOIN_MITER))
   ([canvas size]
    (set-stroke canvas size BasicStroke/CAP_ROUND BasicStroke/JOIN_MITER))
   ([canvas]
@@ -3451,10 +3489,18 @@ Transformations are concatenated.</p>
   canvas)</pre></td></tr><tr><td class="docs"><p>Set color for primitive</p>
 </td><td class="codes"><pre class="brush: clojure">(def set-color (partial set-color-with-fn set-awt-color))</pre></td></tr><tr><td class="docs"><p>Set background color</p>
 </td><td class="codes"><pre class="brush: clojure">(def set-background (partial set-color-with-fn set-awt-background))</pre></td></tr><tr><td class="docs"><p>Set XOR mode</p>
-</td><td class="codes"><pre class="brush: clojure">(def set-xor-mode (partial set-color-with-fn set-awt-xor-mode))</pre></td></tr><tr><td class="docs"><p>Draw an image. You can specify position and size of the image. Default it's placed on whole canvas.</p>
+</td><td class="codes"><pre class="brush: clojure">(def set-xor-mode (partial set-color-with-fn set-awt-xor-mode))</pre></td></tr><tr><td class="docs"><h3>Gradient</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Set paint mode to gradient. Call with canvas only to reset.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn set-gradient
+  ([^Canvas canvas x1 y1 color1 x2 y2 color2]
+   (let [gp (java.awt.GradientPaint. x1 y1 (c/make-awt-color color1) x2 y2 (c/make-awt-color color2))
+         ^Graphics2D g (.graphics canvas)]
+     (.setPaint g gp)
+     canvas)))</pre></td></tr><tr><td class="docs"><h3>Image</h3>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Draw an image. You can specify position and size of the image. Default it's placed on whole canvas.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn image
-  ([^Canvas canvas ^BufferedImage img x y w h]
-   (.drawImage ^Graphics2D (.graphics canvas) img x y w h nil)
+  ([^Canvas canvas img x y w h]
+   (.drawImage ^Graphics2D (.graphics canvas) (get-image img) x y w h nil)
    canvas)
   ([^Canvas canvas img]
    (image canvas img 0 0 (.w canvas) (.h canvas)))
@@ -3595,6 +3641,7 @@ As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseX
   (height [_] h)
   (save [w n] (save-image (get-image @buffer) n) w)
   (convolve [w n] (convolve @buffer n))
+  (get-pixel [_ x y] (get-pixel @buffer x y))
   MouseXYProto
   (mouse-pos [_]
     (let [^java.awt.Point p (.getMousePosition panel)]
@@ -3633,7 +3680,11 @@ As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseX
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Helper function, check if window is active</p>
 </td><td class="codes"><pre class="brush: clojure">(defn window-active?
   [^Window window]
-  @(.active? window))</pre></td></tr><tr><td class="docs"><h3>Global state management</h3>
+  @(.active? window))</pre></td></tr><tr><td class="docs"><p>Check if mouse is inside window</p>
+</td><td class="codes"><pre class="brush: clojure">(defn mouse-in-window?
+  [window]
+  (bool-and (&gt;= ^int (mouse-x window) 0.0)
+            (&gt;= ^int (mouse-y window) 0.0)))</pre></td></tr><tr><td class="docs"><h3>Global state management</h3>
 
 <p>Global atom is needed to keep current window state. Events don't know what window sends it. The only option is to get component name.</p>
 </td><td class="codes"></td></tr><tr><td class="docs">

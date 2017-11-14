@@ -344,7 +344,7 @@
                         (rendering-hints (or (some #{hint} (keys rendering-hints)) :high))
                         width height
                         nil
-                        (when font (java.awt.Font/getFont font)))]
+                        (when font (java.awt.Font/decode font)))]
      (with-canvas result
        (set-background Color/black)
        (set-stroke))))
@@ -415,7 +415,7 @@
 (defn pop-matrix
   "Restore saved transformation state"
   [^Canvas canvas]
-  (when-not (empty? @(.transform-stack canvas))
+  (when (seq @(.transform-stack canvas))
     (let [v (peek @(.transform-stack canvas))]
       (swap! (.transform-stack canvas) pop)
       (.setTransform ^Graphics2D (.graphics canvas) v)))
@@ -559,7 +559,7 @@
 (defn path
   "Draw path from lines. Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines)."
   ([^Canvas canvas vs close? stroke?]
-   (when-not (empty? vs)
+   (when (seq vs)
      (let [^Path2D p (Path2D$Double.)
            ^Vec2 m (first vs)]
        (.moveTo p (.x m) (.y m))
