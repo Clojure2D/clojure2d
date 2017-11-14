@@ -15,9 +15,8 @@
   (set-state! window (assoc (get-state window) :fps fps))
   (-> canvas
       (set-background :black)
-      (set-color :white)
-      (line 0 (inc (mod fps 100)) 100 (inc (mod fps 100)))
       (set-color :maroon)
+      (line 0 (inc (mod fps 100)) 100 (inc (mod fps 100)))
       (ellipse 50 50 10 10)))
 
 (def window (atom nil))
