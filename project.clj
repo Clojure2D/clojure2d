@@ -2,12 +2,12 @@
   :description "Creative coding / glitch library backed by Java2D"
   :plugins [[refactor-nrepl "2.4.0-SNAPSHOT"]
             [cider/cider-nrepl "0.16.0-SNAPSHOT"]
-            [lein-ancient "0.6.12"]
+            [lein-ancient "0.6.14"]
             [lein-kibit "0.1.6-beta2"]
-            [jonase/eastwood "0.2.4"]
+            [jonase/eastwood "0.2.5"]
             [lein-bikeshed "0.4.1"]
             [lein-deps-tree "0.1.2"]
-            [lein-marginalia "0.9.0"]
+            [lein-marginalia "0.9.1"]
             [lein-expectations "0.0.8"]
             [lein-autoexpect "1.9.0"]
             [com.jakemccrary/lein-test-refresh "0.21.0"]
@@ -17,8 +17,8 @@
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [
                  ;; [org.clojure/clojure "1.8.0"]
-                 [org.clojure/clojure "1.9.0-beta1"]
-                 [expectations "2.2.0-rc1"]
+                 [org.clojure/clojure "1.9.0-beta4"]
+                 [expectations "2.2.0-SNAPSHOT"]
                  [net.jafama/jafama "2.1.0"]
                  [org.apache.commons/commons-math3 "3.6.1"]
                  [com.flowpowered/flow-noise "1.0.0"]

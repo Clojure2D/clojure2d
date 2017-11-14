@@ -15,6 +15,7 @@
            [clojure2d.math.vector Vec4 Vec2]
            [clojure2d.java PrimitiveMath]))
 
+
 (def p1 (p/load-pixels "generateme/chad/chad000620.jpg"))
 
 (time
@@ -24,7 +25,6 @@
      (p/set-color p1 x (aget oa x)))))
 
 (time (dorun (map-indexed #(p/set-color p1 %1 %2) (sort #(< (c/green %1) (c/green %2)) (map #(p/get-color p1 %) (range (count p1)))))))
-
 (def oa (object-array (map #(p/get-color p1 %) (range (count p1)))))
 
 (def oasorter (sort #(< (c/red %1) (c/red %2)) oa))
@@ -97,7 +97,7 @@
 (do
   (def palette (g/color-reducer-machine))
   (comment println palette)
-  (p/set-canvas-pixels! canvas (p/filter-channels p/normalize-filter nil (g/color-reducer-machine palette p2))))
+  (p/set-canvas-pixels! canvas (p/filter-channels p/normalize-filter nil (g/color-reducer-machine palette p4))))
 
 ;;mirror
 (defn make-random-mirror
@@ -112,7 +112,6 @@
 (p/set-canvas-pixels! canvas (p/filter-channels p/equalize-filter nil (->> (p/filter-colors c/to-LUV p1)
                                                                            ;; ((make-random-mirror))
                                                                            ((make-random-mirror)))))
-
 
 ;; slitscan
 (binding [v/*skip-random-variations* true]

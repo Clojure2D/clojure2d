@@ -1263,7 +1263,7 @@
        (colorspace-fn (Vec4. ch1 ch2 ch3 ch4)))))
   ([colorspace-fn ch1-scale ch2-scale ch3-scale] (make-color-converter colorspace-fn ch1-scale ch2-scale ch3-scale 255.0))
   ([colorspace-fn ch-scale] (make-color-converter colorspace-fn ch-scale ch-scale ch-scale ch-scale))
-  ([colorspace-fn] #(colorspace-fn %)))
+  ([colorspace-fn] colorspace-fn))
 
 ;; ## Palettes
 

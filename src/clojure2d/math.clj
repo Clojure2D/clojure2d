@@ -274,7 +274,26 @@
 (fastmath-proxy rqsqrt invSqrtQuick)
 
 ;; \\(\sqrt{x^2+y^2}\\) and \\(\sqrt{x^2+y^2+z^2}\\)
-(fastmath-proxy hypot)
+(defn hypot
+  "SQRT version of hypot - fast, not safe"
+  (^double [^double x ^double y]
+   (sqrt (+ (* x x) (* y y))))
+  (^double [^double x ^double y ^double z]
+   (sqrt (+ (* x x) (* y y) (* z z)))))
+
+;; Let's not use
+(comment fastmath-proxy hypot)
+
+;; distance
+(defn dist
+  "Distance between points 2d"
+  ^double [^double x1 ^double y1 ^double x2 ^double y2]
+  (sqrt (+ (sq (- x2 x1)) (sq (- y2 y1)))))
+
+(defn qdist
+  "Quick version of distance between points 2d"
+  ^double [^double x1 ^double y1 ^double x2 ^double y2]
+  (qsqrt (+ (sq (- x2 x1)) (sq (- y2 y1)))))
 
 ;; Rounding functions
 (defn floor ^double [^double v] (FastMath/floor v))
@@ -327,7 +346,6 @@
   (^double [^double v ^long delta]
    (let [ui (Double/doubleToRawLongBits (if (zero? v) 0.0 v))]
      (Double/longBitsToDouble (if (pos? v) (- ui delta) (+ ui delta))))))
-
 
 ;; More constants
 
