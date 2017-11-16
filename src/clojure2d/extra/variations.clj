@@ -17,8 +17,7 @@
             [clojure2d.math.complex :as c]
             [clojure2d.math.random :refer :all]
             [clojure2d.math.joise :as j]
-            [clojure2d.math.vector :as v]
-            [clojure2d.math.random :as r])
+            [clojure2d.math.vector :as v])
   (:import clojure2d.math.vector.Vec2
            [org.apache.commons.math3.special BesselJ Beta Erf Gamma]))
 
@@ -1586,7 +1585,7 @@
   "Julia"
   [^double amount _]
   (fn [^Vec2 v]
-    (let [a (+ (* 0.5 ^double (v/heading v)) (* m/PI (double (irand 2))))
+    (let [a (+ (* 0.5 ^double (v/heading v)) (* m/PI (lrand 2)))
           r (* amount (m/sqrt (v/mag v)))]
       (Vec2. (* r (m/cos a)) (* r (m/sin a))))))
 (make-var-method julia :random)
@@ -1595,7 +1594,7 @@
   "Julia with different angle calc"
   [^double amount _]
   (fn [^Vec2 v]
-    (let [a (+ (* 0.5 (m/atan2 (.x v) (.y v))) (* m/PI (double (irand 2))))
+    (let [a (+ (* 0.5 (m/atan2 (.x v) (.y v))) (* m/PI (lrand 2)))
           r (* amount (m/sqrt (v/mag v)))]
       (Vec2. (* r (m/cos a)) (* r (m/sin a))))))
 (make-var-method julia2 :random)
@@ -1804,6 +1803,49 @@
 
 ;; ## P
 
+;; ### Panorama1
+
+(defn make-panorama1
+  "Panorama1"
+  [^double amount _]
+  (fn [v]
+    (let [aux (/ (m/sqrt (inc ^double (v/magsq v))))
+          nv (v/mult v aux)
+          ^double aux (v/mag nv)]
+      (Vec2. (* amount m/M_1_PI ^double (v/heading nv))
+             (* amount (- aux 0.5))))))
+(make-var-method panorama1 :regular)
+
+;; ### Panorama2
+
+(defn make-panorama2
+  "Panorama2"
+  [^double amount _]
+  (fn [v]
+    (let [aux (/ (inc (m/sqrt (v/magsq v))))
+          nv (v/mult v aux)
+          ^double aux (v/mag nv)]
+      (Vec2. (* amount m/M_1_PI ^double (v/heading nv))
+             (* amount (- aux 0.5))))))
+(make-var-method panorama2 :regular)
+
+;; ### Parabola
+
+(make-config-method parabola {:width (srandom 0.5 2.0)
+                              :height (srandom 0.5 2.0)})
+
+(defn make-parabola
+  "Parabola fn"
+  [^double amount {:keys [^double width ^double height]}]
+  (fn [v]
+    (let [^double r (v/mag v)
+          sr (m/sin r)
+          cr (m/cos r)]
+      (Vec2. (* amount height sr sr (drand))
+             (* amount width cr (drand))))))
+(make-var-method parabola :random)
+
+
 ;; ### Perlin
 
 (make-config-method perlin {:seed (irand)
@@ -1828,6 +1870,19 @@
     (make-noise-variation2 amount scale n)))
 (make-var-method perlin2 :regular)
 
+
+;; ### Petal
+
+(defn make-petal
+  "Petal"
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [a (m/cos (.x v))
+          bx (m/pow (* (m/cos (.x v)) (m/cos (.y v))) 3.0)
+          by (m/pow (* (m/sin (.x v)) (m/cos (.y v))) 3.0)]
+      (Vec2. (* amount a bx)
+             (* amount a by)))))
+(make-var-method petal :regular)
 
 ;; ### Pie
 
@@ -1883,6 +1938,31 @@
                (* t vfcos (.y v)))))))
 (make-var-method perspective :regular)
 
+;; ### Phoenix julia
+
+(make-config-method phoenix-julia {:power (int (srandom 0.51 10))
+                                   :dist (drand -2.0 2.0)
+                                   :x-distort (drand -2.0 2.0)
+                                   :y-distort (drand -2.0 2.0)})
+
+(defn make-phoenix-julia
+  "Phoenix julia"
+  [^double amount {:keys [^double power ^double dist ^double x-distort ^double y-distort]}]
+  (let [inv-n (/ dist power)
+        inv2pi-n (/ m/TWO_PI power)
+        c-n (* 0.5 inv-n)]
+    (fn [^Vec2 v]
+      (let [pre-x (* (.x v) x-distort)
+            pre-y (* (.y v) y-distort)
+            a (+ (* (m/atan2 pre-y pre-x) inv-n)
+                 (* (irand) inv2pi-n))
+            sina (m/sin a)
+            cosa (m/cos a)
+            r (* amount (m/pow (v/magsq v) c-n))]
+        (Vec2. (* r cosa)
+               (* r sina))))))
+(make-var-method phoenix-julia :random)
+
 ;; ### Polar
 
 (defn make-polar
@@ -1901,6 +1981,29 @@
         p2v2 (* 0.5 p2v)]
     (fn [^Vec2 v] (Vec2. (* p2v ^double (v/heading v)) (* p2v2 (m/log (v/magsq v)))))))
 (make-var-method polar2 :regular)
+
+;; ### PowBlock
+
+(make-config-method powblock {:numerator (drand -20 20)
+                              :denominator (drand -20 20)
+                              :root (drand -6 6)
+                              :correctn (drand -2 2)
+                              :correctd (drand -2 2)})
+
+(defn make-powblock
+  "PowBlock"
+  [^double amount {:keys [^double numerator ^double denominator ^double root ^double correctn ^double correctd]}]
+  (let [power (/ (* denominator correctn) (+ m/EPSILON (m/abs correctd)))
+        power (if (< (m/abs power) m/EPSILON) m/EPSILON power)
+        power (/ (* 0.5 numerator) power) 
+        deneps (/ (if (< (m/abs denominator) m/EPSILON) m/EPSILON denominator))]
+    (fn [^Vec2 v]
+      (let [^double theta (v/heading v)
+            r2 (* amount (m/pow (v/magsq v) power))
+            ran (+ (* numerator (+ (* theta deneps) (* root m/TWO_PI (m/floor (drand denominator)) deneps))))]
+        (Vec2. (* r2 (m/cos ran))
+               (* r2 (m/sin ran)))))))
+(make-var-method powblock :random)
 
 ;; ### Power
 
@@ -1942,7 +2045,54 @@
       (Vec2. xx yy))))
 (make-var-method popcorn2 :regular)
 
+;; ### Pressure Wave
+
+(make-config-method pressure-wave {:x-freq (drand -6 6)
+                                   :y-freq (drand -6 6)})
+
+(defn make-pressure-wave
+  "Pressure Wave"
+  [^double amount {:keys [^double x-freq ^double y-freq]}]
+  (let [[^double pwx ^double ipwx] (if (zero? x-freq) [1.0 1.0] (let [pwx (* x-freq m/TWO_PI)] [pwx (/ pwx)]))
+        [^double pwy ^double ipwy] (if (zero? y-freq) [1.0 1.0] (let [pwy (* y-freq m/TWO_PI)] [pwy (/ pwy)]))]
+    (fn [^Vec2 v]
+      (Vec2. (* amount (+ (.x v) (* ipwx (m/sin (* pwx (.x v))))))
+             (* amount (+ (.y v) (* ipwy (m/sin (* pwy (.y v))))))))))
+(make-var-method pressure-wave :regular)
+
 ;; ## R
+
+;; ### R Circle Blur
+
+(make-config-method r-circleblur {:n (drand -3 3)
+                                  :seed (drand Float/MAX_VALUE)
+                                  :dist (drand -1 1)
+                                  :mn (drand -3 3)
+                                  :mx (drand -3 3)})
+
+(defn make-r-circleblur
+  "R Circle Blur"
+  [^double amount {:keys [^double n ^double seed ^double dist ^double mn ^double mx]}]
+  (let [dm (- mx mn)]
+    (fn [v]
+      (let [^double angle (v/heading v)
+            ^double rad (v/mag v)
+            rad (mod rad n)
+            by (m/sin (+ angle rad))
+            bx (m/cos (+ angle rad))
+            by (m/round (* by rad))
+            bx (m/round (* bx rad))
+            rad2 (* 0.5 (m/sqrt (drand)))
+            angle2 (drand m/TWO_PI)
+            a1 (m/sfrac (* 43758.5453 (m/sin (+ (* bx 127.1) (* by 311.7) seed))))
+            a2 (m/sfrac (* 43758.5453 (m/sin (+ (* bx 269.5) (* by 183.3) seed))))
+            a3 (m/sfrac (* 43758.5453 (m/sin (+ (* bx 78.233) (* by 12.9898) seed))))
+            a3 (+ mn (* a3 dm))
+            rad2 (* rad2 a3)]
+        (Vec2. (* amount (+ bx (* rad2 (m/cos angle2)) (* dist a1)))
+               (* amount (+ by (* rad2 (m/sin angle2)) (* dist a2))))))))
+(make-var-method r-circleblur :random)
+
 
 ;; ### Radial Blur
 
@@ -1962,6 +2112,37 @@
                (+ (* rz (.y v)) (* ra (m/sin alpha))))))))
 (make-var-method radialblur :random)
 
+;; ### Rational3
+
+(make-config-method rational3 {:a (drand -3 3)
+                               :b (drand -3 3)
+                               :c (drand -3 3)
+                               :d (drand -3 3)
+                               :e (drand -3 3)
+                               :f (drand -3 3)
+                               :g (drand -3 3)
+                               :h (drand -3 3)})
+
+(defn make-rational3
+  "Rational3"
+  [^double amount {:keys [^double a ^double b ^double c ^double d
+                          ^double e ^double f ^double g ^double h]}]
+  (fn [^Vec2 v]
+    (let [^Vec2 sqr (v/emult v v)
+          ^Vec2 cb (v/emult sqr v)
+          zt3 (- (.x cb) (* 3.0 (.x v) (.y sqr)))
+          zt2 (- (.x sqr) (.y sqr))
+          zb3 (- (* 3.0 (.x sqr) (.y v)) (.y cb))
+          zb2 (* 2.0 (.x v) (.y v))
+          tr (+ (* a zt3) (* b zt2) (* c (.x v)) d)
+          ti (+ (* a zb3) (* b zb2) (* c (.y v )))
+          br (+ (* e zt3) (* f zt2) (* g (.x v)) h)
+          bi (+ (* e zb3) (* f zb2) (* g (.y v )))
+          r3den (/ amount (+ (* br br) (* bi bi)))]
+      (Vec2. (* r3den (+ (* tr br) (* ti bi)))
+             (* r3den (- (* ti br) (* tr bi)))))))
+(make-var-method rational3 :regular)
+
 ;; ### Rays
 
 (defn make-rays
@@ -1975,6 +2156,42 @@
              (* tanr (m/sin (.y v)))))))
 (make-var-method rays :random)
 
+(defn make-rays1
+  "Rays1"
+  [^double amount _]
+  (let [pa (* amount (m/sq m/M_2_PI))]
+    (fn [^Vec2 v]
+      (let [^double t (v/magsq v)
+            u (+ pa (/ (m/tan (m/sqrt t))))
+            r (* amount u t)]
+        (Vec2. (/ r (.x v))
+               (/ r (.y v)))))))
+(make-var-method rays1 :regular)
+
+(defn make-rays2
+  "Rays2"
+  [^double amount _]
+  (let [a10 (/ amount 10.0)]
+    (fn [^Vec2 v]
+      (let [^double t (v/magsq v)
+            u (/ (m/cos (* (+ t m/EPSILON) (m/tan (/ (+ m/EPSILON t))))))
+            r (* a10 t u)]
+        (Vec2. (/ r (.x v))
+               (/ r (.y v)))))))
+(make-var-method rays2 :regular)
+
+(defn make-rays3
+  "Rays3"
+  [^double amount _]
+  (let [a10 (/ amount 10.0)]
+    (fn [^Vec2 v]
+      (let [^double t (v/magsq v)
+            t2 (* t t)
+            u (/ (m/sqrt (m/cos (m/sin (* (+ m/EPSILON t2) (m/sin (/ (+ t2 m/EPSILON))))))))
+            r (* a10 t u)]
+        (Vec2. (/ (* r (m/cos t)) (.x v))
+               (/ (* r (m/tan t)) (.y v)))))))
+(make-var-method rays3 :regular)
 
 ;; ### Rectangles
 
@@ -2004,6 +2221,120 @@
                            (* y)
                            (- (.y v))))))))
 (make-var-method rectangles :regular)
+
+;; ### Rhodonea
+
+(make-config-method rhodonea {:knumer (randval (int (srandom 1 30)) (srandom 1 30))
+                              :kdenom (randval (int (srandom 1 30)) (srandom 1 30))
+                              :radial-offset (drand -1 1)
+                              :inner-mode (irand 7)
+                              :outer-mode (irand 7)
+                              :inner-spread (drand -1 1)
+                              :outer-spread (drand -1 1)
+                              :inner-spread-ratio (drand -2 2)
+                              :outer-spread-ratio (drand -2 2)
+                              :spread-split (drand -1.5 1.5)
+                              :cycle-offset (drand m/TWO_PI)
+                              :cycles-param (randval 0 (drand 100))
+                              :metacycle-expansion (drand -1 1)
+                              :metacycles (drand 10)
+                              :fill (randval 0 (drand))})
+
+
+(defn make-rhodonea
+  "Rhodonea"
+  [^double amount {:keys [^double knumer ^double kdenom ^double radial-offset ^long inner-mode ^long outer-mode
+                          ^double inner-spread ^double outer-spread ^double inner-spread-ratio ^double outer-spread-ratio
+                          ^double spread-split ^double cycles-param ^double cycle-offset ^double metacycle-expansion
+                          ^double metacycles ^double fill]}]
+  (let [kn knumer
+        kd kdenom
+        k (/ kn kd)
+        cycles-to-close (double (if (zero? (mod k 1.0))
+                                  (if (zero? (mod k 2.0))
+                                    1.0
+                                    (if (bool-or (not (zero? radial-offset))
+                                                 (not (zero? inner-spread))
+                                                 (not (zero? outer-spread))
+                                                 (not (zero? fill)))
+                                      1.0
+                                      0.5))
+                                  (if (bool-and (zero? (mod kn 1.0))
+                                                (zero? (mod kd 1.0)))
+                                    (let [lkn (long kn)
+                                          lkd (long kd)
+                                          gcd (m/gcd lkn lkd)
+                                          [^long kn ^long kd] (if (not== gcd 1)
+                                                                [(/ lkn gcd) (/ lkd gcd)]
+                                                                [lkn lkd])]
+                                      (if (bool-or (zero? (mod kn 2.0))
+                                                   (zero? (mod kd 2.0)))
+                                        kd
+                                        (/ kd 2)))
+                                    (if (< cycles-param 16)
+                                      16
+                                      (* 2 kd kn)))))
+        cycles (if (zero? cycles-param)
+                 (* cycles-to-close metacycles)
+                 cycles-param)]
+    (fn [^Vec2 v]
+      (let [rin (* spread-split ^double (v/mag v))
+            ^double tin (v/heading v)
+            t (* cycles (+ tin (* cycle-offset m/TWO_PI)))
+            r (+ radial-offset (m/cos (* t k)))
+            r (if-not (zero? fill)
+                (+ r (* fill (- (drand) 0.5)))
+                r)
+            x (* r (m/cos t))
+            y (* r (m/sin t))
+            expansion (m/floor (/ (* cycles (+ tin m/PI))
+                                  (* cycles-to-close m/TWO_PI)))
+            adjusted-amount (+ amount (* expansion metacycle-expansion))]
+        (if (> (m/abs rin) (m/abs r))
+          (case (long outer-mode)
+            0 (Vec2. (* adjusted-amount x)
+                     (* adjusted-amount y))
+            1 (let [rinx (inc (* (dec rin) outer-spread outer-spread-ratio))
+                    riny (inc (* (dec rin) outer-spread))]
+                (Vec2. (* adjusted-amount rinx x)
+                       (* adjusted-amount riny y)))
+            2 (let [xin (* (m/sgn x) (m/abs (.x v)))
+                    yin (* (m/sgn y) (m/abs (.y v)))]
+                (Vec2. (* adjusted-amount (+ x (* outer-spread outer-spread-ratio (- xin x))))
+                       (* adjusted-amount (+ y (* outer-spread (- yin y))))))
+            3 (let [xin (* (m/sgn x) (m/abs (.x v)))
+                    yin (* (m/sgn y) (m/abs (.y v)))]
+                (Vec2. (* adjusted-amount (+ x (* outer-spread outer-spread-ratio xin)))
+                       (* adjusted-amount (+ y (* outer-spread yin)))))
+            4 (let [rinx (+ (* 0.5 rin) (* outer-spread outer-spread-ratio))
+                    riny (+ (* 0.5 rin) outer-spread)]
+                (Vec2. (* adjusted-amount rinx x)
+                       (* adjusted-amount riny y)))
+            5 v
+            6 (Vec2. 0.0 0.0))
+          (case (long inner-mode)
+            0 (Vec2. (* adjusted-amount x)
+                     (* adjusted-amount y))
+            1 (let [rinx (inc (* (dec rin) inner-spread inner-spread-ratio))
+                    riny (inc (* (dec rin) inner-spread))]
+                (Vec2. (* adjusted-amount rinx x)
+                       (* adjusted-amount riny y)))
+            2 (let [xin (* (m/sgn x) (m/abs (.x v)))
+                    yin (* (m/sgn y) (m/abs (.y v)))]
+                (Vec2. (* adjusted-amount (+ x (* inner-spread inner-spread-ratio (- xin x))))
+                       (* adjusted-amount (+ y (* inner-spread (- yin y))))))
+            3 (let [xin (* (m/sgn x) (m/abs (.x v)))
+                    yin (* (m/sgn y) (m/abs (.y v)))]
+                (Vec2. (* adjusted-amount (+ x (* inner-spread inner-spread-ratio xin)))
+                       (* adjusted-amount (+ y (* inner-spread yin)))))
+            4 (let [rinx (+ (* 0.5 rin) (* inner-spread inner-spread-ratio))
+                    riny (+ (* 0.5 rin) inner-spread)]
+                (Vec2. (* adjusted-amount rinx x)
+                       (* adjusted-amount riny y)))
+            5 v
+            6 (Vec2. 0.0 0.0)
+            ))))))
+(make-var-method rhodonea :random)
 
 ;; ### Rings
 
@@ -2035,6 +2366,51 @@
         (v/mult v r)))))
 (make-var-method rings2 :regular)
 
+;; ### Ripple
+
+(make-config-method ripple {:frequency (drand -3 3)
+                            :velocity (drand -3 3)
+                            :amplitude (drand -2 2)
+                            :centerx (drand -0.5 0.5)
+                            :centery (drand -0.5 0.5)
+                            :phase (drand -1 1)
+                            :scale (srandom 0.5 4)
+                            :fixed-dist-calc (irand 4)})
+
+(defn make-ripple
+  "Ripple"
+  [^double amount {:keys [^double frequency ^double velocity ^double amplitude ^double centerx
+                          ^double centery ^double phase ^double scale ^int fixed-dist-calc]}]
+  (let [f (* frequency 5.0)
+        a (* amplitude 0.01)
+        p (- (* phase m/TWO_PI) m/PI)
+        s (if (zero? scale) m/EPSILON scale)
+        is (/ s)
+        vxp (* velocity p)
+        pxa (* p a)
+        pixa (* (- m/PI p) a)]
+    (fn [^Vec2 v]
+      (let [x (- (* s (.x v)) centerx)
+            y (- (* s (.y v)) centery)
+            ^double d (case (unchecked-int fixed-dist-calc)
+                        0 (v/mag v)
+                        1 (m/sqrt (* (m/sq (.x v)) (m/sq (.y v))))
+                        2 (max (m/abs (.x v)) (m/abs (.y v)))
+                        3 (+ (m/abs (.x v)) (m/abs (.y v))))
+            d (if (< d m/EPSILON) m/EPSILON d)
+            nx (/ x d)
+            ny (/ y d)
+            wave (m/cos (- (* f d) vxp))
+            d1 (+ d (* wave pxa))
+            d2 (+ d (* wave pixa))
+            u1 (+ centerx (* nx d1))
+            u2 (+ centerx (* nx d2))
+            v1 (- (* ny d1) centery)
+            v2 (- (* ny d2) centery)]
+        (Vec2. (* amount is (m/lerp u1 u2 p))
+               (* amount is (m/lerp v1 v2 p)))))))
+(make-var-method ripple :regular)
+
 ;; ### Rippled
 
 (defn make-rippled
@@ -2045,6 +2421,19 @@
       (Vec2. (* (* (m/tanh d) (* 2.0 (.x v))) (/ amount 2.0))
              (* (* (m/cos d) (* 2.0 (.y v))) (/ amount 2.0))))))
 (make-var-method rippled :regular)
+
+;; ### Round Sphere
+
+(defn make-roundspher
+  ""
+  [^double amount _]
+  (let [s (m/sq m/M_2_PI)]
+    (fn [v]
+      (let [^double d (v/magsq v)
+            re (/ (+ s (/ d)))
+            ad (/ amount d)]
+        (v/mult v (* amount ad re))))))
+(make-var-method roundspher :regular)
 
 ;; ## S
 

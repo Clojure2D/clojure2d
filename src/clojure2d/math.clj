@@ -306,8 +306,13 @@
 (defn abs ^double [^double v] (FastMath/abs v))
 (fastmath-proxy iabs)
 
+;; truncate fractional part, keep sign
+(defn trunc ^double [^double v] (if (neg? v) (ceil v) (floor v)))
+
 ;; fractional part, always returns values from 0.0 to 1.0 (exclusive)
-(defmacro frac [v] `(abs (- ~v (unchecked-long ~v))))
+(defn frac ^double [^double v] (abs (- v (unchecked-long v))))
+;; as above but keep sign
+(defn sfrac ^double [^double v] (- v (trunc v)))
 
 ;; Find power of 2 exponent for double number where  
 ;; \\(2^(n-1)\leq x\leq 2^n\\)  
@@ -502,6 +507,12 @@
            (floor)
            (* cycle)
            (- value)))))
+
+;; gcd SO version
+(defn gcd ^long [^long a ^long b]
+  (if (zero? b)
+    a
+    (recur b (mod a b))))
 
 ;; Primitive math eq
 (defn eq 
