@@ -39,7 +39,8 @@
   [canvas window]
   (let [field-config (vr/make-random-configuration)
         field (vr/make-combination field-config)
-        field (vr/make-variation :roundspher)] 
+        ;; field (vr/make-variation :roundspher)
+        ] 
 
     (pprint field-config)
     
