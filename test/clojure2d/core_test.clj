@@ -7,17 +7,23 @@
 ;; global variables
 (def ^:const window-name "Testing clojure.core")
 (def canvas (make-canvas 100 100))
+(def canvas2 (make-canvas 100 100))
+
+(defn draw-on-canvas
+  ""
+  [canvas fps]
+  (-> canvas
+      (set-background :black)
+      (set-color :maroon)
+      (line 0 (inc (mod fps 100)) 100 (inc (mod fps 100)))
+      (ellipse 50 50 10 10)))
 
 ;; window with draw function
 (defn draw
   "Draw function"
   [canvas window fps _]
   (set-state! window (assoc (get-state window) :fps fps))
-  (-> canvas
-      (set-background :black)
-      (set-color :maroon)
-      (line 0 (inc (mod fps 100)) 100 (inc (mod fps 100)))
-      (ellipse 50 50 10 10)))
+  (draw-on-canvas canvas fps))
 
 (def window (atom nil))
 (def window-closed (atom nil))
@@ -44,7 +50,9 @@
                                                              java.awt.event.KeyEvent/KEY_PRESSED
                                                              1 0
                                                              java.awt.event.KeyEvent/VK_UNDEFINED
-                                                             \a)))
+                                                             \a))
+  (with-canvas canvas2
+    (draw-on-canvas 50)))
 
 (defn clean-up
   "Close window, remove files"
@@ -71,8 +79,8 @@
                 java.awt.image.BufferedImage get-image)
         (get-image canvas))
 
-(expect (c/to-color :maroon) (get-pixel canvas 50 50))
-(expect (c/to-color :black) (get-pixel canvas 0 0))
+(expect (c/to-color :maroon) (get-pixel canvas2 50 50))
+(expect (c/to-color :black) (get-pixel canvas2 0 0))
 
 ;; rendering hints available
 (expect [:high :low :mid] (sort (keys rendering-hints)))
