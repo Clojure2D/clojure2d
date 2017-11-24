@@ -3094,8 +3094,10 @@ All functions operate and return <code>double</code> or in some cases <code>long
 (fastmath-proxy rint)</pre></td></tr><tr><td class="docs"><p>Modulo and abs</p>
 </td><td class="codes"><pre class="brush: clojure">(fastmath-proxy remainder)
 (defn abs ^double [^double v] (FastMath/abs v))
-(fastmath-proxy iabs)</pre></td></tr><tr><td class="docs"><p>fractional part, always returns values from 0.0 to 1.0 (exclusive)</p>
-</td><td class="codes"><pre class="brush: clojure">(defmacro frac [v] `(abs (- ~v (unchecked-long ~v))))</pre></td></tr><tr><td class="docs"><p>Find power of 2 exponent for double number where <br />
+(fastmath-proxy iabs)</pre></td></tr><tr><td class="docs"><p>truncate fractional part, keep sign</p>
+</td><td class="codes"><pre class="brush: clojure">(defn trunc ^double [^double v] (if (neg? v) (ceil v) (floor v)))</pre></td></tr><tr><td class="docs"><p>fractional part, always returns values from 0.0 to 1.0 (exclusive)</p>
+</td><td class="codes"><pre class="brush: clojure">(defn frac ^double [^double v] (abs (- v (unchecked-long v))))</pre></td></tr><tr><td class="docs"><p>as above but keep sign</p>
+</td><td class="codes"><pre class="brush: clojure">(defn sfrac ^double [^double v] (- v (trunc v)))</pre></td></tr><tr><td class="docs"><p>Find power of 2 exponent for double number where <br />
 \(2^(n-1)\leq x\leq 2^n\) <br />
 where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-exp</code>
 <code>(low-2-exp TWO_PI) =&gt; 2</code> \(2^2\eq 4\leq 6.28\) <br />
@@ -3243,7 +3245,11 @@ where n-1 is result of <code>low-2-exp</code> and n is result of <code>high-2-ex
            (/ (- value from))
            (floor)
            (* cycle)
-           (- value)))))</pre></td></tr><tr><td class="docs"><p>Primitive math equality helper for doubles</p>
+           (- value)))))</pre></td></tr><tr><td class="docs"><p>gcd SO version</p>
+</td><td class="codes"><pre class="brush: clojure">(defn gcd ^long [^long a ^long b]
+  (if (zero? b)
+    a
+    (recur b (mod a b))))</pre></td></tr><tr><td class="docs"><p>Primitive math equality helper for doubles</p>
 
 <p>Primitive math eq</p>
 </td><td class="codes"><pre class="brush: clojure">(defn eq 

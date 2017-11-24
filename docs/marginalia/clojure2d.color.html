@@ -3856,7 +3856,7 @@ Reverse conversion is not normalized and can exceed 0-255 range</p>
        (colorspace-fn (Vec4. ch1 ch2 ch3 ch4)))))
   ([colorspace-fn ch1-scale ch2-scale ch3-scale] (make-color-converter colorspace-fn ch1-scale ch2-scale ch3-scale 255.0))
   ([colorspace-fn ch-scale] (make-color-converter colorspace-fn ch-scale ch-scale ch-scale ch-scale))
-  ([colorspace-fn] #(colorspace-fn %)))</pre></td></tr><tr><td class="docs"><h2>Palettes</h2>
+  ([colorspace-fn] colorspace-fn))</pre></td></tr><tr><td class="docs"><h2>Palettes</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Convert hexadecimal color representation to color</p>
 </td><td class="codes"><pre class="brush: clojure">(defn hex-to-vec
   [s]

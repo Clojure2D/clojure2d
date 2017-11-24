@@ -62,7 +62,7 @@ No tests (yet)
 Add following line as a dependency to your `project.clj`
 
 ```clojure
-[clojure2d "0.0.6-SNAPSHOT"]
+[clojure2d "0.0.7-SNAPSHOT"]
 ```
 
 ## Usage

@@ -288,6 +288,10 @@
 ;; Please do not use `flush-graphics` and `make-graphics` functions directly. Use `with-canvas->` macro instead. I do not check state of `Graphics2D` anywhere.
 ;; There is one exception: `draw` function associated with Window is already wrapped in `with-canvas->` and you can freely use canvas object inside.
 ;; Another note: `with-canvas->` creates it's own copy of `Canvas` object with set `Graphics2D`.
+;;
+;; Second alternative is `with-canvas []` with which is just wrapper (without threading). As a parameter you have to provide binding name for you canvas.
+;;
+;; Example `with-canvas [local-canvas canvas] (set-background local-canvas :black)`
 
 (defn flush-graphics
   "Dispose current `Graphics2D`"

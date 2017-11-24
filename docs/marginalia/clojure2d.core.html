@@ -3019,7 +3019,7 @@ You can freely change this setting with <code>binding</code> macro. Default is 9
   [^BufferedImage source x y w h]
   (.getSubimage source x y w h))</pre></td></tr><tr><td class="docs"><h2>Canvas</h2>
 
-<p>Canvas is an object you can draw on and which can be displayed in the window. Technically it's a type cosisting of <code>Graphics2D</code> object which is internally used to draw on the image, image (<code>BufferedImage</code> object), rendering quality hints and singletons for primitives. What is important: to draw on canvas you have to wrap your operations in <code>with-canvas</code> macro. <code>with-canvas</code> is responsible for creating and releasing <code>Graphics2D</code> object. Initially <code>Graphics2D</code> is set to <code>nil</code>.
+<p>Canvas is an object you can draw on and which can be displayed in the window. Technically it's a type cosisting of <code>Graphics2D</code> object which is internally used to draw on the image, image (<code>BufferedImage</code> object), rendering quality hints and singletons for primitives. What is important: to draw on canvas you have to wrap your operations in <code>with-canvas-&gt;</code> macro. <code>with-canvas-&gt;</code> is responsible for creating and releasing <code>Graphics2D</code> object. Initially <code>Graphics2D</code> is set to <code>nil</code>.
 Canvas should be accelerated by Java and your video card.
 Reminder: Drawing on canvas is single threaded.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Let's define protocol to equip Canvas and Window types (or any type with image inside) with <code>get-image</code> function. <code>get-image</code> extracts image. Additionally define width/height getters.</p>
@@ -3116,10 +3116,14 @@ Reminder: Drawing on canvas is single threaded.</p>
                              RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON
                              RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON
                              RenderingHints/KEY_STROKE_CONTROL      RenderingHints/VALUE_STROKE_PURE}})</pre></td></tr><tr><td class="docs"><p>Following functions and macro are responsible for creating and releasing <code>Graphics2D</code> object for a canvas.
-You have to use <code>with-canvas</code> macro to draw on canvas. Internally it's a threading macro and accepts only list of methods which first parameter is canvas object.
-Please do not use <code>flush-graphics</code> and <code>make-graphics</code> functions directly. Use <code>with-canvas</code> macro instead. I do not check state of <code>Graphics2D</code> anywhere.
-There is one exception: <code>draw</code> function associated with Window is already wrapped in <code>with-canvas</code> and you can freely use canvas object inside.
-Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</code> object with set <code>Graphics2D</code>.</p>
+You have to use <code>with-canvas-&gt;</code> macro to draw on canvas. Internally it's a threading macro and accepts only list of methods which first parameter is canvas object.
+Please do not use <code>flush-graphics</code> and <code>make-graphics</code> functions directly. Use <code>with-canvas-&gt;</code> macro instead. I do not check state of <code>Graphics2D</code> anywhere.
+There is one exception: <code>draw</code> function associated with Window is already wrapped in <code>with-canvas-&gt;</code> and you can freely use canvas object inside.
+Another note: <code>with-canvas-&gt;</code> creates it's own copy of <code>Canvas</code> object with set <code>Graphics2D</code>.</p>
+
+<p>Second alternative is <code>with-canvas []</code> with which is just wrapper (without threading). As a parameter you have to provide binding name for you canvas.</p>
+
+<p>Example <code>with-canvas [local-canvas canvas] (set-background local-canvas :black)</code></p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Dispose current <code>Graphics2D</code></p>
 </td><td class="codes"><pre class="brush: clojure">(defn flush-graphics
   [^Canvas canvas]
@@ -3139,13 +3143,20 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
              (.h canvas)
              (atom [])
              (.font canvas))))</pre></td></tr><tr><td class="docs"><p>Threading macro which takes care to create and destroy <code>Graphics2D</code> object for drawings on canvas. Macro returns result of last call.</p>
-</td><td class="codes"><pre class="brush: clojure">(defmacro with-canvas
+</td><td class="codes"><pre class="brush: clojure">(defmacro with-canvas-&gt;
   [canvas &amp; body]  
   `(let [newcanvas# (make-graphics ~canvas)
          result# (-&gt; newcanvas#
                      ~@body)]
      (do
        (flush-graphics newcanvas#)
+       result#)))</pre></td></tr><tr><td class="docs"><p>Macro which takes care to create and destroy <code>Graphics2D</code> object for drawings on canvas. Macro returns result of last call.</p>
+</td><td class="codes"><pre class="brush: clojure">(defmacro with-canvas
+  [[c canvas] &amp; body]
+  `(let [~c (make-graphics ~canvas)
+         result# (do ~@body)]
+     (do
+       (flush-graphics ~c)
        result#)))</pre></td></tr><tr><td class="docs"><p>Next functions are canvas management functions: create, save, resize and set quality.</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(declare set-background)
@@ -3168,7 +3179,7 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
                         width height
                         nil
                         (when font (java.awt.Font/decode font)))]
-     (with-canvas result
+     (with-canvas-&gt; result
        (set-background Color/black)
        (set-stroke))))
   ([width height]
@@ -3179,10 +3190,10 @@ Another note: <code>with-canvas</code> creates it's own copy of <code>Canvas</co
 </td><td class="codes"><pre class="brush: clojure">(defn resize-canvas
   [^Canvas canvas width height]
   (let [ncanvas (create-canvas width height (.hints canvas))]
-    (with-canvas ncanvas
+    (with-canvas-&gt; ncanvas
       (image (get-image canvas)))))</pre></td></tr><tr><td class="docs"><h3>Transformations</h3>
 
-<p>You can transform your working area with couple of functions on canvas. They act exactly the same as in Processing. Transformation context is bound to canvas wrapped to <code>with-canvas</code> macro. Each <code>with-canvas</code> cleans all transformations.
+<p>You can transform your working area with couple of functions on canvas. They act exactly the same as in Processing. Transformation context is bound to canvas wrapped to <code>with-canvas-&gt;</code> macro. Each <code>with-canvas-&gt;</code> cleans all transformations.
 Transformations are concatenated.</p>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>Scale canvas</p>
 </td><td class="codes"><pre class="brush: clojure">(defn scale
@@ -3217,7 +3228,7 @@ Transformations are concatenated.</p>
   canvas)</pre></td></tr><tr><td class="docs"><p>Restore saved transformation state</p>
 </td><td class="codes"><pre class="brush: clojure">(defn pop-matrix
   [^Canvas canvas]
-  (when-not (empty? @(.transform-stack canvas))
+  (when (seq @(.transform-stack canvas))
     (let [v (peek @(.transform-stack canvas))]
       (swap! (.transform-stack canvas) pop)
       (.setTransform ^Graphics2D (.graphics canvas) v)))
@@ -3244,7 +3255,7 @@ Transformations are concatenated.</p>
 <ul>
 <li>Color is set globally for all figures (exception: <code>set-background</code>)</li>
 <li>Filled or stroke figures are determined by last parameter <code>stroke?</code>. When set to <code>true</code> draws figure outline, filled otherwise (default). Default is <code>false</code> (filled).</li>
-<li>Always use with <code>with-canvas</code> macro.</li>
+<li>Always use with <code>with-canvas-&gt;</code> macro.</li>
 </ul>
 
 <p>All functions return canvas object</p>
@@ -3336,7 +3347,7 @@ Transformations are concatenated.</p>
    (triangle-strip canvas vs false)))</pre></td></tr><tr><td class="docs"><p>Draw path from lines. Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).</p>
 </td><td class="codes"><pre class="brush: clojure">(defn path
   ([^Canvas canvas vs close? stroke?]
-   (when-not (empty? vs)
+   (when (seq vs)
      (let [^Path2D p (Path2D$Double.)
            ^Vec2 m (first vs)]
        (.moveTo p (.x m) (.y m))
@@ -3552,7 +3563,7 @@ Use this information via <code>window-active?</code> function to control (and po
 
 <p>Function should return current state, which will be passed to function when called next time.</p>
 
-<p>Note: calls to <code>draw</code> are wrapped in <code>with-canvas</code> already.</p>
+<p>Note: calls to <code>draw</code> are wrapped in <code>with-canvas-&gt;</code> already.</p>
 
 <h3>Events</h3>
 
@@ -3811,7 +3822,7 @@ As a parameter you get <code>MouseEvent</code> object equipped with <code>MouseX
            result draw-state]
       (let [ct (System/currentTimeMillis)
             new-result (when draw-fun 
-                         (with-canvas @(.buffer window)
+                         (with-canvas-&gt; @(.buffer window)
                            (draw-fun window cnt result)))] 
         (repaint (.panel window) @(.buffer window))
         (let [delay (- stime (- (System/currentTimeMillis) ct))]
