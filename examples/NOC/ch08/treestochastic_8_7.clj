@@ -28,7 +28,7 @@
 (defn new-tree
   "Create new tree"
   []
-  (with-canvas canvas
+  (with-canvas-> canvas
     (set-background :white)
     (set-color :black)
     (text "Click mouse to generate a new tree" 10 (- (height canvas) 10))

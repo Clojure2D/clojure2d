@@ -97,7 +97,7 @@
    (println recipe)
    (let [{len :len pos :pos :as precipe} (process-recipe recipe)
          [px py] (v/mult pos size)]
-     (with-canvas canvas
+     (with-canvas-> canvas
        (set-background 21 20 25)
        (set-color :lightgrey 240)
        (set-stroke 0.8)

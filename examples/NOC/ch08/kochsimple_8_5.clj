@@ -32,7 +32,7 @@
   [segments]
   (reduce #(concat %1 (iterate-segment %2)) [] segments))
 
-(with-canvas canvas
+(with-canvas-> canvas
   (set-background :white)
   (set-color :black)
   (render (first (drop 5 (iterate next-level initial-state)))))

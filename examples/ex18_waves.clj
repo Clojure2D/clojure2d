@@ -29,7 +29,7 @@
 
 ;; run several times
 (let [lst (into [] (map #(s/make-wave (rand-nth s/oscillators) (f %) (a %) (r/drand 1)) (range 1 5)))]
-  (with-canvas canvas
+  (with-canvas-> canvas
     (set-color :white)
     (set-background :black)
     (draw-fun (s/make-sum-wave lst)))
@@ -56,7 +56,7 @@
   (dotimes [y 600]
     (let [yy (/ y 600.0)
           lst (map #(s/make-wave (nth wvs %) (f (nth octaves %)) (a (nth octaves %)) (+ (* yy ^double (nth phasemult %)) ^double (nth phases %))) (range num))]
-      (with-canvas canvas
+      (with-canvas-> canvas
         (draw-fun2 y (s/make-sum-wave lst)))))
   :done)
 

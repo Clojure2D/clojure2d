@@ -64,7 +64,7 @@
 
       (pprint field-config)
 
-      (with-canvas canvas
+      (with-canvas-> canvas
         (set-background 240 240 240)
         (set-color 20 20 20 20)
         (set-stroke point-size)

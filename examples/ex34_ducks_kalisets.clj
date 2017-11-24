@@ -177,7 +177,7 @@
   "Draw fractal"
   [config]
   (pprint config)
-  (with-canvas canvas
+  (with-canvas-> canvas
     (draw-ducks config)
     (p/set-canvas-pixels! (p/filter-channels p/normalize-filter nil (p/get-canvas-pixels canvas))))
   (println "done!")

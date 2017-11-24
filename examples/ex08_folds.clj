@@ -59,7 +59,7 @@
 (defn draw-folds
   ""
   [[canvas disp]]
-  (with-canvas canvas
+  (with-canvas-> canvas
     (set-background 255 250 245)
     (set-color 35 35 35 16)
     (make-me disp)

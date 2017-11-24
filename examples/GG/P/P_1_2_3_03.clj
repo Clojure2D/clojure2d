@@ -44,8 +44,8 @@
 (def window (show-window canvas "P_1_2_3_03"))
 
 (defmethod mouse-event [(:window-name window) :mouse-released] [_ _] 
-  (with-canvas canvas
+  (with-canvas-> canvas
     draw))
 
-(with-canvas canvas
+(with-canvas-> canvas
   draw)

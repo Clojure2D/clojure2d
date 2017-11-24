@@ -149,7 +149,7 @@
          (p/filter-channels p/equalize-filter nil) ;;;; change!
          (p/set-canvas-pixels! canvas))
 
-    (with-canvas (canvases frame)
+    (with-canvas-> (canvases frame)
       (image (-> (get-image canvas)
                  (o/render-rgb-scanlines) ;;;; change!
                  (o/render-noise (noise-frames frame)) ;;;; change!
@@ -172,7 +172,7 @@
   (let [buffer (create-canvas w h)]
     (loop [time (long 0)]
       (let [frame (mod time number-of-frames)]
-        (with-canvas buffer
+        (with-canvas-> buffer
           (scenario time frame)))
       (when (and  @is-running (window-active? window)) (recur (inc time)))))
   (println "stopped"))

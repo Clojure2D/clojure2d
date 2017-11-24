@@ -15,7 +15,7 @@
       (draw-circle canvas x (+ y r2) r2)
       (draw-circle canvas x (- y r2) r2))))
 
-(with-canvas canvas
+(with-canvas-> canvas
   (set-background :white)
   (set-color :black)
   (draw-circle (/ (width canvas) 2)

@@ -177,7 +177,7 @@
 
 ;; ## Canvas
 ;;
-;; Canvas is an object you can draw on and which can be displayed in the window. Technically it's a type cosisting of `Graphics2D` object which is internally used to draw on the image, image (`BufferedImage` object), rendering quality hints and singletons for primitives. What is important: to draw on canvas you have to wrap your operations in `with-canvas` macro. `with-canvas` is responsible for creating and releasing `Graphics2D` object. Initially `Graphics2D` is set to `nil`.
+;; Canvas is an object you can draw on and which can be displayed in the window. Technically it's a type cosisting of `Graphics2D` object which is internally used to draw on the image, image (`BufferedImage` object), rendering quality hints and singletons for primitives. What is important: to draw on canvas you have to wrap your operations in `with-canvas->` macro. `with-canvas->` is responsible for creating and releasing `Graphics2D` object. Initially `Graphics2D` is set to `nil`.
 ;; Canvas should be accelerated by Java and your video card.
 ;; Reminder: Drawing on canvas is single threaded.
 
@@ -284,10 +284,10 @@
                              RenderingHints/KEY_STROKE_CONTROL      RenderingHints/VALUE_STROKE_PURE}})
 
 ;; Following functions and macro are responsible for creating and releasing `Graphics2D` object for a canvas.
-;; You have to use `with-canvas` macro to draw on canvas. Internally it's a threading macro and accepts only list of methods which first parameter is canvas object.
-;; Please do not use `flush-graphics` and `make-graphics` functions directly. Use `with-canvas` macro instead. I do not check state of `Graphics2D` anywhere.
-;; There is one exception: `draw` function associated with Window is already wrapped in `with-canvas` and you can freely use canvas object inside.
-;; Another note: `with-canvas` creates it's own copy of `Canvas` object with set `Graphics2D`.
+;; You have to use `with-canvas->` macro to draw on canvas. Internally it's a threading macro and accepts only list of methods which first parameter is canvas object.
+;; Please do not use `flush-graphics` and `make-graphics` functions directly. Use `with-canvas->` macro instead. I do not check state of `Graphics2D` anywhere.
+;; There is one exception: `draw` function associated with Window is already wrapped in `with-canvas->` and you can freely use canvas object inside.
+;; Another note: `with-canvas->` creates it's own copy of `Canvas` object with set `Graphics2D`.
 
 (defn flush-graphics
   "Dispose current `Graphics2D`"
@@ -311,7 +311,7 @@
              (atom [])
              (.font canvas))))
 
-(defmacro with-canvas
+(defmacro with-canvas->
   "Threading macro which takes care to create and destroy `Graphics2D` object for drawings on canvas. Macro returns result of last call."
   [canvas & body]  
   `(let [newcanvas# (make-graphics ~canvas)
@@ -319,6 +319,15 @@
                      ~@body)]
      (do
        (flush-graphics newcanvas#)
+       result#)))
+
+(defmacro with-canvas
+  "Macro which takes care to create and destroy `Graphics2D` object for drawings on canvas. Macro returns result of last call."
+  [[c canvas] & body]
+  `(let [~c (make-graphics ~canvas)
+         result# (do ~@body)]
+     (do
+       (flush-graphics ~c)
        result#)))
 
 ;; Next functions are canvas management functions: create, save, resize and set quality.
@@ -345,7 +354,7 @@
                         width height
                         nil
                         (when font (java.awt.Font/decode font)))]
-     (with-canvas result
+     (with-canvas-> result
        (set-background Color/black)
        (set-stroke))))
   ([width height]
@@ -360,12 +369,12 @@
   "Resize canvas to new dimensions. Creates and returns new canvas."
   [^Canvas canvas width height]
   (let [ncanvas (create-canvas width height (.hints canvas))]
-    (with-canvas ncanvas
+    (with-canvas-> ncanvas
       (image (get-image canvas)))))
 
 ;; ### Transformations
 ;;
-;; You can transform your working area with couple of functions on canvas. They act exactly the same as in Processing. Transformation context is bound to canvas wrapped to `with-canvas` macro. Each `with-canvas` cleans all transformations.
+;; You can transform your working area with couple of functions on canvas. They act exactly the same as in Processing. Transformation context is bound to canvas wrapped to `with-canvas->` macro. Each `with-canvas->` cleans all transformations.
 ;; Transformations are concatenated.
 
 (defn scale
@@ -449,7 +458,7 @@
 ;;
 ;; * Color is set globally for all figures (exception: `set-background`)
 ;; * Filled or stroke figures are determined by last parameter `stroke?`. When set to `true` draws figure outline, filled otherwise (default). Default is `false` (filled).
-;; * Always use with `with-canvas` macro.
+;; * Always use with `with-canvas->` macro.
 ;; 
 ;; All functions return canvas object
 
@@ -804,7 +813,7 @@
 ;;
 ;; Function should return current state, which will be passed to function when called next time.
 ;;
-;; Note: calls to `draw` are wrapped in `with-canvas` already.
+;; Note: calls to `draw` are wrapped in `with-canvas->` already.
 ;;
 ;; ### Events
 ;;
@@ -1128,7 +1137,7 @@
            result draw-state]
       (let [ct (System/currentTimeMillis)
             new-result (when draw-fun 
-                         (with-canvas @(.buffer window)
+                         (with-canvas-> @(.buffer window)
                            (draw-fun window cnt result)))] 
         (repaint (.panel window) @(.buffer window))
         (let [delay (- stime (- (System/currentTimeMillis) ct))]

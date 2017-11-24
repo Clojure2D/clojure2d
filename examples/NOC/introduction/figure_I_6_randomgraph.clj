@@ -15,7 +15,7 @@
 (def window (show-window canvas "Random graph"))
 
 (let [p (map #(Vec2. % (random-fn (height canvas))) (range 0 (width canvas) 2))]
-  (with-canvas canvas
+  (with-canvas-> canvas
     (set-background :white)
     (set-color :black)
     (set-stroke 2.0)

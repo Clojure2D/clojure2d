@@ -45,7 +45,7 @@
       (save canvas (next-filename "results/ex07/" ".jpg")))
 
 
-    (with-canvas canvas
+    (with-canvas-> canvas
       (set-background 200 200 210)
       (draw-glass window 800 800)))
   :done)

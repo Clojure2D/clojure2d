@@ -26,7 +26,7 @@
           (pop-matrix))
       canvas)))
 
-(with-canvas canvas
+(with-canvas-> canvas
   (set-background :white)
   (set-color :black)
   (set-stroke 2.0)

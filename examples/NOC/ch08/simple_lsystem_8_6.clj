@@ -7,7 +7,7 @@
                           :state {:string "A"
                                   :generation 0}}))
 
-(with-canvas canvas
+(with-canvas-> canvas
   (set-background :white)
   (set-color :black)
   (text "Click mouse to generate" 10 (- (height canvas) 20)))

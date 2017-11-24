@@ -46,6 +46,6 @@
           (rect canvas x y 1 1))))))
 
 (do
-  (with-canvas canvas
+  (with-canvas-> canvas
     (draw-grid))
   :done)

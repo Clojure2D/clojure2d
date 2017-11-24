@@ -11,7 +11,7 @@
   (when (> r 2.0)
     (recur canvas x y (* 0.75 r))))
 
-(with-canvas canvas
+(with-canvas-> canvas
   (set-background :white)
   (set-color :black)
   (draw-circle (/ (width canvas) 2)

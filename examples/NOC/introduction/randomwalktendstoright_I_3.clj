@@ -29,7 +29,7 @@
 
 (let [canvas (make-canvas 640 360)]
 
-  (with-canvas canvas
+  (with-canvas-> canvas
     (set-background :white))
 
   (show-window canvas "Random Walk - tends to right I_3" draw))

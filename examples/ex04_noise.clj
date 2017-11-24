@@ -25,7 +25,7 @@
 (defn draw-noise
   ""
   [n]
-  (with-canvas canvas
+  (with-canvas-> canvas
     (set-background 0 0 0)
     (loop-noise n))
   nil)

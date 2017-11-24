@@ -46,7 +46,7 @@
                                (core/set-awt-color canv col)
                                (core/rect canv x y size size))))]
 
-       (core/with-canvas canvas
+       (core/with-canvas-> canvas
          (draw))))))
 
 ;; color with image colors

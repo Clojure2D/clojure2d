@@ -69,7 +69,7 @@
 
       (pprint field-config)
 
-      (with-canvas canvas
+      (with-canvas-> canvas
         (set-background 10 10 10)
         (set-stroke point-size)
         looper)    

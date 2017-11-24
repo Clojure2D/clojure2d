@@ -2,7 +2,8 @@
 
 (ns examples.ex00-helloworld
   (:require [clojure2d.core :refer :all]
-            [clojure2d.color :as c]))
+            [clojure2d.color :as c]
+            [clojure2d.math :as m]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -13,8 +14,8 @@
 ;; create window
 (def window (show-window canvas "Hello World!"))
 
-;; draw rectangle with line
-(with-canvas canvas ;; prepare drawing context in canvas
+;; draw rectangle with line wrapping with threading canvas context
+(with-canvas-> canvas ;; prepare drawing context in canvas
   (set-background 10 5 5) ;; clear background
   (set-color 210 210 200) ;; set color
   (rect 100 100 400 400) ;; draw rectangle
@@ -24,6 +25,15 @@
   (set-font-attributes 30)
   (set-color :maroon)
   (text "Hello World!" 110 130)) ;; draw line
+
+;; draw dots
+(with-canvas [c canvas]
+  (set-color c :black)
+  (doseq [angle (range 0.0 m/TWO_PI (/ m/TWO_PI 10))]
+    (ellipse c
+             (+ 300.0 (* 30.0 (m/sin angle)))
+             (+ 300.0 (* 30.0 (m/cos angle)))
+             10 10)))
 
 ;; now lets define drawing function
 ;; type hints to avoid boxed operations

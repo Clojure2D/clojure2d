@@ -42,7 +42,7 @@
           ^Vec2 res (v/add mid (v/mult (spirograph-fn t) (* 0.9 hw)))]      
       (point canvas (.x res) (.y res)))))
 
-(with-canvas canvas
+(with-canvas-> canvas
   (set-background :black)
   (set-color :linen 30)
   (draw-spirograph (make-spirograph) (r/drand 10000 200000)))

@@ -86,7 +86,7 @@
 (defn draw-sentence
   "Prepare canvas and run turtle"
   [canvas init-pos turtle sentence depth]
-  (with-canvas canvas
+  (with-canvas-> canvas
     (set-background :white)
     (set-color :black) 
     (text "Click mouse to generate. Click space for random change." 10 (- (height canvas) 10)) ;

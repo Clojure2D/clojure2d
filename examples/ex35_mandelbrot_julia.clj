@@ -159,21 +159,21 @@
 (def jcanvas (make-canvas hw hw))
 (def jwindow (show-window jcanvas "Julia"))
 
-(with-canvas canvas
+(with-canvas-> canvas
   (draw-mandelbrot (get-state window)))
 
 (defmethod key-pressed ["Mandelbrot" \space] [_ _]
-  (with-canvas canvas
+  (with-canvas-> canvas
     (draw-mandelbrot (make-matrix-maker))))
 
 (defmethod key-pressed ["Mandelbrot" \m] [_ _]
-  (with-canvas canvas
+  (with-canvas-> canvas
     (draw-mandelbrot complex-matrix)))
 
 (defmethod mouse-event ["Mandelbrot" :mouse-moved] [e matrix-maker]
   (let [nx (m/norm (mouse-y e) 0 w -3 3)
         ny (m/norm (mouse-x e) 0 w -3 3)]
-    (with-canvas jcanvas
+    (with-canvas-> jcanvas
       (draw-julia matrix-maker (matrix-maker nx ny)))))
 
 (defmethod key-pressed ["Mandelbrot" \s] [_ s]

@@ -106,6 +106,6 @@
 
 (let [[f d] (last (last (take (r/irand 2 6) (iterate make-step initial-node))))]
   (println d)
-  (with-canvas canvas
+  (with-canvas-> canvas
     (set-background :black)
     (draw-julia f (Vec2. (r/drand -2 2) (r/drand -2 2)))))

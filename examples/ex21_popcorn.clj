@@ -93,7 +93,7 @@
 
       (println field-config)
       
-      (with-canvas canvas
+      (with-canvas-> canvas
         (set-background 240 240 240)
         (set-color 49 52 59 alpha)
         (set-stroke point-size)

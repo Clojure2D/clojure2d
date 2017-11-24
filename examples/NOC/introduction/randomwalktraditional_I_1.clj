@@ -28,7 +28,7 @@
 
 (let [canvas (make-canvas 640 360)]
 
-  (with-canvas canvas
+  (with-canvas-> canvas
     (set-background :white))
 
   (show-window canvas "Random Walk - Traditional I_1" draw))

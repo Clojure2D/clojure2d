@@ -38,7 +38,7 @@
     (println (str "Size: " (count palette)))
     (println (str "Conf: " (:conf fpalette)))
     
-    (with-canvas canvas
+    (with-canvas-> canvas
       (set-color 20 20 20)
       (rect 0 0 w halfh)
       (set-color 235 235 235)

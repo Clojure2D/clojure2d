@@ -46,7 +46,7 @@
           [npx npy ncounter])))))
 
 (let [canvas (make-canvas 550 550)]
-  (with-canvas canvas
+  (with-canvas-> canvas
     (set-background :white))
   (def window (show-window {:canvas canvas
                             :draw-fn draw
@@ -71,7 +71,7 @@
                                                          :draw-mode 3})
 
 (defmethod key-pressed [(:window-name window) \backspace] [_ s]
-  (with-canvas @(:buffer window)
+  (with-canvas-> @(:buffer window)
     (set-background :white))
   s)
 

@@ -32,7 +32,7 @@
           [npx npy])))))
 
 (let [canvas (make-canvas 800 800)]
-  (with-canvas canvas
+  (with-canvas-> canvas
     (set-background :white))
   (def window (show-window {:canvas canvas
                             :draw-fn draw
@@ -40,5 +40,5 @@
                             :draw-state [(/ (width canvas) 2)
                                          (/ (height canvas) 2)]})))
 
-(with-canvas (make-canvas 800 800)
+(with-canvas-> (make-canvas 800 800)
   (draw window 0 [400 400]))

@@ -72,7 +72,7 @@
    (draw-rule (r/irand 256))) 
   ([rule]
    (println (str "Rule: " rule))
-   (with-canvas canvas
+   (with-canvas-> canvas
      (draw-cells (make-rule rule)))))
 
 (defmethod mouse-event ["Wolframca figures 7_1" :mouse-clicked] [_ _]

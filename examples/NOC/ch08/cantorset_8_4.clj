@@ -12,7 +12,7 @@
     (cantor canvas x (+ y 30) (/ len 3.0))
     (cantor canvas (+ x (/ (* 2.0 len) 3.0)) (+ y 30) (/ len 3.0))))
 
-(with-canvas canvas
+(with-canvas-> canvas
   (set-background :white)
   (set-color :black)
   (cantor 35 0 730))

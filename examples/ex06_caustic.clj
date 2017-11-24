@@ -53,7 +53,7 @@
     (defmethod key-pressed ["caustic" \space] [_ _]
       (save canvas (next-filename "results/ex06/" ".jpg")))
 
-    (with-canvas canvas
+    (with-canvas-> canvas
       (set-color 10 20 40 30)
       (set-background 200 200 210)
       (draw-caustic window 800 800)))

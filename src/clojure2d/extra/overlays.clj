@@ -63,7 +63,7 @@
                   (p/get-image-pixels))
          l1 (tinter1 rimg)
          l2 (tinter2 rimg)
-         canvas (with-canvas (create-canvas w h)
+         canvas (with-canvas-> (create-canvas w h)
                   (image (p/image-from-pixels l1))
                   (draw-lines w h))]
      
@@ -169,7 +169,7 @@
    (let [img (get-image img)
          w (width img)
          h (height img)
-         canvas (with-canvas (create-canvas w h)
+         canvas (with-canvas-> (create-canvas w h)
                   (image img)
                   (image noise))]
      (get-image canvas)))
@@ -234,7 +234,7 @@
    (let [img (get-image img)
          w (width img)
          h (height img)
-         canvas (with-canvas (create-canvas w h)
+         canvas (with-canvas-> (create-canvas w h)
                   (apply-images img spots))]     
      (get-image canvas)))
   ([img] (render-spots img (make-spots (width img) (height img)))))

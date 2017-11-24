@@ -53,7 +53,7 @@
           posy2 (+ posy1 (* l2 (m/cos a1)))]
 
       ;; draw rods, balls on buffer
-      (with-canvas local-canvas
+      (with-canvas-> local-canvas
         (set-color 0 0 0 220)
         (rect 0 0 600 600)
         (set-color 250 250 250)
@@ -66,7 +66,7 @@
         (ellipse posx2 posy2 m2 m2))
 
       ;; draw on window
-      (with-canvas canvas
+      (with-canvas-> canvas
         (image (get-image local-canvas)))
 
       ;; wait

@@ -175,6 +175,6 @@
                   desaturate
                   (v/mult 255)
                   c/to-color)]
-        (with-canvas canvas
+        (with-canvas-> canvas
           (set-color c)
           (rect x y 1 1))))))

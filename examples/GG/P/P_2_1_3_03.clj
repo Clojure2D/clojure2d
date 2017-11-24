@@ -59,5 +59,5 @@
     :right [dm (inc tcx) tcy]
     [dm tcx tcy]))
 
-(with-canvas (make-canvas 600 600)
+(with-canvas-> (make-canvas 600 600)
   (draw window 0 0))

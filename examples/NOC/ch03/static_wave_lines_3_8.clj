@@ -18,7 +18,7 @@
 (def canvas (make-canvas w h))
 (def window (show-window canvas "Static wave lines 3_8"))
 
-(with-canvas canvas
+(with-canvas-> canvas
   (set-background :white)
   (set-color :black)
   (set-stroke 2.0)

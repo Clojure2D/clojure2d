@@ -110,6 +110,6 @@
             (set-color canvas (c/to-color (v/mult col 255)))
             (rect canvas x y 1 1)))))))
 
-(with-canvas canvas
+(with-canvas-> canvas
   (set-background 0 0 0)
   (do-it))

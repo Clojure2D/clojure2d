@@ -56,15 +56,15 @@
                                                   (p/filter-channels p/normalize-filter false
                                                                      (g/blend-machine b p1 p2)))))
 
-(core/with-canvas canvas
+(core/with-canvas-> canvas
   (core/image (o/render-rgb-scanlines p3)))
 
-(core/with-canvas canvas
+(core/with-canvas-> canvas
   (core/image (-> (p/image-from-pixels p4)
                   (o/render-noise noise-overlay)
                   (o/render-spots spots-overlay))))
 
-(core/with-canvas canvas
+(core/with-canvas-> canvas
   (core/image (o/render-crt-scanlines (p/image-from-pixels p3) {:resolution 3})))
 
 (core/close-session)
@@ -234,7 +234,7 @@
 (def pcanvas (core/make-canvas 500 500))
 (def pwindow (core/show-window pcanvas "Path test"))
 
-(core/with-canvas pcanvas
+(core/with-canvas-> pcanvas
   (core/set-background :black)
   (core/path-quad [(Vec2. 200 200) (Vec2. 200 300) (Vec2. 300 400) (Vec2. 300 300) (Vec2. 400 300)]))
 

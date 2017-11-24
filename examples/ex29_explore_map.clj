@@ -131,7 +131,7 @@
       rpars (map #(apply r/drand %) pars)]
   (println random-map)
   (println rpars)
-  (with-canvas canvas
+  (with-canvas-> canvas
     (draw-map steps r scale (apply f rpars)))
   :done)
 

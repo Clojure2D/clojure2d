@@ -43,7 +43,7 @@
             y (mouse-y e)
             cr (m/cnorm x 0 399 0 255)
             cg (m/cnorm y 0 399 0 255)]
-        (with-canvas canvas
+        (with-canvas-> canvas
           (set-background cr cg 128))
         (replace-canvas frame1 canvas)))
     nil))

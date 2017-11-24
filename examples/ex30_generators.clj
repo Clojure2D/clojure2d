@@ -27,7 +27,7 @@
       (ellipse canvas (+ ^double posx (.x v)) (+ ^double posy (.y v)) 3 3)))
   canvas)
 
-(with-canvas canvas
+(with-canvas-> canvas
   (set-background 10 10 10)
   (set-color 255 0 0 150)
   (draw-random-rect :halton 50 50 225 1000) ;; upper left

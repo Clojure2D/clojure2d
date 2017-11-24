@@ -21,7 +21,7 @@
 (def canvas (make-canvas 720 720))
 (def window
   (do
-    (with-canvas canvas (set-background :white))
+    (with-canvas-> canvas (set-background :white))
     (show-window {:canvas canvas
                   :window-name "P_2_0_02"
                   :draw-fn draw
@@ -31,5 +31,5 @@
 (defmethod mouse-event [(:window-name window) :mouse-released] [_ _] false)
 
 (defmethod key-pressed [(:window-name window) \backspace] [_ state]
-  (with-canvas canvas (set-background :white))
+  (with-canvas-> canvas (set-background :white))
   state)

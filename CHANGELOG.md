@@ -1,6 +1,16 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 0.0.7
+
+### Added
+
+- `with-canvas` is no longer threading macro (use `with-canvas->` for that)
+
+### Changed
+
+- `with-canvas` is renamed to `with-canvas->`
+
 ## 0.0.5-0.0.6 - 2017-11-21
 
 ### Added

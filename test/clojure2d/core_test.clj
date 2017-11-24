@@ -51,7 +51,7 @@
                                                              1 0
                                                              java.awt.event.KeyEvent/VK_UNDEFINED
                                                              \a))
-  (with-canvas canvas2
+  (with-canvas-> canvas2
     (draw-on-canvas 50)))
 
 (defn clean-up
@@ -95,14 +95,14 @@
 (defn make-transformation
   "Translate canvas and check point position"
   [v]
-  (with-canvas canvas
+  (with-canvas-> canvas
     (translate 100 100)
     (transform v)))
 
 (defn make-inv-transformation
   "Translate canvas and check point"
   [v]
-  (with-canvas canvas
+  (with-canvas-> canvas
     (translate 100 100)
     (inv-transform v)))
 
