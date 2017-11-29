@@ -1311,7 +1311,7 @@
   "Create unique session name based on current time. Result is a vector with date and hash represented as hexadecimary number."
   []
   (let [date (java.util.Date.)]
-    [(.format simple-date-format date) (to-hex (hash date))]))
+    [(.format simple-date-format date) (to-hex (hash date) 8)]))
 
 (defn- make-session-fn 
   "Create session"
