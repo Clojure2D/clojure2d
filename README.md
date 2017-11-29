@@ -165,6 +165,7 @@ I've prepared several examples with results where you can check current state of
 * ex39 - oldschool demoscene effect: tunnel
 * ex40 - oldschool demoscene effect: fire
 * ex41 - folds on lines
+* ex42 - folds on strings
 * NOC - [Nature of Code](https://github.com/shiffman/The-Nature-of-Code-Examples/) Clojure2d version. Most interesting:
   * ch02/attraction-many-2-7.clj
   * ch02/fluidresistance-2-5.clj
