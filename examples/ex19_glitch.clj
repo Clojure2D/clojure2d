@@ -89,3 +89,9 @@
       (p/set-canvas-pixels! canvas (p/filter-channels (g/make-fold-filter f 2.03)
                                                       (g/make-fold-filter f 2.0)
                                                       (g/make-fold-filter f 1.97) nil img)))))
+
+;; pix2line
+
+(p/set-canvas-pixels! canvas (p/filter-channels (g/make-pix2line (g/make-pix2line-config))
+                                                (g/make-pix2line (g/make-pix2line-config))
+                                                (g/make-pix2line (g/make-pix2line-config)) nil img))

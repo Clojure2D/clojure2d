@@ -226,7 +226,64 @@
   [t]
   (t mirror-types))
 
-;;
+;; pix2line
+
+(defn- pix2line-grid 
+  ""
+  [^long grid-sx ^long grid-sy {:keys [^long nx ^long ny ^double scale nseed]}]
+  (let [nnx (m/round (inc (* nx scale)))
+        nny (m/round (inc (* ny scale)))
+        [bget bset] (make-2d-int-array grid-sx grid-sy)
+        noise (r/make-perlin-noise (if nseed nseed (r/irand)))]
+    (dotimes [y grid-sy]
+      (bset 0 y 0) 
+      (loop [currx (int 0)
+             current (< ^double (noise 0 (/ y ny)) 0.5)
+             x (int 1)]
+        (when (< x grid-sx)
+          (let [xnnx (/ x nnx)
+                xx (* xnnx (m/round (* nnx (inc ^double (noise xnnx)))))
+                ynny (/ y nny)
+                yy (* ynny (m/round (* nny (inc ^double (noise ynny)))))
+                here (< ^double (noise (/ (+ x xx) nx) (/ (+ y yy) ny)) 0.5)
+                ncurrx (if (= current here) currx x)
+                ncurrent (if (= current here) current here)]
+            (bset x y ncurrx)
+            (recur ncurrx ncurrent (unchecked-inc x))))))
+    bget))
+
+(defn make-pix2line
+  ""
+  [{:keys [^long tolerance whole] :as config}] 
+  (fn [ch target ^Pixels source]
+    (let [grid (pix2line-grid (width source) (height source) config)]
+      (dotimes [y (height source)]
+        (loop [^int currentc (p/get-value source ch 0 y)
+               lastx 0
+               x (int 1)]
+          (if (< x (.w source))
+            (let [^int c (p/get-value source ch x y)
+                  [^int ncurrentc ^int nlastx] (if (<= tolerance (m/abs (- currentc c)))
+                                                 (let [^int gval (grid x y)
+                                                       ^int myx (if (bool-and whole (< lastx gval)) lastx gval)]
+                                                   (dotimes [xx (- x myx)] (p/set-value target ch (+ myx xx) y c))
+                                                   [c x])
+                                                 [currentc lastx])]
+              (recur ncurrentc (int nlastx) (unchecked-inc x)))
+            (let [x- (dec x)
+                  ^int gval (grid x- y)
+                  ^int myx (if (< lastx gval) lastx gval)]
+              (dotimes [xx (- x- myx)] (p/set-value target ch (+ myx xx) y currentc)))))))))
+
+(defn make-pix2line-config
+  "Make random config for pix2line"
+  []
+  {:nx (inc (r/irand 100))
+   :ny (inc (r/irand 100))
+   :scale (r/drand 5.0)
+   :tolerance (r/randval 0.9 (r/irand 5 80) (r/irand 5 250))
+   :nseed (r/irand)
+   :whole (r/brand 0.8)})
 
 ;; blend machine
 

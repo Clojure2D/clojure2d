@@ -1367,3 +1367,28 @@
                               (.flush o)
                               (->SessionType o (:name s) (:counter s)))))
       (println to-log))))
+
+;;
+;; Mutable array2d creator helper
+;;
+
+(defn make-2d-int-array
+  "Create 2d int array getter and setter methods. Array is mutable!"
+  [^long sizex ^long sizey]
+  (let [buff (int-array (* sizex sizey))]
+    [#(aget ^ints buff (+ ^long %1 (* sizex ^long %2)))
+     #(aset ^ints buff (+ ^long %1 (* sizex ^long %2)) ^int %3)]))
+
+(defn make-2d-long-array
+  "Create 2d int array getter and setter methods. Array is mutable!"
+  [^long sizex ^long sizey]
+  (let [buff (long-array (* sizex sizey))]
+    [#(aget ^longs buff (+ ^long %1 (* sizex ^long %2)))
+     #(aset ^longs buff (+ ^long %1 (* sizex ^long %2)) ^long %3)]))
+
+(defn make-2d-double-array
+  "Create 2d int array getter and setter methods. Array is mutable!"
+  [^long sizex ^long sizey]
+  (let [buff (double-array (* sizex sizey))]
+    [#(aget ^doubles buff (+ ^long %1 (* sizex ^long %2)))
+     #(aset ^doubles buff (+ ^long %1 (* sizex ^long %2)) ^double %3)]))
