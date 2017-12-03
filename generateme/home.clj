@@ -16,7 +16,7 @@
            [clojure2d.java PrimitiveMath]))
 
 
-(def p1 (p/load-pixels "generateme/chad/chad000620.jpg"))
+(def p1 (p/load-pixels "generateme/miles/miles.jpg"))
 
 (time
  (let [oa (object-array (map #(p/get-color p1 %) (range (count p1))))]
@@ -35,7 +35,7 @@
 
 (nth oasorter 1)
 
-(def p2 (p/load-pixels "generateme/chad/chad_000001.png"))
+(def p2 (p/load-pixels "generateme/miles/miles_000000.png"))
 
 (def p3 (p/load-pixels "generateme/ooo/ooo.jpg"))
 
@@ -54,7 +54,7 @@
   (comment println b2)
   (p/set-canvas-pixels! canvas (p/filter-channels p/equalize-filter false 
                                                   (p/filter-channels p/normalize-filter false
-                                                                     (g/blend-machine b p1 p2)))))
+                                                                     (g/blend-machine b p2 p3)))))
 
 (core/with-canvas-> canvas
   (core/image (o/render-rgb-scanlines p3)))
@@ -69,7 +69,7 @@
 
 (core/close-session)
 
-(core/save canvas (core/next-filename "generateme/chad/res" ".png"))
+(core/save canvas (core/next-filename "generateme/miles/res" ".png"))
 
 (p/set-canvas-pixels! canvas (p/sort-colors p1 c/red))
 
@@ -110,7 +110,7 @@
            nil))
 
 (p/set-canvas-pixels! canvas (p/filter-channels p/equalize-filter nil (->> (p/filter-colors c/to-LUV p1)
-                                                                           ;; ((make-random-mirror))
+                                                                           ((make-random-mirror))
                                                                            ((make-random-mirror)))))
 
 ;; slitscan
@@ -140,10 +140,10 @@
   (time (let [t (m/norm frame 0 (* 60 25) 0 m/TWO_PI)
               st (- (* 10.0 (m/sin t)) 3)
               ct (- (* 10.0 (m/cos t)) 3)
-              ;; effect (make-effect :simple-lowpass {:cutoff st})
-              effect (make-effect :dj-eq {:lo st :mid ct :hi 0 :peak-bw 1.3 :shelf-slope 1.5 :rate 44100})
-              ;; effect2 (make-effect :divider {:denom 2})
-              ;; effect3 (make-effect :slew-limit {:maxrise 500 :maxfall 1000})
+              ;; effect (make-effect :simple-lowpass {:cutoff 0.5})
+              ;; effect (make-effect :dj-eq {:lo st :mid ct :hi 0 :peak-bw 1.3 :shelf-slope 1.5 :rate 44100})
+              ;; effect (make-effect :divider {:denom 2})
+              effect (make-effect :slew-limit {:maxrise 500 :maxfall 1000})
               ;; inluv (p/filter-colors c/to-LUV p1)
 
               resp (apply-effects-to-pixels effect
@@ -151,15 +151,17 @@
                                              :channels [0 1 2]
                                              :bits 8
                                              :coding :none
-                                             :signed false}
+                                             :signed true}
                                             {:channels [0 1 2]
                                              :layout :planar
                                              :bits 8
                                              :coding :none
-                                             :signed false} p1)]
+                                             :signed true} p1)]
           (p/set-canvas-pixels! canvas resp;
                                 ;; (p/filter-channels p/equalize-filter nil resp)
                                 ))))
+
+(sonify 10)
 
 (do
   (core/close-session)
@@ -240,3 +242,12 @@
 
 ;;
 
+;;
+
+(def probs [5 35 12 8 11 8 15 6])
+(reduce + probs)
+
+(defn get-list [] (shuffle (reduce concat [] (map-indexed #(repeatedly %2 (constantly %1)) probs))))
+
+(doseq [v (map vector (get-list) (get-list) (get-list))]
+  (prn v))

@@ -155,13 +155,13 @@
 (defn- mi-do-diag-ul
   ""
   [t shift? ch target ^Pixels source]
-  (let [^int t t
+  (let [t (int t)
         size (min (.w source) (.h source))
         tx (if shift? (- (.w source) size) 0)
         ty (if shift? (- (.h source) size) 0)]
     (dotimes [y size]
       (dotimes [x (inc y)]
-        (condp m/eq t
+        (case t
           0 (mi-draw-point ch target source x y y x tx ty)
           1 (mi-draw-point ch target source y x x y tx ty)
           2 (mi-draw-point ch target source x y (- size x 1) (- size y 1) tx ty)
@@ -170,14 +170,14 @@
 (defn- mi-do-diag-ur
   ""
   [t shift? ch target ^Pixels source]
-  (let [^int t t
+  (let [t (int t)
         size (min (.w source) (.h source))
         tx (if shift? (- (.w source) size) 0)
         ty (if shift? (- (.h source) size) 0)]
     (dotimes [y size]
       (loop [x (int (dec size))]
         (when (>= x (- size y 1))
-          (condp m/eq t
+          (case t
             0 (mi-draw-point ch target source x y (- size y 1) (- size x 1) tx ty)
             1 (mi-draw-point ch target source (- size y 1) (- size x 1) x y tx ty)
             2 (mi-draw-point ch target source x y (- size x 1) (- size y 1) tx ty)
@@ -224,7 +224,7 @@
 (defn make-mirror-filter
   ""
   [t]
-  (t mirror-types))
+  (mirror-types t))
 
 ;; pix2line
 
