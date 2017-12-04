@@ -55,9 +55,9 @@
   ""
   []
   (partial p/filter-channels 
-           (g/make-mirror-filter (rand-nth (keys g/mirror-types)))
-           (g/make-mirror-filter (rand-nth (keys g/mirror-types)))
-           (g/make-mirror-filter (rand-nth (keys g/mirror-types)))
+           (g/make-mirror (g/mirror-random-config))
+           (g/make-mirror (g/mirror-random-config))
+           (g/make-mirror (g/mirror-random-config))
            nil))
 
 (p/set-canvas-pixels! canvas (->> img
@@ -92,6 +92,6 @@
 
 ;; pix2line
 
-(p/set-canvas-pixels! canvas (p/filter-channels (g/make-pix2line (g/make-pix2line-config))
-                                                (g/make-pix2line (g/make-pix2line-config))
-                                                (g/make-pix2line (g/make-pix2line-config)) nil img))
+(p/set-canvas-pixels! canvas (p/filter-channels (g/make-pix2line (g/pix2line-random-config))
+                                                (g/make-pix2line (g/pix2line-random-config))
+                                                (g/make-pix2line (g/pix2line-random-config)) nil img))

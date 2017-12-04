@@ -221,10 +221,16 @@
                    :RDL  (partial mi-do-diag-rect true false)
                    :RUL  (partial mi-do-diag-rect false false)})
 
-(defn make-mirror-filter
+(defn make-mirror
   ""
   [t]
   (mirror-types t))
+
+(defn mirror-random-config
+  ""
+  []
+  (rand-nth (keys mirror-types)))
+
 
 ;; pix2line
 
@@ -275,7 +281,7 @@
                   ^int myx (if (< lastx gval) lastx gval)]
               (dotimes [xx (- x- myx)] (p/set-value target ch (+ myx xx) y currentc)))))))))
 
-(defn make-pix2line-config
+(defn pix2line-random-config
   "Make random config for pix2line"
   []
   {:nx (inc (r/irand 100))
