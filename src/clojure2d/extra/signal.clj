@@ -1163,18 +1163,15 @@
       (let [namp (* 0.5 a)]
         (* 2.0 (m/constrain ^double (tri x) (- namp) namp))))))
 
-;; List of all oscillators
-(def oscillators [:sin :noise :saw :square :triangle :cut-triangle])
+(defmethod make-wave :constant [_ _ ^double a _] (constantly a))
 
-(defn sum-waves
-  "Calculate sum of waves (list) for given values"
-  ^double [fs ^double x]
-  (reduce #(+ ^double %1 ^double (%2 x)) 0.0 fs))
+;; List of all oscillators
+(def oscillators [:sin :noise :saw :square :triangle :cut-triangle :constant])
 
 (defn make-sum-wave
-  "Create oscillator as a sum of given base oscillators."
+  "Create function which is sum of all waves."
   [fs]
-  (partial sum-waves fs))
+  (reduce #(fn [^double x] (+ ^double (%1 x) ^double (%2 x))) fs))
 
 (defn make-signal-from-wave
   "Create Signal from oscillator. Parameters are: f - oscillator, samplerate and number of seconds."

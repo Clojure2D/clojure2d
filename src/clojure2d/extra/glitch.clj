@@ -20,7 +20,8 @@
             [clojure2d.core :refer :all]
             [clojure2d.math.vector :as v]
             [clojure2d.extra.signal :as s]
-            [clojure2d.color :as c])
+            [clojure2d.color :as c]
+            [clojure2d.extra.variations :as var])
   (:import [clojure2d.pixels Pixels]
            [clojure2d.math.vector Vec2 Vec4]))
 
@@ -38,60 +39,80 @@
 (def freqs (mapv #(<< 1 ^long %) (range 8)))
 (def amps (mapv #(/ ^long %) freqs))
 
-(defn slitscan-random-setup
-  "Create list of random waves "
-  ([n]
-   (letfn [(f []
-             (let [r (r/randval 0.75 (r/irand 4) (r/irand (count freqs)))]
-               {:wave (rand-nth s/oscillators)
-                :freq (freqs r)
-                :amp (amps r)
-                :phase (r/drand)}))]
-     (repeatedly n f)))
-  ([]
-   (slitscan-random-setup (r/irand 2 6))))
+(defn- make-random-wave 
+  "Create random wave definition."
+  []
+  (let [r (r/randval 0.75 (r/irand 4) (r/irand (count freqs)))]
+    {:wave (rand-nth s/oscillators)
+     :freq (freqs r)
+     :amp (amps r)
+     :phase (r/drand)}))
 
-(defn make-slitscan-waves
-  ""
-  ([waves]
-   (s/make-sum-wave (map #(s/make-wave (:wave %) (:freq %) (:amp %) (:phase %)) waves)))
+(defn slitscan-random-config
+  "Create list of random waves for each axis separately"
+  ([nx ny]
+   {:waves-x (repeatedly nx make-random-wave)
+    :waves-y (repeatedly ny make-random-wave)})
   ([]
-   (make-slitscan-waves (slitscan-random-setup))))
+   (slitscan-random-config (r/irand 2 6) (r/irand 2 6))))
 
-(defn slitscan
-  ""
+(defn- make-slitscan-waves
+  "Create function from waves definision."
+  [waves]
+  (s/make-sum-wave (map #(s/make-wave (:wave %) (:freq %) (:amp %) (:phase %)) waves)))
+
+(defn- slitscan
+  "Shift pixels by amount returned by functions fx and fy."
   [fx fy ch ^Pixels p x y]
   (let [wp (.w p)
         hp (.h p)
-        sx (/ 1.0 wp)
-        sy (/ 1.0 hp)
+        sx (/ wp)
+        sy (/ hp)
         shiftx (* 0.3 wp ^double (fx (* ^int x sx)))
         shifty (* 0.3 hp ^double (fy (* ^int y sy)))
         xx (m/wrap 0.0 wp (+ ^int x shiftx))
         yy (m/wrap 0.0 hp (+ ^int y shifty))]
     (p/get-value p ch xx yy)))
 
-(defn make-slitscan-filter
-  ""
+(defn make-slitscan
+  "Create slitscan filter funtion."
   ([]
-   (partial p/filter-channel-xy (partial slitscan (make-slitscan-waves) (make-slitscan-waves))))
-  ([fx fy]
-   (partial p/filter-channel-xy (partial slitscan fx fy))))
+   (make-slitscan (slitscan-random-config)))
+  ([{:keys [waves-x waves-y]
+     :or {waves-x [(make-random-wave)] waves-y [(make-random-wave)]}}]
+   (partial p/filter-channel-xy (partial slitscan (make-slitscan-waves waves-x) (make-slitscan-waves waves-y)))))
 
 ;; channel shifts
 
-(defn make-shift-channels-filter
-  ""
-  [amount h v]
-  (let [mv (constantly amount)
-        zr (constantly 0.0)]
-    (make-slitscan-filter (if h mv zr) (if v mv zr))))
+(defn shift-channels-random-config
+  "Random shift values."
+  []
+  {:horizontal-shift (r/randval 0.3 0.0 (r/drand -0.1 0.1))
+   :vertical-shift (r/randval 0.3 0.0 (r/drand -0.1 0.1))})
 
-(defn make-slitscan2-filter
-  "f: Vec2 -> Vec2 (use variation)
-   r: value 1.0-3.0"
-  ([f ^double r]
-   (let [r- (- r)]
+(defn make-shift-channels
+  "Shift channels by given amount."
+  ([] (make-shift-channels (shift-channels-random-config)))
+  ([{:keys [horizontal-shift vertical-shift]
+     :or {horizontal-shift 0.05 vertical-shift -0.05}}]
+   (make-slitscan {:waves-x [{:wave :constant :amp horizontal-shift}]
+                   :waves-y [{:wave :constant :amp vertical-shift}]})))
+
+;; Slitscan2
+
+(defn slitscan2-random-config
+  ""
+  []
+  (binding [var/*skip-random-variations* true]
+    {:variation (var/make-random-configuration)
+     :r 2.0}))
+
+(defn make-slitscan2
+  "f: variation configuration
+   r: range value 1.0-3.0"
+  ([{:keys [variation ^double r]}]
+   (let [f (var/make-combination variation)
+         r- (- r)]
      (fn [ch t ^Pixels p]
        (dotimes [y (.h p)]
          (let [^double yv (m/norm y 0.0 (.h p) r- r)]
@@ -103,15 +124,20 @@
                    xx (unchecked-int (m/norm (.x vv) r- r 0.0 (.w p)))
                    yy (unchecked-int (m/norm (.y vv) r- r 0.0 (.h p)))]
                (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
-  ([f]
-   (make-slitscan2-filter f 2.0)))
+  ([]
+   (make-slitscan2 (slitscan2-random-config))))
 
 ;;
-(defn make-fold-filter
-  "f: Vec2 -> Vec2 (use variation)
-   r: value 1.0-3.0"
-  ([f ^double r]
-   (let [r- (- r)]
+
+(def fold-random-config slitscan2-random-config)
+
+
+(defn make-fold
+  "f: variation configuration
+   r: range value 1.0-3.0"
+  ([{:keys [variation ^double r]}]
+   (let [f (var/make-combination variation)
+         r- (- r)]
      (fn [ch t ^Pixels p]
        (dotimes [y (.h p)]
          (let [^double yv (m/norm y 0.0 (.h p) r- r)]
@@ -121,8 +147,8 @@
                    xx (unchecked-int (m/norm (.x vv) r- r 0.0 (.w p)))
                    yy (unchecked-int (m/norm (.y vv) r- r 0.0 (.h p)))]
                (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
-  ([f]
-   (make-fold-filter f 2.0)))
+  ([]
+   (make-fold (fold-random-config))))
 
 ;; mirrorimage
 
@@ -221,16 +247,15 @@
                    :RDL  (partial mi-do-diag-rect true false)
                    :RUL  (partial mi-do-diag-rect false false)})
 
-(defn make-mirror
-  ""
-  [t]
-  (mirror-types t))
-
 (defn mirror-random-config
   ""
   []
   (rand-nth (keys mirror-types)))
 
+(defn make-mirror
+  ""
+  ([t] (mirror-types t))
+  ([] (mirror-types (mirror-random-config))))
 
 ;; pix2line
 
@@ -258,29 +283,6 @@
             (recur ncurrx ncurrent (unchecked-inc x))))))
     bget))
 
-(defn make-pix2line
-  ""
-  [{:keys [^long tolerance whole] :as config}] 
-  (fn [ch target ^Pixels source]
-    (let [grid (pix2line-grid (width source) (height source) config)]
-      (dotimes [y (height source)]
-        (loop [^int currentc (p/get-value source ch 0 y)
-               lastx 0
-               x (int 1)]
-          (if (< x (.w source))
-            (let [^int c (p/get-value source ch x y)
-                  [^int ncurrentc ^int nlastx] (if (<= tolerance (m/abs (- currentc c)))
-                                                 (let [^int gval (grid x y)
-                                                       ^int myx (if (bool-and whole (< lastx gval)) lastx gval)]
-                                                   (dotimes [xx (- x myx)] (p/set-value target ch (+ myx xx) y c))
-                                                   [c x])
-                                                 [currentc lastx])]
-              (recur ncurrentc (int nlastx) (unchecked-inc x)))
-            (let [x- (dec x)
-                  ^int gval (grid x- y)
-                  ^int myx (if (< lastx gval) lastx gval)]
-              (dotimes [xx (- x- myx)] (p/set-value target ch (+ myx xx) y currentc)))))))))
-
 (defn pix2line-random-config
   "Make random config for pix2line"
   []
@@ -290,6 +292,31 @@
    :tolerance (r/randval 0.9 (r/irand 5 80) (r/irand 5 250))
    :nseed (r/irand)
    :whole (r/brand 0.8)})
+
+(defn make-pix2line
+  ""
+  ([]
+   (make-pix2line (pix2line-random-config)))
+  ([{:keys [^long tolerance whole] :as config}] 
+   (fn [ch target ^Pixels source]
+     (let [grid (pix2line-grid (width source) (height source) config)]
+       (dotimes [y (height source)]
+         (loop [^int currentc (p/get-value source ch 0 y)
+                lastx 0
+                x (int 1)]
+           (if (< x (.w source))
+             (let [^int c (p/get-value source ch x y)
+                   [^int ncurrentc ^int nlastx] (if (<= tolerance (m/abs (- currentc c)))
+                                                  (let [^int gval (grid x y)
+                                                        ^int myx (if (bool-and whole (< lastx gval)) lastx gval)]
+                                                    (dotimes [xx (- x myx)] (p/set-value target ch (+ myx xx) y c))
+                                                    [c x])
+                                                  [currentc lastx])]
+               (recur ncurrentc (int nlastx) (unchecked-inc x)))
+             (let [x- (dec x)
+                   ^int gval (grid x- y)
+                   ^int myx (if (< lastx gval) lastx gval)]
+               (dotimes [xx (- x- myx)] (p/set-value target ch (+ myx xx) y currentc))))))))))
 
 ;; blend machine
 

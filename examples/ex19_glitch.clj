@@ -22,32 +22,34 @@
 
 ;; slitscan
 
-(def sc-config-x
-  (let [s (g/slitscan-random-setup)]
-    (println s)
-    (g/make-slitscan-waves s)))
-
-(def sc-config-y
-  (let [s (g/slitscan-random-setup)]
-    (println s)
-    (g/make-slitscan-waves s)))
-
-(p/set-canvas-pixels! canvas (p/filter-channels (g/make-slitscan-filter sc-config-x sc-config-y) nil img))
+(let [s (g/slitscan-random-config)]
+  (println s)
+  (p/set-canvas-pixels! canvas (p/filter-channels (g/make-slitscan s) nil img)))
 
 ;; channel shift
 
-(p/set-canvas-pixels! canvas (p/filter-channels (g/make-shift-channels-filter 0.1 true true)
+(p/set-canvas-pixels! canvas (p/filter-channels (g/make-shift-channels {:horizontal-shift 0.1
+                                                                        :vertical-shift 0.1})
                                                 nil
-                                                (g/make-shift-channels-filter -0.1 true true)
+                                                (g/make-shift-channels {:horizontal-shift -0.1
+                                                                        :vertical-shift -0.1})
                                                 nil img))
 
 (p/set-canvas-pixels! canvas (->> img
                                   (p/filter-colors c/to-HWB)
-                                  (p/filter-channels (g/make-shift-channels-filter 0.1 true false)
+                                  (p/filter-channels (g/make-shift-channels {:horizontal-shift 0.1
+                                                                             :vertical-shift 0.0})
                                                      nil
-                                                     (g/make-shift-channels-filter -0.1 true false)
+                                                     (g/make-shift-channels {:horizontal-shift -0.1
+                                                                             :vertical-shift 0.0})
                                                      nil)
                                   (p/filter-colors c/from-HWB)))
+
+;; random shift
+(p/set-canvas-pixels! canvas (p/filter-channels (g/make-shift-channels)
+                                                (g/make-shift-channels)
+                                                (g/make-shift-channels)
+                                                nil img))
 
 ;; mirror image
 
@@ -68,27 +70,23 @@
 ;; slitscan 2
 
 (binding [v/*skip-random-variations* true]
-  (let [field-config (v/make-random-configuration)
-        f (v/make-combination field-config)]
-
+  (let [field-config (v/make-random-configuration)]
     (binding [p/*pixels-edge* :wrap]
       (println field-config)
-      (p/set-canvas-pixels! canvas (p/filter-channels (g/make-slitscan2-filter f 2.03)
-                                                      (g/make-slitscan2-filter f 2.0)
-                                                      (g/make-slitscan2-filter f 1.97) nil img)))))
+      (p/set-canvas-pixels! canvas (p/filter-channels (g/make-slitscan2 {:variation field-config :r 2.03})
+                                                      (g/make-slitscan2 {:variation field-config :r 2.0})
+                                                      (g/make-slitscan2 {:variation field-config :r 1.97}) nil img)))))
 
 
 ;; fold
 
 (binding [v/*skip-random-variations* true]
-  (let [field-config (v/make-random-configuration)
-        f (v/make-combination field-config)]
-
+  (let [field-config (v/make-random-configuration)]
     (binding [p/*pixels-edge* :wrap]
       (println field-config)
-      (p/set-canvas-pixels! canvas (p/filter-channels (g/make-fold-filter f 2.03)
-                                                      (g/make-fold-filter f 2.0)
-                                                      (g/make-fold-filter f 1.97) nil img)))))
+      (p/set-canvas-pixels! canvas (p/filter-channels (g/make-fold {:variation field-config :r 2.03})
+                                                      (g/make-fold {:variation field-config :r 2.0})
+                                                      (g/make-fold {:variation field-config :r 1.97}) nil img)))))
 
 ;; pix2line
 
