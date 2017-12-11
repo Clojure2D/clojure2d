@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file. This change
 ### Added
 
 - `with-canvas` is no longer threading macro (use `with-canvas->` for that)
+- `:setup` parameter added to `show-window`. It's run before displaying window. Parameters are: canvas (within context) and window. When returned value is not `nil` it's used as initial state. In other case `:draw-state` parameter is used.
+- color can be represented as int (eg. in hex form like: 0x234344)
 
 ### Changed
 

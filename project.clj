@@ -16,7 +16,7 @@
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [
                  ;; [org.clojure/clojure "1.8.0"]
-                 [org.clojure/clojure "1.9.0-RC2"]
+                 [org.clojure/clojure "1.9.0"]
                  [expectations "2.2.0-SNAPSHOT"]
                  [net.jafama/jafama "2.1.0"]
                  [org.apache.commons/commons-math3 "3.6.1"]

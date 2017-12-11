@@ -127,7 +127,15 @@
   (alpha [^Color c] (.getAlpha c))
   nil
   (to-color [_] nil)
-  (to-awt-color [_] nil))
+  (to-awt-color [_] nil)
+  Long
+  (alpha [^long c] (bit-and 0xff (>> c 24)))
+  (red [^long c] (bit-and 0xff (>> c 16)))
+  (green [^long c] (bit-and 0xff (>> c 8)))
+  (blue [^long c] (bit-and 0xff c))
+  (to-color [^long c] (Vec4. (red c) (green c) (blue c) (if (zero? (bit-and 0xff000000 c)) 255 (alpha c))))
+  (to-awt-color [c] (to-awt-color (to-color c)))
+  (to-luma [c] (to-luma (to-color c))))
 
 (defn set-alpha
   "Set alpha channel and return `Vec4` representation."

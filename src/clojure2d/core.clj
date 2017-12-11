@@ -338,6 +338,7 @@
 
 (declare set-background)
 (declare set-stroke)
+(declare set-color)
 (declare image)
 
 (defn create-canvas
@@ -360,7 +361,8 @@
                         (when font (java.awt.Font/decode font)))]
      (with-canvas-> result
        (set-background Color/black)
-       (set-stroke))))
+       (set-stroke)
+       (set-color :white))))
   ([width height]
    (create-canvas width height :high nil))
   ([width height hint]
@@ -1160,6 +1162,13 @@
   [^Window window canvas]
   (reset! (:buffer window) canvas))
 
+;; You may want to extract canvas bound to window
+
+(defn get-canvas
+  ""
+  [^Window window]
+  @(:buffer window))
+
 ;; Finally function which creates and displays window. Function creates window's visibility status (`active?` atom), buffer as atomized canvas, creates frame, creates refreshing task (repainter) and shows window.
 
 (declare to-hex)
@@ -1179,7 +1188,7 @@
   * :fps
   * :draw-fn
   * :state"
-  ([canvas wname width height fps draw-fun state draw-state]
+  ([canvas wname width height fps draw-fun state draw-state setup]
    (let [active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
@@ -1191,31 +1200,34 @@
                           fps
                           width
                           height
-                          wname)]
+                          wname)
+         setup-state (when setup (with-canvas-> canvas
+                                   (setup window)))]
      (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
      (change-state! wname state)
-     (future (refresh-screen-task window draw-fun draw-state))
+     (future (refresh-screen-task window draw-fun (or setup draw-state)))
      window))
   ([canvas wname]
    (show-window canvas wname nil))
   ([canvas wname draw-fn]
    (show-window canvas wname 60 draw-fn))
   ([canvas wname fps draw-fn]
-   (show-window canvas wname (width canvas) (height canvas) fps draw-fn nil nil))
+   (show-window canvas wname (width canvas) (height canvas) fps draw-fn nil nil nil))
   ([canvas wname w h fps]
-   (show-window canvas wname w h fps nil nil nil))
+   (show-window canvas wname w h fps nil nil nil nil))
   ([canvas wname w h fps draw-fun]
-   (show-window canvas wname w h fps draw-fun nil nil))
-  ([{:keys [canvas window-name w h fps draw-fn state draw-state]
-     :or {canvas (make-canvas 100 100)
+   (show-window canvas wname w h fps draw-fun nil nil nil))
+  ([{:keys [canvas window-name w h fps draw-fn state draw-state setup]
+     :or {canvas (make-canvas 200 200)
           window-name (str "Clojure2D - " (to-hex (rand-int (Integer/MAX_VALUE)) 8))
           w (width canvas)
           h (height canvas)
           fps 60
           draw-fn nil
           state nil
-          draw-state nil}}]
-   (show-window canvas window-name w h fps draw-fn state draw-state))
+          draw-state nil
+          setup nil}}]
+   (show-window canvas window-name w h fps draw-fn state draw-state setup))
   ([] (show-window {})))
 
 ;; ## Utility functions
