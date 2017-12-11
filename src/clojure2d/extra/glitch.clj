@@ -131,7 +131,6 @@
 
 (def fold-random-config slitscan2-random-config)
 
-
 (defn make-fold
   "f: variation configuration
    r: range value 1.0-3.0"
@@ -320,32 +319,30 @@
 
 ;; blend machine
 
-(defn random-blend-get-cs
-  "Return colorspace or nil"
+(defn blend-machine-random-config
+  ""
   []
-  (when (r/brand 0.9) (rand-nth c/colorspaces-names)))
+  (let [cs1 (r/randval 0.9 (rand-nth c/colorspaces-names) nil) ; let's convert to some colorspace (or leave rgb)
+        cs2 (r/randval 0.2 (r/randval 0.9 (rand-nth c/colorspaces-names) nil) cs1) ; maybe different cs on second image?
+        outcs (r/randval 0.2 (r/randval 0.9 (rand-nth c/colorspaces-names) nil) cs1) ; maybe some random colorspace on output?
+        bl1 (r/randval 0.85 (rand-nth c/blends-names) nil)    ; ch1 blend
+        bl2 (r/randval 0.85 (rand-nth c/blends-names) nil) ; ch2 blend
+        bl3 (r/randval 0.85 (rand-nth c/blends-names) nil)] ; ch3 blend
+    {:switch (r/brand 0.5)
+     :in-cs1 cs1
+     :in-cs2 cs2
+     :out-cs outcs
+     :cs1-to (r/brand 0.5)
+     :cs2-to (r/brand 0.5)
+     :cs-to (r/brand 0.5)
+     :blend-ch1 bl1
+     :blend-ch2 bl2
+     :blend-ch3 bl3}))
 
 (defn blend-machine
-  "Do random blend of two pixels, use random colorspace"
-  ([]
-   (let [cs1 (random-blend-get-cs) ; let's convert to some colorspace (or leave rgb)
-         cs2 (r/randval 0.2 (random-blend-get-cs) cs1) ; maybe different cs on second image?
-         outcs (r/randval 0.2 (random-blend-get-cs) cs1) ; maybe some random colorspace on output?
-         bl1 (r/randval 0.85 (rand-nth c/blends-names) nil)    ; ch1 blend
-         bl2 (r/randval 0.85 (rand-nth c/blends-names) nil) ; ch2 blend
-         bl3 (r/randval 0.85 (rand-nth c/blends-names) nil)] ; ch3 blend
-     {:switch (r/brand 0.5)
-      :in-cs1 cs1
-      :in-cs2 cs2
-      :out-cs outcs
-      :cs1-to (r/brand 0.5)
-      :cs2-to (r/brand 0.5)
-      :cs-to (r/brand 0.5)
-      :blend-ch1 bl1
-      :blend-ch2 bl2
-      :blend-ch3 bl3}))
+  "Do random blend of two pixels, use random colorspace"  
   ([p1 p2]
-   (blend-machine (blend-machine) p1 p2))
+   (blend-machine (blend-machine-random-config) p1 p2))
   ([{:keys [switch in-cs1 in-cs2 out-cs cs1-to cs2-to cs-to blend-ch1 blend-ch2 blend-ch3]} p1 p2]
    (let [[p1 p2] (if switch [p2 p1] [p1 p2]) ; switch images
          cs1-sel (if cs1-to first second)
@@ -360,45 +357,48 @@
 
 ;; color reducer machine
 
+(defn color-reducer-machine-random-config
+  ""
+  []
+  (let [bpal (condp #(> ^double %1 ^double %2) (r/drand 1.0)
+               0.1 (let [num (r/irand 5 20)]
+                     {:type :iq
+                      :palette (c/make-iq-random-palette num)})
+               0.5 {:type :colourlovers
+                    :palette (rand-nth c/colourlovers-palettes)}
+               0.6 (let [preset (rand-nth (keys c/paletton-presets))
+                         p (rand-nth c/colourlovers-palettes)
+                         h (map #(c/paletton-rgb-to-hue %) p)]
+                     {:type :colourlovers-paletton
+                      :conf {:hue h
+                             :preset preset
+                             :type :monochromatic
+                             :compl false}
+                      :palette (let [v (reduce #(concat %1 (c/make-monochromatic-palette %2 (preset c/paletton-presets))) p h)]
+                                 (vec v))})
+               (let [h (r/drand 360.0)
+                     t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
+                     conf {:compl (r/brand 0.6)
+                           :angle (r/drand 10.0 90.0)
+                           :adj (r/brand 0.5)
+                           :hue h
+                           :preset (rand-nth (keys c/paletton-presets))
+                           :type t}]
+                 {:type :paletton
+                  :conf conf
+                  :palette (c/paletton-palette t h conf)}))
+        pal (r/randval 0.2
+                       (update bpal :palette conj (Vec4. 0.0 0.0 0.0 255.0) (Vec4. 255.0 255.0 255.0 255.0))
+                       bpal)
+        pal (assoc pal :distf (rand-nth [v/dist v/dist-abs v/dist-cheb v/dist-sq v/dist-cos v/dist-discrete]))]
+    pal))
+
 (defn color-reducer-machine
-  "Randomize color reducing filter, random method, random colors"
-  ([]
-   (let [bpal (condp #(> ^double %1 ^double %2) (r/drand 1.0)
-                0.1 (let [num (r/irand 5 20)]
-                      {:type :iq
-                       :palette (c/make-iq-random-palette num)})
-                0.5 {:type :colourlovers
-                     :palette (rand-nth c/colourlovers-palettes)}
-                0.6 (let [preset (rand-nth (keys c/paletton-presets))
-                          p (rand-nth c/colourlovers-palettes)
-                          h (map #(c/paletton-rgb-to-hue %) p)]
-                      {:type :colourlovers-paletton
-                       :conf {:hue h
-                              :preset preset
-                              :type :monochromatic
-                              :compl false}
-                       :palette (let [v (reduce #(concat %1 (c/make-monochromatic-palette %2 (preset c/paletton-presets))) p h)]
-                                  (vec v))})
-                (let [h (r/drand 360.0)
-                      t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
-                      conf {:compl (r/brand 0.6)
-                            :angle (r/drand 10.0 90.0)
-                            :adj (r/brand 0.5)
-                            :hue h
-                            :preset (rand-nth (keys c/paletton-presets))
-                            :type t}]
-                  {:type :paletton
-                   :conf conf
-                   :palette (c/paletton-palette t h conf)}))
-         pal (r/randval 0.2
-                        (update bpal :palette conj (Vec4. 0.0 0.0 0.0 255.0) (Vec4. 255.0 255.0 255.0 255.0))
-                        bpal)
-         pal (assoc pal :distf (rand-nth [v/dist v/dist-abs v/dist-cheb v/dist-sq]))]
-     pal))
+  "Randomize color reducing filter, random method, random colors" 
   ([conf p]
    (p/filter-colors (c/make-reduce-color-filter (:distf conf) (:palette conf)) p))
   ([p]
-   (color-reducer-machine p (color-reducer-machine))))
+   (color-reducer-machine p (color-reducer-machine-random-config))))
 
 ;; find best matching pixels
 

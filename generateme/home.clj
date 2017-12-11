@@ -15,8 +15,7 @@
            [clojure2d.math.vector Vec4 Vec2]
            [clojure2d.java PrimitiveMath]))
 
-
-(def p1 (p/load-pixels "generateme/miles/miles.jpg"))
+(def p1 (p/load-pixels "generateme/exg/7/im701.jpg"))
 
 (time
  (let [oa (object-array (map #(p/get-color p1 %) (range (count p1))))]
@@ -48,8 +47,8 @@
 
 (def windows (core/show-window canvas "glitch" (* scale (core/width p1)) (* scale (core/height p1)) 10))
 
-(let [b (g/blend-machine)
-      b2 (g/blend-machine)]
+(let [b (g/blend-machine-random-config)
+      b2 (g/blend-machine-random-config)]
   (println b)
   (comment println b2)
   (p/set-canvas-pixels! canvas (p/filter-channels p/equalize-filter false 
@@ -95,18 +94,18 @@
     (assoc palette :palette np)))
 
 (do
-  (def palette (g/color-reducer-machine))
-  (comment println palette)
-  (p/set-canvas-pixels! canvas (p/filter-channels p/normalize-filter nil (g/color-reducer-machine palette p4))))
+  (def palette (g/color-reducer-machine-random-config))
+  (println palette)
+  (p/set-canvas-pixels! canvas (p/filter-channels p/normalize-filter nil (g/color-reducer-machine palette p1))))
 
 ;;mirror
 (defn make-random-mirror
   ""
   []
   (partial p/filter-channels 
-           (g/make-mirror-filter (rand-nth (keys g/mirror-types)))
-           (g/make-mirror-filter (rand-nth (keys g/mirror-types)))
-           (g/make-mirror-filter (rand-nth (keys g/mirror-types)))
+           (g/make-mirror (g/mirror-random-config))
+           (g/make-mirror (g/mirror-random-config))
+           (g/make-mirror (g/mirror-random-config))
            nil))
 
 (p/set-canvas-pixels! canvas (p/filter-channels p/equalize-filter nil (->> (p/filter-colors c/to-LUV p1)
@@ -251,3 +250,26 @@
 
 (doseq [v (map vector (get-list) (get-list) (get-list))]
   (prn v))
+
+
+
+;;;;;;;;;;;;;;;
+
+;;exg
+
+
+
+(let [palette (g/color-reducer-machine-random-config)
+      b (g/blend-machine-random-config)
+      m (make-random-mirror)]
+  (core/close-session)
+  (dotimes [i 45]
+    (let [name (str "generateme/exg/18/im" (+ 701 i) ".jpg")
+          img (p/load-pixels name)
+          resp (p/filter-channels p/normalize-filter nil (g/color-reducer-machine palette img))
+          res (p/filter-channels p/equalize-filter false 
+                                 (p/filter-channels p/normalize-filter false
+                                                    (g/blend-machine b (m img) resp)))]
+      (println i)
+      (p/set-canvas-pixels! canvas res)
+      (core/save res (core/next-filename "generateme/exg/18/res/" ".jpg")))))
