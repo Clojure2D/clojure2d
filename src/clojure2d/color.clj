@@ -37,7 +37,12 @@
 ;; First define some clamping functions
 
 (defn clamp255
-  "Clamp to 0-255 integer"
+  "Clamp to 0-255 double"
+  ^double [^double a]
+  (m/constrain a 0 255))
+
+(defn lclamp255
+  "Clamp to 0-255 long"
   ^long [^double a]
   (m/constrain (m/round a) 0 255))
 
@@ -85,9 +90,9 @@
   (to-color [^Vec3 c]
     (Vec4. (.x c) (.y c) (.z c) 255))
   (to-awt-color [^Vec3 c]
-    (Color. (clamp255 (.x c))
-            (clamp255 (.y c))
-            (clamp255 (.z c))))
+    (Color. (lclamp255 (.x c))
+            (lclamp255 (.y c))
+            (lclamp255 (.z c))))
   (to-luma ^double [^Vec3 c] (to-luma-fn (.x c) (.y c) (.z c)))
   (red [^Vec3 c] (.x c))
   (green [^Vec3 c] (.y c))
@@ -96,10 +101,10 @@
   Vec4
   (to-color [c] c)
   (to-awt-color [^Vec4 c]
-    (Color.  (clamp255 (.x c))
-             (clamp255 (.y c))
-             (clamp255 (.z c))
-             (clamp255 (.w c))))
+    (Color.  (lclamp255 (.x c))
+             (lclamp255 (.y c))
+             (lclamp255 (.z c))
+             (lclamp255 (.w c))))
   (to-luma ^double [^Vec4 c] (to-luma-fn (.x c) (.y c) (.z c)))
   (red [^Vec4 c] (.x c))
   (green [^Vec4 c] (.y c))
@@ -150,7 +155,7 @@
     (Color. (.getRed cc)
             (.getGreen cc)
             (.getBlue cc)
-            (clamp255 a))))
+            (lclamp255 a))))
 
 (defn make-awt-color
   "Create java.awt.Color object. Use with `core/set-awt-color` or `core/set-awt-background`."
@@ -159,14 +164,14 @@
   ([c a]
    (set-awt-alpha c a))
   ([r g b]
-   (Color. (clamp255 r)
-           (clamp255 g)
-           (clamp255 b)))
+   (Color. (lclamp255 r)
+           (lclamp255 g)
+           (lclamp255 b)))
   ([r g b a]
-   (Color. (clamp255 r)
-           (clamp255 g)
-           (clamp255 b)
-           (clamp255 a))))
+   (Color. (lclamp255 r)
+           (lclamp255 g)
+           (lclamp255 b)
+           (lclamp255 a))))
 
 (defn make-color
   "Create Vec4 object as color representation. Use with `core/set-color` or `core/set-background`."

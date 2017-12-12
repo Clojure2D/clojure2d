@@ -1187,7 +1187,9 @@
   * :h
   * :fps
   * :draw-fn
-  * :state"
+  * :state
+  * :draw-state
+  * :setup"
   ([canvas wname width height fps draw-fun state draw-state setup]
    (let [active? (atom true)
          buffer (atom canvas)
@@ -1205,7 +1207,7 @@
                                    (setup window)))]
      (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
      (change-state! wname state)
-     (future (refresh-screen-task window draw-fun (or setup draw-state)))
+     (future (refresh-screen-task window draw-fun (or setup-state draw-state)))
      window))
   ([canvas wname]
    (show-window canvas wname nil))

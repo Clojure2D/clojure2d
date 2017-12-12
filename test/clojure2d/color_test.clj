@@ -8,10 +8,15 @@
 
 ;; mods
 
-(expect 255 (clamp255 254.6))
-(expect 0 (clamp255 -1))
-(expect 22 (clamp255 22.49))
-(expect 23 (clamp255 22.5))
+(expect 255 (lclamp255 254.6))
+(expect 0 (lclamp255 -1))
+(expect 22 (lclamp255 22.49))
+(expect 23 (lclamp255 22.5))
+
+(expect 254.6 (clamp255 254.6))
+(expect 0.0 (clamp255 -1))
+(expect 22.49 (clamp255 22.49))
+(expect 255.0 (clamp255 255.5))
 
 (expect 255 (mod255 0xffff))
 (expect 0 (mod255 0))

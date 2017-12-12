@@ -154,9 +154,9 @@
 (defn make-noise
   "Create noise image with set alpha channel (first parameter)."
   ([w h {:keys [alpha] :or {alpha 80}}]
-   (let [fc (fn [v] 
-              (c/clamp255 (+ 100.0 (* 20.0 (r/grand)))))
-         fa (fn [v] alpha)
+   (let [fc (fn [_] 
+              (c/lclamp255 (+ 100.0 (* 20.0 (r/grand)))))
+         fa (constantly (int alpha))
          p (p/filter-channels (partial p/filter-channel fc) nil nil (partial p/filter-channel fa) (p/make-pixels w h))]
      (p/set-channel p 1 (p/get-channel p 0))
      (p/set-channel p 2 (p/get-channel p 0))
