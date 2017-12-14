@@ -4,7 +4,9 @@
   (:require [clojure2d.core :refer :all]
             [clojure2d.math.random :as r]
             [clojure2d.math :as m]
-            [clojure2d.color :as c]))
+            [clojure2d.color :as c]
+            [clojure2d.math.vector :as v]
+            [clojure2d.pixels :as p]))
 
 ;; Below setup is not necessary. I use it to be sure everything is as fast as possible
 (set! *warn-on-reflection* true)
@@ -1018,3 +1020,582 @@
 ;; https://www.funprogramming.org/56-Silly-poet-writes-absurd-things.html
 
 ;; SKIPPED
+
+;; https://www.funprogramming.org/57-A-random-sentence-generator-writes-nonsense.html
+
+;; Comments:
+;;
+;; * getting random sequence is made with clojure functions
+;; * random filename can be generated with `next-filename` function
+
+(let [canvas (make-canvas 500 400)
+      dicts {:art  ["the" "my" "your" "our" "that" "this" "every" "one" "the only" "his" "her"]
+             :adj ["happy" "rotating" "red" "fast" "elastic" "smily" "unbelievable" "infinte" "surprising" 
+                   "mysterious" "glowing" "green" "blue" "tired" "hard" "soft" "transparent" "long" "short" 
+                   "excellent" "noisy" "silent" "rare" "normal" "typical" "living" "clean" "glamorous" 
+                   "fancy" "handsome" "lazy" "scary" "helpless" "skinny" "melodic" "silly" 
+                   "kind" "brave" "nice" "ancient" "modern" "young" "sweet" "wet" "cold" 
+                   "dry" "heavy" "industrial" "complex" "accurate" "awesome" "shiny" "cool" "glittering" 
+                   "fake" "unreal" "naked" "intelligent" "smart" "curious" "strange" "unique" "empty" 
+                   "gray" "saturated" "blurry"]
+             :nou ["forest" "tree" "flower" "sky" "grass" "mountain" "car" "computer" "man" "woman" "dog" 
+                   "elephant" "ant" "road" "butterfly" "phone" "computer program" "grandma" "school" "bed" "mouse" 
+                   "keyboard" "bicycle" "spaghetti" "drink" "cat" "t-shirt" "carpet" "wall" "poster" 
+                   "airport" "bridge" "road" "river" "beach" "sculpture" "piano" "guitar" "fruit" 
+                   "banana" "apple" "strawberry" "rubber band" "saxophone" "window" "linux computer" 
+                   "skate board" "piece of paper" "photograph" "painting" "hat" "space" "fork" 
+                   "mission" "goal" "project" "tax" "wind mill" "light bulb" "microphone" 
+                   "cpu" "hard drive" "screwdriver"]
+             :ver ["sings" "dances" "was dancing" "runs" "will run" "walks" 
+                   "flies" "moves" "moved" "will move" "glows" "glowed" "spins" "promised" 
+                   "hugs" "cheated" "waits" "is waiting" "is studying" "swims" 
+                   "travels" "traveled" "plays" "played" "enjoys" "will enjoy" 
+                   "illuminates" "arises" "eats" "drinks" "calculates" "kissed" "faded" "listens" 
+                   "navigated" "responds" "smiles" "will smile" "will succeed" 
+                   "is wondering" "is thinking" "is" "was" "will be" "might be" "was never"]
+             :pre ["under" "in front of" "above" "behind" "near" "following" "inside" "besides" 
+                   "unlike" "like" "beneath" "against" "into" "beyond" "considering" "without" 
+                   "with" "towards"]} 
+      sentence-conf (fn [] (map-indexed #(hash-map :x (r/drand 50 150)
+                                                   :y (+ 50 (* ^long %1 30))
+                                                   :text-size (r/drand 20 40)
+                                                   :word %2)
+                                        (map #(rand-nth (dicts %)) [:art :adj :nou :ver :pre :art :adj :nou])))
+
+      new-sentence #(with-canvas [c canvas]
+                      (set-background c :white)
+                      (set-color c 0x258FBF)
+                      (doseq [{:keys [x y text-size word]} (sentence-conf)]
+                        (set-font-attributes c text-size)
+                        (text c word x y)))
+      wname "Sentence generator 57"]
+
+  (new-sentence)
+  
+  (show-window {:canvas canvas
+                :window-name wname})
+
+  (defmethod mouse-event [wname :mouse-pressed] [_ _] (new-sentence))
+  (defmethod key-pressed [wname \space] [_ _] (save canvas (next-filename "" ".jpg"))))
+
+
+;; https://www.funprogramming.org/58-Travel-through-space-use-an-array-to-move-stars.html
+
+(let [canvas (make-canvas 500 400 :mid)
+      draw (fn [canvas _ _ points]
+             
+             (set-background canvas :black)
+             (set-color canvas :white)
+             (set-stroke canvas 5.0)
+             
+             (doseq [[x y _] points]
+               (point canvas x y))
+
+             (mapv #(let [[^double x y ^double speed] %1
+                          nx (- x speed)]
+                      [(if (neg? nx) (width canvas) nx) y speed]) points))]
+  
+  (show-window {:canvas canvas
+                :draw-fn draw 
+                :draw-state (repeatedly 100 #(vector (r/drand (width canvas))
+                                                     (r/drand (height canvas))
+                                                     (r/drand 1 5)))}))
+
+;; https://www.funprogramming.org/59-A-space-triangle-flying-through-the-galaxy.html
+
+;; Comments:
+;;
+;; `noCursor` is not implemented
+
+(let [canvas (make-canvas 500 400 :mid)
+      draw (fn [canvas window _ points]
+             
+             (set-background canvas :black)
+             (set-color canvas :white)
+             (set-stroke canvas 3)
+
+             (let [^int mx (mouse-x window)
+                   ^int my (mouse-y window)]
+               (triangle canvas mx (- my 6) mx (+ my 6) (+ mx 30) my)
+               (set-color canvas 200 200 200)
+               (triangle canvas mx (- my 6) mx (+ my 6) (+ mx 30) my true))
+             
+             (doseq [[x y speed] points]
+               (let [co (m/norm speed 1 5 100 255)]
+                 (-> canvas
+                     (set-color co co co)
+                     (set-stroke speed)
+                     (point x y))))
+
+             (mapv #(let [[^double x y ^double speed] %1
+                          nx (- x speed)]
+                      [(if (neg? nx) (width canvas) nx) y speed]) points))]
+  
+  (show-window {:canvas canvas
+                :draw-fn draw 
+                :draw-state (repeatedly 100 #(vector (r/drand (width canvas))
+                                                     (r/drand (height canvas))
+                                                     (r/drand 1 5)))}))
+
+;; https://www.funprogramming.org/60-Are-two-circles-touching-or-intersecting.html
+
+(let [diam 100
+      draw (fn [canvas window _ ^double a]
+             (let [x (* ^int (width canvas) ^double (r/noise a 10.0))
+                   y (* ^int (height canvas) ^double (r/noise a 20.0))
+                   d (m/dist x y (mouse-x window) (mouse-y window))
+                   stroke (if (> d diam) 1.0 (r/drand 10))]
+               (-> canvas
+                   (set-background :black)
+                   (set-stroke stroke)
+                   (set-color 255 255 0)
+                   (ellipse x y diam diam true)
+                   (set-color 0 255 0)
+                   (ellipse (mouse-x window) (mouse-y window) diam diam true)))
+             (+ a 0.003)
+             )]
+  (show-window {:canvas (make-canvas 500 400 :mid)
+                :draw-fn draw
+                :draw-state 0.0}))
+
+;; https://www.funprogramming.org/61-Draw-shaky-points-append-items-to-an-array.html
+
+(let [wname "Shaky point 61"
+      prob (/ 17.0 20.0)
+      draw (fn [canvas window _ _]             
+             (let [state (get-state window)]
+               (set-background canvas :white)
+               (doseq [[x y] state]
+                 (let [clr (r/randval prob :black :red)] 
+                   (set-color canvas clr)
+                   (ellipse canvas x y 20 20)))
+               (set-state! window (map #(let [[^double x ^double y] %]
+                                          [(+ x (r/drand -2 2))
+                                           (+ y (r/drand -2 2))]) state))))]
+
+  (defmethod mouse-event [wname :mouse-pressed] [event state]
+    (conj state [(mouse-x event) (mouse-y event)]))
+  
+  (show-window {:canvas (make-canvas 500 400 :mid)
+                :draw-fn draw
+                :state [[250 200]]
+                :window-name wname}))
+
+;; https://www.funprogramming.org/62-A-screen-full-of-bouncing-circles.html
+
+(let [wname "Bouncing circles 62"
+      prob (/ 17.0 20.0)
+      draw (fn [canvas window _ _]             
+             (let [state (get-state window)]
+               (set-background canvas :black 10)
+               (set-color canvas 0xD60DFF)
+               
+               (doseq [[^double x ^double y] state]
+                 (let [sz (r/drand 10 30)] 
+                   (ellipse canvas (+ x (r/drand -3 3)) (+ y (r/drand -3 3)) sz sz true)))
+               
+               (set-state! window (map #(let [[^double x ^double y ^double movex ^double movey] %
+                                              nx (+ x movex)
+                                              ny (+ y movey)
+                                              [nx nmovex] (if (neg? nx)
+                                                            [0 (- movex)]
+                                                            (if (> nx ^int (width canvas))
+                                                              [(width canvas) (- movex)]
+                                                              [nx movex]))
+                                              [ny nmovey] (if (neg? ny)
+                                                            [0 (- movey)]
+                                                            (if (> ny ^int (height canvas))
+                                                              [(height canvas) (- movey)] ; comment
+                                                              ;; [0 movey] ; uncomment
+                                                              [ny movey]))]
+                                          [nx ny nmovex nmovey]) state))))]
+
+  (defmethod mouse-event [wname :mouse-pressed] [event state]
+    (conj state [(mouse-x event) (mouse-y event)
+                 (r/drand -1 1) (r/drand 1 3)]))
+  
+  (show-window {:canvas (make-canvas 400 200 :mid)
+                :draw-fn draw
+                :state []
+                :window-name wname}))
+
+;; https://www.funprogramming.org/63-Time-for-our-first-3D-animation.html
+
+;; SKIPPED (no 3d)
+
+;; https://www.funprogramming.org/64-Animate-objects-that-slow-down-and-stop-using-lerp.html
+
+(let [canvas (make-canvas 500 400)
+      draw (fn [canvas window _ [x y destx desty]]
+             (-> canvas
+                 (set-background :white)
+                 (set-color :red)
+                 (ellipse x y 20 20))
+             (let [nx (m/lerp x destx 0.1)
+                   ny (m/lerp y desty 0.1)
+                   d (m/dist x y destx desty)
+                   [ndestx ndesty] (if (< d 1.0)
+                                     [(r/drand (width canvas)) (r/drand (height canvas))]
+                                     [destx desty])]
+               (when (< d 50.0)
+                 (ellipse canvas x y (- 100 d) (- 100 d) true))
+               [nx ny ndestx ndesty]))]
+  (show-window {:canvas canvas
+                :draw-fn draw
+                :draw-state [0.0 0.0 (r/drand (width canvas)) (r/drand (height canvas))]}))
+
+;; https://www.funprogramming.org/66-How-random-is-random-randomSeed-noiseSeed.html
+
+;; Comments
+;;
+;; To use seed you have to create your own RNG with `make-randomizer` function. To use own RNG you have to use `[id]random` functions family. `[id]rand` is bound to default JDK RNG.
+
+(let [canvas (make-canvas 500 400)
+      from-hsb (c/make-color-converter c/from-HSB 100)
+      seed (r/irand 10000000)
+      ;; seed 100
+      rng (r/make-randomizer :mersenne seed)]
+
+  (println seed)
+  
+  (with-canvas [c canvas]
+    (loop [x (int 0)]
+      (when (< x ^int (width canvas))
+        (let [wi (r/irandom rng 100)]
+          (set-color c (from-hsb (c/make-color (r/drandom rng 100) 80 80 100)))
+          (rect c x 0 wi (height canvas))
+          (recur (+ x wi))))))
+
+  (show-window {:canvas canvas}))
+
+;; https://www.funprogramming.org/67-Circular-motion-sine-and-her-cousin.html
+
+(let [canvas (make-canvas 500 400)
+      from-hsb (c/make-color-converter c/from-HSB 100)
+      draw (fn [canvas window ^long frame [^double a ^double b]]
+             (let [x0 (m/norm (m/sin a) -1.0 1.0 20.0 (- ^int (width canvas) 20))
+                   y0 (m/norm (m/cos a) -1.0 1.0 20.0 (- ^int (height canvas) 20))
+                   x1 (m/norm (m/sin b) -1.0 1.0 20.0 (- ^int (width canvas) 20))
+                   y1 (m/norm (m/cos b) -1.0 1.0 20.0 (- ^int (height canvas) 20))]
+               (-> canvas
+                   (set-stroke 3.0)
+                   (set-color (from-hsb (c/make-color (mod frame 100) 80 80 20)))
+                   (line x0 y0 x1 y1))
+               [(+ a 0.071)
+                (+ b 0.07)]))]
+  (with-canvas-> canvas (set-background :white))
+  (show-window {:canvas canvas
+                :draw-fn draw
+                :draw-state [0.0 0.0]}))
+
+;; https://www.funprogramming.org/68-Circular-motion-reviewed.html
+
+(let [canvas (make-canvas 500 400)
+      draw (fn [canvas window _ ^double a]
+             (when (<= a m/TWO_PI)
+               (let [r (r/drand 180 220)
+                     x (+ (/ ^int (width canvas) 2) (* r (m/cos a)))
+                     y (+ (/ ^int (height canvas) 2) (* r (m/sin a)))]
+                 (-> canvas
+                     (set-color :white) 
+                     (ellipse x y 10 10)
+                     (set-color :black) 
+                     (ellipse x y 10 10 true))
+                 (+ a 0.1))))]
+  (with-canvas-> canvas (set-background :lightgrey))
+  (show-window {:canvas canvas
+                :draw-fn draw
+                :draw-state 0.0}))
+
+;; https://www.funprogramming.org/69-Combine-circular-and-other-motions.html
+
+(let [canvas (make-canvas 500 400)
+      x (/ ^int (width canvas) 2)
+      y (/ ^int (height canvas) 2)
+      draw (fn [canvas window _ [^double a ^double b]]
+             (let [x2 (* (m/sin a) 50)
+                   y2 (* (m/cos a) 50)
+                   x3 (* (m/sin b) 200)
+                   y3 (* (m/cos b) 200)]
+               (set-color canvas :red)
+               (ellipse canvas (+ x x2 x3) (+ y y2 y3) 10 10))
+             [(+ a 0.1) (+ b 0.01)])]
+  (with-canvas-> canvas (set-background :white))
+  (show-window {:canvas canvas
+                :draw-fn draw
+                :draw-state [0.0 0.0]}))
+
+;; https://www.funprogramming.org/70-Slowly-change-the-direction.html
+
+(let [canvas (make-canvas 500 400)
+      reset #(vector (/ ^int (width canvas) 2) (/ ^int (height canvas) 2) (r/drand m/TWO_PI))
+      draw (fn [canvas window _ [^double oldx ^double oldy ^double a]]
+             (let [newx (+ oldx (* 5.0 (m/cos a)))
+                   newy (+ oldy (* 5.0 (m/sin a)))]
+               (set-color canvas :black)
+               (line canvas oldx oldy newx newy)
+               [newx newy (+ a (r/drand -0.4 0.4))]))]
+  (with-canvas-> canvas (set-background :white))
+  (show-window {:canvas canvas
+                :draw-fn draw
+                :draw-state (reset)}))
+
+;; https://www.funprogramming.org/71-Playing-with-directions.html
+
+(let [canvas (make-canvas 500 400)
+      reset #(vector (/ ^int (width canvas) 2.0) (/ ^int (height canvas) 2.0) (r/drand m/TWO_PI) 1.0)
+      from-hsb (c/make-color-converter c/from-HSB 100)
+      draw (fn [canvas window _ [^double oldx ^double oldy ^double a ^double w]]
+             (let [newx (+ oldx (* 5.0 (m/cos a)))
+                   newy (+ oldy (* 5.0 (m/sin a)))]
+               
+               (set-color canvas (from-hsb (c/make-color 30 100 (* 100 ^double (r/noise w a)) 100)))
+               (set-stroke canvas w)
+               (line canvas oldx oldy newx newy)
+               
+               (if (bool-or (neg? newx)
+                            (neg? newy)
+                            (> newx ^int (width canvas))
+                            (> newy ^int (height canvas)))
+                 (reset)
+                 [newx newy (+ a (r/drand -0.4 0.2)) (+ w 0.1)])))]
+  (with-canvas-> canvas (set-background :white))
+  (show-window {:canvas canvas
+                :draw-fn draw
+                :draw-state (reset)}))
+
+;; https://www.funprogramming.org/72-Create-visual-rhythms-using-modulo.html
+
+;; Comments:
+;;
+;; Using framecounter here instead of variable
+
+(let [canvas (make-canvas 500 400)
+      draw (fn [canvas window ^long frame _]
+             (set-background canvas :white)
+             (set-color canvas 50 200 40)
+             (when (zero? (mod frame 2)) (rect canvas 0 0 100 100))
+             (when (== 1 (mod frame 7)) (rect canvas 100 0 100 100))
+             (when (== 2 (mod frame 7)) (rect canvas 200 0 100 100)))]
+  (show-window {:canvas canvas
+                :fps 7
+                :draw-fn draw}))
+
+;; https://www.funprogramming.org/73-The-circlebeats-of-a-running-circle.html
+
+(let [canvas (make-canvas 500 400)
+      draw (fn [canvas window ^long frame [^int csize ^int grow]]
+             (set-background canvas :white)
+             (set-color canvas :red)
+             (let [grow (if (zero? (mod frame 60)) 5 grow)
+                   [^int csize ^int grow] (cond
+                                            (> csize 80) [80 -2]
+                                            (< csize 50) [50 0]
+                                            :else [csize grow])]
+               (ellipse canvas 250 200 csize csize)
+               [(+ csize grow) grow]))]
+  (show-window {:canvas canvas
+                :draw-fn draw
+                :draw-state [50 0]}))
+
+;; https://www.funprogramming.org/74-for-loops-and-other-ways-of-typing-less.html
+
+;; SKIPPED
+
+;; https://www.funprogramming.org/75-Bezier-curves-are-so-beautiful.html
+
+(let [canvas (make-canvas 500 400)
+      ^int w (width canvas)
+      ^int h (height canvas)
+      midw (/ w 2)]
+
+  (with-canvas [c canvas]
+    (set-background c :white)
+    (set-color c :black)
+    (dotimes [i 30]
+      (bezier c midw h midw (r/drand h)
+              (r/drand w) (r/drand h)
+              (r/drand w) (r/drand h))))
+  
+  (show-window {:canvas canvas}))
+
+;; https://www.funprogramming.org/76-Slowly-morphing-bezier-curves.html
+
+(let [canvas (make-canvas 500 400)
+      ^int w (width canvas)
+      ^int h (height canvas)
+      midw (/ w 2)
+      draw (fn [canvas _ ^long frame _]
+             (let [t (/ frame 300.0)]
+               (set-background canvas :white)
+               (set-color canvas :black)
+               (dotimes [i 30]
+                 (bezier canvas
+                         midw h
+                         midw (* ^double (r/noise 1 i t) h)
+                         (* ^double (r/noise 2 i t) w) (* ^double (r/noise 4 i t) h)
+                         (* ^double (r/noise 3 i t) w) (* ^double (r/noise 5 i t) h)))))]
+  
+  (show-window {:canvas canvas
+                :draw-fn draw}))
+
+;; https://www.funprogramming.org/77-A-3D-rotating-cloud-of-points.html
+;; https://www.funprogramming.org/78-An-array-is-like-a-book-full-of-numbers.html
+;; https://www.funprogramming.org/79-A-spinning-star-becomes-a-plant.html
+
+;; SKIPPED (no 3d)
+
+;; https://www.funprogramming.org/80-The-color-datatype.html
+
+;; Comments:
+;;
+;; Color is represented as vector (Vec4) datatype
+
+(show-window {:setup (fn [canvas _]
+                       (let [orange (c/to-color 0xFC8E05)
+                             nice-blue (c/to-color 0x2A78F2)
+                             white (c/make-color 255 255 255)
+                             ;; white (c/to-color :white) ;; variant
+                             ]
+                         (println orange)
+                         (println nice-blue)
+                         (-> canvas
+                             (set-background orange)
+                             (set-stroke 4)
+                             (set-color nice-blue)
+                             (ellipse 100 100 120 120)
+                             (set-color white)
+                             (ellipse 100 100 120 120 true))))})
+
+;; https://www.funprogramming.org/81-How-to-read-the-color-of-a-pixel.html
+
+(let [canvas (make-canvas 500 400)
+      draw (fn [canvas window _ _]
+             (let [color-under-mouse (get-pixel canvas (mouse-x window) (mouse-y window))]
+               (set-color canvas color-under-mouse)
+               (rect canvas 0 120 (width canvas) 280)))]
+
+  (with-canvas [c canvas]
+    (dotimes [x (width c)]
+      (dotimes [y 120]
+        (let [r (m/norm (r/noise (/ x 80.0) (/ y 80.0) 10.0) 0.0 1.0 0.0 255.0)
+              g (m/norm (r/noise (/ x 80.0) (/ y 80.0) 20.0) 0.0 1.0 0.0 255.0)
+              b (m/norm (r/noise (/ x 80.0) (/ y 80.0) 30.0) 0.0 1.0 0.0 255.0)]
+          (set-color c r g b)
+          (point c x y)))))
+  
+  (show-window {:canvas canvas
+                :draw-fn draw}))
+
+;; https://www.funprogramming.org/82-Program-a-gradient-of-colors.html
+
+(let [canvas (make-canvas 500 400)
+      from-hsb (c/make-color-converter c/from-HSB 100)
+      c1 (c/make-color (r/drand 100) 100 100 100)
+      c2 (c/make-color (r/drand 100) 100 30 100)]
+  
+  (with-canvas [c canvas]
+    (dotimes [y (height c)]
+      (let [n (m/norm y 0 (height c))
+            newc (v/interpolate c1 c2 n)]
+        (set-color c (from-hsb newc))
+        (line c 0 y (width c) y))))
+  
+  (show-window {:canvas canvas}))
+
+;; https://www.funprogramming.org/83-Circular-gradients-can-look-like-spheres.html
+
+(let [canvas (make-canvas 500 400)
+      from-hsb (c/make-color-converter c/from-HSB 100)
+      c1 (c/make-color (r/drand 100) 100 100 100)
+      c2 (c/make-color (r/drand 100) 100 30 100)
+      maxr 500]
+  
+  (with-canvas [c canvas]
+    (set-stroke c 2)
+    (dotimes [r maxr]
+      (let [n (m/norm r 0 maxr)
+            newc (v/interpolate c1 c2 n)]
+        (set-color c (from-hsb newc))
+        (ellipse c 100 100 r r true))))
+  
+  (show-window {:canvas canvas}))
+
+;; https://www.funprogramming.org/84-Draw-gradients-review-functions-and-image-loading.html
+
+(let [wname "Gradients 84"
+      back (load-image "results/test.jpg")
+      canvas (make-canvas (width back) (height back))
+      from-hsb (c/make-color-converter c/from-HSB 100)
+      draw-circ-grad (fn [canvas x y maxd]
+                       (let [c1 (c/make-color (r/drand 100) 100 100 100)
+                             c2 (c/make-color (r/drand 100) 100 30 100)]
+                         (set-stroke canvas 2)
+                         (dotimes [r maxd]
+                           (let [n (m/norm r 0 maxd)
+                                 newc (v/interpolate c1 c2 n)]
+                             (set-color canvas (from-hsb newc))
+                             (ellipse canvas x y r r true)))))]
+  
+  (with-canvas-> canvas (image back))
+
+  (defmethod mouse-event [wname :mouse-pressed] [event _]
+    (with-canvas-> canvas
+      (draw-circ-grad (mouse-x event) (mouse-y event) (r/drand 50 300))))
+  
+  (show-window {:canvas canvas
+                :window-name wname}))
+
+
+;; https://www.funprogramming.org/85-Using-a-background-image-mousePressed-and-mouseReleased.html
+
+(let [wname "Mouse pressed and released 85"
+      back (load-image "results/test.jpg")
+      canvas (make-canvas (width back) (height back))
+      draw (fn [canvas window _ ^double d]
+             (image canvas back)
+             (ellipse canvas (mouse-x window) (mouse-y window) d d true)
+             (if (= :pressed (get-state window)) (inc d) 20.0))]
+  
+  (defmethod mouse-event [wname :mouse-pressed] [_ _] :pressed)
+  (defmethod mouse-event [wname :mouse-released] [_ _] :released)
+  
+  (show-window {:canvas canvas
+                :window-name wname
+                :draw-fn draw
+                :draw-state 20.0
+                :state :released}))
+
+;; https://www.funprogramming.org/86-Drawing-shapes-with-your-mouse.html
+
+;; Comments:
+;;
+;; Solution is highly odd. Main reasons:
+;; * no access to button state inside draw function
+;; * events and draw-fn are in different thread
+;; * access/write to global state is asynchronous (unfortunately)
+
+(let [wname "Mouse pressed and released 85"
+      back (p/load-pixels "results/test.jpg")
+      canvas (make-canvas (width back) (height back))
+      draw (fn [canvas window _ [d back]]
+             (let [nd (or d 20.0)]
+               (p/set-canvas-pixels! canvas back)
+               (ellipse canvas (mouse-x window) (mouse-y window) nd nd true)
+               
+               (if (= (get-state window) :pressed)
+                 [(inc ^double nd) back]
+                 (if (nil? d)
+                   [nil back]
+                   [nil (p/get-canvas-pixels canvas)]))))]
+  
+  (defmethod mouse-event [wname :mouse-pressed] [_ _] :pressed)
+  (defmethod mouse-event [wname :mouse-released] [_ _] :released)
+  
+  (show-window {:canvas canvas
+                :window-name wname
+                :draw-fn draw
+                :draw-state [nil back]
+                :state :released}))
+
+;;

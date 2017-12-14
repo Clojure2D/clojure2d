@@ -29,7 +29,7 @@
 (defn do-it
   ""
   []
-  (let [fpalette (g/color-reducer-machine)
+  (let [fpalette (g/color-reducer-machine-random-config)
         palette (:palette fpalette)
         box-size (int (/ ww (count palette)))
         values (map-indexed (fn [^long id v] [(+ bw (* id box-size)) v])

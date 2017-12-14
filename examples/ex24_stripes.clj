@@ -12,7 +12,7 @@
 
 (def canvas (create-canvas 600 600))
 
-(def colors (:palette (g/color-reducer-machine)))
+(def colors (:palette (g/color-reducer-machine-random-config)))
 
 (defn draw
   ""

@@ -1273,7 +1273,7 @@
            ch2 (* 255.0 (/ (.y v) ^double ch2-scale))
            ch3 (* 255.0 (/ (.z v) ^double ch3-scale))
            ch4 (* 255.0 (/ (.w v) ^double ch4-scale))]
-       (colorspace-fn (Vec4. ch1 ch2 ch3 ch4)))))
+       (colorspace-fn (v/applyf (Vec4. ch1 ch2 ch3 ch4) clamp255)))))
   ([colorspace-fn ch1-scale ch2-scale ch3-scale] (make-color-converter colorspace-fn ch1-scale ch2-scale ch3-scale 255.0))
   ([colorspace-fn ch-scale] (make-color-converter colorspace-fn ch-scale ch-scale ch-scale ch-scale))
   ([colorspace-fn] colorspace-fn))

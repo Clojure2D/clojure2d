@@ -99,7 +99,7 @@
 
 
 ;; prepare random palette for color reduction
-(def palette (g/color-reducer-machine)) ;;;; change!
+(def palette (g/color-reducer-machine-random-config)) ;;;; change!
 
 ;; decompose images into segments
 (binding [p/*pixels-edge* :wrap] ;;;; change!

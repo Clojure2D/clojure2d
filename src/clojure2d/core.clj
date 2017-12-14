@@ -649,6 +649,28 @@
   ([canvas vs close?] (path-bezier canvas vs close? true))
   ([canvas vs] (path-bezier canvas vs false true)))
 
+(defn bezier
+  "Draw bezier curve with 4 sets of coordinates."
+  ([^Canvas canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
+   (let [^Path2D p (Path2D$Double.)]
+     (doto p
+       (.moveTo x1 y1)
+       (.curveTo x2 y2 x3 y3 x4 y4))
+     (draw-fill-or-stroke (.graphics canvas) p stroke?)))
+  ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
+   (bezier canvas x1 y1 x2 y2 x3 y3 x4 y4 true)))
+
+(defn curve
+  "Draw quadratic curve with 3 sets of coordinates."
+  ([^Canvas canvas x1 y1 x2 y2 x3 y3 stroke?]
+   (let [^Path2D p (Path2D$Double.)]
+     (doto p
+       (.moveTo x1 y1)
+       (.quadTo x2 y2 x3 y3))
+     (draw-fill-or-stroke (.graphics canvas) p stroke?)))
+  ([canvas x1 y1 x2 y2 x3 y3]
+   (curve canvas x1 y1 x2 y2 x3 y3 true)))
+
 (defn quad
   "Draw quad with corners at 4 positions."
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
@@ -1125,7 +1147,7 @@
       (loop []
         (let [^Graphics2D graphics-context (.getDrawGraphics strategy)
               ^BufferedImage b (.buffer canvas)]
-          (.setRenderingHints graphics-context (or (.hints canvas) (rendering-hints :high)))
+          ;; (.setRenderingHints graphics-context (or (.hints canvas) (rendering-hints :mid)))
           (.drawImage graphics-context b 0 0 (.getWidth panel) (.getHeight panel) nil)
           (.dispose graphics-context))
         (when (.contentsRestored strategy) (recur)))
@@ -1145,9 +1167,9 @@
             new-result (when draw-fun 
                          (with-canvas-> @(.buffer window)
                            (draw-fun window cnt result)))] 
-        (repaint (.panel window) @(.buffer window))
         (let [delay (- stime (- (System/currentTimeMillis) ct))]
           (when (pos? delay) (Thread/sleep delay)))
+        (repaint (.panel window) @(.buffer window))
         (when @(.active? window) (recur (unchecked-inc cnt) new-result))))))
 
 ;; You may want to replace canvas to the other one. To make it pass result of `show-window` function and new canvas.

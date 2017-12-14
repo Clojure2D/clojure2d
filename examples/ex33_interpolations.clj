@@ -12,7 +12,7 @@
 
 (def canvas (create-canvas 600 500 :high))
 
-(def palette (first (filter #(> ^double (c/to-luma (first %)) 150) (repeatedly #(:palette (g/color-reducer-machine))))))
+(def palette (first (filter #(> ^double (c/to-luma (first %)) 150) (repeatedly #(:palette (g/color-reducer-machine-random-config))))))
 
 (def c1 (first palette))
 (def c2 (second palette))
