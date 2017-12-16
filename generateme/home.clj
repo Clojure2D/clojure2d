@@ -239,14 +239,19 @@
   (core/set-background :black)
   (core/path-quad [(Vec2. 200 200) (Vec2. 200 300) (Vec2. 300 400) (Vec2. 300 300) (Vec2. 400 300)]))
 
-;;
+;; (def probs [5 35 12 8 11 8 15 6])
+(def probs-pre [70 33 40 25 25])
+(def probs (let [s (double (reduce + probs-pre))]
+             (map #(int (* 101 (/ %1 s))) probs-pre)))
 
-;;
+(def probs [35 17 21 13 13])
 
-(def probs [5 35 12 8 11 8 15 6])
 (reduce + probs)
 
-(defn get-list [] (shuffle (reduce concat [] (map-indexed #(repeatedly %2 (constantly %1)) probs))))
+(println probs)
+
+
+(defn get-list [] (shuffle (reduce concat [] (map-indexed #(repeatedly %2 (constantly (inc %1))) probs))))
 
 (doseq [v (map vector (get-list) (get-list) (get-list))]
   (prn v))

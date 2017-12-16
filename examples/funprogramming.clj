@@ -6,7 +6,8 @@
             [clojure2d.math :as m]
             [clojure2d.color :as c]
             [clojure2d.math.vector :as v]
-            [clojure2d.pixels :as p]))
+            [clojure2d.pixels :as p]
+            [clojure.string :refer [join]]))
 
 ;; Below setup is not necessary. I use it to be sure everything is as fast as possible
 (set! *warn-on-reflection* true)
@@ -1598,4 +1599,105 @@
                 :draw-state [nil back]
                 :state :released}))
 
+;; https://www.funprogramming.org/87-Playing-with-strings.html
+
+;; Comments
 ;;
+;; Skipped language related things (printing chars)
+
+(let [get-dt (fn [] (let [dt (map #(format "%02d" %) (datetime :vector))
+                          d (str "Date: " (join "." (take 3 dt)))
+                          t (str "Time: " (join ":" (take 3 (drop 3 dt))))]
+                      [d t]))
+      draw (fn [canvas _ _ _]
+             (let [[d t] (get-dt)]
+               (-> canvas
+                   (set-background 0xFFB81F)
+                   (set-color :white)
+                   (set-font-attributes 20)
+                   (text d 100 100)
+                   (text t 100 130))))]
+  (show-window {:canvas (make-canvas 400 400)
+                :draw-fn draw
+                :fps 1}))
+
+;; https://www.funprogramming.org/88-Change-pixels-using-the-pixels-array.html
+
+;; Comments:
+;;
+;; Pixels in Clojure2d have different format than in Processing. It's an array with 4 separated channels in planar layout with values from 0 to 255.
+;; To operate on array you can use massive and parallel filter higher order functions like `filter-colors` or `filter-channels`
+
+(let [canvas (make-canvas 500 400)
+      pixels (p/get-canvas-pixels canvas)
+      make-gray (fn [_] (let [c (r/irand 256)] (c/make-color c c c)))
+      draw (fn [canvas _ _ _] (p/set-canvas-pixels! canvas (p/filter-colors make-gray pixels)))]
+  (show-window {:canvas canvas 
+                :draw-fn draw}))
+
+;; https://www.funprogramming.org/89-Create-your-own-photo-filters.html
+
+(let [img (load-image "results/test.jpg")
+      canvas (make-canvas (width img) (height img))
+      mix-channels (fn [c] (c/make-color (c/green c) (c/blue c) (c/red c)))]
+
+  (p/set-canvas-pixels! canvas (p/filter-colors mix-channels (p/get-image-pixels img)))
+  
+  (show-window {:canvas canvas}))
+
+;; https://www.funprogramming.org/90-Change-pixel-hue-saturation-and-brightness.html
+
+;; Comments
+;;
+;; Instead converting to HSB I used to-luma fn
+
+(let [img (load-image "results/test.jpg")
+      canvas (make-canvas (width img) (height img))
+      mix-channels (fn [c] (if (> ^double (c/to-luma c) 100.0)
+                             (c/to-color :white)
+                             (c/to-color :black)))]
+
+  (p/set-canvas-pixels! canvas (p/filter-colors mix-channels (p/get-image-pixels img)))
+  
+  (show-window {:canvas canvas}))
+
+;; variant from video
+
+(let [img (load-image "results/test.jpg")
+      canvas (make-canvas (width img) (height img))
+      mix-channels (fn [c] (let [hsb (c/to-HSB c)
+                                 h (c/ch0 hsb)
+                                 s (c/ch1 hsb)
+                                 b (c/ch2 hsb)]
+                             ;; (c/from-HSB (c/make-color h 0 b))
+                             (c/make-color h s b) ))]
+
+  (p/set-canvas-pixels! canvas (p/filter-colors mix-channels (p/get-image-pixels img)))
+  
+  (show-window {:canvas canvas}))
+
+;; https://www.funprogramming.org/91-Timelines-tell-a-story.html
+
+;; Comments
+;;
+;; * To draw filled object with stroke I use filled-with-stroke higer order function
+;; * `millis` fn doesn't return time from moment of running script. You have to manage it your self.
+
+(let [initmillis (millis)
+      scene1 #(filled-with-stroke % :white :black ellipse (r/drand (width %)) (r/drand (height %)) 100 100)
+      scene2 #(filled-with-stroke % :white :black rect (r/drand (width %)) (r/drand (height %)) 100 100)
+      scene3 #(let [x (r/drand (width %))]
+                (set-color % :black)
+                (line % x 0 x (height %))) 
+      draw (fn [canvas _ _ _]
+             (let [m (- (millis) initmillis)]
+               (set-background canvas 0x2D77EA)
+               (condp clojure.core/> m
+                 2000 (scene1 canvas)
+                 12000 (scene2 canvas)
+                 17000 (scene3 canvas)
+                 nil)))]
+  (show-window {:canvas (make-canvas 500 400)
+                :draw-fn draw}))
+
+;; 

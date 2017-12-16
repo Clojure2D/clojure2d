@@ -21,7 +21,7 @@
            [java.awt.event InputEvent ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
            [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double]
            [java.awt.image BufferedImage BufferStrategy Kernel ConvolveOp]
-           [java.util Iterator]
+           [java.util Iterator Calendar]
            [javax.imageio IIOImage ImageIO ImageWriteParam ImageWriter]
            [javax.swing ImageIcon JFrame SwingUtilities]))
 
@@ -778,6 +778,20 @@
 ;; Set XOR mode
 (def set-xor-mode (partial set-color-with-fn set-awt-xor-mode))
 
+;;;
+
+(def ^:private ^:const false-list '(false))
+(def ^:private ^:const true-list '(true))
+
+(defn filled-with-stroke
+  "Draw primitive filled and with stroke."
+  [canvas color-filled color-stroke primitive-fn & attrs]
+  (let [f (partial primitive-fn canvas)] 
+    (set-color canvas color-filled)
+    (apply f (concat attrs false-list))
+    (set-color canvas color-stroke)
+    (apply f (concat attrs true-list))))
+
 ;; ### Gradient
 
 (defn set-gradient
@@ -1273,6 +1287,25 @@
          ret# ~expr]
      (prn (str "(" ~commnt ")" " Elapsed time: " (/ (double (- (. System (nanoTime)) start#)) 1000000.0) " msecs"))
      ret#))
+
+;; ## Date/Time functions
+
+(defn year ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/YEAR))
+(defn month ^long [] (inc ^int (.get ^Calendar (Calendar/getInstance) Calendar/MONTH)))
+(defn day ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/DAY_OF_MONTH))
+(defn hour ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/HOUR_OF_DAY))
+(defn minute ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/MINUTE))
+(defn sec ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/SECOND))
+(defn millis ^long [] (System/currentTimeMillis))
+(defn datetime
+  "Date time values in the array. Optional parameter :vector or :hashmap (default) to indicate what to return."
+  ([type-of-array]
+   (let [y (year) m (month) d (day)
+         h (hour) mi (minute) s (sec) mil (millis)]
+     (if (= type-of-array :vector)
+       [y m d h mi s mil]
+       {:year y :month m :day d :hour h :minute mi :second s :millis mil :sec s})))
+  ([] (datetime :hashmap)))
 
 ;; ## Session management
 ;;

@@ -71,7 +71,10 @@
   (red [c])
   (green [c])
   (blue [c])
-  (alpha [c]))
+  (alpha [c])
+  (ch0 [c])
+  (ch1 [c])
+  (ch2 [c]))
 
 (defn- to-luma-fn
   "Local luma conversion function"
@@ -97,6 +100,9 @@
   (red [^Vec3 c] (.x c))
   (green [^Vec3 c] (.y c))
   (blue [^Vec3 c] (.z c))
+  (ch0 [^Vec3 c] (.x c))
+  (ch1 [^Vec3 c] (.y c))
+  (ch2 [^Vec3 c] (.z c))
   (alpha [_] 255.0)
   Vec4
   (to-color [c] c)
@@ -109,6 +115,9 @@
   (red [^Vec4 c] (.x c))
   (green [^Vec4 c] (.y c))
   (blue [^Vec4 c] (.z c))
+  (ch0 [^Vec4 c] (.x c))
+  (ch1 [^Vec4 c] (.y c))
+  (ch2 [^Vec4 c] (.z c))
   (alpha [^Vec4 c] (.w c))
   clojure.lang.Keyword
   (to-color [n] (html-color n))
@@ -117,6 +126,9 @@
   (red [n] (red (html-color n)))
   (green [n] (green (html-color n)))
   (blue [n] (blue (html-color n)))
+  (ch0 [n] (red (html-color n)))
+  (ch1 [n] (green (html-color n)))
+  (ch2 [n] (blue (html-color n)))
   (alpha [n] (alpha (html-color n)))
   Color
   (to-color [^Color c]
@@ -129,6 +141,9 @@
   (red [^Color c] (.getRed c))
   (green [^Color c] (.getGreen c))
   (blue [^Color c] (.getBlue c))
+  (ch0 [^Color c] (.getRed c))
+  (ch1 [^Color c] (.getGreen c))
+  (ch2 [^Color c] (.getBlue c))
   (alpha [^Color c] (.getAlpha c))
   nil
   (to-color [_] nil)
@@ -138,6 +153,9 @@
   (red [^long c] (bit-and 0xff (>> c 16)))
   (green [^long c] (bit-and 0xff (>> c 8)))
   (blue [^long c] (bit-and 0xff c))
+  (ch0 [^long c] (bit-and 0xff (>> c 16)))
+  (ch1 [^long c] (bit-and 0xff (>> c 8)))
+  (ch2 [^long c] (bit-and 0xff c))
   (to-color [^long c] (Vec4. (red c) (green c) (blue c) (if (zero? (bit-and 0xff000000 c)) 255 (alpha c))))
   (to-awt-color [c] (to-awt-color (to-color c)))
   (to-luma [c] (to-luma (to-color c))))
