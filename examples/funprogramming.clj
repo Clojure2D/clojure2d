@@ -1,3 +1,5 @@
+;; Creative Coding tutorials by Abe Pazos
+;; Check out accompanying video tutorials and deeper explanations on
 ;; https://www.funprogramming.org/
 
 (ns examples.funprogramming
@@ -13,6 +15,10 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
+
+;; https://www.funprogramming.org/1-Introduction.html
+
+;; SKIPPED
 
 ;; https://www.funprogramming.org/2-Download-Processing-Use-point-and-line.html
 
@@ -1700,4 +1706,160 @@
   (show-window {:canvas (make-canvas 500 400)
                 :draw-fn draw}))
 
-;; 
+;; https://www.funprogramming.org/92-Interactivity-a-draggable-circle.html
+;;
+;; Comments:
+;;
+;; Events and global state are used here to manage dragging
+
+(let [wname "Draggable circle 92"
+      sz 100
+      fill (c/from-HSB (c/make-color (r/drand 255) 100 200))
+      bgcolor (c/from-HSB (c/make-color (r/drand 255) 150 255))
+      stroke (c/make-color :white)
+      draw (fn [canvas window _ _]
+             (let [{:keys [x y stroke-size]} (get-state window)]
+               (set-background canvas bgcolor)
+               (set-color canvas fill)
+               (set-stroke canvas stroke-size)
+               (ellipse canvas x y sz sz)
+               (when (< (m/dist x y (mouse-x window) (mouse-y window)) (/ sz 2))
+                 (set-color canvas stroke)
+                 (ellipse canvas x y sz sz true))))]
+
+  (defmethod mouse-event [wname :mouse-pressed] [_ state] (assoc state :stroke-size 5))
+  (defmethod mouse-event [wname :mouse-released] [_ state] (assoc state :stroke-size 2))
+  (defmethod mouse-event [wname :mouse-dragged] [event state] (assoc state :x (mouse-x event) :y (mouse-y event)))
+  
+  (show-window {:window-name wname
+                :canvas (make-canvas 400 300)
+                :draw-fn draw
+                :state {:x 100
+                        :y 100
+                        :stroke-size 2}}))
+
+;; https://www.funprogramming.org/93-Draggable-circle-with-tweening.html
+
+(let [wname "Draggable circle 93"
+      sz 100.0
+      fill (c/from-HSB (c/make-color (r/drand 255) 100 200))
+      bgcolor (c/from-HSB (c/make-color (r/drand 255) 150 255))
+      stroke (c/make-color :white)
+      draw (fn [canvas window _ [x y current-weight target-weight current-alpha]]
+             (let [pressed? (get-state window)
+                   [nx ny ntarget-weight target-alpha] (if (< (m/dist x y (mouse-x window) (mouse-y window)) (/ sz 2))
+                                                         (if pressed?
+                                                           [(m/lerp x (mouse-x window) 0.2)
+                                                            (m/lerp y (mouse-y window) 0.2)
+                                                            10 255]
+                                                           [x y 5 255])
+                                                         [x y target-weight 0])
+                   ncurrent-weight (m/lerp current-weight ntarget-weight 0.2)
+                   ncurrent-alpha (m/lerp current-alpha target-alpha 0.2)]
+
+               (-> canvas
+                   (set-background bgcolor)
+                   (set-color fill)
+                   (set-stroke ncurrent-weight)
+                   (ellipse nx ny sz sz)
+                   (set-color stroke ncurrent-alpha)
+                   (ellipse nx ny sz sz true))
+
+               [nx ny ncurrent-weight ntarget-weight ncurrent-alpha]))]
+
+  (defmethod mouse-event [wname :mouse-pressed] [_ _] true)
+  (defmethod mouse-event [wname :mouse-released] [_ _] false)
+  
+  (show-window {:window-name wname
+                :canvas (make-canvas 400 300)
+                :draw-fn draw
+                :draw-state [100 100 2 2 0]}))
+
+;; https://www.funprogramming.org/94-Boolean-true-or-false.html
+
+;; SKIPPED
+
+;; https://www.funprogramming.org/95-Is-the-mouse-inside-a-square.html
+
+(let [wname "Inside square? 95"
+      sz 100.0
+      fill (c/from-HSB (c/make-color (r/drand 255) 100 200))
+      bgcolor (c/from-HSB (c/make-color (r/drand 255) 150 255))
+      stroke (c/make-color :white)
+      draw (fn [canvas window _ [^double x ^double y current-weight target-weight current-alpha]]
+             (let [pressed? (get-state window)
+                   [nx ny ntarget-weight target-alpha] (if (bool-and (> ^int (mouse-x window) (- x (/ sz 2.0)))
+                                                                     (< ^int (mouse-x window) (+ x (/ sz 2.0)))
+                                                                     (> ^int (mouse-y window) (- y (/ sz 2.0)))
+                                                                     (< ^int (mouse-y window) (+ y (/ sz 2.0))))
+                                                         (if pressed?
+                                                           [(m/lerp x (mouse-x window) 0.2)
+                                                            (m/lerp y (mouse-y window) 0.2)
+                                                            10.0 255.0]
+                                                           [x y 5.0 255.0])
+                                                         [x y target-weight 0.0])
+                   ncurrent-weight (m/lerp current-weight ntarget-weight 0.2)
+                   ncurrent-alpha (m/lerp current-alpha target-alpha 0.2)]
+
+               (-> canvas
+                   (set-background bgcolor)
+                   (set-color fill)
+                   (set-stroke ncurrent-weight)
+                   (crect nx ny sz sz)
+                   (set-color stroke ncurrent-alpha)
+                   (crect nx ny sz sz true))
+
+               [nx ny ncurrent-weight ntarget-weight ncurrent-alpha]))]
+
+  (defmethod mouse-event [wname :mouse-pressed] [_ _] true)
+  (defmethod mouse-event [wname :mouse-released] [_ _] false)
+  
+  (show-window {:window-name wname
+                :canvas (make-canvas 400 300)
+                :draw-fn draw
+                :draw-state [100.0 100.0 2.0 2.0 0.0]}))
+
+;; https://www.funprogramming.org/96-Easier-mouse-in-a-rectangle.html
+
+;; Comments:
+;;
+;; no `CORNERS` mode for rectangle.
+
+(let [wname "Easier mouse in rectangle 96"
+      x1 100.0
+      y1 50.0
+      x2 300.0
+      y2 100.0
+      rw (- x2 x1)
+      rh (- y2 y1)
+      from-hsb (c/make-color-converter c/from-HSB 100)
+      new-colors #(let [h (r/drand 100)
+                        bgcolor (from-hsb (c/make-color h 50 30 100))
+                        fgcolor (from-hsb (c/make-color h 80 100 100))]
+                    [fgcolor bgcolor])
+      inside? (fn [^long x ^long y]
+                (bool-and (> x x1) (< x x2) (> y y1) (< y y2)))
+      draw (fn [canvas window _ colors]
+
+             (let [pressed? (get-state window)
+                   ncolors (if (bool-and pressed? (inside? (mouse-x window) (mouse-y window)))
+                             (new-colors)
+                             colors)]
+               
+               (-> canvas
+                   (set-background (second ncolors))
+                   (set-color (first ncolors))
+                   (rect x1 y1 rw rh))
+
+               ncolors))]
+  
+  (defmethod mouse-event [wname :mouse-pressed] [_ _] true)
+  (defmethod mouse-event [wname :mouse-released] [_ _] false)
+  
+  (show-window {:window-name wname
+                :canvas (make-canvas 400 300)
+                :draw-fn draw
+                :draw-state (new-colors)
+                :state false}))
+
+;;
