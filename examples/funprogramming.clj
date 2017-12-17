@@ -456,24 +456,23 @@
 ;; https://www.funprogramming.org/25-Typing-big-letters-that-fade-out.html
 
 
-(do
-  (def canvas (make-canvas 400 400))
-  (def window-name "Letters 25")
-  
-  (let [draw (fn [canvas window _ _]
-               (set-background canvas 0x3355cc 20))]
-
-    (show-window {:canvas canvas
-                  :draw-fn draw
-                  :window-name window-name
-                  :setup (fn [canvas _]
-                           (set-background canvas 0x3355cc))}))
+(let [canvas (make-canvas 400 400)
+      window-name "Letters 25" 
+      draw (fn [canvas window _ _]
+             (set-background canvas 0x3355cc 20))]
 
   (defmethod key-pressed :default [event _]
-    (with-canvas-> canvas
-      (set-color 0xffe200)
-      (set-font-attributes (r/drand 20 200))
-      (text (str (key-char event)) (r/drand 300) (r/drand 100 400)))))
+    (when (= (event-window-name event) window-name)
+      (with-canvas-> canvas
+        (set-color 0xffe200)
+        (set-font-attributes (r/drand 20 200))
+        (text (str (key-char event)) (r/drand 300) (r/drand 100 400)))))
+  
+  (show-window {:canvas canvas
+                :draw-fn draw
+                :window-name window-name
+                :setup (fn [canvas _]
+                         (set-background canvas 0x3355cc))})  )
 
 ;; https://www.funprogramming.org/26-Make-patterns-by-rotating-objects.html
 
@@ -1862,4 +1861,210 @@
                 :draw-state (new-colors)
                 :state false}))
 
+;; https://www.funprogramming.org/97-Interacting-with-many-rectangles-I.html
+
+(let [canvas (make-canvas 400 300)
+      amt 50
+      from-hsb (c/make-color-converter c/from-HSB 100)
+      bgcolor (from-hsb (c/make-color (r/drand 100) 30 30 100))
+      draw (fn [canvas _ _ rects]
+             (set-background canvas bgcolor)
+             (doseq [[^double x1 ^double y1 ^double x2 ^double y2 clr] rects]
+               (set-color canvas clr)
+               (rect canvas x1 y1 (- x2 x1) (- y2 y1)))
+             rects)]
+  (show-window {:canvas canvas
+                :draw-fn draw
+                :draw-state (repeatedly amt #(let [x1 (r/drand (width canvas))
+                                                   x2 (+ x1 (r/drand 20 100))
+                                                   y1 (r/drand (height canvas))
+                                                   y2 (+ y1 (r/drand 20 100))]
+                                               [x1 y1 x2 y2 (from-hsb (c/make-color (r/drand 100) 80 80 100))]))}))
+
+;; https://www.funprogramming.org/98-Interacting-with-many-rectangles-II.html
+
+(let [wname "Interacting with rectangles 98"
+      canvas (make-canvas 400 300)
+      amt 50
+      from-hsb (c/make-color-converter c/from-HSB 100)
+      bgcolor (from-hsb (c/make-color (r/drand 100) 30 30 100))
+      random-rect #(let [x1 (r/drand (width canvas))
+                         x2 (+ x1 (r/drand 20 100))
+                         y1 (r/drand (height canvas))
+                         y2 (+ y1 (r/drand 20 100))]
+                     [x1 y1 x2 y2 (- x2 x1) (- y2 y1)])
+      inside? (fn [window [^double x1 ^double y1 ^double x2 ^double y2]]
+                (bool-and (> ^int (mouse-x window) x1)
+                          (< ^int (mouse-x window) x2)
+                          (> ^int (mouse-y window) y1)
+                          (< ^int (mouse-y window) y2)))
+      draw (fn [canvas window _ rects]
+             (set-background canvas bgcolor)
+             
+             (doseq [[x1 y1 _ _ w h clr] rects]
+               (set-color canvas clr)
+               (rect canvas x1 y1 w h))
+             
+             (let [[x1 y1 _ _ w h clr :as found] (last (filter #(inside? window %) rects))]
+               (if-not found ;; check if mouse is inside any square (found in previous expression)
+                 rects ;; return original list if not
+                 (if (get-state window) ;; if yes, check if mouse pressed
+                   (map #(if-not (= found %) % (conj (random-rect) clr)) rects) ;; if yes replace found rect with newly created
+                   (do ;; if not draw white stroke and return original list
+                     (set-color canvas :white)
+                     (rect canvas x1 y1 w h true)
+                     rects)))))]
+
+  (defmethod mouse-event [wname :mouse-pressed] [_ _] true)
+  (defmethod mouse-event [wname :mouse-released] [_ _] false)
+  
+  (show-window {:window-name wname
+                :canvas canvas
+                :draw-fn draw
+                :state false
+                :draw-state (repeatedly amt #(conj (random-rect) (from-hsb (c/make-color (r/drand 100) 80 80 100))))}))
+
+;; https://www.funprogramming.org/99-Add-sounds-to-your-programs.html
+;; https://www.funprogramming.org/100-Sound-and-random-rhythms.html
+;; https://www.funprogramming.org/101-Control-Processing-using-a-MIDI-controller.html
+
+;; SKIPPED, no sound or midi
+
+;; https://www.funprogramming.org/102-Control-Processing-tilting-your-phone.html
+;; https://www.funprogramming.org/103-Functions-help-keep-code-organized.html
+
+;; SKIPPED
+
+;; https://www.funprogramming.org/104-OOP-means-Object-Oriented-Programming.html
+
+;; Comments:
 ;;
+;; No objects but Types/Records and Protocols
+;; Should decouple drawing and updating here (kept as in original)
+
+(do
+
+  (defprotocol CarProto
+    (drive [car canvas speed]))
+
+  (defrecord CarType [^double x ^double y c]
+    CarProto
+    (drive [_ canvas speed]
+      (let [nx (+ x ^double speed)]
+        (set-color canvas c)
+        (rect canvas nx y 40 10)
+        (set-color canvas :black)
+        (rect canvas nx y 40 10 true)
+        (->CarType nx y c))))
+
+  (let [draw (fn [canvas _ _ [car1 car2]]
+               (set-background canvas :white)
+               [(drive car1 canvas 1)
+                (drive car2 canvas 2)])]
+    (show-window {:canvas (make-canvas 500 400 :mid)
+                  :draw-fn draw
+                  :draw-state [(->CarType 20 100 0x0AA8F5)
+                               (->CarType 20 150 0xF5470C)]})))
+
+;; 105-110 SKIPPED (109 and 110 missed?)
+
+;; https://www.funprogramming.org/111-Drive-100-cars-an-array-of-objects.html
+
+;; TODO
+
+;; https://www.funprogramming.org/112-Array-of-objects-hypnotic-animation-part-I.html
+
+;; Comments:
+;;
+;; Update and draw decoupled
+
+(do
+
+  (defprotocol BugProto
+    (live [bug])
+    (draw [bug canvas]))
+
+  (defrecord BugType [^double x ^double y ^double sz
+                      ^double maxsz ^double minsz ^double grow]
+    BugProto
+    (live [_]
+      (let [nsz (+ sz grow)
+            [nsz ngrow] (cond
+                          (> nsz maxsz) [maxsz (- grow)]
+                          (< nsz minsz) [minsz (- grow)]
+                          :else [nsz grow])]
+        (->BugType x y nsz maxsz minsz ngrow)))
+    (draw [_ canvas]
+      (ellipse canvas x y sz sz)))
+
+  (let [make-bug #(->BugType %1 %2 %3 20.0 10.0 (r/drand 0.2 0.8))
+        draw (fn [canvas _ _ orecuho]
+               (set-background canvas 150 0 0)
+               (set-color canvas :white)
+               (draw orecuho canvas)
+               (live orecuho))]
+    
+    (show-window {:canvas (make-canvas 400 400)
+                  :draw-fn draw
+                  :draw-state (make-bug 100 100 15)})))
+
+;; https://www.funprogramming.org/113-Array-of-objects-hypnotic-animation-part-II.html
+
+(do
+
+  (defprotocol BugProto2
+    (live [bug])
+    (drawme [bug canvas]))
+
+  (defrecord BugType2 [^double x ^double y ^double t ^double speed]
+    BugProto2
+    (live [_]
+      (->BugType2 x y (+ t speed) speed))
+    (drawme [_ canvas]
+      (let [sz (m/norm (m/sin t) -1.0 1.0 10.0 20.0)]
+        (ellipse canvas x y sz sz))))
+
+  (let [l 200
+        canvas (make-canvas 400 400)
+        draw (fn [canvas _ _ orecuhos]
+               (set-background canvas 150 0 0)
+               (set-color canvas :white)
+               (doseq [orecuho orecuhos] (drawme orecuho canvas))
+               (map #(live %) orecuhos))]
+    
+    (show-window {:canvas canvas
+                  :draw-fn draw
+                  :draw-state (for [iter (range l)
+                                    :let [i (int iter)
+                                          x (+ (/ ^int (width canvas) 2) (* i (m/cos (/ i 2.0))))
+                                          y (+ (/ ^int (height canvas) 2) (* i (m/sin (/ i 2.0))))]]
+                                (->BugType2 x y 0.0 (+ 0.05 (/ i 1000.0))))})))
+
+;; https://www.funprogramming.org/114-How-to-create-movies-using-Processing.html
+
+;; From original script comment:
+;; To convert images to a movie you can use:
+;; ffmpeg -i seq-XXXXXXXX_%06d.png -r 25 -threads 4 video.mp4
+;; where XXXXXXXX is session id (8 hex digits)
+
+;; Comments:
+;;
+;; frame counts starts from 0
+;; uncomment saving first to save frames
+
+(let [draw (fn [canvas _ ^long frame ^long c]
+             (when (<= frame 500)
+               (set-color canvas c c c (r/drand 100))
+               (let [sz (r/drand 200)]
+                 (crect canvas (r/drand (width canvas)) (r/drand (height canvas)) sz sz))
+               ;; (save canvas (next-filename "funprogramming/114/seq-" ".png"))
+               (if (zero? (mod (inc frame) 200)) (- 255 c) c)))]
+  (show-window {:canvas (make-canvas 640 480)
+                :fps 25
+                :draw-fn draw
+                :draw-state 255}))
+
+;; https://www.funprogramming.org/115-Numbers-and-computers.html
+
+;; SKIPPED
+
