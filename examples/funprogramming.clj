@@ -414,13 +414,12 @@
 ;; Set background has the same behaviour as fill + rect on whole canvas
 
 (let [draw (fn [canvas window frame state]
-             (let [distance-left (r/drand 200)]
-               (-> canvas
-                   (set-background :black 30)
-                   (set-color :white)
-                   (ellipse (r/drand (width canvas))
-                            (r/drand (height canvas))
-                            30 30))))]
+             (-> canvas
+                 (set-background :black 20)
+                 (set-color :white)
+                 (ellipse (r/drand (width canvas))
+                          (r/drand (height canvas))
+                          30 30)))]
   (show-window {:draw-fn draw
                 :canvas (make-canvas 400 300)}))
 
@@ -455,18 +454,16 @@
 
 ;; https://www.funprogramming.org/25-Typing-big-letters-that-fade-out.html
 
-
 (let [canvas (make-canvas 400 400)
       window-name "Letters 25" 
       draw (fn [canvas window _ _]
              (set-background canvas 0x3355cc 20))]
 
-  (defmethod key-pressed :default [event _]
-    (when (= (event-window-name event) window-name)
-      (with-canvas-> canvas
-        (set-color 0xffe200)
-        (set-font-attributes (r/drand 20 200))
-        (text (str (key-char event)) (r/drand 300) (r/drand 100 400)))))
+  (defmethod key-event [window-name :key-pressed] [event _]
+    (with-canvas-> canvas
+      (set-color 0xffe200)
+      (set-font-attributes (r/drand 20 200))
+      (text (str (key-char event)) (r/drand 300) (r/drand 100 400))))
   
   (show-window {:canvas canvas
                 :draw-fn draw
@@ -1265,9 +1262,9 @@
   (println seed)
   
   (with-canvas [c canvas]
-    (loop [x (int 0)]
+    (loop [x 0]
       (when (< x ^int (width canvas))
-        (let [wi (r/irandom rng 100)]
+        (let [^int wi (r/irandom rng 100)]
           (set-color c (from-hsb (c/make-color (r/drandom rng 100) 80 80 100)))
           (rect c x 0 wi (height canvas))
           (recur (+ x wi))))))
@@ -1581,7 +1578,7 @@
 ;; * events and draw-fn are in different thread
 ;; * access/write to global state is asynchronous (unfortunately)
 
-(let [wname "Mouse pressed and released 85"
+(let [wname "Mouse pressed and released 86"
       back (p/load-pixels "results/test.jpg")
       canvas (make-canvas (width back) (height back))
       draw (fn [canvas window _ [d back]]
@@ -1970,7 +1967,30 @@
 
 ;; https://www.funprogramming.org/111-Drive-100-cars-an-array-of-objects.html
 
-;; TODO
+(do
+
+  (defprotocol CarProto2
+    (drive2 [car canvas speed]))
+
+  (defrecord CarType2 [^double x ^double y c]
+    CarProto2
+    (drive2 [_ canvas speed]
+      (let [nx (+ x ^double speed)
+            nx (if (> nx ^int (width canvas)) 0.0 nx)]
+        (set-color canvas c)
+        (rect canvas nx y 40 10)
+        (set-color canvas :black)
+        (rect canvas nx y 40 10 true)
+        (->CarType2 nx y c))))
+
+  (let [cnt 100
+        canvas (make-canvas 500 400 :mid)
+        draw (fn [canvas _ _ cars]
+               (set-background canvas :white)
+               (doall (map-indexed #(drive2 %2 canvas %1) cars)))]
+    (show-window {:canvas canvas
+                  :draw-fn draw
+                  :draw-state (repeatedly cnt #(->CarType2 20 (r/drand (height canvas)) 0x0AA8F5))})))
 
 ;; https://www.funprogramming.org/112-Array-of-objects-hypnotic-animation-part-I.html
 
@@ -2013,14 +2033,14 @@
 (do
 
   (defprotocol BugProto2
-    (live [bug])
-    (drawme [bug canvas]))
+    (live2 [bug])
+    (drawme2 [bug canvas]))
 
   (defrecord BugType2 [^double x ^double y ^double t ^double speed]
     BugProto2
-    (live [_]
+    (live2 [_]
       (->BugType2 x y (+ t speed) speed))
-    (drawme [_ canvas]
+    (drawme2 [_ canvas]
       (let [sz (m/norm (m/sin t) -1.0 1.0 10.0 20.0)]
         (ellipse canvas x y sz sz))))
 
@@ -2029,8 +2049,8 @@
         draw (fn [canvas _ _ orecuhos]
                (set-background canvas 150 0 0)
                (set-color canvas :white)
-               (doseq [orecuho orecuhos] (drawme orecuho canvas))
-               (map #(live %) orecuhos))]
+               (doseq [orecuho orecuhos] (drawme2 orecuho canvas))
+               (map #(live2 %) orecuhos))]
     
     (show-window {:canvas canvas
                   :draw-fn draw
@@ -2068,3 +2088,317 @@
 
 ;; SKIPPED
 
+;; https://www.funprogramming.org/116-Reading-and-displaying-bytes-part-1.html
+
+(let [bytes (load-bytes "results/test.jpg")]
+  (bit-and 0xff (first bytes)))
+
+;; https://www.funprogramming.org/117-Reading-and-displaying-bytes-part-2.html
+
+(let [^bytes bytes (load-bytes "results/test.jpg")
+      canvas (make-canvas 600 100 :mid)]
+
+  (with-canvas [c canvas]
+    (dotimes [i 600]
+      (let [myhue (bit-and 0xff (aget bytes i))
+            stroke (c/from-HSB (c/make-color myhue 255 255))]
+        (set-color c stroke)
+        (line c i 0 i (height canvas)))))
+  
+  (show-window {:canvas canvas}))
+
+;; https://www.funprogramming.org/118-Tips-copy-paths-optimize-the-binary-AND-operation.html
+;; https://www.funprogramming.org/119-Using-KeepassX-to-manage-your-passwords.html
+
+;; SKIPPED
+
+;; https://www.funprogramming.org/120-Interactive-file-visualizer-using-loadBytes.html
+
+(let [^bytes bytes (load-bytes "results/test.jpg")
+      canvas (make-canvas 600 100 :mid)
+      draw (fn [canvas window _ _]
+             (let [file-pos (m/round (m/cnorm (mouse-x window) 0.0 (width window) 0.0 (- (alength bytes) ^int (width window))))]
+               (dotimes [i 600]
+                 (let [myhue (bit-and 0xff (aget bytes (+ i file-pos)))
+                       stroke (c/from-HSB (c/make-color myhue 255 255))]
+                   (set-color canvas stroke)
+                   (line canvas i 0 i (height canvas))))))]
+  
+  (show-window {:canvas canvas
+                :draw-fn draw}))
+
+;; https://www.funprogramming.org/121-Using-a-webcam-in-Processing.html
+
+;; SKIPPED (no webcam)
+
+;; https://www.funprogramming.org/122-Programming-roses-and-other-flowers.html
+
+(let [k (/ 2.0 7.0)
+      canvas (make-canvas 400 400 :mid)
+      draw (fn [canvas _ ^long frame-count _]
+             (let [t (/ frame-count 20.0)
+                   x (* (m/cos (* k t)) (m/sin t))
+                   y (* (m/cos (* k t)) (m/cos t))]
+               (-> canvas
+                   (translate (/ ^int (width canvas) 2) (/ ^int (height canvas) 2))
+                   (scale 200 200)
+                   (set-stroke 0.01)
+                   (set-color :white)
+                   (line 0 0 x y))))]
+  
+  (with-canvas-> canvas (set-background 0x129575))
+
+  (show-window {:canvas canvas
+                :draw-fn draw}))
+
+;; https://www.funprogramming.org/123-Controlling-Processing-using-MidiBus-part-1.html
+;; https://www.funprogramming.org/124-Controlling-Processing-using-MidiBus-part-2.html
+;; https://www.funprogramming.org/125-Simple-video-player-in-Processing.html
+;; https://www.funprogramming.org/126-A-Processing-abstract-video-player.html
+
+;; SKIPPED
+
+;; https://www.funprogramming.org/127-Fun-with-filters-part-I.html
+
+;; Comments:
+;;
+;; Using convolution filter from Java (fast but buggy on edges)
+
+(let [draw (fn [canvas _ _ _]
+             (image canvas (-> canvas
+                               (filled-with-stroke (c/make-color (r/drand 255) (r/drand 255) (r/drand 255)) :white ellipse
+                                                   (r/drand (width canvas)) (r/drand (height canvas)) 40 40)
+                               (convolve :gaussian-blur-3)
+                               (convolve :gaussian-blur-3))))]
+
+  (show-window {:canvas (make-canvas 400 400)
+                :draw-fn draw}))
+
+;; Or native pixels filter written in Clojure (slow)
+
+(let [draw (fn [canvas _ _ _]
+             (filled-with-stroke canvas (c/make-color (r/drand 255) (r/drand 255) (r/drand 255)) :white ellipse
+                                 (r/drand (width canvas)) (r/drand (height canvas)) 40 40)
+             (p/set-canvas-pixels! canvas (p/filter-channels p/box-blur-2 nil (p/get-canvas-pixels canvas))))]
+
+  (show-window {:canvas (make-canvas 400 400)
+                :draw-fn draw}))
+
+;; https://www.funprogramming.org/128-Fun-with-filters-part-II-animated-blobs.html
+
+(let [wname "Fun with filters pII 128"
+      draw (fn [canvas window _ _]
+             (let [{:keys [m k]} (get-state window)]
+               (when m (if k
+                         (set-color canvas :white)
+                         (set-color canvas :black))
+                     (set-font-attributes canvas 80)
+                     (text canvas (str (char (r/irand 65 90))) (- ^int (mouse-x window) 30) (+ ^int (mouse-y window) 40))))
+             (p/set-canvas-pixels! canvas
+                                   (p/filter-channels p/threshold-50 (p/get-image-pixels (-> canvas
+                                                                                             (convolve :box-blur)
+                                                                                             (convolve :box-blur)
+                                                                                             (convolve :box-blur))))))]
+
+  (defmethod mouse-event [wname :mouse-pressed] [_ state] (assoc state :m true))
+  (defmethod mouse-event [wname :mouse-released] [_ state] (assoc state :m false))
+  (defmethod key-event [wname :key-pressed] [_ state] (assoc state :k true))
+  (defmethod key-event [wname :key-released] [_ state] (assoc state :k false))
+  
+  (show-window {:window-name wname
+                :canvas (make-canvas 400 400 :mid)
+                :draw-fn draw
+                :state {:m false
+                        :k false}}))
+
+;; 129-138 SKIPPED
+
+;; https://www.funprogramming.org/139-Tweak-values-while-a-program-runs.html
+
+(defn draw-139
+  "Tweak values and execute (works on Emacs/Cider) while window is running."
+  [canvas _ ^long frame _]
+  (-> canvas
+      (set-background 236 211 95)
+      (set-color 224 74 40))
+  (doseq [^int y (range 42 (height canvas) 45)]
+    (doseq [^int x (range 34 (width canvas) 27)]
+      (-> canvas
+          (reset-matrix)
+          (translate x y)
+          (rotate (* m/TWO_PI ^double (r/noise (/ x 570.5) (/ y 534.6) (/ frame 170.8))))
+          (crect 0 0 22 26)))))
+
+(show-window {:canvas (make-canvas 400 400)
+              :draw-fn #(draw-139 %1 %2 %3 %4)})
+
+;; https://www.funprogramming.org/140-Recursive-graphics.html
+
+(let [canvas (make-canvas 500 500)
+      recursive-thing (fn rt-fn [canvas ^double x ^double y ^double sz]
+                        (set-color canvas (v/interpolate (c/make-color 0xB5D333)
+                                                         (c/make-color 0x8F683F)
+                                                         (r/drand)) 100)
+                        (ellipse canvas x y sz sz)
+                        (when (> sz 1.0)
+                          (let [a (r/drand m/TWO_PI)
+                                nx (+ x (* (/ sz 2.0) (m/sin a)))
+                                ny (+ y (* (/ sz 2.0) (m/cos a)))]
+                            (rt-fn canvas nx ny (/ sz 2.0)))
+                          (let [a (r/drand m/TWO_PI)
+                                nx (+ x (* (/ sz 2.0) (m/sin a)))
+                                ny (+ y (* (/ sz 2.0) (m/cos a)))]
+                            (rt-fn canvas nx ny (/ sz 2.0)))
+                          (let [a (r/drand m/TWO_PI)
+                                nx (+ x (* (/ sz 2.0) (m/sin a)))
+                                ny (+ y (* (/ sz 2.0) (m/cos a)))]
+                            (recur canvas nx ny (/ sz 2.0)))))]
+
+  (with-canvas-> canvas
+    (set-background 0x605130)
+    (recursive-thing (/ ^int (width canvas) 2)
+                     (/ ^int (height canvas) 2)
+                     300))
+  
+  (show-window {:canvas canvas}))
+
+;; https://www.funprogramming.org/141-Processing-js-with-sound-audio-I.html
+;; https://www.funprogramming.org/142-Processing-js-with-sound-audio-II.html
+
+;; SKIPPED
+
+;; https://www.funprogramming.org/143-Using-PGraphics-as-layers-in-Processing.html
+
+(let [letters (make-canvas 500 500)
+      squares (make-canvas 500 500)
+      draw (fn [canvas _ _ _]
+             (set-background canvas :black)
+             (with-canvas-> letters
+               (text (str (r/irand 10)) (r/drand (width letters)) (r/drand (height letters))))
+             (with-canvas-> squares
+               (filled-with-stroke 0x000044 :black rect (r/drand (width squares)) (r/drand (height squares)) 40 40))
+             (image canvas letters)
+             (image canvas squares))]
+
+  (with-canvas-> letters (set-background :black 0))
+  (with-canvas-> squares (set-background :black 0))
+  
+  (show-window {:canvas (make-canvas 500 500)
+                :draw-fn draw}))
+
+;; https://www.funprogramming.org/144-Drawing-animated-loops.html
+
+(let [wname "Animated loops 144"
+      frames 20
+      pg (vec (repeatedly frames #(make-canvas 500 500)))
+      draw (fn [canvas window ^long frame [pmousex pmousey]]
+             (let [mousex (mouse-x window)
+                   mousey (mouse-y window)
+                   currframe (mod frame frames)
+                   currpg (pg currframe)]
+               (when (get-state window)
+                 (with-canvas-> currpg
+                   (set-stroke 3.0)
+                   (set-color :white)
+                   (line mousex mousey pmousex pmousey)))
+               (image canvas currpg)
+               [mousex mousey]))]
+
+  (defmethod mouse-event [wname :mouse-pressed] [_ _] true)
+  (defmethod mouse-event [wname :mouse-released] [_ _] false)
+  
+  (show-window {:window-name wname
+                :canvas (make-canvas 500 500)
+                :draw-fn draw
+                :draw-state [0 0]
+                :state false}))
+
+;; https://www.funprogramming.org/145-Export-animation-frames-convert-to-animgif-using-gifsicle.html
+
+;; Comment:
+;;
+;; Cleaning and saving done in events
+
+(let [wname "Export animated loops 145"
+      frames 20
+      pg (vec (repeatedly frames #(make-canvas 500 500)))
+      draw (fn [canvas window ^long frame [pmousex pmousey]]
+             (let [mousex (mouse-x window)
+                   mousey (mouse-y window)
+                   currframe (mod frame frames)
+                   currpg (pg currframe)]
+               (when (get-state window)
+                 (with-canvas-> currpg
+                   (set-stroke 3.0)
+                   (set-color :white)
+                   (line mousex mousey pmousex pmousey)))
+               (image canvas currpg)
+               [mousex mousey]))]
+
+  (defmethod mouse-event [wname :mouse-pressed] [_ _] true)
+  (defmethod mouse-event [wname :mouse-released] [_ _] false)
+  (defmethod key-pressed [wname \space] [_ s]
+    (doseq [g pg] (with-canvas-> g (set-background :black)))
+    s)
+  (defmethod key-pressed [wname \s] [_ s]
+    (doseq [g pg] (save g (next-filename "funprogramming/145/loop" ".jpg")))
+    s)
+  
+  (show-window {:window-name wname
+                :canvas (make-canvas 500 500)
+                :draw-fn draw
+                :draw-state [0 0]
+                :state false}))
+
+;; https://www.funprogramming.org/146-Let-s-make-errors-I-syntax-and-type.html
+
+;; SKIPPED
+
+;; https://www.funprogramming.org/147-Let-s-make-errors-II-nullPointerException-arrays-logic.html
+
+(let [wname "Make errors II 147"
+      fill-color (c/make-color 0x22FF66)
+      glow-color (c/make-color 0xFF7722)
+      glowing-rect (fn [canvas x y w h fx-active?]
+                     (when fx-active?
+                       (-> canvas
+                           (set-color glow-color 10)
+                           (set-stroke 4)
+                           (crect x y w h true)
+                           (set-stroke 9)
+                           (crect x y w h true)
+                           (set-stroke 16)
+                           (crect x y w h true)
+                           (set-stroke 25)
+                           (crect x y w h true)))
+                     (set-color canvas fill-color)
+                     (crect canvas x y w h))
+      draw (fn [canvas window _ _]
+             (set-background canvas :black)
+             (dotimes [i 150]
+               (-> canvas
+                   (push-matrix)
+                   (translate (/ ^int (width canvas) 2) (/ ^int (height canvas) 2))
+                   (rotate i)
+                   (glowing-rect (* 25 (mod i 5)) (* 15 (mod i 4)) 120 10 (get-state window))
+                   (pop-matrix))))]
+
+  (defmethod mouse-event [wname :mouse-pressed] [_ _] true)
+  (defmethod mouse-event [wname :mouse-released] [_ _] false)
+  
+  (show-window {:window-name wname
+                :canvas (make-canvas 675 675)
+                :fps 5
+                :state false
+                :draw-fn draw}))
+
+;; https://www.funprogramming.org/148-Drawing-shapes-with-glow-or-shadow.html
+;; https://www.funprogramming.org/149-Glowing-SVG-vector-shape.html
+;; https://www.funprogramming.org/150-Webcam-light-tracking-and-air-drawing.html
+;; https://www.funprogramming.org/151-Convert-an-image-into-a-3D-grid-of-boxes.html
+;; https://www.funprogramming.org/152-Exporting-3D-shapes-as-obj-files-in-Processing.html
+;; https://www.funprogramming.org/153-Rendering-Processing-shapes-in-Blender.html
+
+;; SKIPPED - no shapes, 3d or webcam support
+
+;; If you are brave enough you can run whole file. Expect plenty of windows. 

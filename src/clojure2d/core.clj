@@ -360,9 +360,8 @@
                         nil
                         (when font (java.awt.Font/decode font)))]
      (with-canvas-> result
-       (set-background Color/black)
-       (set-stroke)
-       (set-color :white))))
+       (set-background Color/black))
+     result))
   ([width height]
    (create-canvas width height :high nil))
   ([width height hint]
@@ -746,18 +745,23 @@
   (.setColor ^Graphics2D (.graphics canvas) c)
   canvas)
 
+(def alpha-composite-src ^java.awt.Composite (java.awt.AlphaComposite/getInstance java.awt.AlphaComposite/SRC))
+
 (defn set-awt-background
   "Set background color. Expects valid `Color` object."
   [^Canvas canvas c]
   (let [^Graphics2D g (.graphics canvas)
-        ^Color currc (.getColor g)]
+        ^Color currc (.getColor g)
+        curr-composite (.getComposite g)]
     (push-matrix canvas)
     (reset-matrix canvas)
+    (.setComposite g (java.awt.AlphaComposite/getInstance java.awt.AlphaComposite/SRC))
     (set-color-with-fn set-awt-color canvas c)
     (doto g
       (.fillRect 0 0 (.w canvas) (.h canvas))
       (.setColor currc))
-    (pop-matrix canvas))
+    (pop-matrix canvas)
+    (.setComposite g curr-composite))
   canvas)
 
 (defn set-awt-xor-mode
@@ -1054,6 +1058,16 @@
 ;; Do nothing on default
 (defmethod key-typed :default [_ s]  s)
 
+;; Multimethod use to processed key events (any key event)
+
+(def key-event-map {KeyEvent/KEY_PRESSED  :key-pressed
+                    KeyEvent/KEY_RELEASED :key-released
+                    KeyEvent/KEY_TYPED    :key-typed})
+
+(defmulti key-event (fn [^KeyEvent e state] [(event-window-name e) (key-event-map (.getID e))]))
+;; Do nothing on default
+(defmethod key-event :default [_ s] s)
+
 ;; Map Java mouse event names onto keywords
 (def mouse-event-map {MouseEvent/MOUSE_CLICKED  :mouse-clicked
                       MouseEvent/MOUSE_DRAGGED  :mouse-dragged
@@ -1077,10 +1091,14 @@
     (change-state! window-name (ef e (@global-state window-name)))))
 
 ;; Key
-(def key-processor (proxy [KeyAdapter] []
-                     (keyPressed [e] (process-state-and-event key-pressed e))
-                     (keyReleased [e] (process-state-and-event key-released e))
-                     (keyTyped [e] (process-state-and-event key-typed e))))
+(def key-char-processor (proxy [KeyAdapter] []
+                          (keyPressed [e] (process-state-and-event key-pressed e))
+                          (keyReleased [e] (process-state-and-event key-released e))
+                          (keyTyped [e] (process-state-and-event key-typed e))))
+(def key-event-processor (proxy [KeyAdapter] []
+                           (keyPressed [e] (process-state-and-event key-event e))
+                           (keyReleased [e] (process-state-and-event key-event e))
+                           (keyTyped [e] (process-state-and-event key-event e))))
 
 ;; Mouse
 (def mouse-processor (proxy [MouseAdapter] []
@@ -1109,10 +1127,12 @@
     (doto panel
       (.setName windowname)
       (.addMouseListener mouse-processor)
-      (.addKeyListener key-processor)
+      (.addKeyListener key-char-processor)
+      (.addKeyListener key-event-processor)
       (.addMouseMotionListener mouse-motion-processor)
       (.setIgnoreRepaint true)
-      (.setPreferredSize (Dimension. width height)))))
+      (.setPreferredSize (Dimension. width height))
+      (.setBackground Color/black))))
 
 ;; Function used to close and dispose window. As a side effect `active?` atom is set to false and global state for window is cleared.
 
@@ -1134,7 +1154,8 @@
     (doto frame
       (.setIconImages window-icons)
       (.add panel)
-      (.addKeyListener key-processor)
+      (.addKeyListener key-char-processor)
+      (.addKeyListener key-event-processor)
       (.setResizable false)
       (.pack)
       (.setDefaultCloseOperation JFrame/DO_NOTHING_ON_CLOSE)
@@ -1306,6 +1327,16 @@
        [y m d h mi s mil]
        {:year y :month m :day d :hour h :minute mi :second s :millis mil :sec s})))
   ([] (datetime :hashmap)))
+
+;; ## Load bytes
+
+(defn load-bytes
+  "Load file and return byte array."
+  [file]
+  (with-open [in (clojure.java.io/input-stream file)
+              out (java.io.ByteArrayOutputStream.)]
+    (clojure.java.io/copy in out)
+    (.toByteArray out)))
 
 ;; ## Session management
 ;;

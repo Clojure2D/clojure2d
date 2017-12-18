@@ -591,16 +591,11 @@
 
 ;; ### Threshold
 
-(defn threshold-pixel
-  "Threshold one pixel."
-  ^long [^long thr ^long v]
-  (if (< v thr) 255 0))
-
 (defn make-threshold
   "Create threshold filter for given value."
   ([^double thr]
    (let [t (unchecked-long (* 256.0 thr))]
-     (partial filter-channel (partial threshold-pixel t))))
+     (partial filter-channel #(if (< ^int % t) 0 255))))
   ([]
    (make-threshold 0.5)))
 

@@ -12,6 +12,13 @@ All notable changes to this project will be documented in this file. This change
 - bezier and curve functions added
 - date/time functions (year, month, day, hour, minute, sec, millis)
 - new function `filled-with-stroke` - to draw primitive with stroke and filled
+- `load-bytes` added
+- general key-event added (like mouse-event). You can now dispatch also on event type not only key char or code
+- background supports transparency
+
+### Fixed
+
+- threshold filter wrong values
 
 ### Changed
 
