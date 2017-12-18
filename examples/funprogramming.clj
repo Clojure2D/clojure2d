@@ -829,7 +829,7 @@
              (+ a 0.03))]
 
   (show-window {:draw-fn draw
-                :canvas (make-canvas 400 400)
+                :canvas (make-canvas 400 400 :mid)
                 :draw-state 0.0}))
 
 ;; https://www.funprogramming.org/44-Combine-sine-functions-to-create-crazy-waveforms.html

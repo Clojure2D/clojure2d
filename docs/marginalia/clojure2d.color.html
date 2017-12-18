@@ -2901,8 +2901,11 @@ Keyword can be used when representing one of 140 html/css colornames (https://ww
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)</pre></td></tr><tr><td class="docs"><h2>Clamping functions</h2>
 </td><td class="codes"></td></tr><tr><td class="docs"><p>First define some clamping functions</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Clamp to 0-255 integer</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Clamp to 0-255 double</p>
 </td><td class="codes"><pre class="brush: clojure">(defn clamp255
+  ^double [^double a]
+  (m/constrain a 0 255))</pre></td></tr><tr><td class="docs"><p>Clamp to 0-255 long</p>
+</td><td class="codes"><pre class="brush: clojure">(defn lclamp255
   ^long [^double a]
   (m/constrain (m/round a) 0 255))</pre></td></tr><tr><td class="docs"><p>Leave 8 bits from long. Wraps input to 0-255 integer</p>
 </td><td class="codes"><pre class="brush: clojure">(defn mod255
@@ -2922,7 +2925,10 @@ Keyword can be used when representing one of 140 html/css colornames (https://ww
   (red [c])
   (green [c])
   (blue [c])
-  (alpha [c]))</pre></td></tr><tr><td class="docs"><p>Local luma conversion function</p>
+  (alpha [c])
+  (ch0 [c])
+  (ch1 [c])
+  (ch2 [c]))</pre></td></tr><tr><td class="docs"><p>Local luma conversion function</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- to-luma-fn
   ^double [^double r ^double g ^double b]
   (+ (* 0.212671 r)
@@ -2936,25 +2942,31 @@ For keyword use one of 140 names from html/css palettes (list: https://www.w3sch
   (to-color [^Vec3 c]
     (Vec4. (.x c) (.y c) (.z c) 255))
   (to-awt-color [^Vec3 c]
-    (Color. (clamp255 (.x c))
-            (clamp255 (.y c))
-            (clamp255 (.z c))))
+    (Color. (lclamp255 (.x c))
+            (lclamp255 (.y c))
+            (lclamp255 (.z c))))
   (to-luma ^double [^Vec3 c] (to-luma-fn (.x c) (.y c) (.z c)))
   (red [^Vec3 c] (.x c))
   (green [^Vec3 c] (.y c))
   (blue [^Vec3 c] (.z c))
+  (ch0 [^Vec3 c] (.x c))
+  (ch1 [^Vec3 c] (.y c))
+  (ch2 [^Vec3 c] (.z c))
   (alpha [_] 255.0)
   Vec4
   (to-color [c] c)
   (to-awt-color [^Vec4 c]
-    (Color.  (clamp255 (.x c))
-             (clamp255 (.y c))
-             (clamp255 (.z c))
-             (clamp255 (.w c))))
+    (Color.  (lclamp255 (.x c))
+             (lclamp255 (.y c))
+             (lclamp255 (.z c))
+             (lclamp255 (.w c))))
   (to-luma ^double [^Vec4 c] (to-luma-fn (.x c) (.y c) (.z c)))
   (red [^Vec4 c] (.x c))
   (green [^Vec4 c] (.y c))
   (blue [^Vec4 c] (.z c))
+  (ch0 [^Vec4 c] (.x c))
+  (ch1 [^Vec4 c] (.y c))
+  (ch2 [^Vec4 c] (.z c))
   (alpha [^Vec4 c] (.w c))
   clojure.lang.Keyword
   (to-color [n] (html-color n))
@@ -2963,6 +2975,9 @@ For keyword use one of 140 names from html/css palettes (list: https://www.w3sch
   (red [n] (red (html-color n)))
   (green [n] (green (html-color n)))
   (blue [n] (blue (html-color n)))
+  (ch0 [n] (red (html-color n)))
+  (ch1 [n] (green (html-color n)))
+  (ch2 [n] (blue (html-color n)))
   (alpha [n] (alpha (html-color n)))
   Color
   (to-color [^Color c]
@@ -2975,10 +2990,24 @@ For keyword use one of 140 names from html/css palettes (list: https://www.w3sch
   (red [^Color c] (.getRed c))
   (green [^Color c] (.getGreen c))
   (blue [^Color c] (.getBlue c))
+  (ch0 [^Color c] (.getRed c))
+  (ch1 [^Color c] (.getGreen c))
+  (ch2 [^Color c] (.getBlue c))
   (alpha [^Color c] (.getAlpha c))
   nil
   (to-color [_] nil)
-  (to-awt-color [_] nil))</pre></td></tr><tr><td class="docs"><p>Set alpha channel and return <code>Vec4</code> representation.</p>
+  (to-awt-color [_] nil)
+  Long
+  (alpha [^long c] (bit-and 0xff (&gt;&gt; c 24)))
+  (red [^long c] (bit-and 0xff (&gt;&gt; c 16)))
+  (green [^long c] (bit-and 0xff (&gt;&gt; c 8)))
+  (blue [^long c] (bit-and 0xff c))
+  (ch0 [^long c] (bit-and 0xff (&gt;&gt; c 16)))
+  (ch1 [^long c] (bit-and 0xff (&gt;&gt; c 8)))
+  (ch2 [^long c] (bit-and 0xff c))
+  (to-color [^long c] (Vec4. (red c) (green c) (blue c) (if (zero? (bit-and 0xff000000 c)) 255 (alpha c))))
+  (to-awt-color [c] (to-awt-color (to-color c)))
+  (to-luma [c] (to-luma (to-color c))))</pre></td></tr><tr><td class="docs"><p>Set alpha channel and return <code>Vec4</code> representation.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn set-alpha
   [c a]
   (let [^Vec4 v (to-color c)]
@@ -2989,21 +3018,21 @@ For keyword use one of 140 names from html/css palettes (list: https://www.w3sch
     (Color. (.getRed cc)
             (.getGreen cc)
             (.getBlue cc)
-            (clamp255 a))))</pre></td></tr><tr><td class="docs"><p>Create java.awt.Color object. Use with <code>core/set-awt-color</code> or <code>core/set-awt-background</code>.</p>
+            (lclamp255 a))))</pre></td></tr><tr><td class="docs"><p>Create java.awt.Color object. Use with <code>core/set-awt-color</code> or <code>core/set-awt-background</code>.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-awt-color
   ([c]
    (to-awt-color c))
   ([c a]
    (set-awt-alpha c a))
   ([r g b]
-   (Color. (clamp255 r)
-           (clamp255 g)
-           (clamp255 b)))
+   (Color. (lclamp255 r)
+           (lclamp255 g)
+           (lclamp255 b)))
   ([r g b a]
-   (Color. (clamp255 r)
-           (clamp255 g)
-           (clamp255 b)
-           (clamp255 a))))</pre></td></tr><tr><td class="docs"><p>Create Vec4 object as color representation. Use with <code>core/set-color</code> or <code>core/set-background</code>.</p>
+   (Color. (lclamp255 r)
+           (lclamp255 g)
+           (lclamp255 b)
+           (lclamp255 a))))</pre></td></tr><tr><td class="docs"><p>Create Vec4 object as color representation. Use with <code>core/set-color</code> or <code>core/set-background</code>.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-color
   ([c]
    (to-color c))
@@ -3853,7 +3882,7 @@ Reverse conversion is not normalized and can exceed 0-255 range</p>
            ch2 (* 255.0 (/ (.y v) ^double ch2-scale))
            ch3 (* 255.0 (/ (.z v) ^double ch3-scale))
            ch4 (* 255.0 (/ (.w v) ^double ch4-scale))]
-       (colorspace-fn (Vec4. ch1 ch2 ch3 ch4)))))
+       (colorspace-fn (v/applyf (Vec4. ch1 ch2 ch3 ch4) clamp255)))))
   ([colorspace-fn ch1-scale ch2-scale ch3-scale] (make-color-converter colorspace-fn ch1-scale ch2-scale ch3-scale 255.0))
   ([colorspace-fn ch-scale] (make-color-converter colorspace-fn ch-scale ch-scale ch-scale ch-scale))
   ([colorspace-fn] colorspace-fn))</pre></td></tr><tr><td class="docs"><h2>Palettes</h2>

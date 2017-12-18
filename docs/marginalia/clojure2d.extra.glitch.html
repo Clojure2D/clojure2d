@@ -2889,7 +2889,8 @@ net.brehaut.ClojureTools = (function (SH) {
             [clojure2d.core :refer :all]
             [clojure2d.math.vector :as v]
             [clojure2d.extra.signal :as s]
-            [clojure2d.color :as c])
+            [clojure2d.color :as c]
+            [clojure2d.extra.variations :as var])
   (:import [clojure2d.pixels Pixels]
            [clojure2d.math.vector Vec2 Vec4]))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(set! *warn-on-reflection* true)
@@ -2901,49 +2902,62 @@ net.brehaut.ClojureTools = (function (SH) {
 Random setup is based on sum of oscillators defined in <code>signal</code> namespace.</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(def freqs (mapv #(&lt;&lt; 1 ^long %) (range 8)))
-(def amps (mapv #(/ ^long %) freqs))</pre></td></tr><tr><td class="docs"><p>Create list of random waves </p>
-</td><td class="codes"><pre class="brush: clojure">(defn slitscan-random-setup
-  ([n]
-   (letfn [(f []
-             (let [r (r/randval 0.75 (r/irand 4) (r/irand (count freqs)))]
-               {:wave (rand-nth s/oscillators)
-                :freq (freqs r)
-                :amp (amps r)
-                :phase (r/drand)}))]
-     (repeatedly n f)))
+(def amps (mapv #(/ ^long %) freqs))</pre></td></tr><tr><td class="docs"><p>Create random wave definition.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- make-random-wave 
+  []
+  (let [r (r/randval 0.75 (r/irand 4) (r/irand (count freqs)))]
+    {:wave (rand-nth s/oscillators)
+     :freq (freqs r)
+     :amp (amps r)
+     :phase (r/drand)}))</pre></td></tr><tr><td class="docs"><p>Create list of random waves for each axis separately</p>
+</td><td class="codes"><pre class="brush: clojure">(defn slitscan-random-config
+  ([nx ny]
+   {:waves-x (repeatedly nx make-random-wave)
+    :waves-y (repeatedly ny make-random-wave)})
   ([]
-   (slitscan-random-setup (r/irand 2 6))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn make-slitscan-waves
-  ([waves]
-   (s/make-sum-wave (map #(s/make-wave (:wave %) (:freq %) (:amp %) (:phase %)) waves)))
-  ([]
-   (make-slitscan-waves (slitscan-random-setup))))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn slitscan
+   (slitscan-random-config (r/irand 2 6) (r/irand 2 6))))</pre></td></tr><tr><td class="docs"><p>Create function from waves definision.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- make-slitscan-waves
+  [waves]
+  (s/make-sum-wave (map #(s/make-wave (:wave %) (:freq %) (:amp %) (:phase %)) waves)))</pre></td></tr><tr><td class="docs"><p>Shift pixels by amount returned by functions fx and fy.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn- slitscan
   [fx fy ch ^Pixels p x y]
   (let [wp (.w p)
         hp (.h p)
-        sx (/ 1.0 wp)
-        sy (/ 1.0 hp)
+        sx (/ wp)
+        sy (/ hp)
         shiftx (* 0.3 wp ^double (fx (* ^int x sx)))
         shifty (* 0.3 hp ^double (fy (* ^int y sy)))
         xx (m/wrap 0.0 wp (+ ^int x shiftx))
         yy (m/wrap 0.0 hp (+ ^int y shifty))]
-    (p/get-value p ch xx yy)))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn make-slitscan-filter
+    (p/get-value p ch xx yy)))</pre></td></tr><tr><td class="docs"><p>Create slitscan filter funtion.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-slitscan
   ([]
-   (partial p/filter-channel-xy (partial slitscan (make-slitscan-waves) (make-slitscan-waves))))
-  ([fx fy]
-   (partial p/filter-channel-xy (partial slitscan fx fy))))</pre></td></tr><tr><td class="docs"><p>channel shifts</p>
+   (make-slitscan (slitscan-random-config)))
+  ([{:keys [waves-x waves-y]
+     :or {waves-x [(make-random-wave)] waves-y [(make-random-wave)]}}]
+   (partial p/filter-channel-xy (partial slitscan (make-slitscan-waves waves-x) (make-slitscan-waves waves-y)))))</pre></td></tr><tr><td class="docs"><p>channel shifts</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Random shift values.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn shift-channels-random-config
+  []
+  {:horizontal-shift (r/randval 0.3 0.0 (r/drand -0.1 0.1))
+   :vertical-shift (r/randval 0.3 0.0 (r/drand -0.1 0.1))})</pre></td></tr><tr><td class="docs"><p>Shift channels by given amount.</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-shift-channels
+  ([] (make-shift-channels (shift-channels-random-config)))
+  ([{:keys [horizontal-shift vertical-shift]
+     :or {horizontal-shift 0.05 vertical-shift -0.05}}]
+   (make-slitscan {:waves-x [{:wave :constant :amp horizontal-shift}]
+                   :waves-y [{:wave :constant :amp vertical-shift}]})))</pre></td></tr><tr><td class="docs"><p>Slitscan2</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn make-shift-channels-filter
-  [amount h v]
-  (let [mv (constantly amount)
-        zr (constantly 0.0)]
-    (make-slitscan-filter (if h mv zr) (if v mv zr))))</pre></td></tr><tr><td class="docs"><p>f: Vec2 -> Vec2 (use variation)
-   r: value 1.0-3.0</p>
-</td><td class="codes"><pre class="brush: clojure">(defn make-slitscan2-filter
-  ([f ^double r]
-   (let [r- (- r)]
+</td><td class="codes"><pre class="brush: clojure">(defn slitscan2-random-config
+  []
+  (binding [var/*skip-random-variations* true]
+    {:variation (var/make-random-configuration)
+     :r 2.0}))</pre></td></tr><tr><td class="docs"><p>f: variation configuration
+   r: range value 1.0-3.0</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-slitscan2
+  ([{:keys [variation ^double r]}]
+   (let [f (var/make-combination variation)
+         r- (- r)]
      (fn [ch t ^Pixels p]
        (dotimes [y (.h p)]
          (let [^double yv (m/norm y 0.0 (.h p) r- r)]
@@ -2955,12 +2969,15 @@ Random setup is based on sum of oscillators defined in <code>signal</code> names
                    xx (unchecked-int (m/norm (.x vv) r- r 0.0 (.w p)))
                    yy (unchecked-int (m/norm (.y vv) r- r 0.0 (.h p)))]
                (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
-  ([f]
-   (make-slitscan2-filter f 2.0)))</pre></td></tr><tr><td class="docs"><p>f: Vec2 -> Vec2 (use variation)
-   r: value 1.0-3.0</p>
-</td><td class="codes"><pre class="brush: clojure">(defn make-fold-filter
-  ([f ^double r]
-   (let [r- (- r)]
+  ([]
+   (make-slitscan2 (slitscan2-random-config))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(def fold-random-config slitscan2-random-config)</pre></td></tr><tr><td class="docs"><p>f: variation configuration
+   r: range value 1.0-3.0</p>
+</td><td class="codes"><pre class="brush: clojure">(defn make-fold
+  ([{:keys [variation ^double r]}]
+   (let [f (var/make-combination variation)
+         r- (- r)]
      (fn [ch t ^Pixels p]
        (dotimes [y (.h p)]
          (let [^double yv (m/norm y 0.0 (.h p) r- r)]
@@ -2970,8 +2987,8 @@ Random setup is based on sum of oscillators defined in <code>signal</code> names
                    xx (unchecked-int (m/norm (.x vv) r- r 0.0 (.w p)))
                    yy (unchecked-int (m/norm (.y vv) r- r 0.0 (.h p)))]
                (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
-  ([f]
-   (make-fold-filter f 2.0)))</pre></td></tr><tr><td class="docs"><p>mirrorimage</p>
+  ([]
+   (make-fold (fold-random-config))))</pre></td></tr><tr><td class="docs"><p>mirrorimage</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- mi-draw-point
   ([ch target source oldx oldy newx newy sx sy]
@@ -2995,27 +3012,27 @@ Random setup is based on sum of oscillators defined in <code>signal</code> names
         (mi-draw-point ch target source (- (.w source) x 1) y x y)))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- mi-do-diag-ul
   [t shift? ch target ^Pixels source]
-  (let [^int t t
+  (let [t (int t)
         size (min (.w source) (.h source))
         tx (if shift? (- (.w source) size) 0)
         ty (if shift? (- (.h source) size) 0)]
     (dotimes [y size]
       (dotimes [x (inc y)]
-        (condp m/eq t
+        (case t
           0 (mi-draw-point ch target source x y y x tx ty)
           1 (mi-draw-point ch target source y x x y tx ty)
           2 (mi-draw-point ch target source x y (- size x 1) (- size y 1) tx ty)
           3 (mi-draw-point ch target source y x (- size y 1) (- size x 1) tx ty))))))</pre></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn- mi-do-diag-ur
   [t shift? ch target ^Pixels source]
-  (let [^int t t
+  (let [t (int t)
         size (min (.w source) (.h source))
         tx (if shift? (- (.w source) size) 0)
         ty (if shift? (- (.h source) size) 0)]
     (dotimes [y size]
       (loop [x (int (dec size))]
         (when (&gt;= x (- size y 1))
-          (condp m/eq t
+          (case t
             0 (mi-draw-point ch target source x y (- size y 1) (- size x 1) tx ty)
             1 (mi-draw-point ch target source (- size y 1) (- size x 1) x y tx ty)
             2 (mi-draw-point ch target source x y (- size x 1) (- size y 1) tx ty)
@@ -3055,34 +3072,88 @@ Random setup is based on sum of oscillators defined in <code>signal</code> names
                    :RDR  (partial mi-do-diag-rect false true)
                    :RDL  (partial mi-do-diag-rect true false)
                    :RUL  (partial mi-do-diag-rect false false)})</pre></td></tr><tr><td class="docs">
-</td><td class="codes"><pre class="brush: clojure">(defn make-mirror-filter
-  [t]
-  (t mirror-types))</pre></td></tr><tr><td class="docs">
-</td><td class="codes"></td></tr><tr><td class="docs"><p>blend machine</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Return colorspace or nil</p>
-</td><td class="codes"><pre class="brush: clojure">(defn random-blend-get-cs
+</td><td class="codes"><pre class="brush: clojure">(defn mirror-random-config
   []
-  (when (r/brand 0.9) (rand-nth c/colorspaces-names)))</pre></td></tr><tr><td class="docs"><p>Do random blend of two pixels, use random colorspace</p>
-</td><td class="codes"><pre class="brush: clojure">(defn blend-machine
+  (rand-nth (keys mirror-types)))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn make-mirror
+  ([t] (mirror-types t))
+  ([] (mirror-types (mirror-random-config))))</pre></td></tr><tr><td class="docs"><p>pix2line</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn- pix2line-grid 
+  [^long grid-sx ^long grid-sy {:keys [^long nx ^long ny ^double scale nseed]}]
+  (let [nnx (m/round (inc (* nx scale)))
+        nny (m/round (inc (* ny scale)))
+        [bget bset] (make-2d-int-array grid-sx grid-sy)
+        noise (r/make-perlin-noise (if nseed nseed (r/irand)))]
+    (dotimes [y grid-sy]
+      (bset 0 y 0) 
+      (loop [currx (int 0)
+             current (&lt; ^double (noise 0 (/ y ny)) 0.5)
+             x (int 1)]
+        (when (&lt; x grid-sx)
+          (let [xnnx (/ x nnx)
+                xx (* xnnx (m/round (* nnx (inc ^double (noise xnnx)))))
+                ynny (/ y nny)
+                yy (* ynny (m/round (* nny (inc ^double (noise ynny)))))
+                here (&lt; ^double (noise (/ (+ x xx) nx) (/ (+ y yy) ny)) 0.5)
+                ncurrx (if (= current here) currx x)
+                ncurrent (if (= current here) current here)]
+            (bset x y ncurrx)
+            (recur ncurrx ncurrent (unchecked-inc x))))))
+    bget))</pre></td></tr><tr><td class="docs"><p>Make random config for pix2line</p>
+</td><td class="codes"><pre class="brush: clojure">(defn pix2line-random-config
+  []
+  {:nx (inc (r/irand 100))
+   :ny (inc (r/irand 100))
+   :scale (r/drand 5.0)
+   :tolerance (r/randval 0.9 (r/irand 5 80) (r/irand 5 250))
+   :nseed (r/irand)
+   :whole (r/brand 0.8)})</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn make-pix2line
   ([]
-   (let [cs1 (random-blend-get-cs) ; let's convert to some colorspace (or leave rgb)
-         cs2 (r/randval 0.2 (random-blend-get-cs) cs1) ; maybe different cs on second image?
-         outcs (r/randval 0.2 (random-blend-get-cs) cs1) ; maybe some random colorspace on output?
-         bl1 (r/randval 0.85 (rand-nth c/blends-names) nil)    ; ch1 blend
-         bl2 (r/randval 0.85 (rand-nth c/blends-names) nil) ; ch2 blend
-         bl3 (r/randval 0.85 (rand-nth c/blends-names) nil)] ; ch3 blend
-     {:switch (r/brand 0.5)
-      :in-cs1 cs1
-      :in-cs2 cs2
-      :out-cs outcs
-      :cs1-to (r/brand 0.5)
-      :cs2-to (r/brand 0.5)
-      :cs-to (r/brand 0.5)
-      :blend-ch1 bl1
-      :blend-ch2 bl2
-      :blend-ch3 bl3}))
+   (make-pix2line (pix2line-random-config)))
+  ([{:keys [^long tolerance whole] :as config}] 
+   (fn [ch target ^Pixels source]
+     (let [grid (pix2line-grid (width source) (height source) config)]
+       (dotimes [y (height source)]
+         (loop [^int currentc (p/get-value source ch 0 y)
+                lastx 0
+                x (int 1)]
+           (if (&lt; x (.w source))
+             (let [^int c (p/get-value source ch x y)
+                   [^int ncurrentc ^int nlastx] (if (&lt;= tolerance (m/abs (- currentc c)))
+                                                  (let [^int gval (grid x y)
+                                                        ^int myx (if (bool-and whole (&lt; lastx gval)) lastx gval)]
+                                                    (dotimes [xx (- x myx)] (p/set-value target ch (+ myx xx) y c))
+                                                    [c x])
+                                                  [currentc lastx])]
+               (recur ncurrentc (int nlastx) (unchecked-inc x)))
+             (let [x- (dec x)
+                   ^int gval (grid x- y)
+                   ^int myx (if (&lt; lastx gval) lastx gval)]
+               (dotimes [xx (- x- myx)] (p/set-value target ch (+ myx xx) y currentc))))))))))</pre></td></tr><tr><td class="docs"><p>blend machine</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn blend-machine-random-config
+  []
+  (let [cs1 (r/randval 0.9 (rand-nth c/colorspaces-names) nil) ; let's convert to some colorspace (or leave rgb)
+        cs2 (r/randval 0.2 (r/randval 0.9 (rand-nth c/colorspaces-names) nil) cs1) ; maybe different cs on second image?
+        outcs (r/randval 0.2 (r/randval 0.9 (rand-nth c/colorspaces-names) nil) cs1) ; maybe some random colorspace on output?
+        bl1 (r/randval 0.85 (rand-nth c/blends-names) nil)    ; ch1 blend
+        bl2 (r/randval 0.85 (rand-nth c/blends-names) nil) ; ch2 blend
+        bl3 (r/randval 0.85 (rand-nth c/blends-names) nil)] ; ch3 blend
+    {:switch (r/brand 0.5)
+     :in-cs1 cs1
+     :in-cs2 cs2
+     :out-cs outcs
+     :cs1-to (r/brand 0.5)
+     :cs2-to (r/brand 0.5)
+     :cs-to (r/brand 0.5)
+     :blend-ch1 bl1
+     :blend-ch2 bl2
+     :blend-ch3 bl3}))</pre></td></tr><tr><td class="docs"><p>Do random blend of two pixels, use random colorspace</p>
+</td><td class="codes"><pre class="brush: clojure">(defn blend-machine
   ([p1 p2]
-   (blend-machine (blend-machine) p1 p2))
+   (blend-machine (blend-machine-random-config) p1 p2))
   ([{:keys [switch in-cs1 in-cs2 out-cs cs1-to cs2-to cs-to blend-ch1 blend-ch2 blend-ch3]} p1 p2]
    (let [[p1 p2] (if switch [p2 p1] [p1 p2]) ; switch images
          cs1-sel (if cs1-to first second)
@@ -3094,45 +3165,46 @@ Random setup is based on sum of oscillators defined in <code>signal</code> names
      (if out-cs
        (p/filter-colors (cs-sel (out-cs c/colorspaces)) result)
        result))))</pre></td></tr><tr><td class="docs"><p>color reducer machine</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Randomize color reducing filter, random method, random colors</p>
+</td><td class="codes"></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defn color-reducer-machine-random-config
+  []
+  (let [bpal (condp #(&gt; ^double %1 ^double %2) (r/drand 1.0)
+               0.1 (let [num (r/irand 5 20)]
+                     {:type :iq
+                      :palette (c/make-iq-random-palette num)})
+               0.5 {:type :colourlovers
+                    :palette (rand-nth c/colourlovers-palettes)}
+               0.6 (let [preset (rand-nth (keys c/paletton-presets))
+                         p (rand-nth c/colourlovers-palettes)
+                         h (map #(c/paletton-rgb-to-hue %) p)]
+                     {:type :colourlovers-paletton
+                      :conf {:hue h
+                             :preset preset
+                             :type :monochromatic
+                             :compl false}
+                      :palette (let [v (reduce #(concat %1 (c/make-monochromatic-palette %2 (preset c/paletton-presets))) p h)]
+                                 (vec v))})
+               (let [h (r/drand 360.0)
+                     t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
+                     conf {:compl (r/brand 0.6)
+                           :angle (r/drand 10.0 90.0)
+                           :adj (r/brand 0.5)
+                           :hue h
+                           :preset (rand-nth (keys c/paletton-presets))
+                           :type t}]
+                 {:type :paletton
+                  :conf conf
+                  :palette (c/paletton-palette t h conf)}))
+        pal (r/randval 0.2
+                       (update bpal :palette conj (Vec4. 0.0 0.0 0.0 255.0) (Vec4. 255.0 255.0 255.0 255.0))
+                       bpal)
+        pal (assoc pal :distf (rand-nth [v/dist v/dist-abs v/dist-cheb v/dist-sq v/dist-cos v/dist-discrete]))]
+    pal))</pre></td></tr><tr><td class="docs"><p>Randomize color reducing filter, random method, random colors</p>
 </td><td class="codes"><pre class="brush: clojure">(defn color-reducer-machine
-  ([]
-   (let [bpal (condp #(&gt; ^double %1 ^double %2) (r/drand 1.0)
-                0.1 (let [num (r/irand 5 20)]
-                      {:type :iq
-                       :palette (c/make-iq-random-palette num)})
-                0.5 {:type :colourlovers
-                     :palette (rand-nth c/colourlovers-palettes)}
-                0.6 (let [preset (rand-nth (keys c/paletton-presets))
-                          p (rand-nth c/colourlovers-palettes)
-                          h (map #(c/paletton-rgb-to-hue %) p)]
-                      {:type :colourlovers-paletton
-                       :conf {:hue h
-                              :preset preset
-                              :type :monochromatic
-                              :compl false}
-                       :palette (let [v (reduce #(concat %1 (c/make-monochromatic-palette %2 (preset c/paletton-presets))) p h)]
-                                  (vec v))})
-                (let [h (r/drand 360.0)
-                      t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
-                      conf {:compl (r/brand 0.6)
-                            :angle (r/drand 10.0 90.0)
-                            :adj (r/brand 0.5)
-                            :hue h
-                            :preset (rand-nth (keys c/paletton-presets))
-                            :type t}]
-                  {:type :paletton
-                   :conf conf
-                   :palette (c/paletton-palette t h conf)}))
-         pal (r/randval 0.2
-                        (update bpal :palette conj (Vec4. 0.0 0.0 0.0 255.0) (Vec4. 255.0 255.0 255.0 255.0))
-                        bpal)
-         pal (assoc pal :distf (rand-nth [v/dist v/dist-abs v/dist-cheb v/dist-sq]))]
-     pal))
   ([conf p]
    (p/filter-colors (c/make-reduce-color-filter (:distf conf) (:palette conf)) p))
   ([p]
-   (color-reducer-machine p (color-reducer-machine))))</pre></td></tr><tr><td class="docs"><p>find best matching pixels</p>
+   (color-reducer-machine p (color-reducer-machine-random-config))))</pre></td></tr><tr><td class="docs"><p>find best matching pixels</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(defn blend-images-filter
   [{:keys [names pixels mode distance cs]

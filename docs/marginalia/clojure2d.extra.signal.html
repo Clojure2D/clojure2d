@@ -3914,14 +3914,12 @@ You can use Audacity/SOX utilities to convert files to audio.</p>
   (let [tri (make-wave :triangle f a p)]
     (fn ^double [^double x]
       (let [namp (* 0.5 a)]
-        (* 2.0 (m/constrain ^double (tri x) (- namp) namp))))))</pre></td></tr><tr><td class="docs"><p>List of all oscillators</p>
-</td><td class="codes"><pre class="brush: clojure">(def oscillators [:sin :noise :saw :square :triangle :cut-triangle])</pre></td></tr><tr><td class="docs"><p>Calculate sum of waves (list) for given values</p>
-</td><td class="codes"><pre class="brush: clojure">(defn sum-waves
-  ^double [fs ^double x]
-  (reduce #(+ ^double %1 ^double (%2 x)) 0.0 fs))</pre></td></tr><tr><td class="docs"><p>Create oscillator as a sum of given base oscillators.</p>
+        (* 2.0 (m/constrain ^double (tri x) (- namp) namp))))))</pre></td></tr><tr><td class="docs">
+</td><td class="codes"><pre class="brush: clojure">(defmethod make-wave :constant [_ _ ^double a _] (constantly a))</pre></td></tr><tr><td class="docs"><p>List of all oscillators</p>
+</td><td class="codes"><pre class="brush: clojure">(def oscillators [:sin :noise :saw :square :triangle :cut-triangle :constant])</pre></td></tr><tr><td class="docs"><p>Create function which is sum of all waves.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-sum-wave
   [fs]
-  (partial sum-waves fs))</pre></td></tr><tr><td class="docs"><p>Create Signal from oscillator. Parameters are: f - oscillator, samplerate and number of seconds.</p>
+  (reduce #(fn [^double x] (+ ^double (%1 x) ^double (%2 x))) fs))</pre></td></tr><tr><td class="docs"><p>Create Signal from oscillator. Parameters are: f - oscillator, samplerate and number of seconds.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-signal-from-wave
   [f ^double samplerate ^double seconds]
   (let [len (* samplerate seconds)

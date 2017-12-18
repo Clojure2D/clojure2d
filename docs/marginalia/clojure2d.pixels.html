@@ -2993,10 +2993,10 @@ Possible values are:</p>
     (set-value pixels ch (+ ^long x (* ^long y w)) v))
   (set-color [_ idx v] 
     (let [^Vec4 v v]
-      (aset ^ints p ^long (pos 0 idx) (c/clamp255 (.x v)))
-      (aset ^ints p ^long (pos 1 idx) (c/clamp255 (.y v)))
-      (aset ^ints p ^long (pos 2 idx) (c/clamp255 (.z v)))
-      (aset ^ints p ^long (pos 3 idx) (c/clamp255 (.w v))))
+      (aset ^ints p ^long (pos 0 idx) (c/lclamp255 (.x v)))
+      (aset ^ints p ^long (pos 1 idx) (c/lclamp255 (.y v)))
+      (aset ^ints p ^long (pos 2 idx) (c/lclamp255 (.z v)))
+      (aset ^ints p ^long (pos 3 idx) (c/lclamp255 (.w v))))
     p)
   (set-color [pixels x y v]
     (set-color pixels (+ ^long x (* ^long y w)) v))
@@ -3347,14 +3347,11 @@ Possible values are:</p>
 </td><td class="codes"><pre class="brush: clojure">(def posterize-4 (make-posterize 4))
 (def posterize-8 (make-posterize 8))
 (def posterize-16 (make-posterize 16))</pre></td></tr><tr><td class="docs"><h3>Threshold</h3>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Threshold one pixel.</p>
-</td><td class="codes"><pre class="brush: clojure">(defn threshold-pixel
-  ^long [^long thr ^long v]
-  (if (&lt; v thr) 255 0))</pre></td></tr><tr><td class="docs"><p>Create threshold filter for given value.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Create threshold filter for given value.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn make-threshold
   ([^double thr]
    (let [t (unchecked-long (* 256.0 thr))]
-     (partial filter-channel (partial threshold-pixel t))))
+     (partial filter-channel #(if (&lt; ^int % t) 0 255))))
   ([]
    (make-threshold 0.5)))</pre></td></tr><tr><td class="docs"><p>Create 3 threshold filters for 0.25, 0.5 and 0.75 threshold values.</p>
 </td><td class="codes"><pre class="brush: clojure">(def threshold-25 (make-threshold 0.25))
