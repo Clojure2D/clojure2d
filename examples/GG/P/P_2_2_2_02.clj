@@ -1,4 +1,4 @@
-(ns examples.GG.P.P-2-2-2-01
+(ns examples.GG.P.P-2-2-2-02
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
             [clojure2d.math.random :as r]
@@ -7,8 +7,12 @@
 (def ^:const ^double angle-count 7.0)
 (def ^:const ^double step-size 3.0)
 (def ^:const ^double min-length 10.0)
+(def ^:const ^double dweight 50.0)
+(def ^:const ^double dstroke 4.0)
 
-(def wname "P_2_2_2_01")
+(def wname "P_2_2_2_02")
+
+(def hsb-mode (c/make-color-converter c/from-HSB 360 100 100 100))
 
 (defn get-random-angle
   ""
@@ -23,7 +27,7 @@
 
 (defn draw-helper
   "Recurrent version of draw (to loop)"
-  [canvas ^long times [^double posx ^double posy ^double posx-cross ^double posy-cross ^double angle direction :as all]]
+  [canvas mode ^long times [^double posx ^double posy ^double posx-cross ^double posy-cross ^double angle direction :as all]]
   (if (neg? times)
     all
     (let [posx (+ posx (* step-size (m/cos (m/radians angle))))
@@ -41,21 +45,22 @@
                                           (let [angle (get-random-angle direction) 
                                                 distance (m/dist posx posy posx-cross posy-cross)]
                                             (when (>= distance min-length)
-                                              (line canvas posx posy posx-cross posy-cross))
+                                              (-> canvas
+                                                  (set-stroke (/ distance dweight))
+                                                  (set-color (case mode
+                                                               1 :black
+                                                               2 (hsb-mode (c/make-color 52 100 (/ distance dstroke) 100))
+                                                               3 (hsb-mode (c/make-color 192 100 64 (/ distance dstroke)))))
+                                                  (line posx posy posx-cross posy-cross)))
                                             [angle posx posy])
                                           [angle posx-cross posy-cross])]
-      (recur canvas (dec times) [posx posy posx-cross posy-cross angle direction]))))
+      (recur canvas mode (dec times) [posx posy posx-cross posy-cross angle direction]))))
 
 
 (defn draw
   ""
   [canvas window _ state]
-  (if (get-state window)
-    (do
-      (set-color canvas :black)
-      (set-stroke canvas 3.0)
-      (draw-helper canvas (max 1 (mouse-x window)) state))
-    state))
+  (draw-helper canvas (get-state window) (max 1 (mouse-x window)) state))
 
 (def canvas (make-canvas 600 600))
 
@@ -66,7 +71,7 @@
               (show-window {:window-name wname
                             :canvas canvas
                             :draw-fn draw
-                            :state true
+                            :state 1
                             :draw-state [posx posy posx posy 
                                          (get-random-angle :south)
                                          :south]})))
@@ -75,5 +80,6 @@
   (with-canvas-> canvas (set-background :white))
   s)
 
-(defmethod key-released [wname \space] [_ _] false)
-(defmethod key-released [wname \l] [_ _] true)
+(defmethod key-released [wname \1] [_ _] 1)
+(defmethod key-released [wname \2] [_ _] 2)
+(defmethod key-released [wname \3] [_ _] 3)

@@ -3,8 +3,8 @@
             [expectations :refer :all]
             [clojure2d.math.vector :as v]
             [clojure2d.math :as m]
-            [clojure2d.math.random :as r]))
-
+            [clojure2d.math.random :as r]
+            [clojure.test :as t]))
 
 ;; mods
 
