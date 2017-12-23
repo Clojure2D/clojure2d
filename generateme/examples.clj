@@ -110,7 +110,7 @@
 
 (meta (with-meta 'clojure2d.math/LOG2E {:ex (eee "dddsaere" m/LOG2E)}))
 
-(fn? clojure2d.math/LOG2E)
+(type eee)
 
 (prn *ns*)
 

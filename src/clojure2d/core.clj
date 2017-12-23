@@ -15,7 +15,8 @@
             [clojure2d.color :as c]
             [clojure2d.math.vector :as v]
             [clojure2d.math :as m]
-            [clojure.reflect :as ref])
+            [clojure.reflect :as ref]
+            [clojure2d.math.random :as r])
   (:import clojure2d.math.vector.Vec2
            [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
            [java.awt.event InputEvent ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
@@ -50,7 +51,9 @@
   * Returns BufferedImage object"
   [^String filename]
   (try
-    (let [^Image img (.getImage (ImageIcon. filename))]
+    (let [^Image img (.getImage (ImageIcon. filename))
+          ;; ^BufferedImage img (ImageIO/read (file filename)) ;; SVG - need to set parameters...
+          ]
       (let [^BufferedImage bimg (BufferedImage. (.getWidth img nil) (.getHeight img nil) BufferedImage/TYPE_INT_ARGB)
             ^Graphics2D gr (.createGraphics bimg)]
         (.drawImage gr img 0 0 nil)

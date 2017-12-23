@@ -22,6 +22,8 @@
                  [org.apache.commons/commons-math3 "3.6.1"]
                  [com.flowpowered/flow-noise "1.0.0"]
                  [com.sudoplay.joise/joise "1.1.0"]
+                 ;; [com.twelvemonkeys.imageio/imageio-batik "3.3.2"] ;; SVG!
+                 ;; [org.apache.xmlgraphics/batik-transcoder "1.9.1"]
                  [net.littleredcomputer/sicmutils "0.10.0"] ;; to be removed
                                         ;	 [de.sciss/jwave "1.0.3"]
                  [criterium "0.4.4"]
