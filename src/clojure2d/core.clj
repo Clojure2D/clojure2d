@@ -177,6 +177,11 @@
   [^BufferedImage source x y w h]
   (.getSubimage source x y w h))
 
+;; ## Screen info
+
+(defn ^Dimension screen-size [] (.getScreenSize (Toolkit/getDefaultToolkit)))
+(defn screen-width [] (.getWidth (screen-size)))
+(defn screen-height [] (.getHeight (screen-size)))
 
 ;; ## Canvas
 ;;
@@ -262,7 +267,7 @@
     (convolve buffer t))
   (get-pixel [_ x y] (get-pixel buffer x y)))
 
-;; Let's define three rendering quality options: `:low`, `:mid` and `:high`. Where `:low` is fastest but has poor quality and `:high` has best quality but may be slow. Rendering options are used when you create canvas.
+;; Let's define three rendering quality options: `:low`, `:mid`, `:high` or `:highest`. Where `:low` is fastest but has poor quality and `:high`/`:highest` has best quality but may be slow. Rendering options are used when you create canvas.
 (def rendering-hints {:low {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF
                             RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR
                             RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
@@ -283,8 +288,22 @@
                              RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY
                              RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY
                              RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON
-                             RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON
-                             RenderingHints/KEY_STROKE_CONTROL      RenderingHints/VALUE_STROKE_PURE}})
+                             RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON}
+                      :highest {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON
+                                RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC
+                                RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY
+                                RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY
+                                RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY
+                                RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON
+                                RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON
+                                RenderingHints/KEY_STROKE_CONTROL      RenderingHints/VALUE_STROKE_PURE}})
+
+(defn get-rendering-hints
+  "Return rendering hints for a key or return default (or :high)."
+  ([hint default]
+   (rendering-hints (or (some #{hint} (keys rendering-hints)) default)))
+  ([hint]
+   (get-rendering-hints hint :high)))
 
 ;; Following functions and macro are responsible for creating and releasing `Graphics2D` object for a canvas.
 ;; You have to use `with-canvas->` macro to draw on canvas. Internally it's a threading macro and accepts only list of methods which first parameter is canvas object.
@@ -358,7 +377,7 @@
                         (Line2D$Double.)
                         (Rectangle2D$Double.)
                         (Ellipse2D$Double.)
-                        (rendering-hints (or (some #{hint} (keys rendering-hints)) :high))
+                        (get-rendering-hints hint)
                         width height
                         nil
                         (when font (java.awt.Font/decode font)))]
@@ -709,9 +728,19 @@
 
 (defn text
   "Draw text with default setting"
-  [^Canvas canvas ^String s ^long x ^long y]
-  (.drawString ^Graphics2D (.graphics canvas) s x y)
-  canvas)
+  ([^Canvas canvas s x y align]
+   (let [x (long x)
+         y (long y)]
+     (case align
+       :right (let [w (.stringWidth (.getFontMetrics ^Graphics2D (.graphics canvas)) s)]
+                (.drawString ^Graphics2D (.graphics canvas) ^String s (- x w) y))
+       :center (let [w (/ (.stringWidth (.getFontMetrics ^Graphics2D (.graphics canvas)) s) 2.0)]
+                 (.drawString ^Graphics2D (.graphics canvas) ^String s (m/round (- x w)) y))
+       :left (.drawString ^Graphics2D (.graphics canvas) ^String s x y)
+       (.drawString ^Graphics2D (.graphics canvas) ^String s x y))) 
+   canvas)
+  ([canvas s x y]
+   (text canvas s x y :left)))
 
 (defn set-stroke
   "Set stroke (line) attributes like `cap`, `join` and size. Default `CAP_ROUND` and `JOIN_MITER` is used. Default size is `1.0`."
@@ -1126,7 +1155,8 @@
 (defn- create-panel
   "Create panel which displays canvas. Attach mouse events, give a name (same as window), set size etc."
   [buffer windowname width height]
-  (let [panel (java.awt.Canvas.)]
+  (let [panel (java.awt.Canvas.)
+        d (Dimension. width height)]
     (doto panel
       (.setName windowname)
       (.addMouseListener mouse-processor)
@@ -1134,7 +1164,7 @@
       (.addKeyListener key-event-processor)
       (.addMouseMotionListener mouse-motion-processor)
       (.setIgnoreRepaint true)
-      (.setPreferredSize (Dimension. width height))
+      (.setPreferredSize d)
       (.setBackground Color/black))))
 
 ;; Function used to close and dispose window. As a side effect `active?` atom is set to false and global state for window is cleared.
@@ -1159,8 +1189,8 @@
       (.add panel)
       (.addKeyListener key-char-processor)
       (.addKeyListener key-event-processor)
-      (.setResizable false)
       (.pack)
+      (.setResizable false)
       (.setDefaultCloseOperation JFrame/DO_NOTHING_ON_CLOSE)
       (.addWindowListener closer)
       (.setName windowname)
@@ -1179,13 +1209,13 @@
 
 (defn- repaint
   "Draw buffer on panel using `BufferStrategy` object."
-  [^java.awt.Canvas panel ^Canvas canvas]
+  [^java.awt.Canvas panel ^Canvas canvas hint]
   (let [^BufferStrategy strategy (.getBufferStrategy panel)]
     (loop []
       (loop []
         (let [^Graphics2D graphics-context (.getDrawGraphics strategy)
               ^BufferedImage b (.buffer canvas)]
-          ;; (.setRenderingHints graphics-context (or (.hints canvas) (rendering-hints :mid)))
+          (.setRenderingHints graphics-context (or (.hints canvas) hint))
           (.drawImage graphics-context b 0 0 (.getWidth panel) (.getHeight panel) nil)
           (.dispose graphics-context))
         (when (.contentsRestored strategy) (recur)))
@@ -1193,22 +1223,29 @@
       (when (.contentsLost strategy) (recur)))
     (.sync (Toolkit/getDefaultToolkit))))
 
+(deftype WithExceptionT [exception? value])
+
 (defn- refresh-screen-task
   "Repaint canvas on window with set FPS.
 
   * Input: frame, active? atom, function to run before repaint, canvas and sleep time."
-  [^Window window draw-fun draw-state]
+  [^Window window draw-fun draw-state hint]
   (let [stime (/ 1000.0 ^double (.fps window))]
     (loop [cnt (long 0)
            result draw-state]
-      (let [ct (System/currentTimeMillis)
-            new-result (when draw-fun 
-                         (with-canvas-> @(.buffer window)
-                           (draw-fun window cnt result)))] 
+      (let [ct (System/currentTimeMillis) 
+            ^WithExceptionT new-result (try
+                                         (WithExceptionT. false (when draw-fun 
+                                                                  (with-canvas-> @(.buffer window)
+                                                                    (draw-fun window cnt result))))
+                                         (catch Throwable e
+                                           (.printStackTrace e)
+                                           (WithExceptionT. true e)))] 
         (let [delay (- stime (- (System/currentTimeMillis) ct))]
           (when (pos? delay) (Thread/sleep delay)))
-        (repaint (.panel window) @(.buffer window))
-        (when @(.active? window) (recur (unchecked-inc cnt) new-result))))))
+        (repaint (.panel window) @(.buffer window) hint)
+        (when (bool-and @(.active? window)
+                        (not (.exception? new-result))) (recur (unchecked-inc cnt) (.value new-result)))))))
 
 ;; You may want to replace canvas to the other one. To make it pass result of `show-window` function and new canvas.
 ;; Internally it just resets buffer atom for another canvas.
@@ -1249,8 +1286,9 @@
   * :draw-fn
   * :state
   * :draw-state
-  * :setup"
-  ([canvas wname width height fps draw-fun state draw-state setup]
+  * :setup
+  * :hint - rendering hint for display"
+  ([canvas wname width height fps draw-fun state draw-state setup hint]
    (let [active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
@@ -1267,29 +1305,28 @@
                                    (setup window)))]
      (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
      (change-state! wname state)
-     (future (refresh-screen-task window draw-fun (or setup-state draw-state)))
+     (future (refresh-screen-task window draw-fun (or setup-state draw-state) (get-rendering-hints hint :mid)))
      window))
   ([canvas wname]
    (show-window canvas wname nil))
   ([canvas wname draw-fn]
    (show-window canvas wname 60 draw-fn))
   ([canvas wname fps draw-fn]
-   (show-window canvas wname (width canvas) (height canvas) fps draw-fn nil nil nil))
+   (show-window canvas wname (width canvas) (height canvas) fps draw-fn nil nil nil :mid))
   ([canvas wname w h fps]
-   (show-window canvas wname w h fps nil nil nil nil))
+   (show-window canvas wname w h fps nil nil nil nil :mid))
   ([canvas wname w h fps draw-fun]
-   (show-window canvas wname w h fps draw-fun nil nil nil))
-  ([{:keys [canvas window-name w h fps draw-fn state draw-state setup]
+   (show-window canvas wname w h fps draw-fun nil nil nil :mid))
+  ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint]
      :or {canvas (make-canvas 200 200)
           window-name (str "Clojure2D - " (to-hex (rand-int (Integer/MAX_VALUE)) 8))
-          w (width canvas)
-          h (height canvas)
           fps 60
           draw-fn nil
           state nil
           draw-state nil
-          setup nil}}]
-   (show-window canvas window-name w h fps draw-fn state draw-state setup))
+          setup nil
+          hint :mid}}]
+   (show-window canvas window-name (or w (width canvas)) (or h (height canvas)) fps draw-fn state draw-state setup hint))
   ([] (show-window {})))
 
 ;; ## Utility functions

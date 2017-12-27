@@ -83,7 +83,7 @@
 (expect (c/to-color :black) (get-pixel canvas2 0 0))
 
 ;; rendering hints available
-(expect [:high :low :mid] (sort (keys rendering-hints)))
+(expect [:high :highest :low :mid] (sort (keys rendering-hints)))
 
 ;; resize canvas
 (expect (more-> 4 width 44 height)

@@ -15,14 +15,18 @@ All notable changes to this project will be documented in this file. This change
 - `load-bytes` added
 - general key-event added (like mouse-event). You can now dispatch also on event type not only key char or code
 - background supports transparency
+- screen-width and screen-height functions
 
 ### Fixed
 
 - threshold filter wrong values
+- `draw` now displays exception when something is wrong
 
 ### Changed
 
 - `with-canvas` is renamed to `with-canvas->`
+- `:highest` hint added (it's `:high` with Stroke Pure)
+- :right, :left or :center alignments for text (last parameter, default :left)
 
 ## 0.0.5-0.0.6 - 2017-11-21
 
