@@ -9,6 +9,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 (def ^:const ^double min-range -2.0)
 (def ^:const ^double max-range 2.0)

@@ -1210,12 +1210,12 @@
 (defn- repaint
   "Draw buffer on panel using `BufferStrategy` object."
   [^java.awt.Canvas panel ^Canvas canvas hint]
-  (let [^BufferStrategy strategy (.getBufferStrategy panel)]
+  (let [^BufferStrategy strategy (.getBufferStrategy panel)
+        ^BufferedImage b (.buffer canvas)]
     (loop []
       (loop []
-        (let [^Graphics2D graphics-context (.getDrawGraphics strategy)
-              ^BufferedImage b (.buffer canvas)]
-          (.setRenderingHints graphics-context (or (.hints canvas) hint))
+        (let [^Graphics2D graphics-context (.getDrawGraphics strategy)]
+          (.setRenderingHints graphics-context hint)
           (.drawImage graphics-context b 0 0 (.getWidth panel) (.getHeight panel) nil)
           (.dispose graphics-context))
         (when (.contentsRestored strategy) (recur)))
@@ -1245,7 +1245,7 @@
           (when (pos? delay) (Thread/sleep delay)))
         (repaint (.panel window) @(.buffer window) hint)
         (when (bool-and @(.active? window)
-                        (not (.exception? new-result))) (recur (unchecked-inc cnt) (.value new-result)))))))
+                        (not (.exception? new-result))) (recur (inc cnt) (.value new-result)))))))
 
 ;; You may want to replace canvas to the other one. To make it pass result of `show-window` function and new canvas.
 ;; Internally it just resets buffer atom for another canvas.

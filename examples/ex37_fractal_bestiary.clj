@@ -26,7 +26,7 @@
 
 ;; canvas
 
-(def canvas (make-canvas size size))
+(def canvas (make-canvas size size :highest))
 
 ;; main algorithm
 
