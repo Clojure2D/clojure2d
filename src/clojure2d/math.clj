@@ -309,6 +309,19 @@
 ;; truncate fractional part, keep sign
 (defn trunc ^double [^double v] (if (neg? v) (ceil v) (floor v)))
 
+;; return approximate value
+(defn approx
+  (^double [^double v] (/ (FastMath/round (* 100.0 v)) 100.0))
+  (^double [^double v ^long digits]
+   (let [sc (pow 10.0 digits)]
+     (/ (FastMath/round (* sc v)) sc))))
+
+(defn approx-eq
+  "Checks equality with approximation."
+  ([^double a ^double b] (== (approx a) (approx b)))
+  ([^double a ^double b ^long digits] (== (approx a digits)
+                                          (approx b digits))))
+
 ;; fractional part, always returns values from 0.0 to 1.0 (exclusive)
 (defn frac ^double [^double v] (abs (- v (unchecked-long v))))
 ;; as above but keep sign

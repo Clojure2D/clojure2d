@@ -1,13 +1,11 @@
 (defproject clojure2d "0.0.7-SNAPSHOT"
   :description "Creative coding / glitch library backed by Java2D"
   :plugins [[refactor-nrepl "2.4.0-SNAPSHOT"]
-            [cider/cider-nrepl "0.16.0"]
+            [cider/cider-nrepl "0.16.0-SNAPSHOT"]
             [lein-ancient "0.6.15"]
             [lein-kibit "0.1.6"]
             [lein-bikeshed "0.5.0"]
             [lein-marginalia "0.9.1"]
-            [lein-expectations "0.0.8"]
-            [lein-autoexpect "1.9.0"]
             [com.jakemccrary/lein-test-refresh "0.22.0"]
             [lein-codox "0.10.3"]]
   :url "https://github.com/Clojure2D/clojure2d"
@@ -16,13 +14,10 @@
   :dependencies [
                  ;; [org.clojure/clojure "1.8.0"]
                  [org.clojure/clojure "1.9.0"]
-                 [expectations "2.2.0-rc3"]
                  [net.jafama/jafama "2.3.1"]
                  [org.apache.commons/commons-math3 "3.6.1"]
                  [com.flowpowered/flow-noise "1.0.0"]
                  [com.sudoplay.joise/joise "1.1.0"]
-                 ;; [com.twelvemonkeys.imageio/imageio-batik "3.3.2"] ;; SVG!
-                 ;; [org.apache.xmlgraphics/batik-transcoder "1.9.1"]
                  [net.littleredcomputer/sicmutils "0.10.0"] ;; to be removed
                                         ;	 [de.sciss/jwave "1.0.3"]
                  [criterium "0.4.4"]
