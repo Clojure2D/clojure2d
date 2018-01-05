@@ -168,10 +168,6 @@
      :bounds (make-bounds -2 -2 2 2)}))
 
 (def canvas (make-canvas w h))
-(def window (show-window {:canvas canvas
-                          :window-name title
-                          :fps 20
-                          :state (make-random-config)}))
 
 (defn draw-fractal
   "Draw fractal"
@@ -187,6 +183,11 @@
   "Create new config and draw fractal"
   []
   (draw-fractal (make-random-config)))
+
+(def window (show-window {:canvas canvas
+                          :window-name title
+                          :fps 20
+                          :state (new-fractal)}))
 
 (defmethod key-pressed [title \n] [_ _]
   (new-fractal))
@@ -227,4 +228,3 @@
                              (+ nx (.sx cbounds)) (+ ny (.sy cbounds)))]
     (draw-fractal (assoc config :bounds nbounds))))
 
-(new-fractal)

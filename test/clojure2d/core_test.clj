@@ -37,7 +37,7 @@
   "Prepare data, events, etc."
   {:expectations-options :before-run}
   []
-  (reset! window (show-window canvas window-name 50 50 60 draw)) 
+  (reset! window (show-window canvas window-name 150 150 60 draw)) 
   (set-state! @window {:a 1})
   (reset! window-closed (show-window canvas "Testing clojure.core closed"))
   (close-window @window-closed)
@@ -120,9 +120,13 @@
 (deftest internal-window-values-test
   (are [x y] (= x (y @window))
     window-name :window-name
-    50 :w
-    50 :h
+    150 :w
+    150 :h
     60.0 :fps))
+
+(deftest panel-size-test
+  (is (= 150 (.getWidth (:panel @window))))
+  (is (= 150 (.getHeight (:panel @window)))))
 
 ;; Test event
 (deftest event-test

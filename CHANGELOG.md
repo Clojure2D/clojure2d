@@ -21,12 +21,15 @@ All notable changes to this project will be documented in this file. This change
 
 - threshold filter wrong values
 - `draw` now displays exception when something is wrong
+- window canvas was in the bad size causing visual artifacts
+- more accurate frame delay calculations
 
 ### Changed
 
 - `with-canvas` is renamed to `with-canvas->`
 - `:highest` hint added (it's `:high` with Stroke Pure)
 - :right, :left or :center alignments for text (last parameter, default :left)
+- `rendering-hints` is map of vectors now, it gave 25% speed gain during recreating graphics context
 
 ## 0.0.5-0.0.6 - 2017-11-21
 

@@ -1,4 +1,4 @@
-(ns NOC.ch06.simplescalarprojection
+(ns examples.NOC.ch06.simplescalarprojection
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
             [clojure2d.math.vector :as v])

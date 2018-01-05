@@ -429,7 +429,7 @@
 ;;
 ;; Negative ellipse size doesn't work here. I have to take absolute value
 
-(let [canvas (make-canvas 400 400)]
+(let [canvas (make-canvas 400 400 :highest)]
   (with-canvas [c canvas]
     (set-background c (c/from-HSB (c/make-color (r/drand 256) (r/drand 50 100) (r/drand 50 100))))
     (set-color c :white 100)
@@ -454,19 +454,26 @@
 
 ;; https://www.funprogramming.org/25-Typing-big-letters-that-fade-out.html
 
+;; Comments:
+;;
+;; You can't draw in events and in draw in the same time...
+
 (let [canvas (make-canvas 400 400)
       window-name "Letters 25" 
       draw (fn [canvas window _ _]
-             (set-background canvas 0x3355cc 20))]
+             (set-background canvas 0x3355cc 20)
+             (when-let [chr (get-state window)]
+               (-> canvas
+                   (set-color 0xffe200)
+                   (set-font-attributes (r/drand 20 200))
+                   (text (str chr) (r/drand 300) (r/drand 100 400)))))]
 
-  (defmethod key-event [window-name :key-pressed] [event _]
-    (with-canvas-> canvas
-      (set-color 0xffe200)
-      (set-font-attributes (r/drand 20 200))
-      (text (str (key-char event)) (r/drand 300) (r/drand 100 400))))
+  (defmethod key-event [window-name :key-pressed] [event chr] (key-char event))
+  (defmethod key-event [window-name :key-released] [_ _])
   
   (show-window {:canvas canvas
                 :draw-fn draw
+                :draw-state true
                 :window-name window-name
                 :setup (fn [canvas _]
                          (set-background canvas 0x3355cc))})  )
@@ -731,7 +738,7 @@
                  (crect 0 0 (* 200.0 ^double (r/noise (+ 30.0 my-num)))
                         (* 200.0 ^double (r/noise my-num))))
              
-             (+ my-num 0.005))]
+             (+ my-num 0.002))]
 
   (show-window {:draw-fn draw
                 :canvas (make-canvas 400 400)
@@ -1099,7 +1106,7 @@
                       [(if (neg? nx) (width canvas) nx) y speed]) points))]
   
   (show-window {:canvas canvas
-                :draw-fn draw 
+                :draw-fn draw
                 :draw-state (repeatedly 100 #(vector (r/drand (width canvas))
                                                      (r/drand (height canvas))
                                                      (r/drand 1 5)))}))
@@ -1135,7 +1142,7 @@
                       [(if (neg? nx) (width canvas) nx) y speed]) points))]
   
   (show-window {:canvas canvas
-                :draw-fn draw 
+                :draw-fn draw
                 :draw-state (repeatedly 100 #(vector (r/drand (width canvas))
                                                      (r/drand (height canvas))
                                                      (r/drand 1 5)))}))
@@ -1295,7 +1302,7 @@
 
 (let [canvas (make-canvas 500 400)
       draw (fn [canvas window _ ^double a]
-             (when (<= a m/TWO_PI)
+             (if (<= a m/TWO_PI)
                (let [r (r/drand 180 220)
                      x (+ (/ ^int (width canvas) 2) (* r (m/cos a)))
                      y (+ (/ ^int (height canvas) 2) (* r (m/sin a)))]
@@ -1304,7 +1311,8 @@
                      (ellipse x y 10 10)
                      (set-color :black) 
                      (ellipse x y 10 10 true))
-                 (+ a 0.1))))]
+                 (+ a 0.1))
+               a))]
   (with-canvas-> canvas (set-background :lightgrey))
   (show-window {:canvas canvas
                 :draw-fn draw
@@ -1558,16 +1566,15 @@
       draw (fn [canvas window _ ^double d]
              (image canvas back)
              (ellipse canvas (mouse-x window) (mouse-y window) d d true)
-             (if (= :pressed (get-state window)) (inc d) 20.0))]
+             (if (get-state window) (inc d) 20.0))]
   
-  (defmethod mouse-event [wname :mouse-pressed] [_ _] :pressed)
-  (defmethod mouse-event [wname :mouse-released] [_ _] :released)
+  (defmethod mouse-event [wname :mouse-pressed] [_ _] true)
+  (defmethod mouse-event [wname :mouse-released] [_ _] false)
   
   (show-window {:canvas canvas
                 :window-name wname
                 :draw-fn draw
-                :draw-state 20.0
-                :state :released}))
+                :draw-state 20.0}))
 
 ;; https://www.funprogramming.org/86-Drawing-shapes-with-your-mouse.html
 
@@ -1586,20 +1593,19 @@
                (p/set-canvas-pixels! canvas back)
                (ellipse canvas (mouse-x window) (mouse-y window) nd nd true)
                
-               (if (= (get-state window) :pressed)
+               (if (get-state window)
                  [(inc ^double nd) back]
                  (if (nil? d)
                    [nil back]
                    [nil (p/get-canvas-pixels canvas)]))))]
   
-  (defmethod mouse-event [wname :mouse-pressed] [_ _] :pressed)
-  (defmethod mouse-event [wname :mouse-released] [_ _] :released)
+  (defmethod mouse-event [wname :mouse-pressed] [_ _] true)
+  (defmethod mouse-event [wname :mouse-released] [_ _] false)
   
   (show-window {:canvas canvas
                 :window-name wname
                 :draw-fn draw
-                :draw-state [nil back]
-                :state :released}))
+                :draw-state [nil back]}))
 
 ;; https://www.funprogramming.org/87-Playing-with-strings.html
 
@@ -1918,7 +1924,6 @@
   (show-window {:window-name wname
                 :canvas canvas
                 :draw-fn draw
-                :state false
                 :draw-state (repeatedly amt #(conj (random-rect) (from-hsb (c/make-color (r/drand 100) 80 80 100))))}))
 
 ;; https://www.funprogramming.org/99-Add-sounds-to-your-programs.html
@@ -2140,11 +2145,13 @@
                    x (* (m/cos (* k t)) (m/sin t))
                    y (* (m/cos (* k t)) (m/cos t))]
                (-> canvas
+                   (push-matrix)
                    (translate (/ ^int (width canvas) 2) (/ ^int (height canvas) 2))
                    (scale 200 200)
                    (set-stroke 0.01)
                    (set-color :white)
-                   (line 0 0 x y))))]
+                   (line 0 0 x y)
+                   (pop-matrix))))]
   
   (with-canvas-> canvas (set-background 0x129575))
 
@@ -2284,7 +2291,8 @@
   (with-canvas-> squares (set-background :black 0))
   
   (show-window {:canvas (make-canvas 500 500)
-                :draw-fn draw}))
+                :draw-fn draw
+                :hint :low}))
 
 ;; https://www.funprogramming.org/144-Drawing-animated-loops.html
 

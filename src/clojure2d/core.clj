@@ -156,6 +156,7 @@
 ;; ### Additional functions
 ;;
 ;; Just an image resizer with bicubic interpolation. Native `Graphics2D` method is called.
+(declare set-rendering-hints-by-key)
 
 (defn resize-image
   "Resize image
@@ -165,9 +166,8 @@
   [img width height]
   (let [^BufferedImage target (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)
         ^Graphics2D g (.createGraphics target)]
+    (set-rendering-hints-by-key g :high)
     (doto g
-      (.setRenderingHint RenderingHints/KEY_INTERPOLATION RenderingHints/VALUE_INTERPOLATION_BICUBIC)
-      (.setRenderingHint RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON)
       (.drawImage img 0 0 width height nil)
       (.dispose))
     target))
@@ -268,35 +268,35 @@
   (get-pixel [_ x y] (get-pixel buffer x y)))
 
 ;; Let's define three rendering quality options: `:low`, `:mid`, `:high` or `:highest`. Where `:low` is fastest but has poor quality and `:high`/`:highest` has best quality but may be slow. Rendering options are used when you create canvas.
-(def rendering-hints {:low {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF
-                            RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR
-                            RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
-                            RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED
-                            RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED
-                            RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF
-                            RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_OFF}
-                      :mid {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON
-                            RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BILINEAR
-                            RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
-                            RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED
-                            RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED
-                            RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF
-                            RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON}
-                      :high {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON
-                             RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC
-                             RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY
-                             RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY
-                             RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY
-                             RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON
-                             RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON}
-                      :highest {RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON
-                                RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC
-                                RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY
-                                RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY
-                                RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY
-                                RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON
-                                RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON
-                                RenderingHints/KEY_STROKE_CONTROL      RenderingHints/VALUE_STROKE_PURE}})
+(def ^:static rendering-hints {:low [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF]
+                                     [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR]
+                                     [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED]
+                                     [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED]
+                                     [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED]
+                                     [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF]
+                                     [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_OFF]]
+                               :mid [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
+                                     [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BILINEAR]
+                                     [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED]
+                                     [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED]
+                                     [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED]
+                                     [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF]
+                                     [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]]
+                               :high [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
+                                      [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC]
+                                      [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY]
+                                      [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY]
+                                      [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY]
+                                      [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON]
+                                      [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]]
+                               :highest [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
+                                         [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC]
+                                         [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY]
+                                         [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY]
+                                         [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY]
+                                         [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON]
+                                         [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]
+                                         [RenderingHints/KEY_STROKE_CONTROL      RenderingHints/VALUE_STROKE_PURE]]})
 
 (defn get-rendering-hints
   "Return rendering hints for a key or return default (or :high)."
@@ -304,6 +304,20 @@
    (rendering-hints (or (some #{hint} (keys rendering-hints)) default)))
   ([hint]
    (get-rendering-hints hint :high)))
+
+(defn- set-rendering-hints
+  "Sets rendering hints for graphics context."
+  [^Graphics2D g hints]
+  (doseq [[key v] hints]
+    (.setRenderingHint g key v))
+  true)
+
+(defn- set-rendering-hints-by-key
+  "Sets rendering hints for graphics context."
+  [g hints]
+  (if (contains? rendering-hints hints)
+    (set-rendering-hints g (hints rendering-hints))
+    false))
 
 ;; Following functions and macro are responsible for creating and releasing `Graphics2D` object for a canvas.
 ;; You have to use `with-canvas->` macro to draw on canvas. Internally it's a threading macro and accepts only list of methods which first parameter is canvas object.
@@ -324,7 +338,7 @@
   "Create new `Graphics2D` object and set renedering hints"
   [^Canvas canvas]
   (let [^Graphics2D ng (.createGraphics ^BufferedImage (.buffer canvas))]
-    (.setRenderingHints ng (or (.hints canvas) (rendering-hints :high)))
+    (set-rendering-hints ng (or (.hints canvas) (rendering-hints :high)))
     (when-let [f (.font canvas)] (.setFont ng f))
     (Canvas. ng
              (.buffer canvas)
@@ -725,6 +739,21 @@
    (let [f (.deriveFont ^java.awt.Font (.getFont ^Graphics2D (.graphics canvas)) (float size))]
      (.setFont ^Graphics2D (.graphics canvas) f)
      canvas)))
+
+(defn char-width
+  "Returns font width from metrics. Should be called within context."
+  ^long [^Canvas canvas chr]
+  (.charWidth (.getFontMetrics ^Graphics2D (.graphics canvas)) ^char chr))
+
+(defn font-height
+  "Returns font width from metrics. Should be called within context."
+  ^long [^Canvas canvas]
+  (.getHeight (.getFontMetrics ^Graphics2D (.graphics canvas))))
+
+(defn text-width
+  "Returns width of the provided string. Should be called within context."
+  ^long [^Canvas canvas ^String txt]
+  (.stringWidth (.getFontMetrics ^Graphics2D (.graphics canvas)) txt))
 
 (defn text
   "Draw text with default setting"
@@ -1163,6 +1192,7 @@
       (.addKeyListener key-char-processor)
       (.addKeyListener key-event-processor)
       (.addMouseMotionListener mouse-motion-processor)
+      (.setFocusTraversalKeysEnabled false)
       (.setIgnoreRepaint true)
       (.setPreferredSize d)
       (.setBackground Color/black))))
@@ -1188,15 +1218,17 @@
       (.setLayout (java.awt.BorderLayout.))
       (.setIconImages window-icons)
       (.add panel)
+      (.setSize (Dimension. width height))
       (.addKeyListener key-char-processor)
       (.addKeyListener key-event-processor)
+      (.invalidate)
       (.setResizable false)
+      (.pack)
       (.setDefaultCloseOperation JFrame/DO_NOTHING_ON_CLOSE)
       (.addWindowListener closer)
       (.setName windowname)
       (.setTitle windowname)
       (.setBackground Color/white)
-      (.pack)
       (.setLocationRelativeTo nil)
       (.setVisible true))
     (doto panel
@@ -1211,18 +1243,19 @@
 
 (defn- repaint
   "Draw buffer on panel using `BufferStrategy` object."
-  [^java.awt.Canvas panel ^Canvas canvas hint]
+  [^java.awt.Canvas panel ^Canvas canvas hints]
   (let [^BufferStrategy strategy (.getBufferStrategy panel)
         ^BufferedImage b (.buffer canvas)]
-    (loop []
+    (when strategy
       (loop []
-        (let [^Graphics2D graphics-context (.getDrawGraphics strategy)]
-          ;; (.setRenderingHints graphics-context hint)
-          (.drawImage graphics-context b 0 0 (.getWidth panel) (.getHeight panel) nil)
-          (.dispose graphics-context))
-        (when (.contentsRestored strategy) (recur)))
-      (.show strategy)
-      (when (.contentsLost strategy) (recur)))
+        (loop []
+          (let [^Graphics2D graphics-context (.getDrawGraphics strategy)]
+            (when hints (set-rendering-hints graphics-context hints))
+            (.drawImage graphics-context b 0 0 (.getWidth panel) (.getHeight panel) nil) ;; sizes of panel???
+            (.dispose graphics-context))
+          (when (.contentsRestored strategy) (recur)))
+        (.show strategy)
+        (when (.contentsLost strategy) (recur))))
     (.sync (Toolkit/getDefaultToolkit))))
 
 (deftype WithExceptionT [exception? value])
@@ -1231,23 +1264,30 @@
   "Repaint canvas on window with set FPS.
 
   * Input: frame, active? atom, function to run before repaint, canvas and sleep time."
-  [^Window window draw-fun draw-state hint] 
+  [^Window window draw-fun draw-state hints]
   (let [stime (/ 1000.0 ^double (.fps window))]
     (loop [cnt (long 0)
-           result draw-state]
-      (let [ct (System/currentTimeMillis) 
-            ^WithExceptionT new-result (try
-                                         (WithExceptionT. false (when draw-fun 
+           result draw-state
+           t (System/nanoTime)
+           overt 0.0]
+      (let [^WithExceptionT new-result (try
+                                         (WithExceptionT. false (when (and draw-fun @(.active? window)) ; call draw only when window is active and draw-fun is defined
                                                                   (with-canvas-> @(.buffer window)
                                                                     (draw-fun window cnt result))))
                                          (catch Throwable e
                                            (.printStackTrace e)
-                                           (WithExceptionT. true e)))] 
-        (let [delay (- stime (- (System/currentTimeMillis) ct))]
-          (when (pos? delay) (Thread/sleep delay)))
-        (repaint (.panel window) @(.buffer window) hint)
-        (when (bool-and @(.active? window)
-                        (not (.exception? new-result))) (recur (inc cnt) (.value new-result)))))))
+                                           (WithExceptionT. true e)))]
+        (repaint (.panel window) @(.buffer window) hints)
+        (let [at (System/nanoTime)
+              diff (/ (- at t) 1.0e6)
+              delay (- stime diff overt)]
+          (when (pos? delay)
+            (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay))))) 
+          (when (bool-and @(.active? window) (not (.exception? new-result)))
+            (recur (inc cnt)
+                   (.value new-result)
+                   (System/nanoTime)
+                   (if (pos? delay) (- (/ (- (System/nanoTime) at) 1.0e6) delay) 0.0))))))))
 
 ;; You may want to replace canvas to the other one. To make it pass result of `show-window` function and new canvas.
 ;; Internally it just resets buffer atom for another canvas.
@@ -1259,14 +1299,14 @@
   * Input: window and new canvas
   * Returns canvas"
   [^Window window canvas]
-  (reset! (:buffer window) canvas))
+  (reset! (.buffer window) canvas))
 
 ;; You may want to extract canvas bound to window
 
 (defn get-canvas
   ""
   [^Window window]
-  @(:buffer window))
+  @(.buffer window))
 
 ;; Finally function which creates and displays window. Function creates window's visibility status (`active?` atom), buffer as atomized canvas, creates frame, creates refreshing task (repainter) and shows window.
 
@@ -1307,18 +1347,18 @@
                                    (setup window)))]
      (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
      (change-state! wname state)
-     (future (refresh-screen-task window draw-fun (or setup-state draw-state) (get-rendering-hints hint :mid)))
+     (future (refresh-screen-task window draw-fun (or setup-state draw-state) (when hint (get-rendering-hints hint :mid))))
      window))
   ([canvas wname]
    (show-window canvas wname nil))
   ([canvas wname draw-fn]
    (show-window canvas wname 60 draw-fn))
   ([canvas wname fps draw-fn]
-   (show-window canvas wname (width canvas) (height canvas) fps draw-fn nil nil nil :mid))
+   (show-window canvas wname (width canvas) (height canvas) fps draw-fn nil nil nil nil))
   ([canvas wname w h fps]
-   (show-window canvas wname w h fps nil nil nil nil :mid))
+   (show-window canvas wname w h fps nil nil nil nil nil))
   ([canvas wname w h fps draw-fun]
-   (show-window canvas wname w h fps draw-fun nil nil nil :mid))
+   (show-window canvas wname w h fps draw-fun nil nil nil nil))
   ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint]
      :or {canvas (make-canvas 200 200)
           window-name (str "Clojure2D - " (to-hex (rand-int (Integer/MAX_VALUE)) 8))
@@ -1327,7 +1367,7 @@
           state nil
           draw-state nil
           setup nil
-          hint :mid}}]
+          hint nil}}]
    (show-window canvas window-name (or w (width canvas)) (or h (height canvas)) fps draw-fn state draw-state setup hint))
   ([] (show-window {})))
 
@@ -1360,6 +1400,7 @@
 (defn minute ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/MINUTE))
 (defn sec ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/SECOND))
 (defn millis ^long [] (System/currentTimeMillis))
+(defn nanos ^long [] (System/nanoTime))
 (defn datetime
   "Date time values in the array. Optional parameter :vector or :hashmap (default) to indicate what to return."
   ([type-of-array]

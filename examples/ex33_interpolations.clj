@@ -9,6 +9,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 (def canvas (create-canvas 600 500 :high))
 
@@ -26,21 +27,23 @@
         d (if (zero? t) (not dir) dir)
         t' (if d t (- 1.0 t))]
 
-    (set-color c 0 0 0 100)
-    (rect c 0 0 600 500)
+    (-> c
+        (set-background 0 0 0 100)
 
-    (set-color c c1)
-    (ellipse c (m/lerp 100 500 t') 100 70 70)
-    
-    (set-color c c2)
-    (ellipse c (m/cos-interpolation 100 500 t') 200 70 70)
+        (set-color c1)
+        (ellipse (m/lerp 100 500 t') 100 70 70)
+        
+        (set-color c2)
+        (ellipse (m/cos-interpolation 100 500 t') 200 70 70)
 
-    (set-color c c3)
-    (ellipse c (m/smooth-interpolation 100 500 t') 300 70 70)
+        (set-color c3)
+        (ellipse (m/smooth-interpolation 100 500 t') 300 70 70)
 
-    (set-color c c4)
-    (ellipse c (m/quad-interpolation 100 500 t') 400 70 70)
+        (set-color c4)
+        (ellipse (m/quad-interpolation 100 500 t') 400 70 70))
 
     d))
 
-(def window (show-window canvas "Interpolations" #(draw %1 %2 %3 %4)))
+(def window (show-window {:canvas canvas 
+                          :window-name "Interpolations"
+                          :draw-fn #(draw %1 %2 %3 %4)}))

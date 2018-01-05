@@ -1,4 +1,4 @@
-(ns NOC.ch06.staywithinwalls-6-3
+(ns examples.NOC.ch06.staywithinwalls-trail-6-3
   (:require [clojure2d.core :refer :all]
             [clojure2d.math :as m]
             [clojure2d.math.vector :as v])
@@ -9,45 +9,48 @@
 
 (def ^:const ^double maxspeed 3.0)
 (def ^:const ^double maxforce 0.15)
-(def ^:const ^double r 3.0)
+(def ^:const ^double r 6.0)
 (def ^:const ^double r2 (+ r r))
+
+(def ^:const ^double d 25.0)
 
 (def ^:const ^int w 640)
 (def ^:const ^int h 360)
 
-(def ^Vec2 circleposition (Vec2. (/ w 2) (/ h 2)))
-(def ^:const ^double circle-radius (- (* h 0.5) 25.0))
-
-(defn boundaries-and-draw
+(defn boundaries-and-run
   ""
-  [canvas [position velocity]]
-  (let [predict (-> velocity
-                    (v/mult 25.0))
-        ^Vec2 futureposition (v/add position predict)
-        distance (double (v/dist futureposition circleposition))
-        acceleration (if (> distance circle-radius)
-                       (-> circleposition
-                           (v/sub position)
-                           (v/normalize)
-                           (v/mult (v/mag velocity))
-                           (v/add velocity)
+  [^Vec2 position ^Vec2 velocity]
+  (let [desired (cond
+                  (< (.x position) d) (Vec2. maxspeed (.y velocity))
+                  (> (.x position) (- w d)) (Vec2. (- maxspeed) (.y velocity))
+                  (< (.y position) d) (Vec2. (.x velocity) maxspeed)
+                  (> (.y position) (- h d)) (Vec2. (.x velocity) (- maxspeed))
+                  :else nil)
+        acceleration (if-not (nil? desired)
+                       (-> desired
                            (v/normalize)
                            (v/mult maxspeed)
                            (v/sub velocity)
                            (v/limit maxforce))
-                       (Vec2. 0 0))
+                       (Vec2. 0.0 0.0))
         nvelocity (-> velocity
                       (v/add acceleration)
-                      (v/limit maxspeed))
-        ^Vec2 nposition (v/add position nvelocity)
-        theta (+ m/HALF_PI ^double (v/heading nvelocity))]
+                      (v/limit maxspeed))]
+    [(v/add position nvelocity) nvelocity]))
+
+(defn draw
+  ""
+  [canvas window _ state]
+  (let [[position velocity history] (or state [(Vec2. (/ w 2) (/ h 2)) (v/mult (Vec2. 3.0 -2.0) 5.0)])
+        [^Vec2 nposition nvelocity] (boundaries-and-run position velocity)
+        theta (+ m/HALF_PI ^double (v/heading velocity))]
 
     (-> canvas
         (set-background :white)
+        (set-color :black)
         (set-color 175 175 175)
-        (ellipse (.x circleposition) (.y circleposition) (* 2 circle-radius) (* 2 circle-radius) true)
-        (set-color :red)
-        (ellipse (.x futureposition) (.y futureposition) 4 4)
+        (crect (/ w 2) (/ h 2) (- w (+ d d)) (- h (+ d d)) true)
+        (set-color 127 0 0)
         (push-matrix)
         (translate (.x nposition) (.y nposition))
         (rotate theta)
@@ -56,9 +59,4 @@
 
     [nposition nvelocity]))
 
-(defn draw
-  ""
-  [canvas window _ state]
-  (boundaries-and-draw canvas (or state [(Vec2. (/ w 2) (/ h 4)) (v/mult (Vec2. 1.0 0.0) 5.0)])))
-
-(def window (show-window (make-canvas w h) "Stay Within Circle" draw))
+(def window (show-window (make-canvas w h) "Stay Within Walls - 6_3" draw))

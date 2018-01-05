@@ -105,7 +105,8 @@
         (translate (* 0.5 resolution)
                    (* 0.5 resolution))
         (draw-field (get-state window))
-        (set-color 175 0 0 200))
+        (set-color 175 0 0 200)
+        (reset-matrix))
     (mapv #(run-vehicle canvas % (get-state window)) vehicles)))
 
 (def window (show-window {:canvas (make-canvas w h)
