@@ -37,7 +37,7 @@
                       (* i row-height)
                       (m/norm p 0 sum-parts-total 0 (width canvas)) row-height)) cumulative parts)))))
 
-(def canvas (make-canvas 800 800))
+(def canvas (make-canvas 800 800 :highest))
 (def window (show-window canvas "P_1_2_3_02"))
 
 (defmethod mouse-event [(:window-name window) :mouse-released] [_ _]

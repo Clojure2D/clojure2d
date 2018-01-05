@@ -75,7 +75,12 @@
   ""
   []
   (let [canvas (create-canvas w h)
-        window (show-window canvas "folds on path" (* 0.4 w) (* 0.4 h) 15 nil)]
+        window (show-window {:canvas canvas
+                             :window-name "folds on path"
+                             :w (* 0.4 w)
+                             :h (* 0.4 h)
+                             :fps 15
+                             :hint :high})]
 
     (defmethod key-pressed ["folds on path" \space] [_ _]
       (save canvas (next-filename "results/ex41/" ".jpg")))

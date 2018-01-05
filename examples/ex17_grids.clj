@@ -13,7 +13,7 @@
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
 
-(def canvas (create-canvas 600 600))
+(def canvas (create-canvas 600 600 :low))
 
 (def window (show-window canvas "grid" 10 nil))
 

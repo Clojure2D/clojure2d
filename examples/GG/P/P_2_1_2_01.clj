@@ -23,7 +23,7 @@
             shift-y (/ (r/drandom rng (- mx) mx) 20)]
         (ellipse canvas (+ px shift-x) (+ py shift-y) (/ my 15) (/ my 15) true)))))
 
-(def window (show-window {:canvas (make-canvas 600 600)
+(def window (show-window {:canvas (make-canvas 600 600 :highest)
                           :window-name "P_2_1_2_01"
                           :draw-fn draw
                           :state 0}))

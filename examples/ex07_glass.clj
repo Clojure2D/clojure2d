@@ -35,19 +35,13 @@
           (when (and (window-active? window) (< y height)) (recur (inc y))))
         (when (and (window-active? window) (< x width)) (recur (inc x)))))))
 
-(defn example-07
-  ""
-  []
-  (let [canvas (create-canvas 800 800)
-        window (show-window canvas "glass" 15 nil)]
+(let [canvas (create-canvas 800 800)
+      window (show-window canvas "glass" 15 nil)]
 
-    (defmethod key-pressed ["glass" \space] [_ _]
-      (save canvas (next-filename "results/ex07/" ".jpg")))
+  (defmethod key-pressed ["glass" \space] [_ _]
+    (save canvas (next-filename "results/ex07/" ".jpg")))
 
 
-    (with-canvas-> canvas
-      (set-background 200 200 210)
-      (draw-glass window 800 800)))
-  :done)
-
-(example-07)
+  (with-canvas-> canvas
+    (set-background 200 200 210)
+    (draw-glass window 800 800)))

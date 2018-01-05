@@ -151,7 +151,7 @@
 
 ;; window, context and events
 
-(def canvas (make-canvas w w))
+(def canvas (make-canvas w w :low))
 (def window (show-window {:canvas canvas
                           :window-name "Mandelbrot"
                           :state complex-matrix}))

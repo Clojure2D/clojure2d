@@ -11,9 +11,10 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
 
 ;; define canvas, window
-(def canvas (create-canvas 600 600))
+(def canvas (create-canvas 600 600 :low))
 (def window (show-window canvas "Double pendulum"))
 
 ;; canvas is refreshed externally by integrator, let's define frame rate

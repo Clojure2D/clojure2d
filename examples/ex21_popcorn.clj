@@ -70,34 +70,30 @@
     (Vec2. (- ^double (f (.x in) (.y in)) 0.5)
            (- ^double (f (.y in) (.x in) 0.3) 0.5))))
 
-(defn example-21
-  []
-  (binding [*skip-random-variations* true]
-    (let [canvas (create-canvas w h)
-          window (show-window canvas "popcorn")
-          field-config (make-random-configuration)
-          field (make-combination field-config)
-          vrand (Vec2. (r/drand -1 1) (r/drand -1 1))
-          noisef (r/randval 0.2 (partial get-noise (make-random-noise)) (constantly (Vec2. 0.0 0.0)))
-          mv-fun (partial move-particle vrand noisef field)
-          
-          particles (repeatedly 15000 make-particle)
-          looper (fn [canvas] (loop [xs particles]
-                                (if (window-active? window)
-                                  (recur (mapv (partial mv-fun canvas) xs))
-                                  canvas)))]
-      
-      (defmethod key-pressed ["popcorn" \space] [_ _]
-        (binding [*jpeg-image-quality* 0.9]
-          (save canvas (next-filename "results/ex21/" ".jpg"))))
+(binding [*skip-random-variations* true]
+  (let [canvas (create-canvas w h)
+        window (show-window canvas "popcorn")
+        field-config (make-random-configuration)
+        field (make-combination field-config)
+        vrand (Vec2. (r/drand -1 1) (r/drand -1 1))
+        noisef (r/randval 0.2 (partial get-noise (make-random-noise)) (constantly (Vec2. 0.0 0.0)))
+        mv-fun (partial move-particle vrand noisef field)
+        
+        particles (repeatedly 15000 make-particle)
+        looper (fn [canvas] (loop [xs particles]
+                              (if (window-active? window)
+                                (recur (mapv (partial mv-fun canvas) xs))
+                                canvas)))]
+    
+    (defmethod key-pressed ["popcorn" \space] [_ _]
+      (binding [*jpeg-image-quality* 0.9]
+        (save canvas (next-filename "results/ex21/" ".jpg"))))
 
-      (println field-config)
-      
-      (with-canvas-> canvas
-        (set-background 240 240 240)
-        (set-color 49 52 59 alpha)
-        (set-stroke point-size)
-        (looper)))))
-
-(example-21)
+    (println field-config)
+    
+    (with-canvas-> canvas
+      (set-background 240 240 240)
+      (set-color 49 52 59 alpha)
+      (set-stroke point-size)
+      (looper))))
 

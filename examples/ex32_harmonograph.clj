@@ -144,7 +144,7 @@
 ;; press `space` to save
 ;; close window to stop
 (def result (let [config (make-random-config)
-                  canvas (create-canvas w h)
+                  canvas (create-canvas w h :low)
                   window (show-window canvas "Harmonograph" 800 800 5)]
 
               (defmethod key-pressed ["Harmonograph" \space] [_ _]

@@ -6,7 +6,7 @@
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
 
-(def canvas (make-canvas 600 600))
+(def canvas (make-canvas 600 600 :mid))
 
 (defn draw-rings
   "Draw rings"

@@ -65,8 +65,6 @@
 
 (close-session)
 (def window (show-window {:canvas (make-canvas w h)
-                          :width w
-                          :height h
                           :window-name "String"
                           :state (new-state)
                           :draw-fn draw}))

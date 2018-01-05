@@ -8,7 +8,7 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
-(def canvas (create-canvas 200 200))
+(def canvas (create-canvas 200 200 :low))
 
 (defn loop-noise
   ""
@@ -30,7 +30,12 @@
     (loop-noise n))
   nil)
 
-(show-window canvas "noise" 600 600 10)
+(show-window {:canvas canvas
+              :window-name "noise"
+              :w 600
+              :h 600
+              :fps 10
+              :hint :mid})
 
 (defmethod key-pressed ["noise" \space] [_ _]
   (save canvas (next-filename "results/ex04/" ".jpg")))

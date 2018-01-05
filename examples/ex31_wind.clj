@@ -10,9 +10,9 @@
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
 
-(def canvas (create-canvas 500 500))
+(def canvas (create-canvas 500 500 :highest))
 
-(def ^:const ^double s (/ m/TWO_PI 120.0)) ;; speed
+(def ^:const ^double s (/ m/TWO_PI 320.0)) ;; speed
 (def ^:const ^double phase-scale (/ m/PI 400.0)) 
 
 (defn random-c

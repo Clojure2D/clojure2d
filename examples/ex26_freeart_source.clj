@@ -43,10 +43,10 @@
 (def ^:const number-of-frames 44)
 
 ;; canvas bound to window
-(def canvas (create-canvas w h))
+(def canvas (create-canvas w h :low))
 
 ;; canvases which represent frames
-(def canvases (vec (repeatedly number-of-frames #(create-canvas w h))))
+(def canvases (vec (repeatedly number-of-frames #(create-canvas w h :mid))))
 
 ;; pixels from images (44 frames)
 (def images (mapv #(p/load-pixels (str "examples/ex26/" (format "%02d" %) ".jpg")) (range number-of-frames)))
@@ -63,7 +63,14 @@
 
 ;; Display window. I don't know why but running first time shows blank window.
 ;; Close and execute second time.
-(def window (show-window canvas "free_art_-_source" (* w 2) (* h 2) 25 draw))
+(def window (show-window {:canvas canvas
+                          :window-name "free_art_-_source"
+                          :w (* w 2)
+                          :h (* h 2)
+                          :fps 25
+                          :draw-fn draw
+                          :renderer :fast
+                          :hint :mid}))
 
 ;; Prepare noise and spot overlay frames, it's slow
 (def noise-frames (vec (repeatedly number-of-frames #(o/make-noise w h {:alpha 60})))) ;;;; change!
@@ -140,12 +147,12 @@
       (ellipse canvas x y size size)) ;;;; change! (use rect)
     
     (->> (p/get-canvas-pixels canvas)
-         (p/filter-channels p/gaussian-blur-1 nil) ;;;; change!
-         (p/compose-channels :multiply (images frame)) ;;;; change!
+         (p/filter-channels p/box-blur-1 nil) ;;;; change!
+         (p/compose-channels :multiply false (images frame)) ;;;; change!
 
          (sonification (* 5.0 (m/sin (/ time 45.0))) (* 5.0  (m/sin (/ time 50.0)))) ;;;; change!
          
-                                        ; (g/color-reducer-machine palette) ;;;; change!
+         ;; (g/color-reducer-machine palette) ;;;; change!
          (p/filter-channels p/equalize-filter nil) ;;;; change!
          (p/set-canvas-pixels! canvas))
 

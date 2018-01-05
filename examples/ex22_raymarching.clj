@@ -19,7 +19,7 @@
 (def ^:const ^long w 1000)
 (def ^:const ^long h 1000)
 
-(def canvas (create-canvas w h))
+(def canvas (create-canvas w h :low))
 
 (def window (show-window canvas "raymarching" 15 nil))
 

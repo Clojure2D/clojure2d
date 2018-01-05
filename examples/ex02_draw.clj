@@ -6,6 +6,7 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
+(m/use-primitive-operators)
 
 (defn draw
   ""
@@ -20,18 +21,20 @@
         ew (* n 160.0)
         eh (* (- 1.0 n) 160.0)]
 
-    (set-background canvas 45 45 41 20)
-    
-    (p/set-canvas-pixels! canvas (->> canvas
-                                      p/get-canvas-pixels
-                                      (p/filter-channels p/gaussian-blur-2 nil)))
+    (-> canvas
+        (set-color 45 45 41 20)
+        (rect 0 0 (width canvas) (height canvas))
+        (p/set-canvas-pixels! (->> canvas
+                                   p/get-canvas-pixels
+                                   (p/filter-channels p/gaussian-blur-2 false)))
 
-    (set-color canvas (- 146.0 ew) (- 199.0 cn) (- 163.0 eh))
-    (ellipse canvas 100 100 ew eh)))
+        (set-color (- 146.0 ew) (- 199.0 cn) (- 163.0 eh))
+        (ellipse 100 100 ew eh))))
 
-(defn example-02
-  ""
-  []
-  (show-window (make-canvas 200 200) "ellipse" 300 300 25 draw))
-
-(example-02)
+(show-window {:canvas (make-canvas 200 200 :mid)
+              :window-name "ellipse"
+              :w 400
+              :h 400
+              :fps 30
+              :hint :mid
+              :draw-fn draw})

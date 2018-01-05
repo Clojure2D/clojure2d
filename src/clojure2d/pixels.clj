@@ -263,9 +263,11 @@
 (defn set-canvas-pixels!
   "Set pixels to canvas"
   ([^Canvas canvas p x y]
-   (set-image-pixels! (.buffer canvas) x y p))
+   (set-image-pixels! (.buffer canvas) x y p)
+   canvas)
   ([^Canvas canvas p]
-   (set-image-pixels! (.buffer canvas) p)))
+   (set-image-pixels! (.buffer canvas) p)
+   canvas))
 
 (defn load-pixels
   "Load pixels from file"

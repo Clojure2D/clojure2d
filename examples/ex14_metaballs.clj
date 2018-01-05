@@ -81,8 +81,11 @@
 (defn example-14
   ""
   [n]
-  (let [canvas (create-canvas SIZE SIZE)]
-    (show-window canvas "metaballs" (partial draw-balls n)))
+  (let [canvas (create-canvas SIZE SIZE :low)]
+    (show-window {:canvas canvas
+                  :window-name "metaballs"
+                  :draw-fn (partial draw-balls n)
+                  :refresher :fast}))
   :done)
 
 (example-14 (r/irand 2 6))

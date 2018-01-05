@@ -167,7 +167,7 @@
      :weight-fn (rand-nth weight-fns)
      :bounds (make-bounds -2 -2 2 2)}))
 
-(def canvas (make-canvas w h))
+(def canvas (make-canvas w h :low))
 
 (defn draw-fractal
   "Draw fractal"
@@ -187,6 +187,7 @@
 (def window (show-window {:canvas canvas
                           :window-name title
                           :fps 20
+                          :refresher :fast
                           :state (new-fractal)}))
 
 (defmethod key-pressed [title \n] [_ _]

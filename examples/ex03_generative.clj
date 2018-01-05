@@ -31,8 +31,4 @@
   (set-awt-background canvas background)
   (draw-lines canvas framecount))
 
-(defn example-03
-  []
-  (show-window (create-canvas 600 600) "clojure-canvas" #(draw %1 %2 %3 %4)))
-
-(example-03)
+(show-window (create-canvas 600 600 :highest) "clojure-canvas" #(draw %1 %2 %3 %4))

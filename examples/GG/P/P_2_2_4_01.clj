@@ -26,7 +26,7 @@
     (doseq [[x y r] lda] (ellipse canvas x y (+ r r) (+ r r)))
     lda))
 
-(def canvas (make-canvas (* 167 3) (* 241 3)))
+(def canvas (make-canvas (* 167 3) (* 241 3) :highest))
 (def window (show-window {:window-name wname
                           :canvas canvas
                           :draw-fn draw

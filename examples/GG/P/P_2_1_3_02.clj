@@ -40,7 +40,7 @@
                  y2 0
                  line-weight 0
                  stroke-color 0]
-            (let [[nx2 ny2] (case side
+            (let [[nx2 ny2] (case (int side)
                               0 [(+ x2 (/ tile-width cnt)) 0.0]
                               1 [tile-width (+ y2 (/ tile-height cnt))]
                               2 [(- x2 (/ tile-width cnt)) tile-height]
@@ -48,7 +48,7 @@
                   [nline-weight nstroke-color] (if (< i (/ cnt 2))
                                                  [(inc line-weight) (+ stroke-color 42.666666)]
                                                  [(dec line-weight) (- stroke-color 42.666666)])]
-              (case draw-mode
+              (case (int draw-mode)
                 1 (set-color canvas :black)
                 2 (do
                     (set-color canvas :black)
@@ -65,7 +65,7 @@
           (pop-matrix canvas))))))
 
 
-(def window (show-window {:canvas (make-canvas 600 600)
+(def window (show-window {:canvas (make-canvas 600 600 :highest)
                           :draw-fn draw
                           :window-name "P_2_1_3_02"
                           :state 1}))

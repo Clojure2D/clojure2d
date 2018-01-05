@@ -37,6 +37,7 @@
         nx (+ (.x in) (* point-step (m/qcos ang)))
         ny (+ (.y in) (* point-step (m/qsin ang))) 
         col (m/cnorm (m/sqrt n) 0 1 100 240)]
+    
     (if (and (<= 80 ny (- h 81)) (<= 80 nx (- w 81)))
       (do
         (set-color canvas col col col alpha)
@@ -48,33 +49,27 @@
         (Vec2. nx ny))
       (make-particle))))
 
-(defn example-05
-  []
-  (binding [*skip-random-variations* true]
-    (let [canvas (create-canvas w h)
-          window (show-window canvas "particles" w h 25)
-          noise (n/make-random-fractal-noise)
-          field-config (make-random-configuration)
-          field (make-combination field-config)
-          vrand (Vec2. (r/drand -1 1) (r/drand -1 1))
-          mv-fun (partial move-particle vrand (r/brand) field noise)       
-          particles (repeatedly 25000 make-particle)
-          looper (fn [canvas] (loop [xs particles]
-                                (if (window-active? window)
-                                  (recur (mapv (partial mv-fun canvas) xs))
-                                  canvas)))]
-      
-      (defmethod key-pressed ["particles" \space] [_ _]
-        (save canvas (next-filename "results/ex05/" ".jpg")))
+(binding [*skip-random-variations* true]
+  (let [canvas (create-canvas w h)
+        window (show-window canvas "particles" w h 25)
+        noise (n/make-random-fractal-noise)
+        field-config (make-random-configuration)
+        field (make-combination field-config)
+        vrand (Vec2. (r/drand -1 1) (r/drand -1 1))
+        mv-fun (partial move-particle vrand (r/brand) field noise)       
+        particles (repeatedly 25000 make-particle)
+        looper (fn [canvas] (loop [xs particles]
+                              (if (window-active? window)
+                                (recur (mapv (partial mv-fun canvas) xs))
+                                canvas)))]
+    
+    (defmethod key-pressed ["particles" \space] [_ _]
+      (save canvas (next-filename "results/ex05/" ".jpg")))
 
-      (pprint field-config)
+    (pprint field-config)
 
-      (with-canvas-> canvas
-        (set-background 10 10 10)
-        (set-stroke point-size)
-        looper)    
-      
-      )))
-
-(example-05)
+    (with-canvas-> canvas
+      (set-background 10 10 10)
+      (set-stroke point-size)
+      looper)))
 

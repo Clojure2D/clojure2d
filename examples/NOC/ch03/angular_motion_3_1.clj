@@ -13,6 +13,7 @@
   (let [[^double angle ^double velocity] (or state [0.0 0.0])]
     (-> canvas
         (set-background :white)
+        (set-stroke 2.0)
         (translate (/ w 2) (/ h 2))
         (rotate angle)
         (set-color 127 127 127)

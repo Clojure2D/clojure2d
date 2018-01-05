@@ -34,4 +34,4 @@
     (set-color canvas (colors col))
     (triangle-strip canvas vs)))
 
-(def window (show-window canvas"stripes" draw))
+(def window (show-window canvas "stripes" draw))

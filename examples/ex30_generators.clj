@@ -11,7 +11,7 @@
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
-(def canvas (create-canvas 600 900))
+(def canvas (create-canvas 600 900 :highest))
 (def window (show-window canvas "Generators" 5 nil))
 
 (defmethod key-pressed ["Generators" \space] [_ _]

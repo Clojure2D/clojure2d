@@ -18,7 +18,6 @@
 
 (def ^:const ^float color-step (/ 6.0 360.0))
 
-
 (defn draw 
   "Draw rects"
   [canvas window _ _]

@@ -29,4 +29,4 @@
 
     (+ theta 0.02)))
 
-(def window (show-window (make-canvas w h) "Polar to cartesan 3_4" draw))
+(def window (show-window (make-canvas w h) "Polar to cartesian 3_4" draw))

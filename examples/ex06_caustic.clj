@@ -45,19 +45,13 @@
         (when (and (window-active? window) (< x (+ d2 width))) (recur (+ x 0.3))))))
   canvas)
 
-(defn example-06
-  ""
-  []
-  (let [canvas (create-canvas 800 800)
-        window (show-window canvas "caustic" 15 nil)]
+(let [canvas (create-canvas 800 800)
+      window (show-window canvas "caustic" 15 nil)]
 
-    (defmethod key-pressed ["caustic" \space] [_ _]
-      (save canvas (next-filename "results/ex06/" ".jpg")))
+  (defmethod key-pressed ["caustic" \space] [_ _]
+    (save canvas (next-filename "results/ex06/" ".jpg")))
 
-    (with-canvas-> canvas
-      (set-color 10 20 40 30)
-      (set-background 200 200 210)
-      (draw-caustic window 800 800)))
-  :done)
-
-(example-06)
+  (with-canvas-> canvas
+    (set-color 10 20 40 30)
+    (set-background 200 200 210)
+    (draw-caustic window 800 800)))

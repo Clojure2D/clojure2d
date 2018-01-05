@@ -1305,7 +1305,7 @@
                                            (WithExceptionT. false (when (and draw-fun @(.active? window)) ; call draw only when window is active and draw-fun is defined
                                                                     (draw-fun canvas window cnt result)))
                                            (catch Throwable e
-                                             (.printStackTrace e)
+                                             (when @(.active? window) (.printStackTrace e))
                                              (WithExceptionT. true e)))] 
           (let [at (System/nanoTime)
                 diff (/ (- at t) 1.0e6)
@@ -1360,8 +1360,8 @@
   * :draw-state
   * :setup
   * :hint - rendering hint for display
-  * :renderer - safe (default) or fast"
-  ([canvas wname width height fps draw-fun state draw-state setup hint renderer]
+  * :refresher - safe (default) or fast"
+  ([canvas wname width height fps draw-fun state draw-state setup hint refresher]
    (let [active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
@@ -1375,8 +1375,8 @@
                           height
                           wname)
          setup-state (when setup (with-canvas-> canvas
-                                   (setup window)))
-         refresh-screen-task (if (= renderer :fast)
+                                   (setup window))) 
+         refresh-screen-task (if (= refresher :fast)
                                refresh-screen-task-speed
                                refresh-screen-task-safety)]
      (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
@@ -1393,7 +1393,7 @@
    (show-window canvas wname w h fps nil nil nil nil nil nil))
   ([canvas wname w h fps draw-fun]
    (show-window canvas wname w h fps draw-fun nil nil nil nil nil))
-  ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint renderer]
+  ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint refresher]
      :or {canvas (make-canvas 200 200)
           window-name (str "Clojure2D - " (to-hex (rand-int (Integer/MAX_VALUE)) 8))
           fps 60
@@ -1402,8 +1402,8 @@
           draw-state nil
           setup nil
           hint nil
-          renderer nil}}]
-   (show-window canvas window-name (or w (width canvas)) (or h (height canvas)) fps draw-fn state draw-state setup hint renderer))
+          refresher nil}}]
+   (show-window canvas window-name (or w (width canvas)) (or h (height canvas)) fps draw-fn state draw-state setup hint refresher))
   ([] (show-window {})))
 
 ;; ## Utility functions

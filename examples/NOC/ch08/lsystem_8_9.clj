@@ -5,7 +5,7 @@
 
 (def ^:const ^int s 600)
 
-(def canvas (make-canvas s s))
+(def canvas (make-canvas s s :highest))
 
 (defn make-generator
   "Apply rules to the string"

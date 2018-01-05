@@ -84,8 +84,6 @@
           y' (- (gumo-mira-fn A x') x)]
       [x' y'])))
 
-((make-gumo-mira-map 1 2) 1 1)
-
 (defn draw-map-position
   "draw N points from given starting point"
   [canvas initx inity [sminx smaxx sminy smaxy] f]

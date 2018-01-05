@@ -69,7 +69,7 @@
 
 (do
 
-  (def canvas (create-canvas w h))
+  (def canvas (create-canvas w h :highest))
 
   (with-canvas-> canvas
     (set-color 220 220 210 200))
