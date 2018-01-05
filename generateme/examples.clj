@@ -1,5 +1,6 @@
 (ns examples
-  (:require [clojure2d.math :as m]))
+  (:require [clojure2d.math :as m]
+            [clojure.test :refer :all]))
 
 (defonce registry-ref (atom {}))
 
@@ -117,3 +118,22 @@
 (eee "dddsaere" m/LOG2E)
 
 (clojure.repl/doc aaaaaa)
+
+(is (= 3 (+ 2 1)))
+
+(with-test
+  (defn abc [] "abc")
+  (is (= "abc" (abc)))
+  (is (not= "abc" (abc))))
+
+((:test (meta #'abc)))
+
+(deftest blahtest
+  (is (= 33 (+ 2 1))))
+
+((:test (meta #'blahtest)))
+
+(test-var #'blahtest)
+
+
+(run-tests)

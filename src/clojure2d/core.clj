@@ -1185,17 +1185,19 @@
   (let [closer (proxy [WindowAdapter] []
                  (windowClosing [^WindowEvent e] (close-window-fn frame active? windowname)))]
     (doto frame
+      (.setLayout (java.awt.BorderLayout.))
       (.setIconImages window-icons)
       (.add panel)
       (.addKeyListener key-char-processor)
       (.addKeyListener key-event-processor)
-      (.pack)
       (.setResizable false)
       (.setDefaultCloseOperation JFrame/DO_NOTHING_ON_CLOSE)
       (.addWindowListener closer)
       (.setName windowname)
       (.setTitle windowname)
       (.setBackground Color/white)
+      (.pack)
+      (.setLocationRelativeTo nil)
       (.setVisible true))
     (doto panel
       (.createBufferStrategy 2))))
@@ -1215,7 +1217,7 @@
     (loop []
       (loop []
         (let [^Graphics2D graphics-context (.getDrawGraphics strategy)]
-          (.setRenderingHints graphics-context hint)
+          ;; (.setRenderingHints graphics-context hint)
           (.drawImage graphics-context b 0 0 (.getWidth panel) (.getHeight panel) nil)
           (.dispose graphics-context))
         (when (.contentsRestored strategy) (recur)))
@@ -1229,7 +1231,7 @@
   "Repaint canvas on window with set FPS.
 
   * Input: frame, active? atom, function to run before repaint, canvas and sleep time."
-  [^Window window draw-fun draw-state hint]
+  [^Window window draw-fun draw-state hint] 
   (let [stime (/ 1000.0 ^double (.fps window))]
     (loop [cnt (long 0)
            result draw-state]
