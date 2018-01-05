@@ -156,7 +156,7 @@
                           :window-name "Mandelbrot"
                           :state complex-matrix}))
 
-(def jcanvas (make-canvas hw hw))
+(def jcanvas (make-canvas hw hw :low))
 (def jwindow (show-window jcanvas "Julia"))
 
 (with-canvas-> canvas

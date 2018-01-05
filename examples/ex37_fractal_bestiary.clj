@@ -18,6 +18,10 @@
             [clojure2d.math.random :as r])
   (:import [clojure2d.math.vector Vec2]))
 
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
+
 (def ^:const ^int size 800)
 
 (def ^:const ^double s60 (m/sin (m/radians 60.0)))
@@ -45,7 +49,7 @@
                                                                           [(Vec2. 0.0 1.0) (Vec2. 0.5 s60)]
                                                                           [(Vec2. 1.0 1.0) (Vec2. 0.5 s60)]]))] 
     (when-let [[in tg] matched] 
-      (v/mult tg (/ (v/mag v) (v/mag in))))))
+      (v/mult tg (/ ^double (v/mag v) ^double (v/mag in))))))
 
 (defn process-recipe
   "Process recipe from book format to angles and lengths required by method provided in this example"
@@ -58,15 +62,15 @@
     {:pos pos
      :len len
      :short-line short-line
-     :scale (/ (v/mag rot))
+     :scale (/ ^double (v/mag rot))
      :rot (v/relative-angle-between unit rot)
      :recipe (map #(conj (drop 2 %2) %1 (v/mag %3)) angles recipe vects)}))
 
 (defn draw-beast
   "Draw recursively given recipe (internally processed)."
-  [canvas depth len {:keys [short-line scale rot recipe] :as all}]
+  [canvas ^long depth ^double len {:keys [short-line ^double scale rot recipe] :as all}]
 
-  (run! #(let [[vlen angle forward flip] %
+  (run! #(let [[^double vlen ^double angle ^double forward ^double flip] %
                slen (* vlen len)
                linelen (if short-line (* 0.6 slen) slen)]
            
@@ -95,7 +99,7 @@
   "Draw recipe for given depth."
   ([recipe depth]
    (println recipe)
-   (let [{len :len pos :pos :as precipe} (process-recipe recipe)
+   (let [{^double len :len pos :pos :as precipe} (process-recipe recipe)
          [px py] (v/mult pos size)]
      (with-canvas-> canvas
        (set-background 21 20 25)
@@ -247,7 +251,7 @@
                           :window-name window-name
                           :state default-recipe}))
 
-(defmethod key-released [window-name virtual-key] [e {depth :depth len :len :or {depth 5 len 0.25} :as state}]
+(defmethod key-released [window-name virtual-key] [e {^long depth :depth ^double len :len :or {depth 5 len 0.25} :as state}]
   (let [ndepth (condp = (key-code e)
                  :right (min 20 (inc depth))
                  :left (max 0 (dec depth)) 
@@ -274,7 +278,7 @@
   (draw-recipe {:grid (if (r/brand) :tri :sq)
                 :len 0.1
                 :pos [0.5 0.5]
-                :recipe (filter #(let [[x y] %]
+                :recipe (filter #(let [[^int x ^int y] %]
                                    (not (and (zero? x) (zero? y)))) (repeatedly (r/irand 2 9)
                                                                                 #(vector (r/irand -1 2)
                                                                                          (r/irand -1 2)
@@ -286,13 +290,13 @@
                                             [x y (r/randval -1 1) (r/randval -1 1)]) recipe))))
 
 (defmethod key-pressed [window-name \w] [_ {pos :pos :or {pos [0.1 0.6]} :as state}]
-  (let [[x y] pos] (draw-recipe (assoc state :pos [x (- y 0.05)]))))
+  (let [[^double x ^double y] pos] (draw-recipe (assoc state :pos [x (- y 0.05)]))))
 (defmethod key-pressed [window-name \s] [_ {pos :pos :or {pos [0.1 0.6]} :as state}]
-  (let [[x y] pos] (draw-recipe (assoc state :pos [x (+ y 0.05)]))))
+  (let [[^double x ^double y] pos] (draw-recipe (assoc state :pos [x (+ y 0.05)]))))
 (defmethod key-pressed [window-name \a] [_ {pos :pos :or {pos [0.1 0.6]} :as state}]
-  (let [[x y] pos] (draw-recipe (assoc state :pos [(- x 0.05) y]))))
+  (let [[^double x ^double y] pos] (draw-recipe (assoc state :pos [(- x 0.05) y]))))
 (defmethod key-pressed [window-name \d] [_ {pos :pos :or {pos [0.1 0.6]} :as state}]
-  (let [[x y] pos] (draw-recipe (assoc state :pos [(+ x 0.05) y]))))
+  (let [[^double x ^double y] pos] (draw-recipe (assoc state :pos [(+ x 0.05) y]))))
 
 (defmethod key-pressed [window-name \f] [_ state]
   (save canvas (next-filename "results/ex37/" ".jpg"))
