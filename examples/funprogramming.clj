@@ -456,27 +456,24 @@
 
 ;; Comments:
 ;;
-;; You can't draw in events and in draw in the same time...
+;; You should avoid to draw in events and in draw fn in the same time...
 
 (let [canvas (make-canvas 400 400)
       window-name "Letters 25" 
       draw (fn [canvas window _ _]
-             (set-background canvas 0x3355cc 20)
-             (when-let [chr (get-state window)]
-               (-> canvas
-                   (set-color 0xffe200)
-                   (set-font-attributes (r/drand 20 200))
-                   (text (str chr) (r/drand 300) (r/drand 100 400)))))]
+             (set-background canvas 0x3355cc 20))]
 
-  (defmethod key-event [window-name :key-pressed] [event chr] (key-char event))
-  (defmethod key-event [window-name :key-released] [_ _])
+  (defmethod key-event [window-name :key-pressed] [event _]
+    (with-canvas-> canvas
+      (set-color 0xffe200)
+      (set-font-attributes (r/drand 20 200))
+      (text (str (key-char event)) (r/drand 300) (r/drand 100 400))))
   
   (show-window {:canvas canvas
                 :draw-fn draw
-                :draw-state true
                 :window-name window-name
                 :setup (fn [canvas _]
-                         (set-background canvas 0x3355cc))})  )
+                         (set-background canvas 0x3355cc))}) )
 
 ;; https://www.funprogramming.org/26-Make-patterns-by-rotating-objects.html
 

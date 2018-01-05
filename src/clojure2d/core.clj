@@ -1260,7 +1260,7 @@
 
 (deftype WithExceptionT [exception? value])
 
-(defn- refresh-screen-task
+(defn- refresh-screen-task-safety
   "Repaint canvas on window with set FPS.
 
   * Input: frame, active? atom, function to run before repaint, canvas and sleep time."
@@ -1276,18 +1276,48 @@
                                                                     (draw-fun window cnt result))))
                                          (catch Throwable e
                                            (.printStackTrace e)
-                                           (WithExceptionT. true e)))]
-        (repaint (.panel window) @(.buffer window) hints)
+                                           (WithExceptionT. true e)))] 
         (let [at (System/nanoTime)
               diff (/ (- at t) 1.0e6)
               delay (- stime diff overt)]
           (when (pos? delay)
-            (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay))))) 
+            (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay)))))
+          (repaint (.panel window) @(.buffer window) hints)
           (when (bool-and @(.active? window) (not (.exception? new-result)))
             (recur (inc cnt)
                    (.value new-result)
                    (System/nanoTime)
                    (if (pos? delay) (- (/ (- (System/nanoTime) at) 1.0e6) delay) 0.0))))))))
+
+
+(defn- refresh-screen-task-speed
+  "Repaint canvas on window with set FPS.
+
+  * Input: frame, active? atom, function to run before repaint, canvas and sleep time."
+  [^Window window draw-fun draw-state hints]
+  (let [stime (/ 1000.0 ^double (.fps window))]
+    (with-canvas [canvas @(.buffer window)]
+      (loop [cnt (long 0)
+             result draw-state
+             t (System/nanoTime)
+             overt 0.0]
+        (let [^WithExceptionT new-result (try
+                                           (WithExceptionT. false (when (and draw-fun @(.active? window)) ; call draw only when window is active and draw-fun is defined
+                                                                    (draw-fun canvas window cnt result)))
+                                           (catch Throwable e
+                                             (.printStackTrace e)
+                                             (WithExceptionT. true e)))] 
+          (let [at (System/nanoTime)
+                diff (/ (- at t) 1.0e6)
+                delay (- stime diff overt)]
+            (when (pos? delay)
+              (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay)))))
+            (repaint (.panel window) @(.buffer window) hints)
+            (when (bool-and @(.active? window) (not (.exception? new-result)))
+              (recur (inc cnt)
+                     (.value new-result)
+                     (System/nanoTime)
+                     (if (pos? delay) (- (/ (- (System/nanoTime) at) 1.0e6) delay) 0.0)))))))))
 
 ;; You may want to replace canvas to the other one. To make it pass result of `show-window` function and new canvas.
 ;; Internally it just resets buffer atom for another canvas.
@@ -1329,8 +1359,9 @@
   * :state
   * :draw-state
   * :setup
-  * :hint - rendering hint for display"
-  ([canvas wname width height fps draw-fun state draw-state setup hint]
+  * :hint - rendering hint for display
+  * :renderer - safe (default) or fast"
+  ([canvas wname width height fps draw-fun state draw-state setup hint renderer]
    (let [active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
@@ -1344,7 +1375,10 @@
                           height
                           wname)
          setup-state (when setup (with-canvas-> canvas
-                                   (setup window)))]
+                                   (setup window)))
+         refresh-screen-task (if (= renderer :fast)
+                               refresh-screen-task-speed
+                               refresh-screen-task-safety)]
      (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
      (change-state! wname state)
      (future (refresh-screen-task window draw-fun (or setup-state draw-state) (when hint (get-rendering-hints hint :mid))))
@@ -1354,12 +1388,12 @@
   ([canvas wname draw-fn]
    (show-window canvas wname 60 draw-fn))
   ([canvas wname fps draw-fn]
-   (show-window canvas wname (width canvas) (height canvas) fps draw-fn nil nil nil nil))
+   (show-window canvas wname (width canvas) (height canvas) fps draw-fn nil nil nil nil nil))
   ([canvas wname w h fps]
-   (show-window canvas wname w h fps nil nil nil nil nil))
+   (show-window canvas wname w h fps nil nil nil nil nil nil))
   ([canvas wname w h fps draw-fun]
-   (show-window canvas wname w h fps draw-fun nil nil nil nil))
-  ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint]
+   (show-window canvas wname w h fps draw-fun nil nil nil nil nil))
+  ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint renderer]
      :or {canvas (make-canvas 200 200)
           window-name (str "Clojure2D - " (to-hex (rand-int (Integer/MAX_VALUE)) 8))
           fps 60
@@ -1367,8 +1401,9 @@
           state nil
           draw-state nil
           setup nil
-          hint nil}}]
-   (show-window canvas window-name (or w (width canvas)) (or h (height canvas)) fps draw-fn state draw-state setup hint))
+          hint nil
+          renderer nil}}]
+   (show-window canvas window-name (or w (width canvas)) (or h (height canvas)) fps draw-fn state draw-state setup hint renderer))
   ([] (show-window {})))
 
 ;; ## Utility functions
