@@ -989,6 +989,21 @@
                     (* amount)))))))
 (make-var-method circlelinear :regular)
 
+;; ### Clifford
+
+(make-config-method clifford {:a (drand -2 2)
+                              :b (drand -2 2)
+                              :c (drand -2 2)
+                              :d (drand -2 2)})
+
+(defn make-clifford
+  "Clifford Pickover attractor"
+  [^double amount {:keys [^double a ^double b ^double c ^double d]}]
+  (fn [^Vec2 v]
+    (v/mult (Vec2. (+ (m/sin (* a (.y v))) (* c (m/cos (* a (.x v)))))
+                   (+ (m/sin (* b (.x v))) (* d (m/cos (* b (.y v)))))) amount)))
+(make-var-method clifford :regular)
+
 ;; ### Conic
 
 (make-config-method conic {:eccentricity (drand -3 3)
@@ -1003,6 +1018,21 @@
           r (* (/ (* (* amount (- (drand) holes)) eccentricity) (inc (* eccentricity ct))) magr)]
       (v/mult v r))))
 (make-var-method conic :random)
+
+;; ### Cot
+
+(defn make-cot
+  "Cot"
+  [^double amount _]
+  (fn [^Vec2 v]
+    (let [cotsin (m/sin (* 2.0 (.x v)))
+          cotcos (m/cos (* 2.0 (.x v)))
+          cotsinh (m/sinh (* 2.0 (.y v)))
+          cotcosh (m/cosh (* 2.0 (.y v)))
+          cotden (/ (- cotcosh cotcos))]
+      (Vec2. (* amount cotden cotsin)
+             (* amount cotden -1.0 cotsinh)))))
+(make-var-method cot :regular)
 
 ;; ### Cosine
 
@@ -1509,6 +1539,41 @@
              (* r (.y v))))))
 (make-var-method hemisphere :regular)
 
+;; ### Hole2
+
+(make-config-method hole2 {:a (drand -2.0 2.0)
+                           :b (drand -2.0 2.0)
+                           :c (drand 3.0)
+                           :d (drand -2.0 2.0)
+                           :inside (brand)
+                           :shape (irand 10)})
+
+(defn make-hole2
+  "Hole2"
+  [^double amount {:keys [^double a ^double b ^double c ^double d inside shape]}]
+  (fn [v]
+    (let [^double rhosq (v/magsq v)
+          theta (* d ^double (v/heading v))
+          delta (* c (m/pow (inc (/ theta m/PI)) a))
+          r (case (unchecked-int shape)
+              1 (m/sqrt (+ rhosq delta))
+              2 (m/sqrt (+ rhosq (m/sin (* b theta)) delta))
+              3 (m/sqrt (+ rhosq (m/sin theta) delta))
+              4 (m/sqrt (- (inc (+ rhosq (m/sin theta))) delta))
+              5 (m/sqrt (+ rhosq (m/abs (m/tan theta)) delta))
+              6 (m/sqrt (+ rhosq (inc (m/sin (* b theta))) delta))
+              7 (m/sqrt (+ rhosq (m/abs (m/sin (* 0.5 b theta))) delta))
+              8 (m/sqrt (+ rhosq (m/sin (* m/PI (m/sin (* b theta)))) delta))
+              9 (m/sqrt (+ rhosq (* 0.5 (+ (m/sin (* b theta))
+                                           (m/sin (+ m/M_PI_2 (* 2.0 b theta))))) delta))
+              (+ delta (m/sqrt rhosq)))
+          r1 (if inside
+               (/ amount r)
+               (* amount r))]
+      (Vec2. (* r (m/cos theta))
+             (* r (m/sin theta))))))
+(make-var-method hole2 :regular)
+
 ;; ### Horseshoe
 
 (defn make-horseshoe
@@ -1533,6 +1598,41 @@
       (Vec2. (/ (m/sin theta) r)
              (* (m/cos theta) r)))))
 (make-var-method hyperbolic :regular)
+
+;;; ### Hypershift
+
+(make-config-method hypershift {:shift (drand -2.0 2.0)
+                                :stretch (drand -2.0 2.0)})
+
+(defn make-hypershift
+  "Hypershift"
+  [^double amount {:keys [^double shift ^double stretch]}]
+  (let [scale (- 1.0 (* shift shift))]
+    (fn [^Vec2 v]
+      (let [rad (/ ^double (v/magsq v))
+            x (+ shift (* rad (.x v)))
+            y (* rad (.y v))
+            r (/ (* amount scale) (+ (* x x) (* y y)))]
+        (Vec2. (+ shift (* r x))
+               (* r y stretch))))))
+(make-var-method hypershift :regular)
+
+;; ## I
+
+;; ### InvTree
+
+(defn make-invtree
+  "InvTree"
+  [^double amount _]
+  (fn [^Vec2 v]
+    (cond
+      (brand 0.333) (v/mult v (* 0.5 amount))
+      (brand 0.666) (v/mult (Vec2. (/ (inc (.x v)))
+                                   (/ (.y v) (inc (.y v)))) amount)
+      :else (v/mult (Vec2. (/ (.x v) (inc (.x v)))
+                           (/ (inc (.y v)))) amount))))
+(make-var-method invtree :random)
+
 
 ;; ## J
 
@@ -2470,6 +2570,28 @@
       (Vec2. (* amount den cn cnh)
              (* (- amount) den sn snh)))))
 (make-var-method sech :regular)
+
+;; ### Shreadrad
+
+(make-config-method shreadrad {:n (randval (int (srandom 1 9)) (srandom 0.0001 8.0))
+                               :width (drand -2.0 2.0)})
+
+(defn make-shreadrad
+  "ShreadRad"
+  [^double amount {:keys [^double n ^double width]}]
+  (let [sa (/ m/TWO_PI n)
+        sa2 (* 0.5 sa)
+        sa2sw (* sa2 width)
+        pi3 (* 3.0 m/PI)]
+    (fn [v]
+      (let [^double ang (v/heading v)
+            ^double rad (v/mag v)
+            xang (/ (+ ang pi3 sa2) sa)
+            ixang (unchecked-int xang)
+            zang (- (* sa (+ ixang (* width (- xang ixang)))) m/PI sa2sw)]
+        (Vec2. (* amount rad (m/cos zang))
+               (* amount rad (m/sin zang)))))))
+(make-var-method shreadrad :regular)
 
 ;; ### Sinusoidal
 
