@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file. This change
 - color can be represented as int (eg. in hex form like: 0x234344)
 - `clamp255` returns double, for long version call `lclamp255`
 - bezier and curve functions added
-- date/time functions (year, month, day, hour, minute, sec, millis)
+- date/time functions (year, month, day, hour, minute, sec, millis, nanos)
 - new function `filled-with-stroke` - to draw primitive with stroke and filled
 - `load-bytes` added
 - general key-event added (like mouse-event). You can now dispatch also on event type not only key char or code

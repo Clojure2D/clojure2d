@@ -78,4 +78,4 @@
 (defmethod mouse-event ["Wolframca figures 7_1" :mouse-clicked] [_ _]
   (draw-rule))
 
-(draw-rule 149)
+(draw-rule 150)

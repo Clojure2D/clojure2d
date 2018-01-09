@@ -31,7 +31,13 @@
 (m/use-primitive-operators)
 
 ;; how many tasks we can run (one less than available cores)?
-(def ^:const ^long available-cores (.availableProcessors (Runtime/getRuntime)))
+(def ^:const ^long
+  ^{:doc "How much processor cores are in system.
+
+##### Examples
+
+`available-cores => 4`"}
+  available-cores (.availableProcessors (Runtime/getRuntime)))
 (def ^:const ^long available-tasks (inc available-cores))
 
 ;; ## Image
@@ -190,7 +196,8 @@
 ;; Reminder: Drawing on canvas is single threaded.
 
 ;; Let's define protocol to equip Canvas and Window types (or any type with image inside) with `get-image` function. `get-image` extracts image. Additionally define width/height getters.
-(defprotocol ImageProto 
+(defprotocol ImageProto
+  "Image Protocol"
   (get-image [i] "Return BufferedImage")
   (width [i])
   (height [i])
@@ -248,16 +255,17 @@
                         (c/make-color r g b a))))))})
 
 ;; Canvas type. Use `get-image` to extract image (`BufferedImage`).
-(deftype Canvas [^Graphics2D graphics
-                 ^BufferedImage buffer
-                 ^Line2D line-obj
-                 ^Rectangle2D rect-obj
-                 ^Ellipse2D ellipse-obj
-                 hints
-                 ^long w
-                 ^long h
-                 transform-stack
-                 font]
+(deftype ^{:doc "Test"}
+    Canvas [^Graphics2D graphics
+            ^BufferedImage buffer
+            ^Line2D line-obj
+            ^Rectangle2D rect-obj
+            ^Ellipse2D ellipse-obj
+            hints
+            ^long w
+            ^long h
+            transform-stack
+            font]
   ImageProto
   (get-image [_] buffer)
   (width [_] w)

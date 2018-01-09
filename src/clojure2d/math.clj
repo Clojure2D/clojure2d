@@ -26,14 +26,17 @@
   "Wrapps operation into macro"
   ([class alt-name name]
    (let [f (symbol (str class "/" name))
+         x (symbol "x")
+         y (symbol "y")
+         z (symbol "z")
          d (str  class " "  name " function.")]
      `(defmacro ~alt-name
-        ([x#]
-         (list '~f x#))
-        ([x# y#]
-         (list '~f x# y#))
-        ([x# y# z#]
-         (list '~f x# y# z#)))))
+        ([~x]
+         (list '~f ~x))
+        ([~x ~y]
+         (list '~f ~x ~y))
+        ([~x ~y ~z]
+         (list '~f ~x ~y ~z)))))
   ([class name]
    `(javaclass-proxy ~class ~name ~name)))
 
@@ -49,17 +52,19 @@
   ([name fn]
    `(variadic-proxy ~name ~fn identity))
   ([name fn single-arg-form]
-   (let [x-sym (gensym "x")
+   (let [x (symbol "x")
+         y (symbol "y")
+         rest (symbol "rest")
          fname (symbol (str "clojure2d.java.PrimitiveMath/" fn))
          doc (str "A primitive macro version of `" name "`")]
      `(defmacro ~name
         ~doc
-        ([~x-sym]
-         ~((eval single-arg-form) x-sym))
-        ([x# y#]
-         (list '~fname x# y#))
-        ([x# y# ~'& rest#]
-         (list* '~name (list '~name x# y#) rest#))))))
+        ([~x]
+         ~((eval single-arg-form) x))
+        ([~x ~y]
+         (list '~fname ~x ~y))
+        ([~x ~y ~'& ~rest]
+         (list* '~name (list '~name ~x ~y) ~rest))))))
 
 (defmacro ^:private variadic-predicate-proxy
   "Turns variadic predicates into multiple pair-wise comparisons.
@@ -69,17 +74,19 @@
   ([name fn]
    `(variadic-predicate-proxy ~name ~fn (constantly true)))
   ([name fn single-arg-form]
-   (let [x-sym (gensym "x")
+   (let [x (symbol "x")
+         y (symbol "y")
+         rest (symbol "rest")
          fname (symbol (str "clojure2d.java.PrimitiveMath/" fn))
          doc (str "A primitive macro version of `" name "`")]
      `(defmacro ~name
         ~doc
-        ([~x-sym]
-         ~((eval single-arg-form) x-sym))
-        ([x# y#]
-         (list '~fname x# y#))
-        ([x# y# ~'& rest#]
-         (list 'clojure2d.java.PrimitiveMath/and (list '~name x# y#) (list* '~name y# rest#)))))))
+        ([~x]
+         ~((eval single-arg-form) x))
+        ([~x ~y]
+         (list '~fname ~x ~y))
+        ([~x ~y ~'& ~rest]
+         (list 'clojure2d.java.PrimitiveMath/and (list '~name ~x ~y) (list* '~name ~y ~rest)))))))
 
 ;; ## Basic operations
 
@@ -275,7 +282,7 @@
 
 ;; \\(\sqrt{x^2+y^2}\\) and \\(\sqrt{x^2+y^2+z^2}\\)
 (defn hypot
-  "SQRT version of hypot - fast, not safe"
+  "SQRT version of hypot - fast, not safe, \\\\(\\sqrt{x^2+y^2}\\\\)"
   (^double [^double x ^double y]
    (sqrt (+ (* x x) (* y y))))
   (^double [^double x ^double y ^double z]
@@ -381,8 +388,8 @@
 (def ^:const ^double SQRTPI (sqrt PI))
 (def ^:const ^double SQRT2PI (sqrt TWO_PI))
 
-;; Golden ratio \\(\varphi\\)
-(def ^:const ^double PHI (* (inc SQRT5) 0.5))
+;; 
+(def ^:const ^double ^{:doc "Golden ratio \\\\(\\varphi\\\\)"} PHI (* (inc SQRT5) 0.5))
 
 ;; math.h predefined constants names
 (def ^:const ^double M_E E)

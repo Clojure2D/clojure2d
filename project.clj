@@ -19,12 +19,22 @@
                  [net.littleredcomputer/sicmutils "0.10.0"] ;; to be removed
                                         ;	 [de.sciss/jwave "1.0.3"]
                  [criterium "0.4.4"]
+                 [codox-theme-rdash "0.1.2"]
                                         ; [org.bytedeco/javacv-platform "1.3.2"]
                  ]
   :resource-path "resources/"
-  :codox {:output-path "docs/codox/"
-          :exclude-vars nil}
+  :codox {:themes [:rdash]
+          :metadata {:doc/format :markdown}
+          :output-path "docs/codox/"
+          :source-uri "https://github.com/Clojure2D/clojure2d/blob/master/{filepath}#L{line}"
+          :exclude-vars nil
+          :doc-paths ["docs/tutorials/"]
+          :html {:transforms [[:head] [:append [:script {:type "text/javascript",
+                                                         :async ""
+                                                         :src "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"}]]]}}
   :java-source-paths ["src"]
+  :scm {:name "git"
+        ::url "https://github.com/Clojure2D/clojure2d.git"}
   :repl-options {:timeout 120000}
   :target-path "target/%s"
   :jvm-opts ["-Xmx4096M"
@@ -33,5 +43,5 @@
                                         ;   "-Dcom.sun.management.jmxremote.authenticate=false"
                                         ;   "-Dcom.sun.management.jmxremote.port=43210"
              ]
-  :marginalia {:javascript ["https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML"]}
+  :marginalia {:javascript ["https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"]} ;; to remove
   :profiles {:uberjar {:aot :all}})
