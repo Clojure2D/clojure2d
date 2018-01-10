@@ -16,7 +16,8 @@
             [clojure2d.math.vector :as v]
             [clojure2d.math :as m]
             [clojure.reflect :as ref]
-            [clojure2d.math.random :as r])
+            [clojure2d.math.random :as r]
+            [meta-doc.core :as ex])
   (:import clojure2d.math.vector.Vec2
            [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
            [java.awt.event InputEvent ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
@@ -32,11 +33,7 @@
 
 ;; how many tasks we can run (one less than available cores)?
 (def ^:const ^long
-  ^{:doc "How much processor cores are in system.
-
-##### Examples
-
-`available-cores => 4`"}
+  ^{:doc "How much processor cores are in system."}
   available-cores (.availableProcessors (Runtime/getRuntime)))
 (def ^:const ^long available-tasks (inc available-cores))
 
@@ -1618,3 +1615,11 @@
   (let [buff (double-array (* sizex sizey))]
     [#(aget ^doubles buff (+ ^long %1 (* sizex ^long %2)))
      #(aset ^doubles buff (+ ^long %1 (* sizex ^long %2)) ^double %3)]))
+
+(ex/add-examples rect
+                 (ex/example-gen-image "Square"
+                                       (do
+                                         (rect canvas 10 10 50 50) 
+                                         (rect canvas 60 60 90 90 true))))
+
+(ex/alter-docs)

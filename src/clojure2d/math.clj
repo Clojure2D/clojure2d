@@ -10,6 +10,7 @@
 
 (ns clojure2d.math
   "Math functions"
+  (:require [meta-doc.core :refer [alter-docs]])
   (:refer-clojure
    :exclude [* + - / > < >= <= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max even? odd?])
   (:import [net.jafama FastMath]
@@ -55,7 +56,7 @@
          y (symbol "y")
          rest (symbol "rest")
          fname (symbol (str "clojure2d.java.PrimitiveMath/" fn))
-         doc (str "A primitive macro version of `" name "`")]
+         doc (str "A primitive math version of `" name "`")]
      `(defmacro ~name
         ~doc
         ([~x]
@@ -77,7 +78,7 @@
          y (symbol "y")
          rest (symbol "rest")
          fname (symbol (str "clojure2d.java.PrimitiveMath/" fn))
-         doc (str "A primitive macro version of `" name "`")]
+         doc (str "A primitive math version of `" name "`")]
      `(defmacro ~name
         ~doc
         ([~x]
@@ -721,4 +722,4 @@
 
 ;;;;;
 
-
+(alter-docs)
