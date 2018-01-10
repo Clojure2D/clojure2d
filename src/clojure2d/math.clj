@@ -10,6 +10,7 @@
 
 (ns clojure2d.math
   "Math functions"
+  (:require [meta-doc.core :refer [alter-docs]])
   (:refer-clojure
    :exclude [* + - / > < >= <= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max even? odd?])
   (:import [net.jafama FastMath]
@@ -24,21 +25,20 @@
 
 (defmacro ^:private javaclass-proxy
   "Wrapps operation into macro"
-  ([class alt-name name]
-   (let [f (symbol (str class "/" name))
+  ([class arity alt-name name]
+   (let [cf (str class "/" name)
+         f (symbol cf)
          x (symbol "x")
          y (symbol "y")
-         z (symbol "z")
-         d (str  class " "  name " function.")]
-     `(defmacro ~alt-name
-        ([~x]
-         (list '~f ~x))
-        ([~x ~y]
-         (list '~f ~x ~y))
-        ([~x ~y ~z]
-         (list '~f ~x ~y ~z)))))
-  ([class name]
-   `(javaclass-proxy ~class ~name ~name)))
+         doc (str cf " function wrapped in macro.")
+         arity-1 `([~x] (list '~f ~x))
+         arity-2 `([~x ~y] (list '~f ~x ~y))]
+     (condp = arity
+       :two `(defmacro ~alt-name ~doc ~arity-2)
+       :onetwo `(defmacro ~alt-name ~doc ~arity-1 ~arity-2)
+       `(defmacro ~alt-name ~doc ~arity-1))))
+  ([class arity name]
+   `(javaclass-proxy ~class ~arity ~name ~name)))
 
 (defmacro ^:private fastmath-proxy [& rest] `(javaclass-proxy "net.jafama.FastMath" ~@rest))
 (defmacro ^:private primitivemath-proxy [& rest] `(javaclass-proxy "clojure2d.java.PrimitiveMath" ~@rest))
@@ -94,32 +94,32 @@
 (variadic-proxy - subtract (fn [x] `(list 'clojure2d.java.PrimitiveMath/negate ~x)))
 (variadic-proxy * multiply)
 (variadic-proxy / divide (fn [x] `(list 'clojure2d.java.PrimitiveMath/reciprocal ~x)))
-(primitivemath-proxy inc)
-(primitivemath-proxy dec)
-(primitivemath-proxy rem remainder)
-(primitivemath-proxy quot quotient)
-(primitivemath-proxy mod modulus)
+(primitivemath-proxy :one inc)
+(primitivemath-proxy :one dec)
+(primitivemath-proxy :two rem remainder)
+(primitivemath-proxy :two quot quotient)
+(primitivemath-proxy :two mod modulus)
 (variadic-proxy bit-and bitAnd)
 (variadic-proxy bit-or bitOr)
 (variadic-proxy bit-xor bitXor)
-(primitivemath-proxy bit-not bitNot)
+(primitivemath-proxy :one bit-not bitNot)
 (variadic-proxy bool-and and)
 (variadic-proxy bool-or or)
 (variadic-proxy bool-xor xor)
-(primitivemath-proxy bool-not not)
+(primitivemath-proxy :one bool-not not)
 (variadic-proxy min)
 (variadic-proxy max)
-(primitivemath-proxy zero? isZero)
-(primitivemath-proxy neg? isNeg)
-(primitivemath-proxy pos? isPos)
-(primitivemath-proxy even? isEven)
-(primitivemath-proxy odd? isOdd)
-(primitivemath-proxy << shiftLeft)
-(primitivemath-proxy >> shiftRight)
-(primitivemath-proxy >>> unsignedShiftRight)
-(primitivemath-proxy bit-shift-left shiftLeft)
-(primitivemath-proxy bit-shift-right shiftRight)
-(primitivemath-proxy unsigned-bit-shift-right unsignedShiftRight)
+(primitivemath-proxy :one zero? isZero)
+(primitivemath-proxy :one neg? isNeg)
+(primitivemath-proxy :one pos? isPos)
+(primitivemath-proxy :one even? isEven)
+(primitivemath-proxy :one odd? isOdd)
+(primitivemath-proxy :two << shiftLeft)
+(primitivemath-proxy :two >> shiftRight)
+(primitivemath-proxy :two >>> unsignedShiftRight)
+(primitivemath-proxy :two bit-shift-left shiftLeft)
+(primitivemath-proxy :two bit-shift-right shiftRight)
+(primitivemath-proxy :two unsigned-bit-shift-right unsignedShiftRight)
 
 (variadic-predicate-proxy < lt)
 (variadic-predicate-proxy > gt)
@@ -155,22 +155,22 @@
 (def ^:const ^double SIXTH (/ 6.0))
 
 ;; Trigonometry
-(fastmath-proxy sin)
-(fastmath-proxy cos)
-(fastmath-proxy tan)
-(fastmath-proxy asin)
-(fastmath-proxy acos)
-(fastmath-proxy atan)
-(fastmath-proxy sinh)
-(fastmath-proxy cosh)
-(fastmath-proxy tanh)
-(fastmath-proxy asinh)
-(fastmath-proxy acosh)
-(fastmath-proxy atanh)
+(fastmath-proxy :one sin)
+(fastmath-proxy :one cos)
+(fastmath-proxy :one tan)
+(fastmath-proxy :one asin)
+(fastmath-proxy :one acos)
+(fastmath-proxy :one atan)
+(fastmath-proxy :one sinh)
+(fastmath-proxy :one cosh)
+(fastmath-proxy :one tanh)
+(fastmath-proxy :one asinh)
+(fastmath-proxy :one acosh)
+(fastmath-proxy :one atanh)
 
 ;; Quick and less accurate `sin` and `cos`
-(fastmath-proxy qsin sinQuick)
-(fastmath-proxy qcos cosQuick)
+(fastmath-proxy :one qsin sinQuick)
+(fastmath-proxy :one qcos cosQuick)
 
 ;; Additional trigonometry functions
 (defn cot ^double [^double v] (FastMath/tan (- HALF_PI v)))
@@ -181,7 +181,7 @@
 (defn acot ^double [^double v] (- HALF_PI (FastMath/atan v)))
 (defn asec ^double [^double v] (FastMath/acos (/ 1.0 v)))
 (defn acsc ^double [^double v] (FastMath/asin (/ 1.0 v)))
-(fastmath-proxy atan2)
+(fastmath-proxy :two atan2)
 
 ;; Additional hyperbolic functions
 (defn coth ^double [^double v] (/ (FastMath/tanh v)))
@@ -194,18 +194,18 @@
 (defn acsch ^double [^double v] (FastMath/asinh (/ v)))
 
 ;; exp and log
-(fastmath-proxy exp)
-(fastmath-proxy log)
-(fastmath-proxy log10)
+(fastmath-proxy :one exp)
+(fastmath-proxy :one log)
+(fastmath-proxy :one log10)
 ;; Alias for natural logarithm
-(fastmath-proxy ln log)
+(fastmath-proxy :one ln log)
 
 ;; Roots (square and cubic)
-(fastmath-proxy sqrt)
-(fastmath-proxy cbrt)
+(fastmath-proxy :one sqrt)
+(fastmath-proxy :one cbrt)
 
 ;; Quick version of exponential \\(e^x\\)
-(fastmath-proxy qexp expQuick)
+(fastmath-proxy :one qexp expQuick)
 
 ;; Radians to degrees (and opposite) conversions
 (def ^:const ^double rad-in-deg (/ 180.0 PI))
@@ -214,10 +214,10 @@
 (defn degrees ^double [^double rad] (* rad-in-deg rad))
 
 ;; Erf
-(erf-proxy erf)
-(erf-proxy erfc)
-(erf-proxy inv-erf erfInv)
-(erf-proxy inv-erfc erfcInv)
+(erf-proxy :onetwo erf)
+(erf-proxy :one erfc)
+(erf-proxy :one inv-erf erfInv)
+(erf-proxy :one inv-erfc erfcInv)
 
 ;; Sinc
 (defn sinc
@@ -251,7 +251,7 @@
   (/ (FastMath/log v) (FastMath/log base)))
 
 ;; Quick logarithm
-(fastmath-proxy qlog logQuick)
+(fastmath-proxy :one qlog logQuick)
 
 ;; \\(\log_2 e\\)
 (def ^:const ^double LOG2E (log2 E))
@@ -260,11 +260,11 @@
 (def ^:const ^double LOG10E (log10 E))
 
 ;; Powers (normal, quick)
-(fastmath-proxy pow)
-(fastmath-proxy qpow powQuick)
+(fastmath-proxy :two pow)
+(fastmath-proxy :two qpow powQuick)
 
 ;; Fast version of power, second parameter should be integer
-(fastmath-proxy fpow powFast)
+(fastmath-proxy :two fpow powFast)
 
 ;; Square and cubic
 (defn sq ^double [^double v] (* v v))
@@ -277,8 +277,8 @@
   (if (neg? value) 0.0 (sqrt value)))
 
 ;; Approximated sqrt via binary operations (error 1.0E-2)
-(fastmath-proxy qsqrt sqrtQuick)
-(fastmath-proxy rqsqrt invSqrtQuick)
+(fastmath-proxy :one qsqrt sqrtQuick)
+(fastmath-proxy :one rqsqrt invSqrtQuick)
 
 ;; \\(\sqrt{x^2+y^2}\\) and \\(\sqrt{x^2+y^2+z^2}\\)
 (defn hypot
@@ -306,12 +306,12 @@
 (defn floor ^double [^double v] (FastMath/floor v))
 (defn ceil ^double [^double v] (FastMath/ceil v))
 (defn round ^long [^double v] (FastMath/round v))
-(fastmath-proxy rint)
+(fastmath-proxy :one rint)
 
 ;; Modulo and abs
-(fastmath-proxy remainder)
+(fastmath-proxy :two remainder)
 (defn abs ^double [^double v] (FastMath/abs v))
-(fastmath-proxy iabs)
+(fastmath-proxy :one iabs)
 
 ;; truncate fractional part, keep sign
 (defn trunc ^double [^double v] (if (neg? v) (ceil v) (floor v)))
@@ -718,3 +718,8 @@
     (doseq [v vars-to-exclude]
       (ns-unmap *ns* v))
     (refer 'clojure.core)))
+
+
+;;;;;
+
+(alter-docs)
