@@ -10,7 +10,6 @@
 
 (ns clojure2d.math
   "Math functions"
-  (:require [meta-doc.core :refer [alter-docs]])
   (:refer-clojure
    :exclude [* + - / > < >= <= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max even? odd?])
   (:import [net.jafama FastMath]
@@ -722,4 +721,4 @@
 
 ;;;;;
 
-(alter-docs)
+

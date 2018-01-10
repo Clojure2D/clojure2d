@@ -1618,4 +1618,3 @@
   (let [buff (double-array (* sizex sizey))]
     [#(aget ^doubles buff (+ ^long %1 (* sizex ^long %2)))
      #(aset ^doubles buff (+ ^long %1 (* sizex ^long %2)) ^double %3)]))
-

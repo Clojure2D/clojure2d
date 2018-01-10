@@ -1,10 +1,14 @@
 (ns meta-doc.core
-  (:require [clojure.string :as s]))
+  (:require [clojure.string :as s]
+            ;; [clojure2d.core :refer [with-canvas]]
+            ))
 
 (def ^:dynamic *load-examples* true)
 (def ^:dynamic *alter-doc* true)
 
 (def ^:const ^String new-line (System/getProperty "line.separator"))
+
+(def escape-map {(char 0xffff) "\\0xffff"})
 
 (defn alter-info
   ""
@@ -13,7 +17,7 @@
     (let [doc (:doc (meta v))]
       (alter-meta! v assoc :doc (str doc new-line new-line (f tag-val s v))))))
 
-(def alter-const-info (partial alter-info :const #(str "Constant value `" %2 " = " (var-get %3) "`")))
+(def alter-const-info (partial alter-info :const #(s/escape (str "Constant value `" %2 " = " (var-get %3) "`") escape-map)))
 (def alter-tag-info (partial alter-info :tag (fn [t & _] (str "Type: " (if (fn? t) (last (s/split (str (type t)) #"\$")) t)))))
 
 (defn alter-docs
