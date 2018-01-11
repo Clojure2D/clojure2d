@@ -35,7 +35,9 @@
 (def ^:const ^long
   ^{:doc "How much processor cores are in system."}
   available-cores (.availableProcessors (Runtime/getRuntime)))
-(def ^:const ^long available-tasks (inc available-cores))
+(def ^:const ^long
+  ^{:doc "How much intensive tasks can we run. Which is `(+ 1 available-cores)`"}
+  available-tasks (inc available-cores))
 
 ;; ## Image
 
@@ -182,9 +184,19 @@
 
 ;; ## Screen info
 
-(defn ^Dimension screen-size [] (.getScreenSize (Toolkit/getDefaultToolkit)))
-(defn screen-width [] (.getWidth (screen-size)))
-(defn screen-height [] (.getHeight (screen-size)))
+(defn- ^Dimension screen-size
+  "Screen size from java.awt.Toolkit."
+  [] (.getScreenSize (Toolkit/getDefaultToolkit)))
+
+(defn screen-width
+  "Returns width of the screen."
+  {:examples [(ex/example "Example value" (screen-width))]}
+  [] (.getWidth (screen-size)))
+
+(defn screen-height 
+  "Returns height of the screen."
+  {:examples [(ex/example "Example value" (screen-height))]}
+  [] (.getHeight (screen-size)))
 
 ;; ## Canvas
 ;;
@@ -218,7 +230,7 @@
                            :gaussian-blur-5 (Kernel. 5 5 (float-array (map #(/ (int %) 256.0) [1 4 6 4 1 4 16 24 16 4 6 24 36 24 6 4 16 24 16 4 1 4 6 4 1])))
                            :unsharp (Kernel. 5 5 (float-array (map #(/ (int %) -256.0) [1 4 6 4 1 4 16 24 16 4 6 24 -476 24 6 4 16 24 16 4 1 4 6 4 1])))})
 
-;; Add ImageProto functions to BufferedImage
+;; Add ImageProto functions to BufferedImae
 (extend BufferedImage
   ImageProto
   {:get-image identity
@@ -508,6 +520,18 @@
 ;; 
 ;; All functions return canvas object
 
+(defn set-stroke
+  "Set stroke (line) attributes like `cap`, `join` and size. Default `CAP_ROUND` and `JOIN_BEVEL` are used. Default size is `1.0`."
+  ([^Canvas canvas size cap join]
+   (.setStroke ^Graphics2D (.graphics canvas) (BasicStroke. size cap join))
+   canvas)
+  ([canvas size cap]
+   (set-stroke canvas size cap BasicStroke/JOIN_BEVEL))
+  ([canvas size]
+   (set-stroke canvas size BasicStroke/CAP_ROUND BasicStroke/JOIN_BEVEL))
+  ([canvas]
+   (set-stroke canvas 1.0)))
+
 (defn line
   "Draw line from point `(x1,y1)` to `(x2,y2)`"
   ([^Canvas canvas x1 y1 x2 y2]
@@ -519,39 +543,61 @@
    (line canvas (.x v1) (.y v1) (.x v2) (.y v2))))
 
 (defn point
-  "Draw point at `(x,y)` position"
+  "Draw point at `x`,`y` or `^Vec2` position.
+
+  It's implemented as very short line. Consider using `(rect x y 1 1)` for speed when `x` and `y` are integers."
+  {:examples [(ex/example-gen-image "Sequence of points."
+                (doseq [x (range 10 159 10)] (point canvas x x)))
+              (ex/example-gen-image "Magnified point can look differently when different stroke settings are used."
+                (-> canvas
+                    (scale 80.0)
+                    (set-stroke 0.5)
+                    (point 0.5 0.5)
+                    (set-stroke 0.5 BasicStroke/CAP_SQUARE BasicStroke/JOIN_MITER)
+                    (point 1.5 1.5)))]}
   ([canvas ^double x ^double y]
    (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
    canvas)
-  ([canvas ^Vec2 p]
-   (point canvas (.x p) (.y p))))
+  ([canvas ^Vec2 vec]
+   (point canvas (.x vec) (.y vec))))
+
+(comment show-window {:canvas (with-canvas-> (make-canvas 160 160))})
 
 (defn- draw-fill-or-stroke
-  "Draw filled or stroked object."
+  "Draw filled or outlined shape."
   [^Graphics2D g ^Shape obj stroke?]
   (if stroke?
     (.draw g obj)
     (.fill g obj)))
 
 (defn rect
-  "Draw rectangle with top-left corner at `(x,y)` position with width `w` and height `h`."
-  ([^Canvas canvas x1 y1 w h stroke?]
+  "Draw rectangle with top-left corner at `(x,y)` position with width `w` and height `h`. Optionally you can set `stroke?` (default: `false`) to `true` if you don't want to fill rectangle and draw outline only."
+  {:examples [(ex/example-gen-image "Two squares, one filled and second as outline."
+                (-> canvas
+                    (rect 10 10 50 50) 
+                    (rect 60 60 90 90 true)))]}
+  ([^Canvas canvas x y w h stroke?]
    (let [^Rectangle2D r (.rect-obj canvas)] 
-     (.setFrame r x1 y1 w h)
+     (.setFrame r x y w h)
      (draw-fill-or-stroke (.graphics canvas) r stroke?))
    canvas)
-  ([canvas x1 y1 w h]
-   (rect canvas x1 y1 w h false)))
+  ([canvas x y w h]
+   (rect canvas x y w h false)))
 
 (defn crect
-  "Centered version of rectangle"
-  ([canvas x1 y1 w h stroke?]
+  "Centered version of [[rect]]."
+  {:examples [(ex/example-gen-image "Two squares, one centered."
+                (-> canvas
+                    (set-color :white 160)
+                    (rect 50 50 70 70) 
+                    (crect 50 50 70 70)))]}
+  ([canvas x y w h stroke?]
    (let [w2 (* 0.5 ^double w)
          h2 (* 0.5 ^double h)]
-     (rect canvas (- ^double x1 w2) (- ^double y1 h2) w h stroke?))
+     (rect canvas (- ^double x w2) (- ^double y h2) w h stroke?))
    canvas)
-  ([canvas x1 y1 w h]
-   (crect canvas x1 y1 w h false)))
+  ([canvas x y w h]
+   (crect canvas x y w h false)))
 
 (defn ellipse
   "Draw ellipse with middle at `(x,y)` position with width `w` and height `h`."
@@ -775,18 +821,6 @@
    canvas)
   ([canvas s x y]
    (text canvas s x y :left)))
-
-(defn set-stroke
-  "Set stroke (line) attributes like `cap`, `join` and size. Default `CAP_ROUND` and `JOIN_MITER` is used. Default size is `1.0`."
-  ([^Canvas canvas size cap join]
-   (.setStroke ^Graphics2D (.graphics canvas) (BasicStroke. size cap join))
-   canvas)
-  ([canvas size cap]
-   (set-stroke canvas size cap BasicStroke/JOIN_MITER))
-  ([canvas size]
-   (set-stroke canvas size BasicStroke/CAP_ROUND BasicStroke/JOIN_MITER))
-  ([canvas]
-   (set-stroke canvas 1.0)))
 
 ;; ### Color
 
@@ -1615,11 +1649,5 @@
   (let [buff (double-array (* sizex sizey))]
     [#(aget ^doubles buff (+ ^long %1 (* sizex ^long %2)))
      #(aset ^doubles buff (+ ^long %1 (* sizex ^long %2)) ^double %3)]))
-
-(ex/add-examples rect
-                 (ex/example-gen-image "Square"
-                                       (do
-                                         (rect canvas 10 10 50 50) 
-                                         (rect canvas 60 60 90 90 true))))
 
 (ex/alter-docs)

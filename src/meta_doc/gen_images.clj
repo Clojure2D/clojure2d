@@ -1,6 +1,7 @@
 (ns meta-doc.gen-images
   "Generate images from examples attached to metadata."
   (:require [clojure2d.core :refer :all]
+            [clojure2d.color :refer :all]
             [clojure2d.pixels :as p]
             [clojure2d.math.joise :as j]
             [clojure2d.math.complex :as c]
@@ -11,20 +12,22 @@
             [clojure2d.extra.raymarching :as r]
             [clojure2d.extra.segmentation :as segm]))
 
-(def ^:dynamic *generate-images* false)
+(def ^:dynamic *generate-images* true)
 
 (defn draw-example
   "Draw example on canvas."
-  [f]
-  (with-canvas [c (make-canvas 160 160)]
-    (set-background c 0x30426a)
-    (f c)))
+  [f {:keys [w h hints background]
+      :or {w 160 h 160 hints :high background 0x30426a}}]
+  (with-canvas [c (make-canvas w h hints)]
+    (set-background c background)
+    (f c)
+    c))
 
 (defn save-example
   "Save generated image to file."
   [name img]
-  (binding [*jpeg-image-quality* 0.7]
-    (save img (str "docs/images/" name ".jpg"))))
+  (binding [*jpeg-image-quality* 0.85]
+    (save img (str "docs/images/" name))))
 
 (defn get-all-clojure2d-ns
   "Return all namespaces from clojure2d."
@@ -45,9 +48,8 @@
 
 (defn generate-image
   "Generate image from example."
-  [{:keys [digest value-fn]}]
-  (println digest)
-  (save-example digest (draw-example value-fn)))
+  [{:keys [filename value-fn params]}]
+  (save-example filename (draw-example value-fn params)))
 
 (defn generate-images
   "Process all examples from all loaded namespaces."
@@ -55,7 +57,8 @@
   (when *generate-images* 
     (doseq [example (->> (get-all-clojure2d-ns)
                          (mapcat get-examples-from-vars)
-                         (apply concat))]
+                         (apply concat)
+                         (filter #(= (:type %) :gen-image)))] 
       (generate-image example))))
 
 (generate-images)
