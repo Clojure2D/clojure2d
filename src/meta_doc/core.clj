@@ -38,9 +38,9 @@
            [java.math BigInteger]))
 
 (def ^:dynamic ^{:doc "Do include examples when calling [[alter-docs]]?"}
-  *load-examples* false)
+  *load-examples* true)
 (def ^:dynamic ^{:doc "Do modify `:doc` metadata?"}
-  *alter-docs* false)
+  *alter-docs* true)
 
 (def ^:const ^:private ^String new-line (System/getProperty "line.separator"))
 (def ^:const ^:private ^String separator (str new-line new-line))
@@ -190,14 +190,20 @@
   ([] (alter-docs *ns*))
   ([ns]
    (when *alter-docs*
-     (doseq [[s v] (ns-publics ns)]
-       (let [mv (meta v)]
-         (when (and *load-examples* (contains? mv :examples))
-           (append-to-doc v (str separator "#### Examples" new-line (examples-info (:examples mv))))) 
-         (when (some mv [:const :tag])
-           (append-to-doc v (str separator "##### Additional info" new-line))
-           (alter-const-info s v)
-           (alter-tag-info s v)))))))
+     (let [consts (atom (sorted-map))]
+       (doseq [[s v] (ns-publics ns)]
+         (let [mv (meta v)]
+           (when (and *load-examples* (contains? mv :examples))
+             (append-to-doc v (str separator "#### Examples" new-line (examples-info (:examples mv))))) 
+           (when (some mv [:const :tag])
+             (append-to-doc v (str separator "##### Additional info" new-line))
+             (alter-const-info s v)
+             (alter-tag-info s v)
+             (when (:const mv) (swap! consts assoc (str s) (s/escape (str (var-get v)) escape-map))))))
+       (when-not (empty? @consts)
+         (append-to-doc ns (str separator "  #### Constants" separator
+                                (s/join new-line (map (fn [[n v]] (str "  * [[" n "]] = `" v "`")) @consts)))))))
+   :done))
 
 (add-examples md5
   (example "MD5 of a string" (md5 "abc"))

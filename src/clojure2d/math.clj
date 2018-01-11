@@ -9,7 +9,31 @@
 ;; * Statistics
 
 (ns clojure2d.math
-  "Math functions"
+  "Collection of fast math functions and plethora of constants known from other libraries.
+
+  #### Primitive math operators
+
+  Based on [Primitive Math by Zach Tellman](https://github.com/ztellman/primitive-math) several operators are introduced and replace `clojure.core` functions. All operators are macros and can't be used as function. List includes:
+
+  Known from Clojure: `*` `+` `-` `/` `>` `<` `>=` `<=` `==` `rem` `quot` `mod` `bit-or` `bit-and` `bit-xor` `bit-not` `bit-shift-left` `bit-shift-right` `unsigned-bit-shift-right` `inc` `dec` `zero?` `neg?` `pos?` `min` `max` `even?` `odd?`
+
+  And additionally:
+
+  * `bool-and` - `and` working on booleans
+  * `bool-or` - boolean `or`
+  * `bool-xor` - boolean `xor`
+  * `bool-not` - boolean `not`
+  * `<<` - bit shift left
+  * `>>` - signed bit shift right
+  * `>>>` - unsigned bit shift right
+  * `not==` - not equal
+
+  To turn on primitive math on your namespace call [[use-primitive-operators]] to turn off and revert original versions call [[unuse-primitive-operators]]
+
+  #### Fast Math
+
+  
+  "
   (:require [meta-doc.core :refer [alter-docs]])
   (:refer-clojure
    :exclude [* + - / > < >= <= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max even? odd?])

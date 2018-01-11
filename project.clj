@@ -1,7 +1,7 @@
 (defproject clojure2d "0.0.7-SNAPSHOT"
   :description "Creative coding / glitch library backed by Java2D"
   :plugins [[refactor-nrepl "2.4.0-SNAPSHOT"]
-            [cider/cider-nrepl "0.17.0-SNAPSHOT"]
+            [cider/cider-nrepl "0.16.0"]
             [lein-ancient "0.6.15"]
             [lein-kibit "0.1.6"]
             [lein-bikeshed "0.5.0"]
