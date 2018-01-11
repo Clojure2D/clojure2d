@@ -37,8 +37,10 @@
   (:import [java.security MessageDigest]
            [java.math BigInteger]))
 
-(def ^:dynamic ^{:doc "Do include examples when calling [[alter-docs]]?"} *load-examples* true)
-(def ^:dynamic ^{:doc "Do modify `:doc` metadata?"} *alter-docs* true)
+(def ^:dynamic ^{:doc "Do include examples when calling [[alter-docs]]?"}
+  *load-examples* false)
+(def ^:dynamic ^{:doc "Do modify `:doc` metadata?"}
+  *alter-docs* false)
 
 (def ^:const ^:private ^String new-line (System/getProperty "line.separator"))
 (def ^:const ^:private ^String separator (str new-line new-line))
