@@ -28,13 +28,14 @@
   * `>>>` - unsigned bit shift right
   * `not==` - not equal
 
-  To turn on primitive math on your namespace call [[use-primitive-operators]] to turn off and revert original versions call [[unuse-primitive-operators]]
+  To turn on primitive math on your namespace call [[use-primitive-operators]].
+  To turn off and revert original versions call [[unuse-primitive-operators]]
 
   #### Fast Math
 
-  
+  All math functions are backed by [FastMath](https://github.com/jeffhain/jafama) library. Most of them are macros. Some of them are wrapped in Clojure functions. Almost all operates on primitive `double` and return `double` (with an exception [[round]] which returns `long`).
   "
-  (:require [meta-doc.core :refer [alter-docs]])
+  (:require [meta-doc.core :refer [example example-gen-image alter-docs]])
   (:refer-clojure
    :exclude [* + - / > < >= <= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max even? odd?])
   (:import [net.jafama FastMath]
@@ -234,8 +235,12 @@
 ;; Radians to degrees (and opposite) conversions
 (def ^:const ^double rad-in-deg (/ 180.0 PI))
 (def ^:const ^double deg-in-rad (/ PI 180.0))
-(defn radians ^double [^double deg] (* deg-in-rad deg))
-(defn degrees ^double [^double rad] (* rad-in-deg rad))
+(defn ^{:doc "Convert degrees into radians."
+        :examples [(example "Let's convert 180 degrees to radians." (radians 180))]}
+  radians ^double [^double deg] (* deg-in-rad deg))
+(defn ^{:doc "Convert degrees into radians."
+        :examples [(example "Let's convert \\\\(\\pi\\\\) radians to degrees." (degrees PI))]}
+  degrees ^double [^double rad] (* rad-in-deg rad))
 
 ;; Erf
 (erf-proxy :onetwo erf)
@@ -251,28 +256,22 @@
     (if (< x 1.0e-5) 1.0
         (/ (FastMath/sin x) x))))
 
-;; Few logarithm constants
-;; \\(\ln 2\\)
-(def ^:const ^double LN2 (log 2.0))
-(def ^:const ^double INV_LN2 (/ LN2))
-(def ^:const ^double LN2_2 (* 0.5 LN2))
-
-;; \\(\ln 10\\)
-(def ^:const ^double LN10 (log 10.0))
-
-;; \\(\frac{1.0}{\ln{0.5}}\\)
-(def ^:const ^double INV_LOG_HALF (/ (log 0.5)))
+(def ^:const ^double ^{:doc "\\\\(\\ln{2.0}\\\\)"} LN2 (log 2.0))
+(def ^:const ^double ^{:doc "\\\\(\\frac{1.0}{\\ln{2.0}}\\\\)"} INV_LN2 (/ LN2))
+(def ^:const ^double ^{:doc "\\\\(\\frac{\\ln{2.0}}{2.0}\\\\)"} LN2_2 (* 0.5 LN2))
+(def ^:const ^double ^{:doc "\\\\(\\ln{10.0}\\\\)"} LN10 (log 10.0))
+(def ^:const ^double ^{:doc "\\\\(\\frac{1.0}{\\ln{0.5}}\\\\)"} INV_LOG_HALF (/ (log 0.5)))
 
 (defn log2
-  "Log with base 2"
-  ^double [^double v]
-  (* (FastMath/log v) INV_LN2))
+  "Log with base 2. \\\\(\\ln_2{x}\\\\)"
+  ^double [^double x]
+  (* (FastMath/log x) INV_LN2))
 
 ;; \\(\log_b x\\)
 (defn logb
-  "Logarithm with base"
-  ^double [^double base ^double v]
-  (/ (FastMath/log v) (FastMath/log base)))
+  "Logarithm with base. \\\\(\\ln_b{x}\\\\)"
+  ^double [^double b ^double x]
+  (/ (FastMath/log x) (FastMath/log b)))
 
 ;; Quick logarithm
 (fastmath-proxy :one qlog logQuick)
@@ -296,7 +295,16 @@
 (defn pow3 ^double [^double v] (* v (* v v)))
 
 (defn safe-sqrt
-  "Safe sqrt, for value <= 0 result is 0"
+  "Safe sqrt, for value <= 0 result is 0.
+
+  \\\\(
+  \\left\\\\{
+  \\begin{array}{lr}
+  0 & : x \\leq 0\\\\\\\\
+  \\sqrt{x} & : x > 0
+  \\end{array}
+  \\\\right.
+  \\\\)"
   ^double [^double value]
   (if (neg? value) 0.0 (sqrt value)))
 
