@@ -545,16 +545,16 @@
 (defn point
   "Draw point at `x`,`y` or `^Vec2` position.
 
-  It's implemented as very short line. Consider using `(rect x y 1 1)` for speed when `x` and `y` are integers."
+  It's implemented as a very short line. Consider using `(rect x y 1 1)` for speed when `x` and `y` are integers."
   {:examples [(ex/example-gen-image "Sequence of points."
-                (doseq [x (range 10 159 10)] (point canvas x x)))
+                                    (doseq [x (range 10 159 10)] (point canvas x x)))
               (ex/example-gen-image "Magnified point can look differently when different stroke settings are used."
-                (-> canvas
-                    (scale 80.0)
-                    (set-stroke 0.5)
-                    (point 0.5 0.5)
-                    (set-stroke 0.5 BasicStroke/CAP_SQUARE BasicStroke/JOIN_MITER)
-                    (point 1.5 1.5)))]}
+                                    (-> canvas
+                                        (scale 80.0)
+                                        (set-stroke 0.5)
+                                        (point 0.5 0.5)
+                                        (set-stroke 0.5 BasicStroke/CAP_SQUARE BasicStroke/JOIN_MITER)
+                                        (point 1.5 1.5)))]}
   ([canvas ^double x ^double y]
    (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
    canvas)

@@ -159,7 +159,7 @@
   {:style/indent :defn}
   [v & examples]
   (when (and *load-examples* (seq? examples))
-    `(alter-meta! (var ~v) assoc :examples (vec (conj (or [] (:examples (meta (var ~v)))) ~@examples)))))
+    `(alter-meta! (var ~v) assoc :examples (vec (conj (or (:examples (meta (var ~v))) []) ~@examples)))))
 
 ;; Generate markdown
 

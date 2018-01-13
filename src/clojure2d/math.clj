@@ -34,8 +34,24 @@
   #### Fast Math
 
   All math functions are backed by [FastMath](https://github.com/jeffhain/jafama) library. Most of them are macros. Some of them are wrapped in Clojure functions. Almost all operates on primitive `double` and return `double` (with an exception [[round]] which returns `long`).
+
+  #### Statistics
+
+  Statistic functions are taken from this [GIST](https://gist.github.com/scottdw/2960070)
+
+  #### Other functions
+
+  Additionally namespace contains functions which are common in frameworks like OpenFrameworks and Processing.
+
+  * For random/noise functions check [[clojure2d.math.random]] and [[clojure2d.math.joise]] namespaces.
+  * [[clojure2d.math.vector]] contains vector (2,3,4 dim. + double array + clojure vector) protocol and implementations.
+  * [[clojure2d.math.complex]] contains complex number operations
+
+  #### Graphs
+
+  Generated graphs are from range [-3.2, 3.2].
   "
-  (:require [meta-doc.core :refer [example example-gen-image alter-docs]])
+  (:require [meta-doc.core :refer :all])
   (:refer-clojure
    :exclude [* + - / > < >= <= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max even? odd?])
   (:import [net.jafama FastMath]
@@ -54,8 +70,8 @@
    (let [cf (str class "/" name)
          f (symbol cf)
          x (symbol "x")
-         y (symbol "y")
-         doc (str cf " function wrapped in macro.")
+         y (symbol "y") 
+         doc (or (:doc (meta alt-name)) (str cf " function wrapped in macro."))
          arity-1 `([~x] (list '~f ~x))
          arity-2 `([~x ~y] (list '~f ~x ~y))]
      (condp = arity
@@ -81,7 +97,7 @@
          y (symbol "y")
          rest (symbol "rest")
          fname (symbol (str "clojure2d.java.PrimitiveMath/" fn))
-         doc (str "A primitive math version of `" name "`")]
+         doc (or (:doc (meta name)) (str "A primitive math version of `" name "`"))]
      `(defmacro ~name
         ~doc
         ([~x]
@@ -103,7 +119,7 @@
          y (symbol "y")
          rest (symbol "rest")
          fname (symbol (str "clojure2d.java.PrimitiveMath/" fn))
-         doc (str "A primitive math version of `" name "`")]
+         doc (or (:doc (meta name)) (str "A primitive math version of `" name "`"))]
      `(defmacro ~name
         ~doc
         ([~x]
@@ -159,25 +175,24 @@
 ;; All functions operate and return `double` or in some cases `long`.
 
 ;; Processing math constants
-(def ^:const ^double PI Math/PI)
-(def ^:const ^double HALF_PI (/ PI 2.0))
-(def ^:const ^double THIRD_PI (/ PI 3.0))
-(def ^:const ^double QUARTER_PI (/ PI 4.0))
-(def ^:const ^double TWO_PI (* PI 2.0))
-(def ^:const ^double TAU TWO_PI)
-(def ^:const ^double E Math/E)
+(def ^:const ^double ^{:doc "Value of \\\\(\\pi\\\\)"} PI Math/PI)
+(def ^:const ^double ^{:doc "Value of \\\\(\\frac{\\pi}{2.0}\\\\)"} HALF_PI (/ PI 2.0))
+(def ^:const ^double ^{:doc "Value of \\\\(\\frac{\\pi}{3.0}\\\\)"} THIRD_PI (/ PI 3.0))
+(def ^:const ^double ^{:doc "Value of \\\\(\\frac{\\pi}{4.0}\\\\)"} QUARTER_PI (/ PI 4.0))
+(def ^:const ^double ^{:doc "Value of \\\\(2 {\\pi}\\\\)"} TWO_PI (* PI 2.0))
+(def ^:const ^double ^{:doc "Alias for [[TWO_PI]]"}TAU TWO_PI)
+(def ^:const ^double ^{:doc "Value of \\\\(e\\\\)"} E Math/E)
 
-;; Very small number \\(\varepsilon\\)
-(def ^:const ^double EPSILON 1.0e-10)
+(def ^:const ^double ^{:doc "Very small number \\\\(\\varepsilon\\\\)"} EPSILON 1.0e-10)
 
-(def ^:const ^double MACHINE-EPSILON (* 0.5 (double (loop [d (double 1.0)]
-                                                      (if (not== 1.0 (+ 1.0 (* d 0.5)))
-                                                        (recur (* d 0.5))
-                                                        d)))))
-;; Common fractions
-(def ^:const ^double THIRD (/ 3.0))
-(def ^:const ^double TWO_THIRD (/ 2.0 3.0))
-(def ^:const ^double SIXTH (/ 6.0))
+(def ^:const ^double ^{:doc "Smalles machine number"}
+  MACHINE-EPSILON (* 0.5 (double (loop [d (double 1.0)]
+                                   (if (not== 1.0 (+ 1.0 (* d 0.5)))
+                                     (recur (* d 0.5))
+                                     d)))))
+(def ^:const ^double ^{:doc "Value of \\\\(\\frac{1.0}{3.0}\\\\)"} THIRD (/ 3.0))
+(def ^:const ^double ^{:doc "Value of \\\\(\\frac{2.0}{3.0}\\\\)"} TWO_THIRD (/ 2.0 3.0))
+(def ^:const ^double ^{:doc "Value of \\\\(\\frac{1.0}{6.0}\\\\)"} SIXTH (/ 6.0))
 
 ;; Trigonometry
 (fastmath-proxy :one sin)
@@ -193,48 +208,59 @@
 (fastmath-proxy :one acosh)
 (fastmath-proxy :one atanh)
 
-;; Quick and less accurate `sin` and `cos`
-(fastmath-proxy :one qsin sinQuick)
-(fastmath-proxy :one qcos cosQuick)
+(fastmath-proxy :one ^{:doc "Fast and less accurate [[sin]]."} qsin sinQuick)
+(fastmath-proxy :one ^{:doc "Fast and less accurate [[qcos]]."} qcos cosQuick)
+
+(add-examples qsin
+  (example "[[sin]]" (sin 1.123))
+  (example "[[qsin]]" (qsin 1.123)))
+
+(add-examples qcos
+  (example "[[cos]]" (cos 1.123))
+  (example "[[qcos]]" (qcos 1.123)))
 
 ;; Additional trigonometry functions
-(defn cot ^double [^double v] (FastMath/tan (- HALF_PI v)))
-(defn sec ^double [^double v] (/ (FastMath/cos v)))
-(defn csc ^double [^double v] (/ (FastMath/sin v)))
+(defn ^{:doc "Cotangent"} cot ^double [^double v] (FastMath/tan (- HALF_PI v)))
+(defn ^{:doc "Secant"} sec ^double [^double v] (/ (FastMath/cos v)))
+(defn ^{:doc "Cosecant"} csc ^double [^double v] (/ (FastMath/sin v)))
 
 ;; Additional cyclometric functions
-(defn acot ^double [^double v] (- HALF_PI (FastMath/atan v)))
-(defn asec ^double [^double v] (FastMath/acos (/ 1.0 v)))
-(defn acsc ^double [^double v] (FastMath/asin (/ 1.0 v)))
+(defn ^{:doc "Arccotangent"} acot ^double [^double v] (- HALF_PI (FastMath/atan v)))
+(defn ^{:doc "Arcsecant"} asec ^double [^double v] (FastMath/acos (/ 1.0 v)))
+(defn ^{:doc "Arccosecant"} acsc ^double [^double v] (FastMath/asin (/ 1.0 v)))
 (fastmath-proxy :two atan2)
 
 ;; Additional hyperbolic functions
-(defn coth ^double [^double v] (/ (FastMath/tanh v)))
-(defn sech ^double [^double v] (/ (FastMath/cosh v)))
-(defn csch ^double [^double v] (/ (FastMath/sinh v)))
+(defn ^{:doc "Hyperbolic cotangent"} coth ^double [^double v] (/ (FastMath/tanh v)))
+(defn ^{:doc "Hyperbolic secant"} sech ^double [^double v] (/ (FastMath/cosh v)))
+(defn ^{:doc "Hyperbolic cosecant"} csch ^double [^double v] (/ (FastMath/sinh v)))
 
 ;; Additional inverse hyperbolic functions
-(defn acoth ^double [^double v] (FastMath/atanh (/ v)))
-(defn asech ^double [^double v] (FastMath/acosh (/ v)))
-(defn acsch ^double [^double v] (FastMath/asinh (/ v)))
+(defn ^{:doc "Area hyperbolic cotangent"} acoth ^double [^double v] (FastMath/atanh (/ v)))
+(defn ^{:doc "Area hyperbolic secant"} asech ^double [^double v] (FastMath/acosh (/ v)))
+(defn ^{:doc "Area hyperbolic cosecant"} acsch ^double [^double v] (FastMath/asinh (/ v)))
 
 ;; exp and log
 (fastmath-proxy :one exp)
 (fastmath-proxy :one log)
-(fastmath-proxy :one log10)
+(fastmath-proxy :one ^{:doc "\\\\(\\ln_{10}{x}\\\\)"} log10)
 ;; Alias for natural logarithm
 (fastmath-proxy :one ln log)
 
 ;; Roots (square and cubic)
-(fastmath-proxy :one sqrt)
-(fastmath-proxy :one cbrt)
+(fastmath-proxy :one ^{:doc "\\\\(\\sqrt{x}\\\\)"} sqrt)
+(fastmath-proxy :one ^{:doc "\\\\(\\sqrt[3]{x}\\\\)"} cbrt)
 
 ;; Quick version of exponential \\(e^x\\)
-(fastmath-proxy :one qexp expQuick)
+(fastmath-proxy :one ^{:doc "Quick and less accurate version of [[exp]] \\\\(\\exp{x}\\\\)"} qexp expQuick)
+
+(add-examples qexp
+  (example "[[exp]]" (exp 1.123))
+  (example "[[qexp]]" (qexp 1.123)))
 
 ;; Radians to degrees (and opposite) conversions
-(def ^:const ^double rad-in-deg (/ 180.0 PI))
-(def ^:const ^double deg-in-rad (/ PI 180.0))
+(def ^:const ^double ^{:doc "\\\\(\\frac{180.0}{\\pi}\\\\)"} rad-in-deg (/ 180.0 PI))
+(def ^:const ^double ^{:doc "\\\\(\\frac{\\pi}{180.0}\\\\)"} deg-in-rad (/ PI 180.0))
 (defn ^{:doc "Convert degrees into radians."
         :examples [(example "Let's convert 180 degrees to radians." (radians 180))]}
   radians ^double [^double deg] (* deg-in-rad deg))
@@ -243,14 +269,14 @@
   degrees ^double [^double rad] (* rad-in-deg rad))
 
 ;; Erf
-(erf-proxy :onetwo erf)
-(erf-proxy :one erfc)
-(erf-proxy :one inv-erf erfInv)
-(erf-proxy :one inv-erfc erfcInv)
+(erf-proxy :onetwo ^{:doc "Error function. For two arguments return difference between `(erf x)` and `(erf y)`."} erf)
+(erf-proxy :one ^{:doc "Complementary error function."} erfc)
+(erf-proxy :one ^{:doc "Inverse [[erf]]."} inv-erf erfInv)
+(erf-proxy :one ^{:doc "Inverse [[erfc]]."} inv-erfc erfcInv)
 
 ;; Sinc
 (defn sinc
-  "Sinc function"
+  "Sinc function."
   ^double [^double v]
   (let [x (* PI (FastMath/abs v))]
     (if (< x 1.0e-5) 1.0
@@ -263,36 +289,48 @@
 (def ^:const ^double ^{:doc "\\\\(\\frac{1.0}{\\ln{0.5}}\\\\)"} INV_LOG_HALF (/ (log 0.5)))
 
 (defn log2
-  "Log with base 2. \\\\(\\ln_2{x}\\\\)"
+  "Logarithm with base 2.
+
+  \\\\(\\ln_2{x}\\\\)"
   ^double [^double x]
   (* (FastMath/log x) INV_LN2))
 
 ;; \\(\log_b x\\)
 (defn logb
-  "Logarithm with base. \\\\(\\ln_b{x}\\\\)"
+  "Logarithm with base `b`.
+
+  \\\\(\\ln_b{x}\\\\)"
   ^double [^double b ^double x]
   (/ (FastMath/log x) (FastMath/log b)))
 
 ;; Quick logarithm
-(fastmath-proxy :one qlog logQuick)
+(fastmath-proxy :one ^{:doc "Fast and less accurate version of [[log]]."} qlog logQuick)
+
+(add-examples qlog
+  (example "[[log]]" (log 23.123))
+  (example "[[qlog]]" (qlog 23.123)))
 
 ;; \\(\log_2 e\\)
-(def ^:const ^double LOG2E (log2 E))
+(def ^:const ^double ^{:doc "\\\\(\\log_{2}{e}\\\\)"} LOG2E (log2 E))
 
 ;; \\(\log_{10} e\\)
-(def ^:const ^double LOG10E (log10 E))
+(def ^:const ^double ^{:doc "\\\\(\\log_{10}{e}\\\\)"} LOG10E (log10 E))
 
 ;; Powers (normal, quick)
 (fastmath-proxy :two pow)
-(fastmath-proxy :two qpow powQuick)
+(fastmath-proxy :two ^{:doc "Fast and less accurate version of [[pow]]."} qpow powQuick)
+
+(add-examples qpow
+  (example "[[pow]]" (pow 1.23 43.3))
+  (example "[[qpow]]" (qpow 1.23 43.3)))
 
 ;; Fast version of power, second parameter should be integer
-(fastmath-proxy :two fpow powFast)
+(fastmath-proxy :two ^{:doc "Fast version of pow where exponent is integer."} fpow powFast)
 
 ;; Square and cubic
-(defn sq ^double [^double v] (* v v))
-(defn pow2 ^double [^double v] (* v v))
-(defn pow3 ^double [^double v] (* v (* v v)))
+(defn sq "Same as [[pow2]]. \\\\(x^2\\\\)" ^double [^double x] (* x x))
+(defn pow2 "Same as [[sq]]. \\\\(x^2\\\\)" ^double [^double x] (* x x))
+(defn pow3 "\\\\(x^3\\\\)" ^double [^double x] (* x (* x x)))
 
 (defn safe-sqrt
   "Safe sqrt, for value <= 0 result is 0.
@@ -309,12 +347,15 @@
   (if (neg? value) 0.0 (sqrt value)))
 
 ;; Approximated sqrt via binary operations (error 1.0E-2)
-(fastmath-proxy :one qsqrt sqrtQuick)
-(fastmath-proxy :one rqsqrt invSqrtQuick)
+(fastmath-proxy :one ^{:doc "Approximated [[sqrt]] using binary operations with error `1.0E-2`."} qsqrt sqrtQuick)
+(fastmath-proxy :one ^{:doc "Inversed version of [[qsqrt]]. Quick and less accurate."} rqsqrt invSqrtQuick)
 
-;; \\(\sqrt{x^2+y^2}\\) and \\(\sqrt{x^2+y^2+z^2}\\)
+(add-examples qsqrt
+  (example "[[sqrt]]" (sqrt 23.123))
+  (example "[[qsqrt]]" (qsqrt 23.123)))
+
 (defn hypot
-  "SQRT version of hypot - fast, not safe, \\\\(\\sqrt{x^2+y^2}\\\\)"
+  "Hypot as \\\\(\\sqrt{x^2+y^2}\\\\) or \\\\(\\sqrt{x^2+y^2+z^2}\\\\)"
   (^double [^double x ^double y]
    (sqrt (+ (* x x) (* y y))))
   (^double [^double x ^double y ^double z]
@@ -325,57 +366,87 @@
 
 ;; distance
 (defn dist
-  "Distance between points 2d"
+  "Euclidean distance between points `(x1,y1)` and `(x2,y2)`. See [[clojure2d.math.vector]] namespace to see other metrics which work on vectors."
+  {:examples [(example "Distance between two points." (dist 1 3 -2 10))]}
   ^double [^double x1 ^double y1 ^double x2 ^double y2]
   (sqrt (+ (sq (- x2 x1)) (sq (- y2 y1)))))
 
 (defn qdist
-  "Quick version of distance between points 2d"
+  "Quick version of distance between points. [[qsqrt]] is used instead of [[sqrt]]."
+  {:examples [(example "Distance between two points (quick version)." (qdist 1 3 -2 10))
+              (example "Distance between two points (accurate version)." (dist 1 3 -2 10))]}
   ^double [^double x1 ^double y1 ^double x2 ^double y2]
   (qsqrt (+ (sq (- x2 x1)) (sq (- y2 y1)))))
 
 ;; Rounding functions
-(defn floor ^double [^double v] (FastMath/floor v))
-(defn ceil ^double [^double v] (FastMath/ceil v))
-(defn round ^long [^double v] (FastMath/round v))
-(fastmath-proxy :one rint)
+(defn floor "\\\\(\\lfloor x \\rfloor\\\\)" ^double [^double x] (FastMath/floor x))
+(defn ceil "\\\\(\\lceil x \\ceil\\\\)" ^double [^double x] (FastMath/ceil x))
+(defn ^{:doc "Round to `long`. See [[rint]]."
+        :examples [(example "Round long." (round PI))]} round ^long [^double x] (FastMath/round x))
+(defn ^{:doc "Round to `double`. See [[round]]."
+        :examples [(example "Round to double." (rint PI))]} rint ^double [^double x] (FastMath/rint x))
 
-;; Modulo and abs
-(fastmath-proxy :two remainder)
-(defn abs ^double [^double v] (FastMath/abs v))
-(fastmath-proxy :one iabs)
+(fastmath-proxy :two ^{:doc "From `FastMath` doc: returns dividend - divisor * n,
+where n is the mathematical integer closest to dividend/divisor. Returned value in `[-|divisor|/2,|divisor|/2]`"} remainder)
 
-;; truncate fractional part, keep sign
-(defn trunc ^double [^double v] (if (neg? v) (ceil v) (floor v)))
+(add-examples remainder
+  (example "Remainder" (remainder 3.123 0.2))
+  (example "Comparing to [[rem]]" (rem 3.123 0.2)))
+
+(defn abs "\\\\(|x|\\\\) - `double` version. See [[iabs]]." ^double [^double x] (FastMath/abs x))
+(defn iabs "\\\\(|x|\\\\) - `long` version. See [[abs]]." ^long [^long x] (if (neg? x) (- x) x))
+
+(defn trunc "Truncate fractional part, keep sign." ^double [^double v] (if (neg? v) (ceil v) (floor v)))
 
 ;; return approximate value
 (defn approx
+  "Round give value to specified (default: 2) decimal places. Be aware of `double` number accuracy."
+  {:examples [(example "Default rounding (2 digits)." (approx 1.232323))
+              (example "Rounding up to 4 digits. You can see `double` accuracy errors." (approx 1.232323 4))]}
   (^double [^double v] (/ (FastMath/round (* 100.0 v)) 100.0))
   (^double [^double v ^long digits]
    (let [sc (pow 10.0 digits)]
      (/ (FastMath/round (* sc v)) sc))))
 
 (defn approx-eq
-  "Checks equality with approximation."
+  "Checks equality approximately. See [[approx]]."
+  {:examples [(example "Default rounding (2 digits)." (approx-eq 1.232323 1.231999))
+              (example "Rounding up to 4 digits." (approx-eq 1.232323 1.23231999 4))
+              (example "Keep an eye on rounding" (approx-eq 1.2349 1.2350))]}
   ([^double a ^double b] (== (approx a) (approx b)))
   ([^double a ^double b ^long digits] (== (approx a digits)
                                           (approx b digits))))
 
-;; fractional part, always returns values from 0.0 to 1.0 (exclusive)
-(defn frac ^double [^double v] (abs (- v (unchecked-long v))))
-;; as above but keep sign
-(defn sfrac ^double [^double v] (- v (trunc v)))
+(defn frac
+  "Fractional part, always returns values from 0.0 to 1.0 (exclusive). See [[sfrac]] for signed version."
+  ^double [^double v] (abs (- v (unchecked-long v))))
+
+(defn sfrac
+  "Fractional part, always returns values from -1.0 to 1.0 (exclusive). See [[frac]] for unsigned version."
+  ^double [^double v] (- v (trunc v)))
 
 ;; Find power of 2 exponent for double number where  
 ;; \\(2^(n-1)\leq x\leq 2^n\\)  
 ;; where n-1 is result of `low-2-exp` and n is result of `high-2-exp`
 ;; `(low-2-exp TWO_PI) => 2` \\(2^2\eq 4\leq 6.28\\)  
 ;; `(high-2-exp TWO_PI) => 3` \\(6.28\leq 2^3\eq 8\\)
-(defn low-2-exp ^long [v] (-> v log2 floor unchecked-long))
-(defn high-2-exp ^long [v] (-> v log2 ceil unchecked-long))
+(defn low-2-exp
+  "Find greatest power of 2 exponent which is lower than `x`. See [[high-2-exp]]."
+  {:examples [(example "Result 4 means, that \\\\(2^4=16\\\\) is lower than 23.11. Next exponent (5) gives greater value (32)." (low-2-exp 23.11))
+              (example "For `x` less than 1.0 gives negative exponent." (low-2-exp 0.11))]}
+  ^long [^double x] (-> x log2 floor unchecked-long))
+
+(defn high-2-exp
+  "Find lowest power of 2 exponent which is greater than `x`. See [[low-2-exp]]."
+  {:examples [(example "Result 5 means, that \\\\(2^5=32\\\\) is greater than 23.11. Lower exponent (4) gives lower value (16)." (high-2-exp 23.11))
+              (example "For `x` less than 1.0 gives negative exponent." (high-2-exp 0.11))]}
+  ^long [^double v] (-> v log2 ceil unchecked-long))
 
 (defn round-up-pow2
   "Round long to the next power of 2"
+  {:examples [(example "Example 1" (round-up-pow2 1023))
+              (example "Example 2" (round-up-pow2 1024))
+              (example "Example 3" (round-up-pow2 1025))]}
   ^long [^long v]
   (as-> (dec v) v
     (bit-or v (>> v 1))
@@ -387,7 +458,9 @@
     (inc v)))
 
 (defn next-float-up
-  "Next double value."
+  "Next double value. Optional value `delta` sets step amount."
+  {:examples [(example "Next double." (next-float-up 1234.56789))
+              (example "Next double with delta." (next-float-up 1234.56789 1000))]}
   (^double [^double v]
    (let [ui (Double/doubleToRawLongBits (if (zero? v) 0.0 v))]
      (Double/longBitsToDouble (if (neg? v) (dec ui) (inc ui)))))
@@ -396,7 +469,9 @@
      (Double/longBitsToDouble (if (neg? v) (- ui delta) (+ ui delta))))))
 
 (defn next-float-down
-  "Prev double value."
+  "Previous double value. Optional value `delta` sets step amount."
+  {:examples [(example "Prev. double." (next-float-down 1234.56789))
+              (example "Prev. double with delta." (next-float-down 1234.56789 1000))]}
   (^double [^double v]
    (let [ui (Double/doubleToRawLongBits (if (zero? v) 0.0 v))]
      (Double/longBitsToDouble (if (pos? v) (dec ui) (inc ui)))))
@@ -736,7 +811,7 @@
 
 (defn use-primitive-operators
   "Replaces Clojure's arithmetic and number coercion functions with primitive equivalents.  These are
-   defined as macros, so they cannot be used as higher-order functions.  This is an idempotent operation.."
+   defined as macros, so they cannot be used as higher-order functions.  This is an idempotent operation."
   []
   (when-not (using-primitive-operators?)
     (doseq [v vars-to-exclude]
@@ -744,7 +819,7 @@
     (require (vector 'clojure2d.math :refer vars-to-exclude))))
 
 (defn unuse-primitive-operators
-  "Undoes the work of `use-primitive-operators`.  This is idempotent."
+  "Undoes the work of [[use-primitive-operators]]. This is idempotent."
   []
   (when (using-primitive-operators?)
     (doseq [v vars-to-exclude]
@@ -752,6 +827,23 @@
     (refer 'clojure.core)))
 
 
-;;;;;
+;;;;; Alter documentation
+
+(defmacro ^:private generate-graph-examples
+  "Add graph examples to given symbols"
+  [& xs]
+  (let [lst (for [x xs
+                  :let [d (str "`" x "` graph")
+                        n (str "m/" x ".png")]]
+              `(add-examples ~x (example-image ~d ~n)))]
+    `(do ~@lst)))
+
+(generate-graph-examples sin cos tan cot sec csc asin acos atan acot asec acsc
+                         sinh cosh tanh coth sech csch asinh acosh atanh acoth asech acsch
+                         qsin qcos exp log log10 ln sqrt cbrt qexp
+                         erf erfc inv-erf inv-erfc sinc log2 qlog
+                         sq pow2 pow3 safe-sqrt floor ceil round rint abs iabs trunc
+                         frac sfrac low-2-exp high-2-exp round-up-pow2 next-float-up next-float-down
+                         signum sgn)
 
 (alter-docs)
