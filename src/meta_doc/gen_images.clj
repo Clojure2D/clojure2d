@@ -99,7 +99,7 @@
 
 (def math-names ["m/sin" "m/cos" "m/tan" "m/cot" "m/sec" "m/csc" "m/asin" "m/acos" "m/atan" "m/acot" "m/asec" "m/acsc"
                  "m/sinh" "m/cosh" "m/tanh" "m/coth" "m/sech" "m/csch" "m/asinh" "m/acosh" "m/atanh" "m/acoth" "m/asech" "m/acsch"
-                 "m/qsin" "m/qcos" "m/exp" "m/log" "m/log10" "m/ln" "m/sqrt" "m/cbrt" "m/qexp"
+                 "m/qsin" "m/qcos" "m/exp" "m/log" "m/log10" "m/ln" "m/sqrt" "m/cbrt" "m/qexp" "m/qsqrt" "m/rqsqrt"
                  "m/erf" "m/erfc" "m/inv-erf" "m/inv-erfc" "m/sinc" "m/log2" "m/qlog"
                  "m/sq" "m/pow2" "m/pow3" "m/safe-sqrt" "m/floor" "m/ceil" "m/round" "m/rint" "m/abs" "m/iabs" "m/trunc"
                  "m/frac" "m/sfrac" "m/low-2-exp" "m/high-2-exp" "m/round-up-pow2" "m/next-float-up" "m/next-float-down"

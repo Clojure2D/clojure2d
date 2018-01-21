@@ -49,7 +49,7 @@
 
   #### Graphs
 
-  Generated graphs are from range [-3.2, 3.2].
+  Generated graphs are from range `[-3.2, 3.2]` or `[-0.05, 1].
   "
   (:require [meta-doc.core :refer :all]
             [clojure2d.math :as m])
@@ -167,7 +167,7 @@
 (variadic-predicate-proxy > gt)
 (variadic-predicate-proxy <= lte)
 (variadic-predicate-proxy >= gte)
-(variadic-predicate-proxy == eq)
+(variadic-predicate-proxy ^{:doc "Equality. See also [[eq]] for function version."} == eq)
 (variadic-predicate-proxy not== neq)
 
 ;; ## Math functions
@@ -177,9 +177,9 @@
 
 ;; Processing math constants
 (def ^:const ^double ^{:doc "Value of \\\\(\\pi\\\\)"} PI Math/PI)
-(def ^:const ^double ^{:doc "Value of \\\\(\\frac{\\pi}{2.0}\\\\)"} HALF_PI (/ PI 2.0))
-(def ^:const ^double ^{:doc "Value of \\\\(\\frac{\\pi}{3.0}\\\\)"} THIRD_PI (/ PI 3.0))
-(def ^:const ^double ^{:doc "Value of \\\\(\\frac{\\pi}{4.0}\\\\)"} QUARTER_PI (/ PI 4.0))
+(def ^:const ^double ^{:doc "Value of \\\\(\\frac{\\pi}{2}\\\\)"} HALF_PI (/ PI 2.0))
+(def ^:const ^double ^{:doc "Value of \\\\(\\frac{\\pi}{3}\\\\)"} THIRD_PI (/ PI 3.0))
+(def ^:const ^double ^{:doc "Value of \\\\(\\frac{\\pi}{4}\\\\)"} QUARTER_PI (/ PI 4.0))
 (def ^:const ^double ^{:doc "Value of \\\\(2 {\\pi}\\\\)"} TWO_PI (* PI 2.0))
 (def ^:const ^double ^{:doc "Alias for [[TWO_PI]]"}TAU TWO_PI)
 (def ^:const ^double ^{:doc "Value of \\\\(e\\\\)"} E Math/E)
@@ -191,9 +191,9 @@
                                    (if (not== 1.0 (+ 1.0 (* d 0.5)))
                                      (recur (* d 0.5))
                                      d)))))
-(def ^:const ^double ^{:doc "Value of \\\\(\\frac{1.0}{3.0}\\\\)"} THIRD (/ 3.0))
-(def ^:const ^double ^{:doc "Value of \\\\(\\frac{2.0}{3.0}\\\\)"} TWO_THIRD (/ 2.0 3.0))
-(def ^:const ^double ^{:doc "Value of \\\\(\\frac{1.0}{6.0}\\\\)"} SIXTH (/ 6.0))
+(def ^:const ^double ^{:doc "Value of \\\\(\\frac{1}{3}\\\\)"} THIRD (/ 3.0))
+(def ^:const ^double ^{:doc "Value of \\\\(\\frac{2}{3}\\\\)"} TWO_THIRD (/ 2.0 3.0))
+(def ^:const ^double ^{:doc "Value of \\\\(\\frac{1}{6}\\\\)"} SIXTH (/ 6.0))
 
 ;; Trigonometry
 (fastmath-proxy :one sin)
@@ -210,7 +210,7 @@
 (fastmath-proxy :one atanh)
 
 (fastmath-proxy :one ^{:doc "Fast and less accurate [[sin]]."} qsin sinQuick)
-(fastmath-proxy :one ^{:doc "Fast and less accurate [[qcos]]."} qcos cosQuick)
+(fastmath-proxy :one ^{:doc "Fast and less accurate [[cos]]."} qcos cosQuick)
 
 (add-examples qsin
   (example "[[sin]]" (sin 1.123))
@@ -253,15 +253,15 @@
 (fastmath-proxy :one ^{:doc "\\\\(\\sqrt[3]{x}\\\\)"} cbrt)
 
 ;; Quick version of exponential \\(e^x\\)
-(fastmath-proxy :one ^{:doc "Quick and less accurate version of [[exp]] \\\\(\\exp{x}\\\\)"} qexp expQuick)
+(fastmath-proxy :one ^{:doc "Quick and less accurate version of [[exp]]."} qexp expQuick)
 
 (add-examples qexp
   (example "[[exp]]" (exp 1.123))
   (example "[[qexp]]" (qexp 1.123)))
 
 ;; Radians to degrees (and opposite) conversions
-(def ^:const ^double ^{:doc "\\\\(\\frac{180.0}{\\pi}\\\\)"} rad-in-deg (/ 180.0 PI))
-(def ^:const ^double ^{:doc "\\\\(\\frac{\\pi}{180.0}\\\\)"} deg-in-rad (/ PI 180.0))
+(def ^:const ^double ^{:doc "\\\\(\\frac{180}{\\pi}\\\\)"} rad-in-deg (/ 180.0 PI))
+(def ^:const ^double ^{:doc "\\\\(\\frac{\\pi}{180}\\\\)"} deg-in-rad (/ PI 180.0))
 (defn ^{:doc "Convert degrees into radians."
         :examples [(example "Let's convert 180 degrees to radians." (radians 180))]}
   radians ^double [^double deg] (* deg-in-rad deg))
@@ -283,11 +283,11 @@
     (if (< x 1.0e-5) 1.0
         (/ (FastMath/sin x) x))))
 
-(def ^:const ^double ^{:doc "\\\\(\\ln{2.0}\\\\)"} LN2 (log 2.0))
-(def ^:const ^double ^{:doc "\\\\(\\frac{1.0}{\\ln{2.0}}\\\\)"} INV_LN2 (/ LN2))
-(def ^:const ^double ^{:doc "\\\\(\\frac{\\ln{2.0}}{2.0}\\\\)"} LN2_2 (* 0.5 LN2))
-(def ^:const ^double ^{:doc "\\\\(\\ln{10.0}\\\\)"} LN10 (log 10.0))
-(def ^:const ^double ^{:doc "\\\\(\\frac{1.0}{\\ln{0.5}}\\\\)"} INV_LOG_HALF (/ (log 0.5)))
+(def ^:const ^double ^{:doc "\\\\(\\ln{2}\\\\)"} LN2 (log 2.0))
+(def ^:const ^double ^{:doc "\\\\(\\frac{1}{\\ln{2}}\\\\)"} INV_LN2 (/ LN2))
+(def ^:const ^double ^{:doc "\\\\(\\frac{\\ln{2}}{2}\\\\)"} LN2_2 (* 0.5 LN2))
+(def ^:const ^double ^{:doc "\\\\(\\ln{10}\\\\)"} LN10 (log 10.0))
+(def ^:const ^double ^{:doc "\\\\(\\frac{1}{\\ln{0.5}}\\\\)"} INV_LOG_HALF (/ (log 0.5)))
 
 (defn log2
   "Logarithm with base 2.
@@ -381,7 +381,7 @@
 
 ;; Rounding functions
 (defn floor "\\\\(\\lfloor x \\rfloor\\\\)" ^double [^double x] (FastMath/floor x))
-(defn ceil "\\\\(\\lceil x \\ceil\\\\)" ^double [^double x] (FastMath/ceil x))
+(defn ceil "\\\\(\\lceil x \\rceil\\\\)" ^double [^double x] (FastMath/ceil x))
 (defn ^{:doc "Round to `long`. See [[rint]]."
         :examples [(example "Round long." (round PI))]} round ^long [^double x] (FastMath/round x))
 (defn ^{:doc "Round to `double`. See [[round]]."
@@ -401,7 +401,7 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 ;; return approximate value
 (defn approx
-  "Round give value to specified (default: 2) decimal places. Be aware of `double` number accuracy."
+  "Round `v` to specified (default: 2) decimal places. Be aware of `double` number accuracy."
   {:examples [(example "Default rounding (2 digits)." (approx 1.232323))
               (example "Rounding up to 4 digits. You can see `double` accuracy errors." (approx 1.232323 4))]}
   (^double [^double v] (/ (FastMath/round (* 100.0 v)) 100.0))
@@ -553,11 +553,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
   ^double [^double value]
   (if (neg? value) -1.0 1.0))
 
-;;`(constrain 0.5 1 2) => 1`  
-;;`(constrain 1.5 1 2) => 1.5`  
-;;`(constrain 2.5 1 2) => 2`  
 (defmacro constrain
-  "Clamp `value` to the range [`mn`,`mx`]."
+  "Clamp `value` to the range `[mn,mx]`."
   [value mn mx]
   `(max (min ~value ~mx) ~mn))
 
@@ -574,7 +571,7 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
      (/ (- ~v ~start) (- ~stop ~start))))
 
 (defn norm
-  "Normalize `v` from the range [`start`,`stop`] to the range [`0`,`1`] or map `v` from the range [`start1`,`stop1`] to the range [`start2`,`stop2`]. See also [[make-norm]]."
+  "Normalize `v` from the range `[start,stop]` to the range `[0,1]` or map `v` from the range `[start1,stop1]` to the range `[start2,stop2]`. See also [[make-norm]]."
   {:examples [(example "Normalize from [1,-1] to [0,1]" (norm 0.234 -1.0 1.0))
               (example "Normalize from [-1,1] to [0,1]" (norm 0.234 1.0 -1.0))
               (example "Normalize cos() to [0,255]" (norm (cos HALF_PI) -1.0 1.0 0.0 255.0))
@@ -585,7 +582,7 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
    (+ ^double start2 (* (- ^double stop2 ^double start2) (normalize-macro ^double v ^double start1 ^double stop1)))))
 
 (defn make-norm
-  "Make [[norm]] function for given range. Resulting function accepts `double` value (with optional target [`dstart`,`dstop`] range) and returns `double`."
+  "Make [[norm]] function for given range. Resulting function accepts `double` value (with optional target `[dstart,dstop]` range) and returns `double`."
   {:examples [(example "Make cos() normalizer from [-1.0,1.0] to [0.0, 1.0]." (let [norm-cos (make-norm -1.0 1.0 0.0 1.0)]
                                                                                 (norm-cos (cos 2.0))))
               (example "Make normalizer from [0,255] to any range." (let [norm-0-255 (make-norm 0 255)]
@@ -604,7 +601,7 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
          (+ dstart (* d vn)))))))
 
 (defn cnorm
-  "Constrained version of norm. Result of [[norm]] is applied to [[constrain]] to [`0`,`1`] or [`start2`,`stop2`] ranges."
+  "Constrained version of norm. Result of [[norm]] is applied to [[constrain]] to `[0,1]` or `[start2,stop2]` ranges."
   {:examples [(example "Constrain result of norm." (cnorm 1.5 0 1 100 200))
               (example "Example 2" (cnorm 555 200 500))]}
   ([v start1 stop1 start2 stop2]
@@ -694,19 +691,26 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
            (- value)))))
 
 ;; gcd SO version
-(defn gcd ^long [^long a ^long b]
-  (if (zero? b)
-    a
-    (recur b (mod a b))))
+(defn gcd
+  "Greatest common divisor."
+  {:examples [(example "Example 1" (gcd 226 339))]}
+  ^long [^long a ^long b] 
+  (if (zero? b) a (recur b (mod a b))))
 
 ;; Primitive math eq
 (defn eq 
-  "Primitive math equality helper for doubles"
-  [^double a ^double b]
-  (== a b))
+  "Primitive math equality function for doubles. See [[==]]." 
+  ([^double a] true)
+  ([^double a ^double b]
+   (== a b))
+  ([^double a ^double b ^double c]
+   (bool-and (== a b) (== b c)))
+  ([^double a ^double b ^double c ^double d]
+   (bool-and (== a b) (== b c) (== c d))))
 
 (defn med
-  "MMedian of three values."
+  "Median of three values. See [[median]]."
+  {:examples [(example "Median of [7 1 4]" (med 7 1 4))]}
   ^double [^double a ^double b ^double c]
   (max (min a b) (min (max a b) c)))
 
@@ -726,62 +730,56 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 ;; Additionally you can gather all statistics into one map by calling `stats-map` functions
 ;;
 
-;; `(mode '(1 2 3 -1 -1 2 -1 11 111)) => -1`
 (defn mode
-  "Find the value that appears most often in a dataset"
+  "Find the value that appears most often in a dataset `vs`."
+  {:examples [(example "Example 1" (mode [1 2 3 -1 -1 2 -1 11 111]))
+              (example "Return last element when every element appears equally." (mode [5 1 2 3 4]))]}
   [vs]
   (let [fs (frequencies vs)]
     (first (last (sort-by second fs)))))
 
-;; `(quantile 0.25 '(1 2 3 -1 -1 2 -1 11 111)) => -1.0`
-;; `(quantile 0.75 '(1 2 3 -1 -1 2 -1 11 111)) => 7.0`
-;; `(quantile 0.9  '(1 2 3 -1 -1 2 -1 11 111)) => 111`
 (defn quantile
-  "Calculate p-quantile of a list"
+  "Calculate p-quantile (percentile) of a `vs`."
+  {:examples [(example "Quantile 0.25" (quantile 0.25 [1 2 3 -1 -1 2 -1 11 111]))
+              (example "Quantile 0.5 (median)" (quantile 0.5 [1 2 3 -1 -1 2 -1 11 111]))
+              (example "Quantile 0.75" (quantile 0.75 [1 2 3 -1 -1 2 -1 11 111]))
+              (example "Quantile 0.9" (quantile 0.9 [1 2 3 -1 -1 2 -1 11 111]))]}
   (^double [^double p vs]
-   (let [svs (sort vs)]
-     (quantile p (count vs) svs (first svs) (last svs))))
-  ([p c svs mn mx]
-   (let [pic (* ^double p (inc ^long c))
-         k (round pic)
-         d (- pic k)
-         ^double ndk (if (zero? k) mn (nth svs (dec k)))]
-     (cond
-       (zero? k) mn
-       (== ^long c (dec k)) mx
-       (== ^long c k) mx
-       :else (+ ndk (* d (- ^double (nth svs k) ndk)))))))
+   (let [svs (sort vs)
+         s (count vs)
+         k (constrain (unchecked-int (floor (* p s))) 0 (dec s))]
+     (nth svs k))))
 
-;; `(median '(1 2 3 -1 -1 2 -1 11 111)) => 2.0`
 (defn median
-  "Calculate median of a list"
-  ([vs] (quantile 0.5 vs))
-  ([sz svs mn mx] (quantile 0.5 sz svs mn mx)))
+  "Calculate median of a list. See [[med]]."
+  {:examples [(example "Median (percentile 50%)." (median [1 2 3 -1 -1 2 -1 11 111]))
+              (example "For three elements use faster [[med]]." (median [7 1 4]))]}
+  (^double [vs] (quantile 0.5 vs)))
 
-;; `(mean '(1 2 3 -1 -1 2 -1 11 111)) => 14.11111111111111`
 (defn mean
   "Calculate mean of a list"
-  ([vs] (mean (reduce clojure.core/+ vs) (count vs)))
-  ([^double sm ^long sz] (/ sm sz)))
+  {:examples [(example "Mean (average value)" (mean [1 2 3 -1 -1 2 -1 11 111]))]}
+  (^double [vs] (/ ^double (reduce clojure.core/+ vs) (count vs))))
 
-;; `(standard-deviation '(1 2 3 -1 -1 2 -1 11 111)) => 34.43333154064031`
 (defn standard-deviation
   "Calculate standard deviation of a list"
+  {:examples [(example "Std. dev." (standard-deviation [1 2 3 -1 -1 2 -1 11 111]))]}
   ([vs]
-   (standard-deviation vs (count vs) (mean vs)))
-  ([vs ^long sz ^double u]
-   (sqrt (/ ^double (reduce clojure.core/+ (map #(pow (- ^double % u) 2) vs)) sz))))
+   (standard-deviation vs (mean vs)))
+  ([vs ^double u]
+   (sqrt (/ ^double (reduce clojure.core/+ (map #(pow (- ^double % u) 2) vs)) (count vs)))))
 
-;; `(median-absolute-deviation '(1 2 3 -1 -1 2 -1 11 111))  => 3.0`
-(defn median-absolute-deviation
+(defn median-absolute-deviation 
   "Calculate MAD"
+  {:examples [(example "MAD" (median-absolute-deviation [1 2 3 -1 -1 2 -1 11 111]))]}
   ([vs]
-     (median-absolute-deviation vs (median vs)))
+   (median-absolute-deviation vs (median vs)))
   ([vs ^double m]
-     (median (map #(abs (- ^double % m)) vs))))
+   (median (map #(abs (- ^double % m)) vs))))
 
-;; `(lower-adjacent-value '(1 2 3 -1 -1 2 -1 11 111)) => -1`
 (defn lower-adjacent-value
+  "Lower adjacent value (LAV)."
+  {:examples [(example "LAV" (lower-adjacent-value [1 2 3 -1 -1 2 -1 11 111]))]}
   ([vs]
    (let [q1 (quantile 0.25 vs)
          m (median vs)
@@ -791,35 +789,36 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
    (let [l (- m qd)]
      (first (filter (partial clojure.core/< l) svs)))))
 
-;; `(upper-adjacent-value '(1 2 3 -1 -1 2 -1 11 111)) => 3`
 (defn upper-adjacent-value
+  "Upper adjacent value (UAV)."
+  {:examples [(example "UAV" (upper-adjacent-value [1 2 3 -1 -1 2 -1 11 111]))]}
   ([vs]
-     (let [q1 (quantile 0.25 vs)
-           m (median vs)
-           q3 (quantile 0.75 vs)]
-       (upper-adjacent-value (reverse (sort vs)) m (- q3 q1))))
+   (let [q1 (quantile 0.25 vs)
+         m (median vs)
+         q3 (quantile 0.75 vs)]
+     (upper-adjacent-value (reverse (sort vs)) m (- q3 q1))))
   ([rsvs ^double m ^double qd]
-     (let [l (+ m qd)]
-       (first (filter #(< ^double % l) rsvs)))))
+   (let [l (+ m qd)]
+     (first (filter #(< ^double % l) rsvs)))))
 
-;; `(stats-map '(1 2 3 -1 -1 2 -1 11 111))`
-;; `=> {:MAD 3.0, :Max 111, :Size 9, :LAV -1, :Mode -1, :Mean 14.11111111111111, :Q1 -1.0, :Q3 7.0, :Min -1, :Total 127, :SD 34.43333154064031, :UAV 3, :Median 2.0}`
 (defn stats-map
-  "Calculate several statistics from the list and return as map"
+  "Calculate several statistics from the list and return as map."
+  {:examples [(example "Stats" (stats-map [1 2 3 -1 -1 2 -1 11 111]))
+              (example "Select keys" (stats-map [:Mean :Q1 :Q3] [1 2 3 -1 -1 2 -1 11 111]))]}
   ([vs]
    (let [sz (count vs)
          svs (sort vs)
          rsvs (reverse svs)
          mn (first svs)
          mx (first rsvs)
-         sm (reduce clojure.core/+ vs)
-         u (mean sm sz)
-         mdn (median sz svs mn mx)
-         q1 (quantile 0.25 sz svs mn mx)
-         q3 (quantile 0.75 sz svs mn mx)
-         sd (standard-deviation vs sz u)
+         ^double sm (reduce clojure.core/+ vs)
+         u (/ sm sz)
+         mdn (median vs)
+         q1 (quantile 0.25 vs)
+         q3 (quantile 0.75 vs)
+         sd (standard-deviation vs u)
          mad (median-absolute-deviation vs mdn)
-         qd (- ^double q3 ^double q1)
+         qd (- q3 q1)
          lav (lower-adjacent-value svs mdn qd)
          uav (upper-adjacent-value rsvs mdn qd)]
      {:Size sz
@@ -845,6 +844,7 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 ;; `(k-means 4 '(1 2 3 -1 -1 2 -1 11 111)) => (-1.0 2.0 11.0 111.0)`
 (defn k-means
   "k-means clustering"
+  {:examples [(example "Reduce to 4 values." (k-means 4 [1 2 3 -1 -1 2 -1 11 111]))]}
   [^long k vs]
   (let [vs (map double vs)
         svs (set vs)]
@@ -884,7 +884,6 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
       (ns-unmap *ns* v))
     (refer 'clojure.core)))
 
-
 ;;;;; Alter documentation
 
 (defmacro ^:private generate-graph-examples
@@ -898,7 +897,7 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (generate-graph-examples sin cos tan cot sec csc asin acos atan acot asec acsc
                          sinh cosh tanh coth sech csch asinh acosh atanh acoth asech acsch
-                         qsin qcos exp log log10 ln sqrt cbrt qexp
+                         qsin qcos exp log log10 ln sqrt cbrt qexp qsqrt rqsqrt
                          erf erfc inv-erf inv-erfc sinc log2 qlog
                          sq pow2 pow3 safe-sqrt floor ceil round rint abs iabs trunc
                          frac sfrac low-2-exp high-2-exp round-up-pow2 next-float-up next-float-down
