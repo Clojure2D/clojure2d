@@ -14,7 +14,7 @@
             [clojure2d.extra.raymarching :as r]
             [clojure2d.extra.segmentation :as segm]))
 
-(def ^:dynamic *generate-images* true)
+(def ^:dynamic *generate-images* false)
 
 (defn draw-example
   "Draw example on canvas."
