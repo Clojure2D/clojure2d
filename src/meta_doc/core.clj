@@ -31,8 +31,7 @@
   
   #### Documentation alteration
 
-  Just call [[alter-docs]] in your namespace (or provide ns) to process all examples or additional info. If you want to turn this feature on/off bind [[*alter-docs*]] dynamic variable.
-  " 
+  Just call [[alter-docs]] in your namespace (or provide ns) to process all examples or additional info. If you want to turn this feature on/off bind [[*alter-docs*]] dynamic variable." 
   (:require [clojure.string :as s])
   (:import [java.security MessageDigest]
            [java.math BigInteger]))
@@ -190,16 +189,24 @@
   ([] (alter-docs *ns*))
   ([ns]
    (when *alter-docs*
-     (let [consts (atom (sorted-map))]
+     (let [consts (atom (sorted-map))
+           category-names (assoc (:category (meta ns)) :zzzzzz "Other functions")
+           categories (atom (sorted-map))]
        (doseq [[s v] (ns-publics ns)]
          (let [mv (meta v)]
            (when (and *load-examples* (contains? mv :examples))
              (append-to-doc v (str separator "#### Examples" new-line (examples-info (:examples mv))))) 
-           (when (some mv [:const :tag])
-             (append-to-doc v (str separator "##### Additional info" new-line))
-             (alter-const-info s v)
-             (alter-tag-info s v)
-             (when (:const mv) (swap! consts assoc (str s) (s/escape (str (var-get v)) escape-map))))))
+           (if (some mv [:const :tag])
+             (do
+               (append-to-doc v (str separator "##### Additional info" new-line))
+               (alter-const-info s v)
+               (alter-tag-info s v)
+               (when (:const mv) (swap! consts assoc (str s) (s/escape (str (var-get v)) escape-map))))
+             (when-let [cname (or (:category mv) :zzzzzz)]
+               (swap! categories assoc cname (conj (cname @categories) s))))))
+       (when-not (empty? @categories)
+         (append-to-doc ns (str separator "  #### Categories" separator
+                                (s/join new-line (map (fn [[n v]] (str "  * " (n category-names) ": " (s/join " " (sort (map #(str "[[" % "]]") v))))) @categories)))))
        (when-not (empty? @consts)
          (append-to-doc ns (str separator "  #### Constants" separator
                                 (s/join new-line (map (fn [[n v]] (str "  * [[" n "]] = `" v "`")) @consts)))))))

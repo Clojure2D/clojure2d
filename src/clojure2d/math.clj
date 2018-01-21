@@ -3,7 +3,7 @@
 ;; Collection of math function:
 ;;
 ;; * Several constants from Java, C, Processing, etc.
-;; * Functions based on FastMath exposed as macros or functions (trigonometry, powers/logartihms/roots, rounding)
+;; * Functions based on FastMath exposed as macros or functions (trigonometry, powers/logarithms/roots, rounding)
 ;; * Primitive operators (as in primitive-math package)
 ;; * Additional math functions (signum, constrain, interpolation)
 ;; * Statistics
@@ -49,8 +49,17 @@
 
   #### Graphs
 
-  Generated graphs are from range `[-3.2, 3.2]` or `[-0.05, 1].
-  "
+  Generated graphs are from range `[-3.2, 3.2]` or `[-0.05, 1]."
+  {:category {:trig "Trigonometry"
+              :pow "Powers / logarithms"
+              :conv "Conversions"
+              :err "Error"
+              :dist "Distance"
+              :round "Rounding"
+              :sign "Sign"
+              :stat "Statistics"
+              :bitwise "Bitwise"
+              :mod "Mod"}}
   (:require [meta-doc.core :refer :all]
             [clojure2d.math :as m])
   (:refer-clojure
@@ -138,30 +147,30 @@
 (variadic-proxy / divide (fn [x] `(list 'clojure2d.java.PrimitiveMath/reciprocal ~x)))
 (primitivemath-proxy :one inc)
 (primitivemath-proxy :one dec)
-(primitivemath-proxy :two rem remainder)
-(primitivemath-proxy :two quot quotient)
-(primitivemath-proxy :two mod modulus)
-(variadic-proxy bit-and bitAnd)
-(variadic-proxy bit-or bitOr)
-(variadic-proxy bit-xor bitXor)
-(primitivemath-proxy :one bit-not bitNot)
+(primitivemath-proxy :two ^{:category :mod} rem remainder)
+(primitivemath-proxy :two ^{:category :mod} quot quotient)
+(primitivemath-proxy :two ^{:category :mod} mod modulus)
+(variadic-proxy ^{:category :bitwise} bit-and bitAnd)
+(variadic-proxy ^{:category :bitwise} bit-or bitOr)
+(variadic-proxy ^{:category :bitwise} bit-xor bitXor)
+(primitivemath-proxy :one ^{:category :bitwise} bit-not bitNot)
 (variadic-proxy bool-and and)
 (variadic-proxy bool-or or)
 (variadic-proxy bool-xor xor)
 (primitivemath-proxy :one bool-not not)
-(variadic-proxy min)
-(variadic-proxy max)
+(variadic-proxy ^{:category :stat} min)
+(variadic-proxy ^{:category :stat} max)
 (primitivemath-proxy :one zero? isZero)
 (primitivemath-proxy :one neg? isNeg)
 (primitivemath-proxy :one pos? isPos)
 (primitivemath-proxy :one even? isEven)
 (primitivemath-proxy :one odd? isOdd)
-(primitivemath-proxy :two << shiftLeft)
-(primitivemath-proxy :two >> shiftRight)
-(primitivemath-proxy :two >>> unsignedShiftRight)
-(primitivemath-proxy :two bit-shift-left shiftLeft)
-(primitivemath-proxy :two bit-shift-right shiftRight)
-(primitivemath-proxy :two unsigned-bit-shift-right unsignedShiftRight)
+(primitivemath-proxy :two ^{:category :bitwise} << shiftLeft)
+(primitivemath-proxy :two ^{:category :bitwise} >> shiftRight)
+(primitivemath-proxy :two ^{:category :bitwise} >>> unsignedShiftRight)
+(primitivemath-proxy :two ^{:category :bitwise} bit-shift-left shiftLeft)
+(primitivemath-proxy :two ^{:category :bitwise} bit-shift-right shiftRight)
+(primitivemath-proxy :two ^{:category :bitwise} unsigned-bit-shift-right unsignedShiftRight)
 
 (variadic-predicate-proxy < lt)
 (variadic-predicate-proxy > gt)
@@ -196,21 +205,21 @@
 (def ^:const ^double ^{:doc "Value of \\\\(\\frac{1}{6}\\\\)"} SIXTH (/ 6.0))
 
 ;; Trigonometry
-(fastmath-proxy :one sin)
-(fastmath-proxy :one cos)
-(fastmath-proxy :one tan)
-(fastmath-proxy :one asin)
-(fastmath-proxy :one acos)
-(fastmath-proxy :one atan)
-(fastmath-proxy :one sinh)
-(fastmath-proxy :one cosh)
-(fastmath-proxy :one tanh)
-(fastmath-proxy :one asinh)
-(fastmath-proxy :one acosh)
-(fastmath-proxy :one atanh)
+(fastmath-proxy :one ^{:category :trig} sin)
+(fastmath-proxy :one ^{:category :trig} cos)
+(fastmath-proxy :one ^{:category :trig} tan)
+(fastmath-proxy :one ^{:category :trig} asin)
+(fastmath-proxy :one ^{:category :trig} acos)
+(fastmath-proxy :one ^{:category :trig} atan)
+(fastmath-proxy :one ^{:category :trig} sinh)
+(fastmath-proxy :one ^{:category :trig} cosh)
+(fastmath-proxy :one ^{:category :trig} tanh)
+(fastmath-proxy :one ^{:category :trig} asinh)
+(fastmath-proxy :one ^{:category :trig} acosh)
+(fastmath-proxy :one ^{:category :trig} atanh)
 
-(fastmath-proxy :one ^{:doc "Fast and less accurate [[sin]]."} qsin sinQuick)
-(fastmath-proxy :one ^{:doc "Fast and less accurate [[cos]]."} qcos cosQuick)
+(fastmath-proxy :one ^{:doc "Fast and less accurate [[sin]]." :category :trig} qsin sinQuick)
+(fastmath-proxy :one ^{:doc "Fast and less accurate [[cos]]." :category :trig} qcos cosQuick)
 
 (add-examples qsin
   (example "[[sin]]" (sin 1.123))
@@ -221,39 +230,39 @@
   (example "[[qcos]]" (qcos 1.123)))
 
 ;; Additional trigonometry functions
-(defn ^{:doc "Cotangent"} cot ^double [^double v] (FastMath/tan (- HALF_PI v)))
-(defn ^{:doc "Secant"} sec ^double [^double v] (/ (FastMath/cos v)))
-(defn ^{:doc "Cosecant"} csc ^double [^double v] (/ (FastMath/sin v)))
+(defn ^{:doc "Cotangent" :category :trig} cot ^double [^double v] (FastMath/tan (- HALF_PI v)))
+(defn ^{:doc "Secant" :category :trig} sec ^double [^double v] (/ (FastMath/cos v)))
+(defn ^{:doc "Cosecant" :category :trig} csc ^double [^double v] (/ (FastMath/sin v)))
 
 ;; Additional cyclometric functions
-(defn ^{:doc "Arccotangent"} acot ^double [^double v] (- HALF_PI (FastMath/atan v)))
-(defn ^{:doc "Arcsecant"} asec ^double [^double v] (FastMath/acos (/ 1.0 v)))
-(defn ^{:doc "Arccosecant"} acsc ^double [^double v] (FastMath/asin (/ 1.0 v)))
-(fastmath-proxy :two atan2)
+(defn ^{:doc "Arccotangent" :category :trig} acot ^double [^double v] (- HALF_PI (FastMath/atan v)))
+(defn ^{:doc "Arcsecant" :category :trig} asec ^double [^double v] (FastMath/acos (/ 1.0 v)))
+(defn ^{:doc "Arccosecant" :category :trig} acsc ^double [^double v] (FastMath/asin (/ 1.0 v)))
+(fastmath-proxy :two ^{:category :trig} atan2)
 
 ;; Additional hyperbolic functions
-(defn ^{:doc "Hyperbolic cotangent"} coth ^double [^double v] (/ (FastMath/tanh v)))
-(defn ^{:doc "Hyperbolic secant"} sech ^double [^double v] (/ (FastMath/cosh v)))
-(defn ^{:doc "Hyperbolic cosecant"} csch ^double [^double v] (/ (FastMath/sinh v)))
+(defn ^{:doc "Hyperbolic cotangent" :category :trig} coth ^double [^double v] (/ (FastMath/tanh v)))
+(defn ^{:doc "Hyperbolic secant" :category :trig} sech ^double [^double v] (/ (FastMath/cosh v)))
+(defn ^{:doc "Hyperbolic cosecant" :category :trig} csch ^double [^double v] (/ (FastMath/sinh v)))
 
 ;; Additional inverse hyperbolic functions
-(defn ^{:doc "Area hyperbolic cotangent"} acoth ^double [^double v] (FastMath/atanh (/ v)))
-(defn ^{:doc "Area hyperbolic secant"} asech ^double [^double v] (FastMath/acosh (/ v)))
-(defn ^{:doc "Area hyperbolic cosecant"} acsch ^double [^double v] (FastMath/asinh (/ v)))
+(defn ^{:doc "Area hyperbolic cotangent" :category :trig} acoth ^double [^double v] (FastMath/atanh (/ v)))
+(defn ^{:doc "Area hyperbolic secant" :category :trig} asech ^double [^double v] (FastMath/acosh (/ v)))
+(defn ^{:doc "Area hyperbolic cosecant" :category :trig} acsch ^double [^double v] (FastMath/asinh (/ v)))
 
 ;; exp and log
-(fastmath-proxy :one exp)
-(fastmath-proxy :one log)
-(fastmath-proxy :one ^{:doc "\\\\(\\ln_{10}{x}\\\\)"} log10)
+(fastmath-proxy :one ^{:category :pow} exp)
+(fastmath-proxy :one ^{:category :pow} log)
+(fastmath-proxy :one ^{:doc "\\\\(\\ln_{10}{x}\\\\)" :category :pow} log10)
 ;; Alias for natural logarithm
-(fastmath-proxy :one ln log)
+(fastmath-proxy :one ^{:category :pow} ln log)
 
 ;; Roots (square and cubic)
-(fastmath-proxy :one ^{:doc "\\\\(\\sqrt{x}\\\\)"} sqrt)
-(fastmath-proxy :one ^{:doc "\\\\(\\sqrt[3]{x}\\\\)"} cbrt)
+(fastmath-proxy :one ^{:doc "\\\\(\\sqrt{x}\\\\)" :category :pow} sqrt)
+(fastmath-proxy :one ^{:doc "\\\\(\\sqrt[3]{x}\\\\)" :category :pow} cbrt)
 
 ;; Quick version of exponential \\(e^x\\)
-(fastmath-proxy :one ^{:doc "Quick and less accurate version of [[exp]]."} qexp expQuick)
+(fastmath-proxy :one ^{:doc "Quick and less accurate version of [[exp]]." :category :pow} qexp expQuick)
 
 (add-examples qexp
   (example "[[exp]]" (exp 1.123))
@@ -263,21 +272,24 @@
 (def ^:const ^double ^{:doc "\\\\(\\frac{180}{\\pi}\\\\)"} rad-in-deg (/ 180.0 PI))
 (def ^:const ^double ^{:doc "\\\\(\\frac{\\pi}{180}\\\\)"} deg-in-rad (/ PI 180.0))
 (defn ^{:doc "Convert degrees into radians."
+        :category :conv
         :examples [(example "Let's convert 180 degrees to radians." (radians 180))]}
   radians ^double [^double deg] (* deg-in-rad deg))
 (defn ^{:doc "Convert degrees into radians."
+        :category :conv
         :examples [(example "Let's convert \\\\(\\pi\\\\) radians to degrees." (degrees PI))]}
   degrees ^double [^double rad] (* rad-in-deg rad))
 
 ;; Erf
-(erf-proxy :onetwo ^{:doc "Error function. For two arguments return difference between `(erf x)` and `(erf y)`."} erf)
-(erf-proxy :one ^{:doc "Complementary error function."} erfc)
-(erf-proxy :one ^{:doc "Inverse [[erf]]."} inv-erf erfInv)
-(erf-proxy :one ^{:doc "Inverse [[erfc]]."} inv-erfc erfcInv)
+(erf-proxy :onetwo ^{:doc "Error function. For two arguments return difference between `(erf x)` and `(erf y)`." :category :err} erf)
+(erf-proxy :one ^{:doc "Complementary error function." :category :err} erfc)
+(erf-proxy :one ^{:doc "Inverse [[erf]]." :category :err} inv-erf erfInv)
+(erf-proxy :one ^{:doc "Inverse [[erfc]]." :category :err} inv-erfc erfcInv)
 
 ;; Sinc
 (defn sinc
   "Sinc function."
+  {:category :trig}
   ^double [^double v]
   (let [x (* PI (FastMath/abs v))]
     (if (< x 1.0e-5) 1.0
@@ -293,6 +305,7 @@
   "Logarithm with base 2.
 
   \\\\(\\ln_2{x}\\\\)"
+  {:category :pow}
   ^double [^double x]
   (* (FastMath/log x) INV_LN2))
 
@@ -301,11 +314,12 @@
   "Logarithm with base `b`.
 
   \\\\(\\ln_b{x}\\\\)"
+  {:category :pow}
   ^double [^double b ^double x]
   (/ (FastMath/log x) (FastMath/log b)))
 
 ;; Quick logarithm
-(fastmath-proxy :one ^{:doc "Fast and less accurate version of [[log]]."} qlog logQuick)
+(fastmath-proxy :one ^{:doc "Fast and less accurate version of [[log]]." :category :pow} qlog logQuick)
 
 (add-examples qlog
   (example "[[log]]" (log 23.123))
@@ -318,20 +332,20 @@
 (def ^:const ^double ^{:doc "\\\\(\\log_{10}{e}\\\\)"} LOG10E (log10 E))
 
 ;; Powers (normal, quick)
-(fastmath-proxy :two pow)
-(fastmath-proxy :two ^{:doc "Fast and less accurate version of [[pow]]."} qpow powQuick)
+(fastmath-proxy :two ^{:category :pow} pow)
+(fastmath-proxy :two ^{:doc "Fast and less accurate version of [[pow]]." :category :pow} qpow powQuick)
 
 (add-examples qpow
   (example "[[pow]]" (pow 1.23 43.3))
   (example "[[qpow]]" (qpow 1.23 43.3)))
 
 ;; Fast version of power, second parameter should be integer
-(fastmath-proxy :two ^{:doc "Fast version of pow where exponent is integer."} fpow powFast)
+(fastmath-proxy :two ^{:doc "Fast version of pow where exponent is integer." :category :pow} fpow powFast)
 
 ;; Square and cubic
-(defn sq "Same as [[pow2]]. \\\\(x^2\\\\)" ^double [^double x] (* x x))
-(defn pow2 "Same as [[sq]]. \\\\(x^2\\\\)" ^double [^double x] (* x x))
-(defn pow3 "\\\\(x^3\\\\)" ^double [^double x] (* x (* x x)))
+(defn sq "Same as [[pow2]]. \\\\(x^2\\\\)" {:category :pow} ^double [^double x] (* x x))
+(defn pow2 "Same as [[sq]]. \\\\(x^2\\\\)" {:category :pow} ^double [^double x] (* x x))
+(defn pow3 "\\\\(x^3\\\\)" {:category :pow} ^double [^double x] (* x (* x x)))
 
 (defn safe-sqrt
   "Safe sqrt, for value <= 0 result is 0.
@@ -344,12 +358,13 @@
   \\end{array}
   \\\\right.
   \\\\)"
+  {:category :pow}
   ^double [^double value]
   (if (neg? value) 0.0 (sqrt value)))
 
 ;; Approximated sqrt via binary operations (error 1.0E-2)
-(fastmath-proxy :one ^{:doc "Approximated [[sqrt]] using binary operations with error `1.0E-2`."} qsqrt sqrtQuick)
-(fastmath-proxy :one ^{:doc "Inversed version of [[qsqrt]]. Quick and less accurate."} rqsqrt invSqrtQuick)
+(fastmath-proxy :one ^{:doc "Approximated [[sqrt]] using binary operations with error `1.0E-2`." :category :pow} qsqrt sqrtQuick)
+(fastmath-proxy :one ^{:doc "Inversed version of [[qsqrt]]. Quick and less accurate." :category :pow} rqsqrt invSqrtQuick)
 
 (add-examples qsqrt
   (example "[[sqrt]]" (sqrt 23.123))
@@ -357,6 +372,7 @@
 
 (defn hypot
   "Hypot as \\\\(\\sqrt{x^2+y^2}\\\\) or \\\\(\\sqrt{x^2+y^2+z^2}\\\\)"
+  {:category :dist}
   (^double [^double x ^double y]
    (sqrt (+ (* x x) (* y y))))
   (^double [^double x ^double y ^double z]
@@ -368,41 +384,47 @@
 ;; distance
 (defn dist
   "Euclidean distance between points `(x1,y1)` and `(x2,y2)`. See [[clojure2d.math.vector]] namespace to see other metrics which work on vectors."
-  {:examples [(example "Distance between two points." (dist 1 3 -2 10))]}
+  {:category :dist
+   :examples [(example "Distance between two points." (dist 1 3 -2 10))]}
   ^double [^double x1 ^double y1 ^double x2 ^double y2]
   (sqrt (+ (sq (- x2 x1)) (sq (- y2 y1)))))
 
 (defn qdist
   "Quick version of distance between points. [[qsqrt]] is used instead of [[sqrt]]."
-  {:examples [(example "Distance between two points (quick version)." (qdist 1 3 -2 10))
+  {:category :dist
+   :examples [(example "Distance between two points (quick version)." (qdist 1 3 -2 10))
               (example "Distance between two points (accurate version)." (dist 1 3 -2 10))]}
   ^double [^double x1 ^double y1 ^double x2 ^double y2]
   (qsqrt (+ (sq (- x2 x1)) (sq (- y2 y1)))))
 
 ;; Rounding functions
-(defn floor "\\\\(\\lfloor x \\rfloor\\\\)" ^double [^double x] (FastMath/floor x))
-(defn ceil "\\\\(\\lceil x \\rceil\\\\)" ^double [^double x] (FastMath/ceil x))
+(defn floor "\\\\(\\lfloor x \\rfloor\\\\)" {:category :round} ^double [^double x] (FastMath/floor x))
+(defn ceil "\\\\(\\lceil x \\rceil\\\\)" {:category :round} ^double [^double x] (FastMath/ceil x))
 (defn ^{:doc "Round to `long`. See [[rint]]."
+        :category :round
         :examples [(example "Round long." (round PI))]} round ^long [^double x] (FastMath/round x))
 (defn ^{:doc "Round to `double`. See [[round]]."
+        :category :round
         :examples [(example "Round to double." (rint PI))]} rint ^double [^double x] (FastMath/rint x))
 
 (fastmath-proxy :two ^{:doc "From `FastMath` doc: returns dividend - divisor * n,
-where n is the mathematical integer closest to dividend/divisor. Returned value in `[-|divisor|/2,|divisor|/2]`"} remainder)
+where n is the mathematical integer closest to dividend/divisor. Returned value in `[-|divisor|/2,|divisor|/2]`"
+                       :category :mod} remainder)
 
 (add-examples remainder
   (example "Remainder" (remainder 3.123 0.2))
   (example "Comparing to [[rem]]" (rem 3.123 0.2)))
 
-(defn abs "\\\\(|x|\\\\) - `double` version. See [[iabs]]." ^double [^double x] (FastMath/abs x))
-(defn iabs "\\\\(|x|\\\\) - `long` version. See [[abs]]." ^long [^long x] (if (neg? x) (- x) x))
+(defn abs "\\\\(|x|\\\\) - `double` version. See [[iabs]]." {:category :round} ^double [^double x] (FastMath/abs x))
+(defn iabs "\\\\(|x|\\\\) - `long` version. See [[abs]]." {:category :round} ^long [^long x] (if (neg? x) (- x) x))
 
-(defn trunc "Truncate fractional part, keep sign." ^double [^double v] (if (neg? v) (ceil v) (floor v)))
+(defn trunc "Truncate fractional part, keep sign." {:category :round} ^double [^double v] (if (neg? v) (ceil v) (floor v)))
 
 ;; return approximate value
 (defn approx
   "Round `v` to specified (default: 2) decimal places. Be aware of `double` number accuracy."
-  {:examples [(example "Default rounding (2 digits)." (approx 1.232323))
+  {:category :round
+   :examples [(example "Default rounding (2 digits)." (approx 1.232323))
               (example "Rounding up to 4 digits. You can see `double` accuracy errors." (approx 1.232323 4))]}
   (^double [^double v] (/ (FastMath/round (* 100.0 v)) 100.0))
   (^double [^double v ^long digits]
@@ -411,7 +433,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (defn approx-eq
   "Checks equality approximately. See [[approx]]."
-  {:examples [(example "Default rounding (2 digits)." (approx-eq 1.232323 1.231999))
+  {:category :round
+   :examples [(example "Default rounding (2 digits)." (approx-eq 1.232323 1.231999))
               (example "Rounding up to 4 digits." (approx-eq 1.232323 1.23231999 4))
               (example "Keep an eye on rounding" (approx-eq 1.2349 1.2350))]}
   ([^double a ^double b] (== (approx a) (approx b)))
@@ -420,10 +443,12 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (defn frac
   "Fractional part, always returns values from 0.0 to 1.0 (exclusive). See [[sfrac]] for signed version."
+  {:category :round}
   ^double [^double v] (abs (- v (unchecked-long v))))
 
 (defn sfrac
   "Fractional part, always returns values from -1.0 to 1.0 (exclusive). See [[frac]] for unsigned version."
+  {:category :round}
   ^double [^double v] (- v (trunc v)))
 
 ;; Find power of 2 exponent for double number where  
@@ -433,19 +458,22 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 ;; `(high-2-exp TWO_PI) => 3` \\(6.28\leq 2^3\eq 8\\)
 (defn low-2-exp
   "Find greatest power of 2 exponent which is lower than `x`. See [[high-2-exp]]."
-  {:examples [(example "Result 4 means, that \\\\(2^4=16\\\\) is lower than 23.11. Next exponent (5) gives greater value (32)." (low-2-exp 23.11))
+  {:category :pow
+   :examples [(example "Result 4 means, that \\\\(2^4=16\\\\) is lower than 23.11. Next exponent (5) gives greater value (32)." (low-2-exp 23.11))
               (example "For `x` less than 1.0 gives negative exponent." (low-2-exp 0.11))]}
   ^long [^double x] (-> x log2 floor unchecked-long))
 
 (defn high-2-exp
   "Find lowest power of 2 exponent which is greater than `x`. See [[low-2-exp]]."
-  {:examples [(example "Result 5 means, that \\\\(2^5=32\\\\) is greater than 23.11. Lower exponent (4) gives lower value (16)." (high-2-exp 23.11))
+  {:category :pow
+   :examples [(example "Result 5 means, that \\\\(2^5=32\\\\) is greater than 23.11. Lower exponent (4) gives lower value (16)." (high-2-exp 23.11))
               (example "For `x` less than 1.0 gives negative exponent." (high-2-exp 0.11))]}
   ^long [^double v] (-> v log2 ceil unchecked-long))
 
 (defn round-up-pow2
   "Round long to the next power of 2"
-  {:examples [(example "Example 1" (round-up-pow2 1023))
+  {:category :round
+   :examples [(example "Example 1" (round-up-pow2 1023))
               (example "Example 2" (round-up-pow2 1024))
               (example "Example 3" (round-up-pow2 1025))]}
   ^long [^long v]
@@ -534,6 +562,7 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
   \\end{array}
   \\\\right.
   \\\\)"
+  {:category :sign}
   ^double [^double value]
   (cond (pos? value) 1.0
         (neg? value) -1.0
@@ -550,11 +579,13 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
   \\end{array}
   \\\\right.
   \\\\)"
+  {:category :sign}
   ^double [^double value]
   (if (neg? value) -1.0 1.0))
 
 (defmacro constrain
   "Clamp `value` to the range `[mn,mx]`."
+  {:category :conv}
   [value mn mx]
   `(max (min ~value ~mx) ~mn))
 
@@ -572,7 +603,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (defn norm
   "Normalize `v` from the range `[start,stop]` to the range `[0,1]` or map `v` from the range `[start1,stop1]` to the range `[start2,stop2]`. See also [[make-norm]]."
-  {:examples [(example "Normalize from [1,-1] to [0,1]" (norm 0.234 -1.0 1.0))
+  {:category :conv
+   :examples [(example "Normalize from [1,-1] to [0,1]" (norm 0.234 -1.0 1.0))
               (example "Normalize from [-1,1] to [0,1]" (norm 0.234 1.0 -1.0))
               (example "Normalize cos() to [0,255]" (norm (cos HALF_PI) -1.0 1.0 0.0 255.0))
               (example "Normalize cos() to [255,0]" (norm (cos HALF_PI) -1.0 1.0 255.0 0.0))]}
@@ -583,7 +615,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (defn make-norm
   "Make [[norm]] function for given range. Resulting function accepts `double` value (with optional target `[dstart,dstop]` range) and returns `double`."
-  {:examples [(example "Make cos() normalizer from [-1.0,1.0] to [0.0, 1.0]." (let [norm-cos (make-norm -1.0 1.0 0.0 1.0)]
+  {:category :conv
+   :examples [(example "Make cos() normalizer from [-1.0,1.0] to [0.0, 1.0]." (let [norm-cos (make-norm -1.0 1.0 0.0 1.0)]
                                                                                 (norm-cos (cos 2.0))))
               (example "Make normalizer from [0,255] to any range." (let [norm-0-255 (make-norm 0 255)]
                                                                       [(norm-0-255 123 -10 -20)
@@ -602,7 +635,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (defn cnorm
   "Constrained version of norm. Result of [[norm]] is applied to [[constrain]] to `[0,1]` or `[start2,stop2]` ranges."
-  {:examples [(example "Constrain result of norm." (cnorm 1.5 0 1 100 200))
+  {:category :conv
+   :examples [(example "Constrain result of norm." (cnorm 1.5 0 1 100 200))
               (example "Example 2" (cnorm 555 200 500))]}
   ([v start1 stop1 start2 stop2]
    (constrain ^double (norm v start1 stop1 start2 stop2) ^double start2 ^double stop2))
@@ -614,7 +648,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 ;; Linear interpolation between `start` and `stop`.
 (defn lerp
   "Linear interpolation between `start` and `stop` for amount `t`. See also [[mlerp]], [[cos-interpolation]], [[quad-interpolation]] or [[smooth-interpolation]]."
-  {:examples [(example "Example 1" (lerp 0.0 1.0 0.123))
+  {:category :conv
+   :examples [(example "Example 1" (lerp 0.0 1.0 0.123))
               (example "Example 2" (lerp 0.0 100.0 0.123))
               (example "Example 3" (lerp 100 200 0.5))
               (example "Example 4. Interpolate outside give range." (lerp -1.0 1.0 1.5))
@@ -624,6 +659,7 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (defmacro mlerp
   "[[lerp]] as macro. For inline code. See also [[lerp]], [[cos-interpolation]], [[quad-interpolation]] or [[smooth-interpolation]]."
+  {:category :conv}
   [start stop t]
   `(+ ~start (* ~t (- ~stop ~start))))
 
@@ -637,21 +673,24 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 ;; Cosine interpolation between `start` and `stop`
 (defn cos-interpolation
   "oF interpolateCosine interpolation. See also [[lerp]]/[[mlerp]], [[quad-interpolation]] or [[smooth-interpolation]]."
-  {:examples [(example "Example" (cos-interpolation 0.0 1.0 0.123))
+  {:category :conv
+   :examples [(example "Example" (cos-interpolation 0.0 1.0 0.123))
               (example-image "Interpolate between 0 and 1" "m/cos-interpolation.png")]}
   ^double [^double start ^double stop ^double t]
   (mlerp start stop (* 0.5 (- 1.0 (cos (* t PI))))))
 
 (defn smooth-interpolation
   "Smoothstep based interpolation. See also [[lerp]]/[[mlerp]], [[quad-interpolation]] or [[smooth-interpolation]]."
-  {:examples [(example "Example" (smooth-interpolation 0.0 1.0 0.123))
+  {:category :conv
+   :examples [(example "Example" (smooth-interpolation 0.0 1.0 0.123))
               (example-image "Interpolate between 0 and 1" "m/smooth-interpolation.png")]}
   ^double [^double start ^double stop ^double t]
   (mlerp start stop (* t t (- 3.0 (* 2.0 t)))))
 
 (defn quad-interpolation
   "Quad interpolation. See also [[lerp]]/[[mlerp]], [[cos-interpolation]] or [[smooth-interpolation]]."
-  {:examples [(example "Example" (quad-interpolation 0.0 1.0 0.123))
+  {:category :conv
+   :examples [(example "Example" (quad-interpolation 0.0 1.0 0.123))
               (example-image "Interpolate between 0 and 1" "m/quad-interpolation.png")]}
   ^double [^double start ^double stop ^double t]
   (mlerp start stop (let [t' (* 2.0 t)]
@@ -661,7 +700,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (defn smoothstep
   "GL [smoothstep](https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/smoothstep.xhtml)."
-  {:examples [(example "x from range." (smoothstep 100 200 120))
+  {:category :conv
+   :examples [(example "x from range." (smoothstep 100 200 120))
               (example "corner case (< x edge0)" (smoothstep 100 200 50))
               (example "corner case (> x edge1)" (smoothstep 100 200 250))]}
   ^double [^double edge0 ^double edge1 ^double x]
@@ -673,7 +713,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 ;;`(wrap 1.1 -1 1) => -0.8999999999999999`
 (defn wrap
   "Wrap overflowed value into the range, similar to [ofWrap](http://openframeworks.cc/documentation/math/ofMath/#!show_ofWrap)."
-  {:examples [(example "Example 1" (wrap 0 -1 1))
+  {:category :conv
+   :examples [(example "Example 1" (wrap 0 -1 1))
               (example "Example 2 (value outside range)" (wrap -1.1 -1 1.5))
               (example "Example 3 (reversed range)" (wrap 0.7 0.5 1.0))
               (example-image "Wrap value between 0.1 0.3" "m/wrap.png")]}
@@ -710,7 +751,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (defn med
   "Median of three values. See [[median]]."
-  {:examples [(example "Median of [7 1 4]" (med 7 1 4))]}
+  {:category :stat
+   :examples [(example "Median of [7 1 4]" (med 7 1 4))]}
   ^double [^double a ^double b ^double c]
   (max (min a b) (min (max a b) c)))
 
@@ -732,7 +774,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (defn mode
   "Find the value that appears most often in a dataset `vs`."
-  {:examples [(example "Example 1" (mode [1 2 3 -1 -1 2 -1 11 111]))
+  {:category :stat
+   :examples [(example "Example 1" (mode [1 2 3 -1 -1 2 -1 11 111]))
               (example "Return last element when every element appears equally." (mode [5 1 2 3 4]))]}
   [vs]
   (let [fs (frequencies vs)]
@@ -740,7 +783,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (defn quantile
   "Calculate p-quantile (percentile) of a `vs`."
-  {:examples [(example "Quantile 0.25" (quantile 0.25 [1 2 3 -1 -1 2 -1 11 111]))
+  {:category :stat
+   :examples [(example "Quantile 0.25" (quantile 0.25 [1 2 3 -1 -1 2 -1 11 111]))
               (example "Quantile 0.5 (median)" (quantile 0.5 [1 2 3 -1 -1 2 -1 11 111]))
               (example "Quantile 0.75" (quantile 0.75 [1 2 3 -1 -1 2 -1 11 111]))
               (example "Quantile 0.9" (quantile 0.9 [1 2 3 -1 -1 2 -1 11 111]))]}
@@ -752,18 +796,21 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (defn median
   "Calculate median of a list. See [[med]]."
-  {:examples [(example "Median (percentile 50%)." (median [1 2 3 -1 -1 2 -1 11 111]))
+  {:category :stat
+   :examples [(example "Median (percentile 50%)." (median [1 2 3 -1 -1 2 -1 11 111]))
               (example "For three elements use faster [[med]]." (median [7 1 4]))]}
   (^double [vs] (quantile 0.5 vs)))
 
 (defn mean
   "Calculate mean of a list"
-  {:examples [(example "Mean (average value)" (mean [1 2 3 -1 -1 2 -1 11 111]))]}
+  {:category :stat
+   :examples [(example "Mean (average value)" (mean [1 2 3 -1 -1 2 -1 11 111]))]}
   (^double [vs] (/ ^double (reduce clojure.core/+ vs) (count vs))))
 
 (defn standard-deviation
   "Calculate standard deviation of a list"
-  {:examples [(example "Std. dev." (standard-deviation [1 2 3 -1 -1 2 -1 11 111]))]}
+  {:category :stat
+   :examples [(example "Std. dev." (standard-deviation [1 2 3 -1 -1 2 -1 11 111]))]}
   ([vs]
    (standard-deviation vs (mean vs)))
   ([vs ^double u]
@@ -771,7 +818,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (defn median-absolute-deviation 
   "Calculate MAD"
-  {:examples [(example "MAD" (median-absolute-deviation [1 2 3 -1 -1 2 -1 11 111]))]}
+  {:category :stat
+   :examples [(example "MAD" (median-absolute-deviation [1 2 3 -1 -1 2 -1 11 111]))]}
   ([vs]
    (median-absolute-deviation vs (median vs)))
   ([vs ^double m]
@@ -779,7 +827,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (defn lower-adjacent-value
   "Lower adjacent value (LAV)."
-  {:examples [(example "LAV" (lower-adjacent-value [1 2 3 -1 -1 2 -1 11 111]))]}
+  {:category :stat
+   :examples [(example "LAV" (lower-adjacent-value [1 2 3 -1 -1 2 -1 11 111]))]}
   ([vs]
    (let [q1 (quantile 0.25 vs)
          m (median vs)
@@ -791,7 +840,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (defn upper-adjacent-value
   "Upper adjacent value (UAV)."
-  {:examples [(example "UAV" (upper-adjacent-value [1 2 3 -1 -1 2 -1 11 111]))]}
+  {:category :stat
+   :examples [(example "UAV" (upper-adjacent-value [1 2 3 -1 -1 2 -1 11 111]))]}
   ([vs]
    (let [q1 (quantile 0.25 vs)
          m (median vs)
@@ -803,7 +853,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 (defn stats-map
   "Calculate several statistics from the list and return as map."
-  {:examples [(example "Stats" (stats-map [1 2 3 -1 -1 2 -1 11 111]))
+  {:category :stat
+   :examples [(example "Stats" (stats-map [1 2 3 -1 -1 2 -1 11 111]))
               (example "Select keys" (stats-map [:Mean :Q1 :Q3] [1 2 3 -1 -1 2 -1 11 111]))]}
   ([vs]
    (let [sz (count vs)
@@ -844,7 +895,8 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 ;; `(k-means 4 '(1 2 3 -1 -1 2 -1 11 111)) => (-1.0 2.0 11.0 111.0)`
 (defn k-means
   "k-means clustering"
-  {:examples [(example "Reduce to 4 values." (k-means 4 [1 2 3 -1 -1 2 -1 11 111]))]}
+  {:category :stat
+   :examples [(example "Reduce to 4 values." (k-means 4 [1 2 3 -1 -1 2 -1 11 111]))]}
   [^long k vs]
   (let [vs (map double vs)
         svs (set vs)]
