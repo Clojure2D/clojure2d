@@ -76,7 +76,7 @@
 
 ;; Examples
 
-(def ^:private indent-forms #{'-> 'do 'doseq 'example 'add-examples 'example-gen-image 'example-image})
+(def ^:private indent-forms #{'-> 'do 'doseq 'example 'add-examples 'example-gen-image 'example-image 'let})
 
 (defn- maybe-wrap-string
   "Wrap string into quotation marks."

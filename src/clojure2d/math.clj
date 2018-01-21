@@ -51,7 +51,8 @@
 
   Generated graphs are from range [-3.2, 3.2].
   "
-  (:require [meta-doc.core :refer :all])
+  (:require [meta-doc.core :refer :all]
+            [clojure2d.math :as m])
   (:refer-clojure
    :exclude [* + - / > < >= <= == rem quot mod bit-or bit-and bit-xor bit-not bit-shift-left bit-shift-right unsigned-bit-shift-right inc dec zero? neg? pos? min max even? odd?])
   (:import [net.jafama FastMath]
@@ -185,7 +186,7 @@
 
 (def ^:const ^double ^{:doc "Very small number \\\\(\\varepsilon\\\\)"} EPSILON 1.0e-10)
 
-(def ^:const ^double ^{:doc "Smalles machine number"}
+(def ^:const ^double ^{:doc "Smallest machine number"}
   MACHINE-EPSILON (* 0.5 (double (loop [d (double 1.0)]
                                    (if (not== 1.0 (+ 1.0 (* d 0.5)))
                                      (recur (* d 0.5))
@@ -482,56 +483,73 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 ;; More constants
 
 ;; \\(\sqrt{2}\\)
-(def ^:const ^double SQRT2 (sqrt 2.0))
-(def ^:const ^double SQRT2_2 (* 0.5 SQRT2))
+(def ^:const ^double ^{:doc "\\\\(\\sqrt{2}\\\\)"} SQRT2 (sqrt 2.0))
+(def ^:const ^double ^{:doc "\\\\(\\frac{\\sqrt{2}}{2}\\\\)"} SQRT2_2 (* 0.5 SQRT2))
 
 ;; \\(\sqrt{3}\\)
-(def ^:const ^double SQRT3 (sqrt 3.0))
+(def ^:const ^double ^{:doc "\\\\(\\sqrt{3}\\\\)"} SQRT3 (sqrt 3.0))
 
 ;; \\(\sqrt{5}\\)
-(def ^:const ^double SQRT5 (sqrt 5.0))
+(def ^:const ^double ^{:doc "\\\\(\\sqrt{5}\\\\)" }SQRT5 (sqrt 5.0))
 
 ;; \\(\sqrt{\pi}\\)
-(def ^:const ^double SQRTPI (sqrt PI))
-(def ^:const ^double SQRT2PI (sqrt TWO_PI))
+(def ^:const ^double ^{:doc "\\\\(\\sqrt{\\pi}\\\\)"} SQRTPI (sqrt PI))
+(def ^:const ^double ^{:doc "\\\\(\\sqrt{2\\pi}\\\\)"} SQRT2PI (sqrt TWO_PI))
 
 ;; 
 (def ^:const ^double ^{:doc "Golden ratio \\\\(\\varphi\\\\)"} PHI (* (inc SQRT5) 0.5))
 
 ;; math.h predefined constants names
-(def ^:const ^double M_E E)
-(def ^:const ^double M_LOG2E LOG2E)
-(def ^:const ^double M_LOG10E LOG10E)
-(def ^:const ^double M_LN2 LN2)
-(def ^:const ^double M_LN10 LN10)
-(def ^:const ^double M_PI PI)
-(def ^:const ^double M_PI_2 HALF_PI)
-(def ^:const ^double M_PI_4 QUARTER_PI)
-(def ^:const ^double M_1_PI (/ PI))
-(def ^:const ^double M_2_PI (/ 2.0 PI))
-(def ^:const ^double M_2_SQRTPI (/ 2.0 SQRTPI))
-(def ^:const ^double M_SQRT2 SQRT2)
-(def ^:const ^double M_SQRT1_2 (/ SQRT2))
+(def ^:const ^double ^{:doc "\\\\(e\\\\)"} M_E E)
+(def ^:const ^double ^{:doc "\\\\(\\log_{2}{e}\\\\)"} M_LOG2E LOG2E)
+(def ^:const ^double ^{:doc "\\\\(\\log_{10}{e}\\\\)"} M_LOG10E LOG10E)
+(def ^:const ^double ^{:doc "\\\\(\\ln{2}\\\\)"} M_LN2 LN2)
+(def ^:const ^double ^{:doc "\\\\(\\ln{10}\\\\)"} M_LN10 LN10)
+(def ^:const ^double ^{:doc "\\\\(\\pi\\\\)"} M_PI PI)
+(def ^:const ^double ^{:doc "\\\\(\\frac{\\pi}{2}\\\\)"} M_PI_2 HALF_PI)
+(def ^:const ^double ^{:doc "\\\\(\\frac{\\pi}{4}\\\\)"} M_PI_4 QUARTER_PI)
+(def ^:const ^double ^{:doc "\\\\(\\frac{1}{\\pi}\\\\)"} M_1_PI (/ PI))
+(def ^:const ^double ^{:doc "\\\\(\\frac{2}{\\pi}\\\\)"} M_2_PI (/ 2.0 PI))
+(def ^:const ^double ^{:doc "\\\\(\\frac{2}{\\sqrt\\pi}\\\\)"} M_2_SQRTPI (/ 2.0 SQRTPI))
+(def ^:const ^double ^{:doc "\\\\(\\sqrt{2}\\\\)"} M_SQRT2 SQRT2)
+(def ^:const ^double ^{:doc "\\\\(\\frac{1}{\\sqrt{2}}\\\\)"} M_SQRT1_2 (/ SQRT2))
 
-(def ^:const ^double M_TWOPI TWO_PI)
-(def ^:const ^double M_3PI_4 (* PI 0.75))
-(def ^:const ^double M_SQRT_PI SQRTPI)
-(def ^:const ^double M_LN2LO 1.9082149292705877000E-10)
-(def ^:const ^double M_LN2HI 6.9314718036912381649E-1)
-(def ^:const ^double M_SQRT3 SQRT3)
-(def ^:const ^double M_IVLN10 (/ LN10))
-(def ^:const ^double M_LOG2_E LN2)
-(def ^:const ^double M_INVLN2 (/ LN2))
+(def ^:const ^double ^{:doc "\\\\(2\\pi\\\\)"} M_TWOPI TWO_PI)
+(def ^:const ^double ^{:doc "\\\\(\\frac{3\\pi}{4}\\\\)"} M_3PI_4 (* PI 0.75))
+(def ^:const ^double ^{:doc "\\\\(\\sqrt\\pi\\\\)"} M_SQRT_PI SQRTPI)
+(def ^:const ^double ^{:doc "\\\\(\\sqrt{3}\\\\)"} M_SQRT3 SQRT3)
+(def ^:const ^double ^{:doc "\\\\(\\frac{1}{\\ln{10}}\\\\)"} M_IVLN10 (/ LN10))
+(def ^:const ^double ^{:doc "\\\\(\\ln{2}\\\\)"} M_LOG2_E LN2)
+(def ^:const ^double ^{:doc "\\\\(\\frac{1}{\\ln{2}}\\\\)"} M_INVLN2 (/ LN2))
 
 (defn signum
-  "Return 1 if the specified value is > 0, 0 if it is 0, -1 otherwise"
+  "Return 1 if `value` is > 0, 0 if it is 0, -1 otherwise. See also [[sgn]].
+
+  \\\\(
+  \\left\\\\{
+  \\begin{array}{lr}
+  1.0 & : x > 0\\\\\\\\
+  -1.0 & : x < 0\\\\\\\\
+  0.0 & : x = 0
+  \\end{array}
+  \\\\right.
+  \\\\)"
   ^double [^double value]
   (cond (pos? value) 1.0
         (neg? value) -1.0
         true 0.0))
 
 (defn sgn
-  "Return -1 when value is negative, 1 otherwise"
+  "Return -1 when `value` is negative, 1 otherwise. See also [[signum]].
+
+  \\\\(
+  \\left\\\\{
+  \\begin{array}{lr}
+  1.0 & : x \\geq 0\\\\\\\\
+  -1.0 & : x < 0\\\\\\\\
+  \\end{array}
+  \\\\right.
+  \\\\)"
   ^double [^double value]
   (if (neg? value) -1.0 1.0))
 
@@ -539,9 +557,14 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 ;;`(constrain 1.5 1 2) => 1.5`  
 ;;`(constrain 2.5 1 2) => 2`  
 (defmacro constrain
-  "Clamp value between mn and mx"
+  "Clamp `value` to the range [`mn`,`mx`]."
   [value mn mx]
   `(max (min ~value ~mx) ~mn))
+
+(add-examples constrain
+  (example "Example1" (constrain 0.5 1 2))
+  (example "Example2" (constrain 1.5 1 2))
+  (example "Example3" (constrain 2.5 1 2)))
 
 ;; Map value from range `[start1,stop1]` to new range `[start2,stop2]` or if new range is not given map to `[0,1]`
 (defmacro ^:private normalize-macro
@@ -551,29 +574,39 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
      (/ (- ~v ~start) (- ~stop ~start))))
 
 (defn norm
-  "Processing map and norm"
-  ([v start1 stop1 start2 stop2] ;; map
-   (+ ^double start2 (* (- ^double stop2 ^double start2) (normalize-macro ^double v ^double start1 ^double stop1))))
+  "Normalize `v` from the range [`start`,`stop`] to the range [`0`,`1`] or map `v` from the range [`start1`,`stop1`] to the range [`start2`,`stop2`]. See also [[make-norm]]."
+  {:examples [(example "Normalize from [1,-1] to [0,1]" (norm 0.234 -1.0 1.0))
+              (example "Normalize from [-1,1] to [0,1]" (norm 0.234 1.0 -1.0))
+              (example "Normalize cos() to [0,255]" (norm (cos HALF_PI) -1.0 1.0 0.0 255.0))
+              (example "Normalize cos() to [255,0]" (norm (cos HALF_PI) -1.0 1.0 255.0 0.0))]}
   (^double [^double v ^double start ^double stop] ;; norm
-   (normalize-macro v start stop)))
+   (normalize-macro v start stop))
+  ([v start1 stop1 start2 stop2] ;; map
+   (+ ^double start2 (* (- ^double stop2 ^double start2) (normalize-macro ^double v ^double start1 ^double stop1)))))
 
 (defn make-norm
-  "Make type hinted map/norm function"
+  "Make [[norm]] function for given range. Resulting function accepts `double` value (with optional target [`dstart`,`dstop`] range) and returns `double`."
+  {:examples [(example "Make cos() normalizer from [-1.0,1.0] to [0.0, 1.0]." (let [norm-cos (make-norm -1.0 1.0 0.0 1.0)]
+                                                                                (norm-cos (cos 2.0))))
+              (example "Make normalizer from [0,255] to any range." (let [norm-0-255 (make-norm 0 255)]
+                                                                      [(norm-0-255 123 -10 -20)
+                                                                       (norm-0-255 123 20 10)]))]}
   ([^double start ^double stop]
    (let [r (- stop start)]
      (fn ^double [^double v ^double dstart ^double dstop]
        (let [vn (/ (- v start) r)]
          (+ dstart (* (- dstop dstart) vn))))))
   ([^double start ^double stop ^double dstart ^double dstop]
-   (let [r (- stop start)]
+   (let [r (- stop start)
+         d (- dstop dstart)]
      (fn ^double [^double v]
        (let [vn (/ (- v start) r)]
-         (+ dstart (* (- dstop dstart) vn)))))))
+         (+ dstart (* d vn)))))))
 
-;; Map and constrain values
-;; `(cnorm 1.5 0 1 100 200) => 200`
 (defn cnorm
-  "Constrained version of norm"
+  "Constrained version of norm. Result of [[norm]] is applied to [[constrain]] to [`0`,`1`] or [`start2`,`stop2`] ranges."
+  {:examples [(example "Constrain result of norm." (cnorm 1.5 0 1 100 200))
+              (example "Example 2" (cnorm 555 200 500))]}
   ([v start1 stop1 start2 stop2]
    (constrain ^double (norm v start1 stop1 start2 stop2) ^double start2 ^double stop2))
   (^double [v start stop]
@@ -583,28 +616,46 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 ;; Linear interpolation between `start` and `stop`.
 (defn lerp
-  "Lerp function (same as in Processing)"
+  "Linear interpolation between `start` and `stop` for amount `t`. See also [[mlerp]], [[cos-interpolation]], [[quad-interpolation]] or [[smooth-interpolation]]."
+  {:examples [(example "Example 1" (lerp 0.0 1.0 0.123))
+              (example "Example 2" (lerp 0.0 100.0 0.123))
+              (example "Example 3" (lerp 100 200 0.5))
+              (example "Example 4. Interpolate outside give range." (lerp -1.0 1.0 1.5))
+              (example-image "Interpolate between 0 and 1" "m/lerp.png")]}
   ^double [^double start ^double stop ^double t]
   (+ start (* t (- stop start))))
 
 (defmacro mlerp
-  "lerp macro version"
+  "[[lerp]] as macro. For inline code. See also [[lerp]], [[cos-interpolation]], [[quad-interpolation]] or [[smooth-interpolation]]."
   [start stop t]
   `(+ ~start (* ~t (- ~stop ~start))))
 
+(add-examples mlerp
+  (example "Example 1" (mlerp 0.0 1.0 0.123))
+  (example "Example 2" (mlerp 0.0 100.0 0.123))
+  (example "Example 3" (mlerp 100 200 0.5))
+  (example "Example 4. Interpolate outside give range." (mlerp -1.0 1.0 1.5))
+  (example-image "Interpolate between 0 and 1" "m/lerp.png"))
+
 ;; Cosine interpolation between `start` and `stop`
 (defn cos-interpolation
-  "oF interpolateCosine"
+  "oF interpolateCosine interpolation. See also [[lerp]]/[[mlerp]], [[quad-interpolation]] or [[smooth-interpolation]]."
+  {:examples [(example "Example" (cos-interpolation 0.0 1.0 0.123))
+              (example-image "Interpolate between 0 and 1" "m/cos-interpolation.png")]}
   ^double [^double start ^double stop ^double t]
   (mlerp start stop (* 0.5 (- 1.0 (cos (* t PI))))))
 
 (defn smooth-interpolation
-  "smoothstep based interpolation"
+  "Smoothstep based interpolation. See also [[lerp]]/[[mlerp]], [[quad-interpolation]] or [[smooth-interpolation]]."
+  {:examples [(example "Example" (smooth-interpolation 0.0 1.0 0.123))
+              (example-image "Interpolate between 0 and 1" "m/smooth-interpolation.png")]}
   ^double [^double start ^double stop ^double t]
   (mlerp start stop (* t t (- 3.0 (* 2.0 t)))))
 
 (defn quad-interpolation
-  "quad interpolation"
+  "Quad interpolation. See also [[lerp]]/[[mlerp]], [[cos-interpolation]] or [[smooth-interpolation]]."
+  {:examples [(example "Example" (quad-interpolation 0.0 1.0 0.123))
+              (example-image "Interpolate between 0 and 1" "m/quad-interpolation.png")]}
   ^double [^double start ^double stop ^double t]
   (mlerp start stop (let [t' (* 2.0 t)]
                       (if (< t' 1.0)
@@ -612,16 +663,23 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
                         (* -0.5 (dec (* (dec t') (- t' 3.0))))))))
 
 (defn smoothstep
-  "GL smoothstep"
-  ^double [^double start ^double stop ^double x]
-  (let [t (cnorm x start stop)]
+  "GL [smoothstep](https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/smoothstep.xhtml)."
+  {:examples [(example "x from range." (smoothstep 100 200 120))
+              (example "corner case (< x edge0)" (smoothstep 100 200 50))
+              (example "corner case (> x edge1)" (smoothstep 100 200 250))]}
+  ^double [^double edge0 ^double edge1 ^double x]
+  (let [t (cnorm x edge0 edge1)]
     (* t t (- 3.0 (* 2.0 t)))))
 
 ;;`(wrap 0 -1 1) => 0.0`  
 ;;`(wrap -1.1 -1 1) => 0.8999999999999999`  
 ;;`(wrap 1.1 -1 1) => -0.8999999999999999`
 (defn wrap
-  "Wrap overflowed value into the range, ofWrap"
+  "Wrap overflowed value into the range, similar to [ofWrap](http://openframeworks.cc/documentation/math/ofMath/#!show_ofWrap)."
+  {:examples [(example "Example 1" (wrap 0 -1 1))
+              (example "Example 2 (value outside range)" (wrap -1.1 -1 1.5))
+              (example "Example 3 (reversed range)" (wrap 0.7 0.5 1.0))
+              (example-image "Wrap value between 0.1 0.3" "m/wrap.png")]}
   ^double [^double start ^double stop ^double value]
   (let [p (> start stop)
         from (if p stop start)
