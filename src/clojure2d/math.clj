@@ -49,7 +49,7 @@
 
   #### Graphs
 
-  Generated graphs are from range `[-3.2, 3.2]` or `[-0.05, 1]."
+  Generated graphs are from range `[-3.2, 3.2]` or `[-0.05, 1]`."
   {:category {:trig "Trigonometry"
               :pow "Powers / logarithms"
               :conv "Conversions"
