@@ -5,7 +5,6 @@
             [lein-ancient "0.6.15"]
             [lein-kibit "0.1.6"]
             [lein-bikeshed "0.5.0"]
-            [lein-marginalia "0.9.1"]
             [com.jakemccrary/lein-test-refresh "0.22.0"]
             [lein-codox "0.10.3"]]
   :url "https://github.com/Clojure2D/clojure2d"
@@ -16,11 +15,11 @@
                  [org.apache.commons/commons-math3 "3.6.1"]
                  [com.flowpowered/flow-noise "1.0.0"]
                  [com.sudoplay.joise/joise "1.1.0"]                 
-                 [net.littleredcomputer/sicmutils "0.10.0"] ;; to be removed
-                                        ;	 [de.sciss/jwave "1.0.3"]
+                 ;; [net.littleredcomputer/sicmutils "0.10.0"] ;; have to be enabled for one of the examples 
+                 ;; [de.sciss/jwave "1.0.3"]
                  [criterium "0.4.4"]
                  [codox-theme-rdash "0.1.2"]
-                                        ; [org.bytedeco/javacv-platform "1.3.2"]
+                 ;; [org.bytedeco/javacv-platform "1.3.2"]
                  ]
   :resource-path "resources/"
   :codox {:themes [:rdash]

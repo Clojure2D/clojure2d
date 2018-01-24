@@ -12,7 +12,7 @@
   {:category {:trig "Trigonometry"
               :pow "Power / logarithm"}}
   (:require [clojure2d.math :as m]
-            [clojure2d.math.vector :as v]
+            [clojure2d.math.vector :as v] 
             [meta-doc.core :refer :all])
   (:import [clojure2d.math.vector Vec2]))
 

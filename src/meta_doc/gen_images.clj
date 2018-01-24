@@ -89,6 +89,20 @@
       (let [c (draw-example (partial generate-math-graph f a b))]
         (save-example (str n ".png") c)))))
 
+(defn- generate-complex-graph
+  ""
+  [canvas f]
+  (let [w (width canvas)
+        h (height canvas)]
+    (dotimes [x w]
+      (dotimes [y h]
+        (let [xx (m/norm x 0 w -2.0 2.0)
+              yy (m/norm y 0 h -2.0 2.0)
+              ^Vec2 res (f (Vec2. xx yy))
+              resx (m/norm (.x res) -2.0 2.0 0 w)
+              resy (m/norm (.y res) -2.0 2.0 0 h)])))))
+
+
 (defn name-to-fn
   "Convert names to functions"
   [fs]
