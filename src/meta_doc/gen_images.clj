@@ -1,6 +1,7 @@
 (ns meta-doc.gen-images
   "Generate images from examples attached to metadata."
-  (:require [clojure2d.core :refer :all]
+  (:require [meta-doc.core :refer :all]
+            [clojure2d.core :refer :all]
             [clojure2d.color :refer :all]
             [clojure2d.pixels :as p]
             [clojure2d.math :as m]
@@ -31,23 +32,6 @@
   [name img]
   (binding [*jpeg-image-quality* 0.85]
     (save img (str "docs/images/" name))))
-
-(defn get-all-clojure2d-ns
-  "Return all namespaces from clojure2d."
-  [] 
-  (->> (all-ns)
-       (map ns-name)
-       (filter #(re-matches #".*clojure2d.*" (str %)))
-       (map the-ns)))
-
-(defn get-examples-from-vars
-  "Return all examples from metatags"
-  [namespace]
-  (->> (ns-publics namespace)
-       (vals)
-       (map meta)
-       (map :examples)
-       (filter (complement nil?))))
 
 (defn generate-image
   "Generate image from example."

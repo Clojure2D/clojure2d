@@ -160,6 +160,30 @@
   (when (and *load-examples* (seq? examples))
     `(alter-meta! (var ~v) assoc :examples (vec (conj (or (:examples (meta (var ~v))) []) ~@examples)))))
 
+;; ns processor
+
+(defn get-all-clojure2d-ns
+  "Return all namespaces from clojure2d."
+  [] 
+  (->> (all-ns)
+       (map ns-name)
+       (filter #(re-matches #".*clojure2d.*" (str %)))
+       (map the-ns)))
+
+(defn get-metas-from-vars
+  ""
+  [namespace]
+  (->> (ns-publics namespace)
+       (vals)
+       (map meta)))
+
+(defn get-examples-from-vars
+  "Return all examples from metatags"
+  [namespace]
+  (->> (get-metas-from-vars namespace)
+       (map :examples)
+       (filter (complement nil?))))
+
 ;; Generate markdown
 
 (defmulti ^:private example-markdown
@@ -211,6 +235,14 @@
          (append-to-doc ns (str separator "  #### Constants" separator
                                 (s/join new-line (map (fn [[n v]] (str "  * [[" n "]] = `" v "`")) @consts)))))))
    :done))
+
+(defn alter-docs-in-all-clojure2d-ns
+  "Alter docs for all Clojure2d namespaces."
+  []
+  (doseq [ns (get-all-clojure2d-ns)]
+    (alter-docs ns)))
+
+(comment alter-docs-in-all-clojure2d-ns)
 
 (add-examples md5
   (example "MD5 of a string" (md5 "abc"))

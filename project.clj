@@ -15,7 +15,7 @@
                  [org.apache.commons/commons-math3 "3.6.1"]
                  [com.flowpowered/flow-noise "1.0.0"]
                  [com.sudoplay.joise/joise "1.1.0"]                 
-                 ;; [net.littleredcomputer/sicmutils "0.10.0"] ;; have to be enabled for one of the examples 
+                 [net.littleredcomputer/sicmutils "0.10.0"] ;; have to be enabled for one of the examples 
                  ;; [de.sciss/jwave "1.0.3"]
                  [criterium "0.4.4"]
                  [codox-theme-rdash "0.1.2"]
@@ -42,5 +42,4 @@
                                         ;   "-Dcom.sun.management.jmxremote.authenticate=false"
                                         ;   "-Dcom.sun.management.jmxremote.port=43210"
              ]
-  :marginalia {:javascript ["https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML"]} ;; to remove
   :profiles {:uberjar {:aot :all}})

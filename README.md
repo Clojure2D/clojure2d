@@ -15,10 +15,6 @@ Clojure2D is a library supporting generative coding or glitching. It's based on 
 
 ## Documentation
 
-[Github.io](https://clojure2d.github.io/clojure2d/)
-
-[Marginalia - In progress!](https://clojure2d.github.io/clojure2d/docs/marginalia/toc.html)
-
 [Codox - In progress!](https://clojure2d.github.io/clojure2d/docs/codox/)
 
 ## Motivation
@@ -69,7 +65,7 @@ Add following line as a dependency to your `project.clj`
 
 Since still no tutorials are available, check out prepared examples. All namespaces are described below.
 
-### clojure2d.core [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.core.html)
+### clojure2d.core [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.core.html)
 
 This is main namespace with functions in three groups:
 
@@ -79,7 +75,7 @@ This is main namespace with functions in three groups:
 * global state (one per window)
 * session handling (logger + unique, sequential filename generator)
 
-### clojure2d.pixels [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.pixels.html)
+### clojure2d.pixels [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.pixels.html)
 
 Pixels type as a representation of channel values of the image plus operations on pixels.
 Defines also:
@@ -89,13 +85,13 @@ Defines also:
 * higher order functions which operate on Pixels parallelly (filter-channels, blend-channels)
 * accumulation bins (smooth rendering canvas)
 
-### clojure2d.color [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.color.html)
+### clojure2d.color [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.color.html)
 
 * colorspace converters
 * collection of blending basic functions (like add, subtract, divide, difference, etc.)
 * palette generation / color reducing filter
 
-### clojure2d.math [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.math.html)
+### clojure2d.math [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.math.html)
 
 * FastMath (jafama) bindings
 * PrimitiveMath operations (built in)
@@ -103,19 +99,19 @@ Defines also:
 
 Additionally in following namespaces:
 
-* clojure2d.math.complex - Complex (Vec2) operations (code taken from Apache Commons Math) [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.math.complex.html)
-* clojure2d.math.vector - Vec2, Vec3 and Vec4 types and operations on vectors [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.math.vector.html)
-* clojure2d.math.joise - Joise library bindings (basic (simplex/perlin/value), cell (voronoi) and fractal noise + combinations) [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.math.joise.html)
-* clojure2d.math.random - Random functions and perlin noise from flow-noise library [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.math.random.html)
+* clojure2d.math.complex - Complex (Vec2) operations (code taken from Apache Commons Math) [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.math.complex.html)
+* clojure2d.math.vector - Vec2, Vec3 and Vec4 types and operations on vectors [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.math.vector.html)
+* clojure2d.math.joise - Joise library bindings (basic (simplex/perlin/value), cell (voronoi) and fractal noise + combinations) [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.math.joise.html)
+* clojure2d.math.random - Random functions and perlin noise from flow-noise library [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.math.random.html)
 
 ### clojure2d.extra
 
 This is namespace for common generative/glitch specific libraries:
 
-* signal - signal processing, wave generators, effects and filters (sonification enabler) [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.extra.signal.html)
-* overlays - 3 overlays (noise, spots and rgb scanlines) to finish your images [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.extra.overlays.html)
-* segmentation - segment Pixels into rectangles [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.extra.segmentation.html)
-* variations - vector field functions / variations taken from fractal flames world [docs](https://clojure2d.github.io/clojure2d/docs/marginalia/clojure2d.extra.variations.html)
+* signal - signal processing, wave generators, effects and filters (sonification enabler) [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.extra.signal.html)
+* overlays - 3 overlays (noise, spots and rgb scanlines) to finish your images [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.extra.overlays.html)
+* segmentation - segment Pixels into rectangles [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.extra.segmentation.html)
+* variations - vector field functions / variations taken from fractal flames world [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.extra.variations.html)
 * glitch - glitching filters
 * raymarching - simple ray marching 3d scene renderer
 
