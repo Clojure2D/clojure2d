@@ -938,16 +938,7 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 ;;;;; Alter documentation
 
-(defmacro ^:private generate-graph-examples
-  "Add graph examples to given symbols"
-  [& xs]
-  (let [lst (for [x xs
-                  :let [d (str "`" x "` graph")
-                        n (str "m/" x ".png")]]
-              `(add-examples ~x (example-image ~d ~n)))]
-    `(do ~@lst)))
-
-(generate-graph-examples sin cos tan cot sec csc asin acos atan acot asec acsc
+(generate-graph-examples "m/" sin cos tan cot sec csc asin acos atan acot asec acsc
                          sinh cosh tanh coth sech csch asinh acosh atanh acoth asech acsch
                          qsin qcos exp log log10 ln sqrt cbrt qexp qsqrt rqsqrt
                          erf erfc inv-erf inv-erfc sinc log2 qlog

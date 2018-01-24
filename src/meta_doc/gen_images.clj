@@ -74,17 +74,28 @@
         (save-example (str n ".png") c)))))
 
 (defn- generate-complex-graph
-  ""
-  [canvas f]
+  "Generate graph for complex fn."
+  [f canvas]
   (let [w (width canvas)
         h (height canvas)]
+    (set-stroke canvas 0.5)
+    (set-color canvas :white 100)
     (dotimes [x w]
       (dotimes [y h]
         (let [xx (m/norm x 0 w -2.0 2.0)
               yy (m/norm y 0 h -2.0 2.0)
               res (f (vec/vec2 xx yy))
               resx (m/norm (res 0) -2.0 2.0 0 w)
-              resy (m/norm (res 1) -2.0 2.0 0 h)])))))
+              resy (m/norm (res 1) -2.0 2.0 0 h)]
+          (point canvas resx resy))))))
+
+(defn generate-complex-graphs
+  "Generate graphs for complex functions."
+  [fs]
+  (when *generate-images*
+    (doseq [[n f] fs]
+      (let [c (draw-example (partial generate-complex-graph f))]
+        (save-example (str n ".png") c)))))
 
 
 (defn name-to-fn
@@ -110,6 +121,12 @@
                                  ["m/smooth-interpolation" (partial m/smooth-interpolation 0.0 1.0)]
                                  ["m/quad-interpolation" (partial m/quad-interpolation 0.0 1.0)]
                                  ["m/wrap" (partial m/wrap 0.1 0.3)]])
+
+(def complex-names ["c/atan" "c/asin" "c/acos" "c/log" "c/exp" "c/csc" "c/sec"
+                    "c/tanh" "c/tan" "c/sinh" "c/sin" "c/cosh" "c/cos" "c/sqrt" "c/sq"])
+
+
+(generate-complex-graphs (name-to-fn complex-names))
 
 (generate-images)
 

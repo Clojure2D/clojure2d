@@ -206,6 +206,15 @@
   [examples]
   (reduce #(str %1 (example-markdown %2)) "" examples))
 
+(defmacro generate-graph-examples
+  "Add graph examples to given symbols"
+  [pref & xs]
+  (let [lst (for [x xs
+                  :let [d (str "`" x "` graph")
+                        n (str pref x ".png")]]
+              `(add-examples ~x (example-image ~d ~n)))]
+    `(do ~@lst)))
+
 ;; 
 
 (defn alter-docs

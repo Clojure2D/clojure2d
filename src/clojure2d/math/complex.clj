@@ -8,7 +8,27 @@
 
   Complex number is represented as `Vec2` type (from [[clojure2d.math.vector]] namespace).
 
-  To create complex number use [[complex]] or [[->Vec2]]."
+  To create complex number use [[complex]], [[vec2]] or [[->Vec2]].
+
+  Graphs are generate with following snippet (where `f` is complex function).
+  
+  ```
+  (defn generate-complex-graph
+    [f canvas]
+    (let [w (width canvas)
+          h (height canvas)]
+      (set-stroke canvas 0.5)
+      (set-color canvas :white 100)
+      (dotimes [x w]
+        (dotimes [y h]
+          (let [xx (m/norm x 0 w -2.0 2.0)
+                yy (m/norm y 0 h -2.0 2.0)
+                res (f (vec/vec2 xx yy))
+                resx (m/norm (res 0) -2.0 2.0 0 w)
+                resy (m/norm (res 1) -2.0 2.0 0 h)]
+            (point canvas resx resy))))))
+  ```
+  "
   {:category {:trig "Trigonometry"
               :pow "Power / logarithm"}}
   (:require [clojure2d.math :as m]
@@ -255,5 +275,7 @@
        (exp)))
 
 ;;
+
+(generate-graph-examples "c/" atan asin acos log exp csc sec tanh tan sinh sin cosh cos sqrt sq)
 
 (alter-docs)
