@@ -10,22 +10,22 @@
 
   To create complex number use [[complex]], [[vec2]] or [[->Vec2]].
 
-  Graphs are generate with following snippet (where `f` is complex function).
+  Graphs are generated with following snippet (where `f` is complex function).
   
   ```
   (defn generate-complex-graph
     [f canvas]
     (let [w (width canvas)
           h (height canvas)]
-      (set-stroke canvas 0.5)
-      (set-color canvas :white 100)
+      (set-stroke canvas 1.5)
+      (set-color canvas :white 60)
       (dotimes [x w]
         (dotimes [y h]
-          (let [xx (m/norm x 0 w -2.0 2.0)
-                yy (m/norm y 0 h -2.0 2.0)
-                res (f (vec/vec2 xx yy))
-                resx (m/norm (res 0) -2.0 2.0 0 w)
-                resy (m/norm (res 1) -2.0 2.0 0 h)]
+          (let [xx (m/norm x 0 w (- m/PI) m/PI)
+                yy (m/norm y 0 h (- m/PI) m/PI)
+                res (f (c/complex xx yy))
+                resx (m/norm (res 0) (- m/PI) m/PI 0 w)
+                resy (m/norm (res 1) (- m/PI) m/PI 0 h)]
             (point canvas resx resy))))))
   ```
   "
@@ -276,6 +276,6 @@
 
 ;;
 
-(generate-graph-examples "c/" atan asin acos log exp csc sec tanh tan sinh sin cosh cos sqrt sq)
+(generate-graph-examples "c/" ".jpg" atan asin acos log exp csc sec tanh tan sinh sin cosh cos sqrt sq sqrt1z reciprocal)
 
 (alter-docs)

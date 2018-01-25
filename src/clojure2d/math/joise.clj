@@ -29,7 +29,7 @@
 
 ;; ## Noise creators
 
-(defn get-noise-fn
+(defn- get-noise-fn
   "Get noise from Joise Module class"
   ([^Module m x]
    (.get m x 0.333))
@@ -51,7 +51,7 @@
 ;;
 ;; Noise autocorrection function calculates scaling factor. The main reason is that usually noise doesn't return values from [0,1] range. To make it more accurate use `auto-correct` which returns scaled version of passed module.
 
-(defn auto-correct
+(defn- auto-correct
   "Autocorrect module to desired range, (0,1) default. Function calculate scaling factor based on number of samples."
   ([^Module m samples mn mx]
    (let [^ModuleAutoCorrect ac (ModuleAutoCorrect. mn mx)]
@@ -96,9 +96,9 @@
 (defn make-basis
   "Create noise basis module"
   [& m]
-  (let [params (merge  {:type :gradval
-                        :interpolation :cubic
-                        :seed (lrand)} (apply merge m))
+  (let [params (merge {:type :gradval
+                       :interpolation :cubic
+                       :seed (lrand)} (apply merge m))
         typ (:type params)
         ^ModuleBasisFunction fun (ModuleBasisFunction. (typ basis-type)
                                                        ((:interpolation params) interpolation-type)

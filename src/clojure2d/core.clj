@@ -546,15 +546,15 @@
   "Draw point at `x`,`y` or `^Vec2` position.
 
   It's implemented as a very short line. Consider using `(rect x y 1 1)` for speed when `x` and `y` are integers."
-  {:examples [(ex/example-gen-image "Sequence of points."
-                                    (doseq [x (range 10 159 10)] (point canvas x x)))
-              (ex/example-gen-image "Magnified point can look differently when different stroke settings are used."
-                                    (-> canvas
-                                        (scale 80.0)
-                                        (set-stroke 0.5)
-                                        (point 0.5 0.5)
-                                        (set-stroke 0.5 BasicStroke/CAP_SQUARE BasicStroke/JOIN_MITER)
-                                        (point 1.5 1.5)))]}
+  {:examples [(ex/example-gen-image :simple "Sequence of points."
+                (doseq [x (range 10 159 10)] (point canvas x x)))
+              (ex/example-gen-image :simple "Magnified point can look differently when different stroke settings are used."
+                (-> canvas
+                    (scale 80.0)
+                    (set-stroke 0.5)
+                    (point 0.5 0.5)
+                    (set-stroke 0.5 BasicStroke/CAP_SQUARE BasicStroke/JOIN_MITER)
+                    (point 1.5 1.5)))]}
   ([canvas ^double x ^double y]
    (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
    canvas)
@@ -572,7 +572,7 @@
 
 (defn rect
   "Draw rectangle with top-left corner at `(x,y)` position with width `w` and height `h`. Optionally you can set `stroke?` (default: `false`) to `true` if you don't want to fill rectangle and draw outline only."
-  {:examples [(ex/example-gen-image "Two squares, one filled and second as outline."
+  {:examples [(ex/example-gen-image :simple "Two squares, one filled and second as outline."
                 (-> canvas
                     (rect 10 10 50 50) 
                     (rect 60 60 90 90 true)))]}
@@ -586,7 +586,7 @@
 
 (defn crect
   "Centered version of [[rect]]."
-  {:examples [(ex/example-gen-image "Two squares, one centered."
+  {:examples [(ex/example-gen-image :simple "Two squares, one centered."
                 (-> canvas
                     (set-color :white 160)
                     (rect 50 50 70 70) 

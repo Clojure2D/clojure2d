@@ -27,16 +27,31 @@
      (f c)
      c)))
 
+(defn draw-example-xy
+  "Draw example on canvas."
+  ([f] (draw-example f {}))
+  ([f {:keys [w h hints background]
+       :or {w 160 h 160 hints :high background 0x30426a}}]
+   (with-canvas [c (make-canvas w h hints)]
+     (set-background c background)
+     (dotimes [x w]
+       (dotimes [y w]
+         (f c x y)))
+     c)))
+
 (defn save-example
   "Save generated image to file."
   [name img]
   (binding [*jpeg-image-quality* 0.85]
     (save img (str "docs/images/" name))))
 
+(def ^:private draw-types {:simple draw-example
+                           :xy-loop draw-example-xy})
+
 (defn generate-image
   "Generate image from example."
-  [{:keys [filename value-fn params]}]
-  (save-example filename (draw-example value-fn params)))
+  [{:keys [filename value-fn params draw-type]}]
+  (save-example filename ((draw-type draw-types) value-fn params)))
 
 (defn generate-images
   "Process all examples from all loaded namespaces."
@@ -78,15 +93,15 @@
   [f canvas]
   (let [w (width canvas)
         h (height canvas)]
-    (set-stroke canvas 0.5)
-    (set-color canvas :white 100)
+    (set-stroke canvas 1.5)
+    (set-color canvas :white 60)
     (dotimes [x w]
       (dotimes [y h]
-        (let [xx (m/norm x 0 w -2.0 2.0)
-              yy (m/norm y 0 h -2.0 2.0)
-              res (f (vec/vec2 xx yy))
-              resx (m/norm (res 0) -2.0 2.0 0 w)
-              resy (m/norm (res 1) -2.0 2.0 0 h)]
+        (let [xx (m/norm x 0 w (- m/PI) m/PI)
+              yy (m/norm y 0 h (- m/PI) m/PI)
+              res (f (c/complex xx yy))
+              resx (m/norm (res 0) (- m/PI) m/PI 0 w)
+              resy (m/norm (res 1) (- m/PI) m/PI 0 h)]
           (point canvas resx resy))))))
 
 (defn generate-complex-graphs
@@ -95,7 +110,7 @@
   (when *generate-images*
     (doseq [[n f] fs]
       (let [c (draw-example (partial generate-complex-graph f))]
-        (save-example (str n ".png") c)))))
+        (save-example (str n ".jpg") c)))))
 
 
 (defn name-to-fn
@@ -122,8 +137,8 @@
                                  ["m/quad-interpolation" (partial m/quad-interpolation 0.0 1.0)]
                                  ["m/wrap" (partial m/wrap 0.1 0.3)]])
 
-(def complex-names ["c/atan" "c/asin" "c/acos" "c/log" "c/exp" "c/csc" "c/sec"
-                    "c/tanh" "c/tan" "c/sinh" "c/sin" "c/cosh" "c/cos" "c/sqrt" "c/sq"])
+(def complex-names ["c/atan" "c/asin" "c/acos" "c/log" "c/exp" "c/csc" "c/sec" "c/reciprocal"
+                    "c/tanh" "c/tan" "c/sinh" "c/sin" "c/cosh" "c/cos" "c/sqrt" "c/sq" "c/sqrt1z"])
 
 
 (generate-complex-graphs (name-to-fn complex-names))

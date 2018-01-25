@@ -118,16 +118,16 @@
       :value-fn ~(when call? `(fn [] ~@xample))}))
 
 (defmacro example-gen-image
-  "Create example as image. Produce markdown image url and function which operates on canvas. Unique filename for png image is generated. You can adjust generating canvas with map as a second parameter (optional).
+  "Create example as image. Produce markdown image url and function which operates on canvas. Unique filename for png image is generated. First parameter describes type of wrapping function (:simple, :xy-loop). Second is description. You can adjust generating canvas with map as a third parameter (optional).
 
   * :w - width of the resulting image (default :160)
   * :h - height of the resulting image (default :160)
   * :hints - canvas quality (default: :high)
   * :background - background color (default: 0x30426a)"
-  {:style/indent 1
-   :examples [(example "Following example will be executed within canvas context." false (example-gen-image "Description" (rect canvas 10 10 100 100)))
-              (example "You can pass also additional parameters." false (example-gen-image "Description" {:w 200 :h 200 :hints :high :background :white} false (rect 10 10 100 100)))]}
-  ([description & xample]
+  {:style/indent :defn
+   :examples [(example "Following example will be executed within canvas context." false (example-gen-image :simple "Description" (rect canvas 10 10 100 100)))
+              (example "You can pass also additional parameters." false (example-gen-image :simple "Description" {:w 200 :h 200 :hints :high :background :white} false (rect 10 10 100 100)))]}
+  ([draw-type description & xample]
    (let [[params xample] (if (map? (first xample))
                            [(first xample) (next xample)]
                            [{} xample])
@@ -139,6 +139,7 @@
      `{:type :gen-image
        :doc ~description
        :example ~sx
+       :draw-type ~draw-type
        :value-fn (fn [~canvas] ~@xample)
        :filename ~fname
        :value ~value})))
@@ -208,10 +209,10 @@
 
 (defmacro generate-graph-examples
   "Add graph examples to given symbols"
-  [pref & xs]
+  [pref suffix & xs]
   (let [lst (for [x xs
                   :let [d (str "`" x "` graph")
-                        n (str pref x ".png")]]
+                        n (str pref x suffix)]]
               `(add-examples ~x (example-image ~d ~n)))]
     `(do ~@lst)))
 

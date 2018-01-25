@@ -938,7 +938,7 @@ where n is the mathematical integer closest to dividend/divisor. Returned value 
 
 ;;;;; Alter documentation
 
-(generate-graph-examples "m/" sin cos tan cot sec csc asin acos atan acot asec acsc
+(generate-graph-examples "m/" ".png" sin cos tan cot sec csc asin acos atan acot asec acsc
                          sinh cosh tanh coth sech csch asinh acosh atanh acoth asech acsch
                          qsin qcos exp log log10 ln sqrt cbrt qexp qsqrt rqsqrt
                          erf erfc inv-erf inv-erfc sinc log2 qlog
