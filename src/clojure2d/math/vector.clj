@@ -180,8 +180,8 @@
 (deftype Vec2 [^double x ^double y]
   Object
   (toString [_] (str "[" x ", " y "]"))
-  (equals [t v]
-    (and (identical? t v)
+  (equals [_ v]
+    (and (instance? Vec2 v)
          (let [^Vec2 v v]
            (bool-and (== x (.x v))
                      (== y (.y v))))))
@@ -272,8 +272,8 @@
 (deftype Vec3 [^double x ^double y ^double z]
   Object
   (toString [_] (str "[" x ", " y ", " z "]"))
-  (equals [t v]
-    (and (identical? t v)
+  (equals [_ v]
+    (and (instance? Vec3 v)
          (let [^Vec3 v v]
            (bool-and (== x (.x v))
                      (== y (.y v))
@@ -440,8 +440,8 @@
 (deftype Vec4 [^double x ^double y ^double z ^double w]
   Object
   (toString [_] (str "[" x ", " y ", " z ", " w "]"))
-  (equals [t v]
-    (and (identical? t v)
+  (equals [_ v]
+    (and (instance? Vec4 v)
          (let [^Vec4 v v]
            (bool-and (== x (.x v))
                      (== y (.y v))
