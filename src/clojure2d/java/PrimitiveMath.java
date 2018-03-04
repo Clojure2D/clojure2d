@@ -112,4 +112,12 @@ public final class PrimitiveMath {
 
     public static boolean isEven(long a) { return (a&1)==0; }
     public static boolean isOdd(long a) { return (a&1)==1; }
+
+    public static double norm(double v, double start, double stop) {
+        return start == stop ? (v < start ? 0.0 : 1.0) : (v - start) / (stop - start);
+    }
+    public static double norm(double v, double start1, double stop1, double start2, double stop2) {
+        return start2 + (stop2 - start2) * norm(v, start1, stop1);
+    }
 }
+

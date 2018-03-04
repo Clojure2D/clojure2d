@@ -774,9 +774,9 @@
         (let [sig (* sample phase)
               new-integral (+ (.integral state) sig)
               m (m/cos (+ new-integral (* omega (.t state))))
-              ^double m (if (pos? quant)
-                          (m/norm (unchecked-int (m/norm m -1.0 1.0 0.0 quant)) 0.0 quant -1.0 1.0)
-                          m)
+              m (if (pos? quant)
+                  (m/norm (unchecked-int (m/norm m -1.0 1.0 0.0 quant)) 0.0 quant -1.0 1.0)
+                  m)
               dem (m/abs (- m (.pre state)))
               ^EffectsList res (single-pass (.lp state) dem)
               demf (/ (* 2.0 (- (.sample res) omega)) phase)]

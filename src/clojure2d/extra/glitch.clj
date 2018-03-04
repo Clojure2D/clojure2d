@@ -115,7 +115,7 @@
          r- (- r)]
      (fn [ch t ^Pixels p]
        (dotimes [y (.h p)]
-         (let [^double yv (m/norm y 0.0 (.h p) r- r)]
+         (let [yv (m/norm y 0.0 (.h p) r- r)]
            (dotimes [x (.w p)]
              (let [xlerp (m/norm x 0.0 (.w p))
                    v1 (f (Vec2. r- yv))
@@ -139,9 +139,9 @@
          r- (- r)]
      (fn [ch t ^Pixels p]
        (dotimes [y (.h p)]
-         (let [^double yv (m/norm y 0.0 (.h p) r- r)]
+         (let [yv (m/norm y 0.0 (.h p) r- r)]
            (dotimes [x (.w p)]
-             (let [^double xv (m/norm x 0.0 (.w p) r- r)
+             (let [xv (m/norm x 0.0 (.w p) r- r)
                    ^Vec2 vv (f (Vec2. xv yv))
                    xx (unchecked-int (m/norm (.x vv) r- r 0.0 (.w p)))
                    yy (unchecked-int (m/norm (.y vv) r- r 0.0 (.h p)))]

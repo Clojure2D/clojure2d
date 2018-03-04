@@ -10,7 +10,7 @@
 (ns clojure2d.math.random
   (:require [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
-            [meta-doc.core :refer :all])
+            [metadoc.examples :refer :all])
   (:import [clojure2d.math.vector Vec2]
            [org.apache.commons.math3.random RandomGenerator ISAACRandom JDKRandomGenerator MersenneTwister
             Well512a Well1024a Well19937a Well19937c Well44497a Well44497b
@@ -340,5 +340,3 @@
    (discrete-noise X 0)))
 
 ;;
-
-(alter-docs)

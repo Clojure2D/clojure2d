@@ -29,11 +29,11 @@
             (point canvas resx resy))))))
   ```
   "
-  {:category {:trig "Trigonometry"
-              :pow "Power / logarithm"}}
+  {:categories {:trig "Trigonometry"
+                :pow "Power / logarithm"}}
   (:require [clojure2d.math :as m]
             [clojure2d.math.vector :as v] 
-            [meta-doc.core :refer :all])
+            [metadoc.examples :refer :all])
   (:import [clojure2d.math.vector Vec2]))
 
 (set! *warn-on-reflection* true)
@@ -131,7 +131,7 @@
 
 (defn cos
   "cos"
-  {:category :trig
+  {:categories #{:trig}
    :examples [(example "cos(z)" (cos (complex 2 -1)))]}
   [^Vec2 z]
   (let [x (.x z)
@@ -141,7 +141,7 @@
 
 (defn sin
   "sin"
-  {:category :trig
+  {:categories #{:trig}
    :examples [(example "sin(z)" (sin (complex 2 -1)))]}
   [^Vec2 z]
   (let [x (.x z)
@@ -151,7 +151,7 @@
 
 (defn cosh
   "cosh"
-  {:category :trig
+  {:categories #{:trig}
    :examples [(example "cosh(z)" (cosh (complex 2 -1)))]}
   [^Vec2 z]
   (let [x (.x z)
@@ -161,7 +161,7 @@
 
 (defn sinh
   "sinh"
-  {:category :trig
+  {:categories #{:trig}
    :examples [(example "sinh(z)" (sinh (complex 2 -1)))]}
   [^Vec2 z]
   (let [x (.x z)
@@ -171,7 +171,7 @@
 
 (defn tan
   "tan"
-  {:category :trig
+  {:categories #{:trig}
    :examples [(example "tan(z)" (tan (complex 2 -1)))]}
   [^Vec2 z]
   (let [aa (* 2.0 (.x z))
@@ -182,7 +182,7 @@
 
 (defn tanh
   "tanh"
-  {:category :trig
+  {:categories #{:trig}
    :examples [(example "tanh(z)" (tanh (complex 2 -1)))]}
   [^Vec2 z]
   (let [aa (* 2.0 (.x z))
@@ -193,7 +193,7 @@
 
 (defn sec
   "secant"
-  {:category :trig
+  {:categories #{:trig}
    :examples [(example "sec(z)" (sec (complex 2 -1)))]}
   [^Vec2 z]
   (let [cc (+ (m/cos (* 2.0 (.x z)))
@@ -203,7 +203,7 @@
 
 (defn csc
   "cosecant"
-  {:category :trig
+  {:categories #{:trig}
    :examples [(example "csc(z)" (csc (complex 2 -1)))]}
   [^Vec2 z]
   (let [cc (- (m/cos (* 2.0 (.x z)))
@@ -214,7 +214,7 @@
 
 (defn exp
   "exp"
-  {:category :pow
+  {:categories #{:pow}
    :examples [(example "exp(z)" (exp (complex 2 -1)))
               (example "\\\\(e^{i\\pi}+1\\\\)" (add (exp (complex 0 m/PI)) ONE))]}
   [^Vec2 z]
@@ -225,7 +225,7 @@
 
 (defn log
   "log"
-  {:category :pow
+  {:categories #{:pow}
    :examples [(example "log(z)" (log (complex 2 -1)))
               (example "log(e)" (log (complex m/E 0)))]}
   [^Vec2 z]
@@ -234,7 +234,7 @@
 
 (defn acos
   "acos"
-  {:category :trig
+  {:categories #{:trig}
    :examples [(example "acos(z)" (acos (complex 2 -1)))]}
   [z]
   (->> (sqrt1z z)
@@ -245,7 +245,7 @@
 
 (defn asin
   "asin"
-  {:category :trig
+  {:categories #{:trig}
    :examples [(example "asin(z)" (asin (complex 2 -1)))]}
   [z]
   (->> (sqrt1z z)
@@ -255,7 +255,7 @@
 
 (defn atan
   "atan"
-  {:category :trig
+  {:categories #{:trig}
    :examples [(example "atan(z)" (atan (complex 2 -1)))]}
   [z]
   (->> (sub I z)
@@ -265,7 +265,7 @@
 
 (defn pow
   "Power. \\\\(z_1^{z_2}\\\\)"
-  {:category :pow
+  {:categories #{:pow}
    :examples [(example "\\\\(\\sqrt{2}\\\\)" (pow TWO (complex 0.5 0.0)))
               (example "Complex power" (pow (complex 1 2) (complex 3 4)))]}
   [z1 z2]
@@ -276,6 +276,6 @@
 
 ;;
 
-(generate-graph-examples "c/" ".jpg" atan asin acos log exp csc sec tanh tan sinh sin cosh cos sqrt sq sqrt1z reciprocal)
+;; (generate-graph-examples "c/" ".jpg" atan asin acos log exp csc sec tanh tan sinh sin cosh cos sqrt sq sqrt1z reciprocal)
 
-(alter-docs)
+;; (alter-docs)

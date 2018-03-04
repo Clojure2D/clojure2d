@@ -8,8 +8,10 @@
 ;; All vectors are equipped with Counted (`count`), Sequential, Sequable (`seq`) and IFn protocols. Additionally Clojure vector is equipped with defined here `VectorProto`.
 
 (ns clojure2d.math.vector
-  (:require [clojure2d.math :as m])
-  (:import [clojure.lang Counted IFn PersistentVector Seqable Sequential]))
+  (:require [clojure2d.math :as m]
+            [metadoc.examples :refer :all])
+  (:import [clojure.lang Counted IFn PersistentVector Seqable Sequential]
+           [clojure.core Vec]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -22,7 +24,7 @@
 
 (defprotocol VectorProto
   "Vector operations"
-  (to-vec [v] "Convert to Clojure vector")
+  (to-vec [v] "Convert to Clojure primitive vector")
   (applyf [v f] "Apply function to all vector values (map)")
   (magsq [v1] "length squared")
   (mag [v1] "length")
@@ -76,7 +78,7 @@
 ;; Add `VectorProto` to Clojure vector using map/reduce terms.
 (extend PersistentVector
   VectorProto
-  {:to-vec identity
+  {:to-vec #(apply conj (vector-of :double) %1)
    :applyf #(mapv %2 %1)
    :magsq (fn [v] (reduce #(+ ^double %1 (* ^double %2 ^double %2)) (double 0) v))
    :mag #(m/sqrt (magsq %))
@@ -123,7 +125,6 @@
           false)
         true))))
 
-
 ;; Array Vector
 (deftype ArrayVec [^doubles array]
   Object
@@ -143,7 +144,8 @@
   Counted
   (count [_] (alength array))
   VectorProto
-  (to-vec [_] (vec array))
+  (to-vec [_] (let [^Vec v (vector-of :double)]
+                (Vec. (.am v) (alength array) (.shift v) (.root v) array (.meta v))))
   (applyf [_ f] (ArrayVec. (amap array idx ret ^double (f (aget array idx)))))
   (magsq [_] (areduce array idx ret (double 0.0) (+ ret (m/sq (aget array idx)))))
   (mag [v1] (m/sqrt (magsq v1)))
@@ -178,8 +180,8 @@
 (deftype Vec2 [^double x ^double y]
   Object
   (toString [_] (str "[" x ", " y "]"))
-  (equals [_ v]
-    (and (instance? Vec2 v)
+  (equals [t v]
+    (and (identical? t v)
          (let [^Vec2 v v]
            (bool-and (== x (.x v))
                      (== y (.y v))))))
@@ -195,7 +197,7 @@
       1 y
       nil))
   VectorProto
-  (to-vec [_] [x y])
+  (to-vec [_] (vector-of :double x y))
   (applyf [_ f] (Vec2. (f x) (f y)))
   (magsq [_] (+ (* x x) (* y y)))
   (mag [_] (m/hypot x y))
@@ -270,8 +272,8 @@
 (deftype Vec3 [^double x ^double y ^double z]
   Object
   (toString [_] (str "[" x ", " y ", " z "]"))
-  (equals [_ v]
-    (and (instance? Vec3 v)
+  (equals [t v]
+    (and (identical? t v)
          (let [^Vec3 v v]
            (bool-and (== x (.x v))
                      (== y (.y v))
@@ -289,7 +291,7 @@
       2 z
       nil))
   VectorProto
-  (to-vec [_] [x y z])
+  (to-vec [_] (vector-of :double x y z))
   (applyf [_ f] (Vec3. (f x) (f y) (f z)))
   (magsq [_] (+ (* x x) (* y y) (* z z)))
   (mag [_] (m/hypot x y z))
@@ -438,8 +440,8 @@
 (deftype Vec4 [^double x ^double y ^double z ^double w]
   Object
   (toString [_] (str "[" x ", " y ", " z ", " w "]"))
-  (equals [_ v]
-    (and (instance? Vec4 v)
+  (equals [t v]
+    (and (identical? t v)
          (let [^Vec4 v v]
            (bool-and (== x (.x v))
                      (== y (.y v))
@@ -459,7 +461,7 @@
       3 w
       nil))
   VectorProto
-  (to-vec [_] [x y z w])
+  (to-vec [_] (vector-of :double x y z w))
   (applyf [_ f] (Vec4. (f x) (f y) (f z) (f w)))
   (magsq [_] (+ (* x x) (* y y) (* z z) (* w w)))
   (mag [v1] (m/sqrt (magsq v1)))
@@ -685,3 +687,17 @@
   "Make ArrayVec type"
   [lst]
   (ArrayVec. (double-array lst)))
+
+
+;;
+
+(add-examples mag
+  (example "Length of the vector" {:test-value (m/sqrt 2.0)} (mag (vec2 1 1))))
+
+(add-examples to-vec
+  (example-session "Check types"
+    (type (to-vec [1 2 3]))
+    (type (to-vec (vec2 1 2)))
+    (type (to-vec (vec3 1 2 3)))
+    (type (to-vec (vec4 1 2 3 4)))
+    (type (to-vec (array-vec 1)))))
