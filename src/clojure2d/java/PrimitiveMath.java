@@ -119,5 +119,8 @@ public final class PrimitiveMath {
     public static double norm(double v, double start1, double stop1, double start2, double stop2) {
         return start2 + (stop2 - start2) * norm(v, start1, stop1);
     }
-}
 
+    public static double lerp(double a, double b, double t) { return a + t * (b - a); }
+    public static double hermite(double v) { return v * v * (3.0 - 2.0 * v); }
+    public static double quintic(double v) { return v * v * v * (v * (v * 6.0 - 15.0) + 10.0); }    
+}

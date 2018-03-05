@@ -255,4 +255,3 @@
 ;; Joise version of Perlin noise
 
 (def perlin-noise (make-noise (make-fractal)))
-
