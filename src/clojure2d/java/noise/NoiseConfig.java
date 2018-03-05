@@ -10,10 +10,18 @@ public final class NoiseConfig {
     public final static int INTERPOLATE_HERMITE = 2;
     public final static int INTERPOLATE_QUINTIC = 3;
 
-    public final static double[] GRADX = {1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 0.0, 0.0, 0.0, 0.0};
-    public final static double[] GRADY = {1.0, 1.0, -1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, -1.0, 1.0, -1.0};
-    public final static double[] GRADZ = {0.0, 0.0, 0.0, 0.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, -1.0};
+    public final static double[] GRAD1dX = {2.0, -2.0};
+    
+    public final static double[] GRAD2dX = {1.0, -1.0, 1.0, -1.0};
+    public final static double[] GRAD2dY = {1.0, -1.0, -1.0, 1.0};
+    
+    public final static double[] GRAD3dX = {1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 0.0, 0.0, 0.0, 0.0};
+    public final static double[] GRAD3dY = {1.0, 1.0, -1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, -1.0, 1.0, -1.0};
+    public final static double[] GRAD3dZ = {0.0, 0.0, 0.0, 0.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, -1.0};
 
+    public final static double[] SIMPLEX1d = {1.0, -1.0, 2.0, -2.0, 3.0, -3.0, 4.0, -4.0,
+                                              5.0, -5.0, 6.0, -6.0, 7.0, -7.0, 8.0, -8.0};
+    
     public int interpolate_type;
     public int octaves;
     public double lacunarity;

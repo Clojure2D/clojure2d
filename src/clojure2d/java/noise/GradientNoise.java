@@ -4,27 +4,36 @@ import static clojure2d.java.PrimitiveMath.*;
 
 public final class GradientNoise {
     // 1D
+
+    public static double grad(NoiseConfig cfg, int offset, int x, double xd) {
+        int idx = cfg.perm[(x & 0xff) + offset] & 0x1;
+        return xd * NoiseConfig.GRAD1dX[idx];
+    }
     
     public static double value(NoiseConfig cfg, int offset, double x) {
         int x0 = x > 0.0 ? (int)x : (int)x - 1;
+
+        double xd0 = x - x0;
         
         if(cfg.interpolate_type == NoiseConfig.INTERPOLATE_NONE) {
-            return cfg.valueLUT[cfg.perm[(x0 & 0xff) + offset]];
+            return grad(cfg, offset, x0, xd0) * 0.5;
         } else {
             int x1 = x0 + 1;
+
+            double xd1 = xd0 - 1.0;
             
             double xs;
             
             switch (cfg.interpolate_type) {
                 
-            case NoiseConfig.INTERPOLATE_HERMITE: xs = hermite(x - x0); break;
-            case NoiseConfig.INTERPOLATE_QUINTIC: xs = quintic(x - x0); break;
-            default: xs = x - x0;
+            case NoiseConfig.INTERPOLATE_HERMITE: xs = hermite(xd0); break;
+            case NoiseConfig.INTERPOLATE_QUINTIC: xs = quintic(xd0); break;
+            default: xs = xd0;
             
             }
 
-            return lerp(cfg.valueLUT[cfg.perm[(x0 & 0xff) + offset]],
-                        cfg.valueLUT[cfg.perm[(x1 & 0xff) + offset]], xs);
+            return lerp(grad(cfg, offset, x0, xd0),
+                        grad(cfg, offset, x1, xd1), xs);
         }
     }
 
@@ -47,8 +56,8 @@ public final class GradientNoise {
     
     // 2D
     public static double grad(NoiseConfig cfg, int offset, int x, int y, double xd, double yd) {
-        int idx = cfg.perm12[(x & 0xff) + cfg.perm[(y & 0xff) + offset]];
-        return xd * NoiseConfig.GRADX[idx] + yd * NoiseConfig.GRADY[idx];
+        int idx = cfg.perm[(x & 0xff) + cfg.perm[(y & 0xff) + offset]] & 0x3;
+        return xd * NoiseConfig.GRAD2dX[idx] + yd * NoiseConfig.GRAD2dY[idx];
     }
     
     public static double value(NoiseConfig cfg, int offset, double x, double y) {
@@ -59,7 +68,7 @@ public final class GradientNoise {
         double yd0 = y - y0;
         
         if(cfg.interpolate_type == NoiseConfig.INTERPOLATE_NONE) {
-            return grad(cfg, offset, x0, y0, xd0, yd0);
+            return grad(cfg, offset, x0, y0, xd0, yd0) * 0.5;
         } else {
             int x1 = x0 + 1;
             int y1 = y0 + 1;
@@ -112,7 +121,7 @@ public final class GradientNoise {
     // 3D
     public static double grad(NoiseConfig cfg, int offset, int x, int y, int z, double xd, double yd, double zd) {
         int idx = cfg.perm12[(x & 0xff) + cfg.perm[(y & 0xff) + cfg.perm[(z & 0xff) + offset]]];
-        return xd * NoiseConfig.GRADX[idx] + yd * NoiseConfig.GRADY[idx] + zd * NoiseConfig.GRADZ[idx];
+        return xd * NoiseConfig.GRAD3dX[idx] + yd * NoiseConfig.GRAD3dY[idx] + zd * NoiseConfig.GRAD3dZ[idx];
     }
 
     public static double value(NoiseConfig cfg, int offset, double x, double y, double z) {
@@ -125,7 +134,7 @@ public final class GradientNoise {
         double zd0 = z - z0;
         
         if(cfg.interpolate_type == NoiseConfig.INTERPOLATE_NONE) {
-            return grad(cfg, offset, x0, y0, z0, xd0, yd0, zd0);
+            return grad(cfg, offset, x0, y0, z0, xd0, yd0, zd0) * 0.5;
         } else {
             int x1 = x0 + 1;
             int y1 = y0 + 1;
