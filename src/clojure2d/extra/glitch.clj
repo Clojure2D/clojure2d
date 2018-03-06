@@ -264,7 +264,7 @@
   (let [nnx (m/round (inc (* nx scale)))
         nny (m/round (inc (* ny scale)))
         [bget bset] (make-2d-int-array grid-sx grid-sy)
-        noise (r/make-perlin-noise (if nseed nseed (r/irand)))]
+        noise (r/make-fbm-noise (:seed (or nseed (r/irand))))]
     (dotimes [y grid-sy]
       (bset 0 y 0) 
       (loop [currx (int 0)

@@ -1,12 +1,10 @@
 package clojure2d.java.noise;
 
-import static clojure2d.java.PrimitiveMath.*;
-
 public final class SimplexNoise {
     // 1D
 
     public static double grad(NoiseConfig cfg, int offset, int x, double xd) {
-        int idx = cfg.perm[(x & 0xff) + offset] & 0x7;
+        int idx = cfg.perm[(x & 0xff) + offset] & 0xf;
         return xd * NoiseConfig.SIMPLEX1d[idx];
     }
     
@@ -25,24 +23,7 @@ public final class SimplexNoise {
         t1 *= t1;
         double n1 = t1 * t1 * grad(cfg, offset, i1, x1);
 
-        return 0.79 * (n0 + n1);
-    }
-
-    public static double fbm(NoiseConfig cfg, double x) {
-        double sum = value(cfg, cfg.perm[0], x);
-        double amp = 1.0;
-
-        double xx = x;
-
-        int i=0;
-        while(++i < cfg.octaves) {
-            xx *= cfg.lacunarity;
-            
-            amp *= cfg.gain;
-            sum += value(cfg, cfg.perm[i], xx) * amp;
-        }
-
-        return cfg.normalize ? ((sum * cfg.fractalBounding) + 1.0) * 0.5 : sum * cfg.fractalBounding;
+        return 0.395 * (n0 + n1);
     }
     
     // 2D
@@ -53,7 +34,7 @@ public final class SimplexNoise {
     public static final double G2_2 = G2 + G2;
     
     public static double grad(NoiseConfig cfg, int offset, int x, int y, double xd, double yd) {
-        int idx = cfg.perm12[(x & 0xff) + cfg.perm[(y & 0xff) + offset]];
+        int idx = cfg.perm12[NoiseConfig.hash(cfg, offset, x, y) & 0xff];
         return xd * NoiseConfig.GRAD3dX[idx] + yd * NoiseConfig.GRAD3dY[idx];
     }
     
@@ -113,25 +94,6 @@ public final class SimplexNoise {
   
     }
 
-    public static double fbm(NoiseConfig cfg, double x, double y) {
-        double sum = value(cfg, cfg.perm[0], x, y);
-        double amp = 1.0;
-
-        double xx = x;
-        double yy = y;
-
-        int i=0;
-        while(++i < cfg.octaves) {
-            xx *= cfg.lacunarity;
-            yy *= cfg.lacunarity;
-            
-            amp *= cfg.gain;
-            sum += value(cfg, cfg.perm[i], xx, yy) * amp;
-        }
-
-        return cfg.normalize ? ((sum * cfg.fractalBounding) + 1.0) * 0.5 : sum * cfg.fractalBounding;
-    }
-
     // 3D
 
     public static final double F3 = 1.0 / 3.0;
@@ -140,7 +102,7 @@ public final class SimplexNoise {
     public static final double G3_3 = 0.5;
     
     public static double grad(NoiseConfig cfg, int offset, int x, int y, int z, double xd, double yd, double zd) {
-        int idx = cfg.perm12[(x & 0xff) + cfg.perm[(y & 0xff) + cfg.perm[(z & 0xff) + offset]]];
+        int idx = cfg.perm12[(NoiseConfig.hash(cfg, offset, x, y, z) & 511)];
         return xd * NoiseConfig.GRAD3dX[idx] + yd * NoiseConfig.GRAD3dY[idx] + zd * NoiseConfig.GRAD3dZ[idx];
     }
 
@@ -229,25 +191,4 @@ public final class SimplexNoise {
 	return 32.0 * (n0 + n1 + n2 + n3);
     }
 
-
-    public static double fbm(NoiseConfig cfg, double x, double y, double z) {
-        double sum = value(cfg, cfg.perm[0], x, y, z);
-        double amp = 1.0;
-
-        double xx = x;
-        double yy = y;
-        double zz = z;
-
-        int i=0;
-        while(++i < cfg.octaves) {
-            xx *= cfg.lacunarity;
-            yy *= cfg.lacunarity;
-            zz *= cfg.lacunarity;
-            
-            amp *= cfg.gain;
-            sum += value(cfg, cfg.perm[i], xx, yy, zz) * amp;
-        }
-
-        return cfg.normalize ? ((sum * cfg.fractalBounding) + 1.0) * 0.5 : sum * cfg.fractalBounding;
-    }
 }

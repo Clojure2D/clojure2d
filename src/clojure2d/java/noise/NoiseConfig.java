@@ -10,6 +10,10 @@ public final class NoiseConfig {
     public final static int INTERPOLATE_HERMITE = 2;
     public final static int INTERPOLATE_QUINTIC = 3;
 
+    public final static int NOISE_VALUE = 0;
+    public final static int NOISE_GRADIENT = 1;
+    public final static int NOISE_SIMPLEX = 2;
+    
     public final static double[] GRAD1dX = {2.0, -2.0};
     
     public final static double[] GRAD2dX = {1.0, -1.0, 1.0, -1.0};
@@ -21,7 +25,14 @@ public final class NoiseConfig {
 
     public final static double[] SIMPLEX1d = {1.0, -1.0, 2.0, -2.0, 3.0, -3.0, 4.0, -4.0,
                                               5.0, -5.0, 6.0, -6.0, 7.0, -7.0, 8.0, -8.0};
+
+    private static final int X_NOISE_GEN = 1619;
+    private static final int Y_NOISE_GEN = 31337;
+    private static final int Z_NOISE_GEN = 6971;
+    private static final int SEED_NOISE_GEN = 1013;
+    private static final int SHIFT_NOISE_GEN = 13;
     
+    public int noise_type;
     public int interpolate_type;
     public int octaves;
     public double lacunarity;
@@ -30,19 +41,22 @@ public final class NoiseConfig {
     public boolean normalize;
 
     public double fractalBounding;
+    public double rev_octaves;
 
     public int[] perm, perm12;
     public double[] valueLUT;
-    
-    public NoiseConfig(int seed, int interpolate_type, int octaves, double lacunarity, double gain, boolean normalize) {
+
+    public NoiseConfig(int seed, int noise_type, int interpolate_type, int octaves, double lacunarity, double gain, boolean normalize) {
         this.seed = seed;
+        this.noise_type = noise_type;
         this.interpolate_type = interpolate_type;
-        this.octaves = octaves;
+        this.octaves = Math.max(octaves,1);
         this.lacunarity = lacunarity;
         this.gain = gain;
         this.normalize = normalize;
         
         calcFractalBounding();
+        rev_octaves = 1.0 / octaves;
 
         perm = new int[512];
         perm12 = new int[512];
@@ -87,5 +101,24 @@ public final class NoiseConfig {
         }
         fractalBounding = 1.0/ampf;
     }
-}
 
+    public final static double interpolate(NoiseConfig cfg, double v) {
+        if(cfg.interpolate_type == INTERPOLATE_QUINTIC) return v * v * v * (v * (v * 6.0 - 15.0) + 10.0);
+        if(cfg.interpolate_type == INTERPOLATE_HERMITE) return v * v * (3.0 - 2.0 * v);
+
+        return v;
+    }
+
+    public final static int hash(NoiseConfig cfg, int offset, int x, int y) {
+        int vectorIndex = ((X_NOISE_GEN * x) ^ (Y_NOISE_GEN * y) ^ cfg.seed ^ (SEED_NOISE_GEN * offset));
+        vectorIndex = vectorIndex * vectorIndex * vectorIndex * 60493;
+        return vectorIndex ^ (vectorIndex >> SHIFT_NOISE_GEN);
+    }
+
+    public final static int hash(NoiseConfig cfg, int offset, int x, int y, int z) {
+        int vectorIndex = ((X_NOISE_GEN * x) ^ (Y_NOISE_GEN * y) ^ (Z_NOISE_GEN * z) ^ cfg.seed ^ (SEED_NOISE_GEN * offset));
+        vectorIndex = vectorIndex * vectorIndex * vectorIndex * 60493;
+        return vectorIndex ^ (vectorIndex >> SHIFT_NOISE_GEN);
+    }
+
+}

@@ -1132,7 +1132,7 @@
     (* a
        (m/sin (+ (* p m/TWO_PI) (* x m/TWO_PI f))))))
 
-(def snoise (r/make-perlin-noise (r/irand) 2))
+(def snoise (r/make-fbm-noise {:octaves 2}))
 
 (defmethod make-wave :noise [_ ^double f ^double a ^double p]
   (let [shift-noise (r/drand -5.0 5.0)]

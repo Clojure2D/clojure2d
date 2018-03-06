@@ -122,5 +122,8 @@ public final class PrimitiveMath {
 
     public static double lerp(double a, double b, double t) { return a + t * (b - a); }
     public static double hermite(double v) { return v * v * (3.0 - 2.0 * v); }
-    public static double quintic(double v) { return v * v * v * (v * (v * 6.0 - 15.0) + 10.0); }    
+    public static double quintic(double v) { return v * v * v * (v * (v * 6.0 - 15.0) + 10.0); }
+
+    public static long fastFloor(double v) { return v > 0.0 ? (long)v : (long)v - 1L; }
+    public static long fastCeil(double v) { return - fastFloor(-v); }
 }

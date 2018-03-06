@@ -16,7 +16,6 @@
   (:require [clojure2d.math :as m]
             [clojure2d.math.complex :as c]
             [clojure2d.math.random :refer :all]
-            [clojure2d.math.joise :as j]
             [clojure2d.math.vector :as v])
   (:import clojure2d.math.vector.Vec2
            [org.apache.commons.math3.special BesselJ Beta Erf Gamma]))
@@ -1638,45 +1637,45 @@
 
 ;; ### Joise noises
 
-(make-config-method joise-basis (assoc (j/make-random-basis-conf)
-                                       :scale (srandom 0.1 1.5)))
+;; (make-config-method joise-basis (assoc (j/make-random-basis-conf)
+;;                                        :scale (srandom 0.1 1.5)))
 
-(defn make-joise-basis
-  "Joise basis noise (angle version)"
-  [amount c]
-  (let [n (j/make-noise (j/make-basis c))]
-    (make-noise-variation amount (:scale c) n)))
-(make-var-method joise-basis :regular)
+;; (defn make-joise-basis
+;;   "Joise basis noise (angle version)"
+;;   [amount c]
+;;   (let [n (j/make-noise (j/make-basis c))]
+;;     (make-noise-variation amount (:scale c) n)))
+;; (make-var-method joise-basis :regular)
 
-(make-config-method joise-basis2 (assoc (j/make-random-basis-conf)
-                                        :scale (srandom 0.1 1.5)))
+;; (make-config-method joise-basis2 (assoc (j/make-random-basis-conf)
+;;                                         :scale (srandom 0.1 1.5)))
 
-(defn make-joise-basis2
-  "Joise basis noise (shift version)"
-  [amount c]
-  (let [n (j/make-noise (j/make-basis c))]
-    (make-noise-variation2 amount (:scale c) n)))
-(make-var-method joise-basis2 :regular)
+;; (defn make-joise-basis2
+;;   "Joise basis noise (shift version)"
+;;   [amount c]
+;;   (let [n (j/make-noise (j/make-basis c))]
+;;     (make-noise-variation2 amount (:scale c) n)))
+;; (make-var-method joise-basis2 :regular)
 
-(make-config-method joise-cell (assoc (j/make-random-cell-conf)
-                                      :scale (drand)))
+;; (make-config-method joise-cell (assoc (j/make-random-cell-conf)
+;;                                       :scale (drand)))
 
-(defn make-joise-cell
-  "Joise basis cell (angle version)"
-  [amount c]
-  (let [n (j/make-noise (j/make-cell c))]
-    (make-noise-variation amount (:scale c) n)))
-(make-var-method joise-cell :regular)
+;; (defn make-joise-cell
+;;   "Joise basis cell (angle version)"
+;;   [amount c]
+;;   (let [n (j/make-noise (j/make-cell c))]
+;;     (make-noise-variation amount (:scale c) n)))
+;; (make-var-method joise-cell :regular)
 
-(make-config-method joise-cell2 (assoc (j/make-random-cell-conf)
-                                       :scale (drand)))
+;; (make-config-method joise-cell2 (assoc (j/make-random-cell-conf)
+;;                                        :scale (drand)))
 
-(defn make-joise-cell2
-  "Joise basis cell (shift version)"
-  [amount c]
-  (let [n (j/make-noise (j/make-cell c))]
-    (make-noise-variation2 amount (:scale c) n)))
-(make-var-method joise-cell2 :regular)
+;; (defn make-joise-cell2
+;;   "Joise basis cell (shift version)"
+;;   [amount c]
+;;   (let [n (j/make-noise (j/make-cell c))]
+;;     (make-noise-variation2 amount (:scale c) n)))
+;; (make-var-method joise-cell2 :regular)
 
 
 ;; ### Julia
@@ -1955,7 +1954,7 @@
 (defn make-perlin
   "Perlin noise"
   [amount {:keys [seed octaves scale]}]
-  (let [n (make-perlin-noise seed octaves)]
+  (let [n (make-fbm-noise {:seed seed :octaves octaves})]
     (make-noise-variation amount scale n)))
 (make-var-method perlin :regular)
 
@@ -1966,7 +1965,7 @@
 (defn make-perlin2
   "Perlin noise"
   [^double amount {:keys [^int seed ^int octaves ^double scale]}]
-  (let [n (make-perlin-noise seed octaves)]
+  (let [n (make-fbm-noise {:seed seed :octaves octaves})]
     (make-noise-variation2 amount scale n)))
 (make-var-method perlin2 :regular)
 

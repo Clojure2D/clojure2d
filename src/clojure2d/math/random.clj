@@ -10,12 +10,13 @@
 (ns clojure2d.math.random
   (:require [clojure2d.math :as m]
             [clojure2d.math.vector :as v]
-            [metadoc.examples :refer :all])
+            [metadoc.examples :refer :all]
+            [clojure2d.math.random :as r])
   (:import [clojure2d.math.vector Vec2]
            [org.apache.commons.math3.random RandomGenerator ISAACRandom JDKRandomGenerator MersenneTwister
             Well512a Well1024a Well19937a Well19937c Well44497a Well44497b
             RandomVectorGenerator HaltonSequenceGenerator SobolSequenceGenerator UnitSphereRandomVectorGenerator]
-           [com.flowpowered.noise.module.source Perlin]))
+           [clojure2d.java.noise Billow RidgedMulti FBM NoiseConfig Noise]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -46,7 +47,7 @@
 ;; * `:well512a`, `:well1024a`, `:well19937a`, `:well19937c`, `:well44497a`, `:well44497b` - several WELL variants
 
 ;; Type hinted functions generating random value
-(defn next-random-value-long
+(defn- next-random-value-long
   "Generate next long.
 
   * arity 0 - from 0 to maximum long value
@@ -59,7 +60,7 @@
      (if (zero? diff) mn
          (+ mn (next-random-value-long r diff))))))
 
-(defn next-random-value-double
+(defn- next-random-value-double
   "Generate next double.
 
   * arity 0 - from 0 to 1 (exluded)
@@ -72,7 +73,7 @@
      (if (zero? diff) mn
          (+ mn (next-random-value-double r diff))))))
 
-(defn next-random-value-gaussian
+(defn- next-random-value-gaussian
   "Generate next random value from normal distribution.
 
   * arity 0 - N(0,1)
@@ -286,37 +287,76 @@
 (defmethod make-sequence-generator :default [gen size] (random-generators gen size))
 
 ;; ## Noise
-;;
-;; Basic perling noise function, see `clojure2d.math.joise` namespace for binding to composable noise system
 
-(defn with-noise
-  "Get noise value with given Perlin object. Returned value is from [0,1] range."
-  (^double [^Perlin n x] (* 0.5 (+ 1.0 (.getValue n x 0.5 0.5))))
-  (^double [^Perlin n x y] (* 0.5 (+ 1.0 (.getValue n x y 0.5))))
-  (^double [^Perlin n x y z] (* 0.5 (+ 1.0 (.getValue n x y z)))))
+(def ^:private interpolations {:none NoiseConfig/INTERPOLATE_NONE
+                               :linear NoiseConfig/INTERPOLATE_LINEAR
+                               :hermite NoiseConfig/INTERPOLATE_HERMITE
+                               :quintic NoiseConfig/INTERPOLATE_QUINTIC})
 
-(defn make-perlin-noise
-  "Create noise functions and bind with freshly created Perlin object.
+(def ^:private noise-types {:value NoiseConfig/NOISE_VALUE
+                            :gradient NoiseConfig/NOISE_GRADIENT
+                            :simplex NoiseConfig/NOISE_SIMPLEX})
 
-  Parameters: 
+(defn- make-noise-config
+  ""
+  [{:keys [seed noise-type interpolation octaves lacunarity gain normalize?]}]
+  (NoiseConfig. seed
+                (or (noise-types noise-type) NoiseConfig/NOISE_GRADIENT)
+                (or (interpolations interpolation) NoiseConfig/INTERPOLATE_HERMITE)
+                octaves lacunarity gain normalize?))
 
-  * seed (optional)
-  * octaves (optional)
+(defn noise-config
+  "Create FBM noise function for given configuration."
+  ([] (noise-config {}))
+  ([cfg]
+   (make-noise-config (merge {:seed (r/irand)
+                              :noise-type :gradient
+                              :interpolation :hermite
+                              :octaves 6
+                              :lacunarity 2.00
+                              :gain 0.5
+                              :normalize? true} cfg))))
 
-  Returns `noise` function."
-  ([] (partial with-noise (Perlin.)))
-  ([seed]
-   (let [^Perlin n (Perlin.)]
-     (.setSeed n seed)
-     (partial with-noise n)))
-  ([seed octaves]
-   (let [^Perlin n (Perlin.)]
-     (.setSeed n seed)
-     (.setOctaveCount n octaves)
-     (partial with-noise n))))
+(def ^:private perlin-noise-config (noise-config {:interpolation :quintic}))
+(def ^:private simplex-noise-config (noise-config {:noise-type :simplex}))
+(def ^:private value-noise-config (noise-config {:noise-type :value}))
 
-;; default noise function with random seed and default octave numbers
-(def noise (make-perlin-noise))
+(defn vnoise
+  "Value Noise.
+
+  6 octaves, Hermite interpolation (cubic, h01)."
+  (^double [^double x] (FBM/noise value-noise-config x))
+  (^double [^double x ^double y] (FBM/noise value-noise-config x y))
+  (^double [^double x ^double y ^double z] (FBM/noise value-noise-config x y z)))
+
+(defn noise
+  "Create improved Perlin Noise.
+
+  6 octaves, quintic interpolation."
+  (^double [^double x] (FBM/noise perlin-noise-config x))
+  (^double [^double x ^double y] (FBM/noise perlin-noise-config x y))
+  (^double [^double x ^double y ^double z] (FBM/noise perlin-noise-config x y z)))
+
+(defn simplex
+  "Create Simplex noise. 6 octaves."
+  (^double [^double x] (FBM/noise simplex-noise-config x))
+  (^double [^double x ^double y] (FBM/noise simplex-noise-config x y))
+  (^double [^double x ^double y ^double z] (FBM/noise simplex-noise-config x y z)))
+
+(defmacro ^:private gen-noise-function
+  "Generate various noise for static function"
+  [method]
+  `(fn [cfg#]
+     (let [ncfg# (noise-config cfg#)]
+       (fn
+         ([x#] (~method ncfg# x#))
+         ([x# y#] (~method ncfg# x# y#))
+         ([x# y# z#] (~method ncfg# x# y# z#))))))
+
+(def make-single-noise (gen-noise-function Noise/noise))
+(def make-fbm-noise (gen-noise-function FBM/noise))
+(def make-billow-noise (gen-noise-function Billow/noise))
+(def make-ridgedmulti-noise (gen-noise-function RidgedMulti/noise))
 
 ;; ### Discrete noise
 
@@ -340,7 +380,3 @@
    (discrete-noise X 0)))
 
 ;;
-
-
-
-

@@ -5,7 +5,11 @@ All notable changes to this project will be documented in this file. This change
 
 ### Changed
 
-- refactor...
+- new noise functions approach (backed by Java classes)
+
+### Removed
+
+- external noise (joise and flow-noise) libraries dependency
 
 ## 0.0.7
 
