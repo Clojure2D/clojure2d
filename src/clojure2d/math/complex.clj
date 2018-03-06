@@ -10,7 +10,7 @@
 
   To create complex number use [[complex]], [[vec2]] or [[->Vec2]].
 
-  Graphs are generated with following snippet (where `f` is complex function).
+  Graphs are generated with following snippet using Clojure2d lib (where `f` is complex function).
   
   ```
   (defn generate-complex-graph
@@ -276,6 +276,11 @@
 
 ;;
 
-;; (generate-graph-examples "c/" ".jpg" atan asin acos log exp csc sec tanh tan sinh sin cosh cos sqrt sq sqrt1z reciprocal)
+(defmacro ^:private add-image-examples
+  [xs]
+  `(do
+     ~@(for [x xs]
+         `(add-examples ~x
+            (example-image ~(str "Plot of " x) ~(str "../images/c/" x ".jpg"))))))
 
-;; (alter-docs)
+(add-image-examples [atan asin acos log exp csc sec tanh tan sinh sin cosh cos sqrt sq sqrt1z reciprocal])
