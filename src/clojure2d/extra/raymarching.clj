@@ -3,9 +3,9 @@
 ;; cheap&dirty ray marching helper library
 
 (ns clojure2d.extra.raymarching
-  (:require [clojure2d.math :as m]
-            [clojure2d.math.vector :as v])
-  (:import [clojure2d.math.vector Vec2 Vec3]))
+  (:require [fastmath.core :as m]
+            [fastmath.vector :as v])
+  (:import [fastmath.vector Vec2 Vec3]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)

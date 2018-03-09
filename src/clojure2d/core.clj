@@ -13,13 +13,12 @@
   "JFrame, Java2D, file io and simple session management"
   (:require [clojure.java.io :refer :all]
             [clojure2d.color :as c]
-            [clojure2d.math.vector :as v]
-            [clojure2d.math :as m]
+            [fastmath.vector :as v]
+            [fastmath.core :as m]
             [clojure.reflect :as ref]
-            [clojure2d.math.random :as r]
-            [metadoc.examples :as ex]
-            )
-  (:import clojure2d.math.vector.Vec2
+            [fastmath.random :as r]
+            [metadoc.examples :as ex])
+  (:import [fastmath.vector Vec2]
            [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
            [java.awt.event InputEvent ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
            [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double]

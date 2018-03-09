@@ -13,11 +13,11 @@
 ;;
 (ns clojure2d.extra.variations
   "Variations namespace"
-  (:require [clojure2d.math :as m]
-            [clojure2d.math.complex :as c]
-            [clojure2d.math.random :refer :all]
-            [clojure2d.math.vector :as v])
-  (:import clojure2d.math.vector.Vec2
+  (:require [fastmath.core :as m]
+            [fastmath.complex :as c]
+            [fastmath.random :refer :all]
+            [fastmath.vector :as v])
+  (:import [fastmath.vector Vec2]
            [org.apache.commons.math3.special BesselJ Beta Erf Gamma]))
 
 (set! *warn-on-reflection* true)

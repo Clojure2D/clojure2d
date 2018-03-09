@@ -9,15 +9,15 @@
 ;; See examples 16 and 18
 
 (ns clojure2d.extra.signal
-  (:require [clojure2d.math :as m]
+  (:require [fastmath.core :as m]
             [clojure2d.pixels :as p]
             [clojure2d.core :refer :all]
             [clojure2d.color :as c]
             [clojure.java.io :refer :all]
-            [clojure2d.math.vector :as v]
-            [clojure2d.math.random :as r])
+            [fastmath.vector :as v]
+            [fastmath.random :as r])
   (:import [clojure2d.pixels Pixels]
-           [clojure2d.math.vector Vec2 Vec3]
+           [fastmath.vector Vec2 Vec3]
            [clojure.lang Counted]))
 
 (set! *warn-on-reflection* true)

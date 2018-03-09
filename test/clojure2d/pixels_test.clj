@@ -1,7 +1,7 @@
 (ns clojure2d.pixels-test
   (:require [clojure2d.pixels :as p]
             [clojure2d.color :as c]
-            [clojure2d.math.vector :as v]
+            [fastmath.vector :as v]
             [clojure2d.core :refer :all]
             [clojure.test :refer :all])
   (:import [clojure2d.pixels Pixels]))
@@ -24,7 +24,6 @@
 (use-fixtures :once pixels-fixture)
 
 ;; protocol
-
 (deftest get-colot-test
   (is (= (c/make-color 100 200 10 22) (p/get-color pixels-planar 10 10)))
   (is (= (c/make-color 1 2 3 4) (p/get-color pixels-planar 222)))

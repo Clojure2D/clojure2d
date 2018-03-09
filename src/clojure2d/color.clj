@@ -21,11 +21,11 @@
 
 (ns clojure2d.color
   (:require [clojure.xml :as xml]
-            [clojure2d.math :as m]
-            [clojure2d.math.random :as r]
-            [clojure2d.math.vector :as v]
+            [fastmath.core :as m]
+            [fastmath.random :as r]
+            [fastmath.vector :as v]
             [clojure.java.io :refer :all])
-  (:import [clojure2d.math.vector Vec3 Vec4]           
+  (:import [fastmath.vector Vec3 Vec4]           
            java.awt.Color))
 
 (set! *warn-on-reflection* true)

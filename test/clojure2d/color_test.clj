@@ -1,8 +1,8 @@
 (ns clojure2d.color-test
   (:require [clojure2d.color :refer :all] 
-            [clojure2d.math.vector :as v]
-            [clojure2d.math :as m]
-            [clojure2d.math.random :as r]
+            [fastmath.vector :as v]
+            [fastmath.core :as m]
+            [fastmath.random :as r]
             [clojure.test :refer :all]))
 
 ;; mods

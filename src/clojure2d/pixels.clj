@@ -20,11 +20,11 @@
 (ns clojure2d.pixels
   (:require [clojure2d.color :as c]
             [clojure2d.core :as core]
-            [clojure2d.math :as m]
-            [clojure2d.math.vector :as v])
-  (:import clojure2d.core.Canvas
-           [clojure2d.math.vector Vec2 Vec4]
-           java.awt.image.BufferedImage
+            [fastmath.core :as m]
+            [fastmath.vector :as v])
+  (:import [clojure2d.core Canvas]
+           [fastmath.vector Vec2 Vec4]
+           [java.awt.image BufferedImage]
            [clojure.lang Counted]))
 
 (set! *warn-on-reflection* true)

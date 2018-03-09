@@ -1,6 +1,6 @@
 (ns clojure2d.core-test
   (:require [clojure.test :refer :all]
-            [clojure2d.math.vector :as v]
+            [fastmath.vector :as v]
             [clojure2d.core :refer :all]
             [clojure2d.color :as c]))
 

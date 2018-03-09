@@ -1,15 +1,13 @@
-(defproject clojure2d "0.0.8-SNAPSHOT"
+(defproject clojure2d "0.1.0-SNAPSHOT"
   :description "Creative coding / glitch library backed by Java2D"
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.9.0"]
-                 [net.jafama/jafama "2.3.1"]
-                 [org.apache.commons/commons-math3 "3.6.1"]
                  ;; [net.littleredcomputer/sicmutils "0.10.0"] ;; have to be enabled for one of the examples 
                  ;; [de.sciss/jwave "1.0.3"]
-                 ;; [criterium "0.4.4"]
-                 [metadoc "0.0.1-SNAPSHOT"]
+                 [metadoc "0.0.3-SNAPSHOT"]
+                 [generateme/fastmath "0.1.0-SNAPSHOT"]
                  ;; [org.bytedeco/javacv-platform "1.3.2"]
                  ]
   :resource-path "resources/"
@@ -32,7 +30,8 @@
                              [lein-bikeshed "0.5.0"]
                              [com.jakemccrary/lein-test-refresh "0.22.0"]
                              [lein-codox "0.10.3"]]
-                   :dependencies [[codox-theme-rdash "0.1.2"]]
+                   :dependencies [[codox-theme-rdash "0.1.2"]
+                                  [criterium "0.4.4"]]
                    :codox {:themes [:rdash]
                            :metadata {:doc/format :markdown}
                            :output-path "docs/codox/"

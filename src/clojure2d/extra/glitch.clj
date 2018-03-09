@@ -14,16 +14,16 @@
 ;; More info soon. Some API is subject to change (make it more consistent).
 
 (ns clojure2d.extra.glitch
-  (:require [clojure2d.math :as m]
-            [clojure2d.math.random :as r]
+  (:require [fastmath.core :as m]
+            [fastmath.random :as r]
             [clojure2d.pixels :as p]
             [clojure2d.core :refer :all]
-            [clojure2d.math.vector :as v]
+            [fastmath.vector :as v]
             [clojure2d.extra.signal :as s]
             [clojure2d.color :as c]
             [clojure2d.extra.variations :as var])
   (:import [clojure2d.pixels Pixels]
-           [clojure2d.math.vector Vec2 Vec4]))
+           [fastmath.vector Vec2 Vec4]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
