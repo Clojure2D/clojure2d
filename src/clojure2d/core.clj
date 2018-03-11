@@ -10,14 +10,48 @@
 ;; * Some general helper functions
 
 (ns clojure2d.core
-  "JFrame, Java2D, file io and simple session management"
+  "Main Clojure2d entry point for Canvas, Window and drawing generatively.
+
+  Basic concepts:
+
+  * Image - `BufferedImage` java object used to store ARGB color information.
+  * Canvas - Image which contains graphical context. You draw on it. Similar to processing Graphics object.
+  * Window - Window which can display canvas, process events, keeps app/script concept. Similar to Processing sketch with display.
+  * Events - Mouse and keyboard events
+
+  Protocols:
+
+  * [[ImageProto]] - basic Image operations (Image, Canvas, Window and Pixels (see [clojure2d.pixels]) implement this protocol.
+  * Various events protocols. Events and Window implement these:
+    * [[MouseXYProto]] - mouse position related to Window.
+    * [[MouseButtonProto]] - status of mouse buttons.
+    * [[KeyEventProto]] - keyboard status
+    * [[ModifiersProto]] - status of special keys (Ctrl, Meta, Alt, etc.)
+
+  To draw on Canvas outside Window you have to create graphical context. Wrap your code into one of two functions:
+
+  * [[with-canvas]] - binding macro `(with-canvas [local-canvas canvas-object] ...)`
+  * [[with-canvas->]] - threading macro `(with-canvas-> canvas ...)`. Each function in this macro has to accept Canvas as first parameter and return Canvas.
+
+  Canvas bound to Window accessed via callback drawing function (a'ka Processing `draw()`) has graphical context created automatically.
+
+  ### Image
+
+  Image is `BufferedImage` java object. Image can be read from file using [[load-image]] function or saved to file with [[save]]. ImageProto provides [[get-image]] function to access to Image object directly (if you need)
+  There is no function which creates Image directly (use Canvas instead).
+
+  ### Canvas
+
+  "
+  {:metadoc/categories {:image "Image functions."}}
   (:require [clojure.java.io :refer :all]
             [clojure2d.color :as c]
             [fastmath.vector :as v]
             [fastmath.core :as m]
             [clojure.reflect :as ref]
             [fastmath.random :as r]
-            [metadoc.examples :as ex])
+            [metadoc.examples :as ex]
+            [clojure.string :as s])
   (:import [fastmath.vector Vec2]
            [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
            [java.awt.event InputEvent ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
@@ -33,27 +67,30 @@
 
 ;; how many tasks we can run (one less than available cores)?
 (def ^:const ^long
-  ^{:doc "How much processor cores are in system."}
+  ^{:doc "How much processor cores are in system. Constant is machine dependant."}
   available-cores (.availableProcessors (Runtime/getRuntime)))
 (def ^:const ^long
-  ^{:doc "How much intensive tasks can we run. Which is `(+ 1 available-cores)`"}
-  available-tasks (inc available-cores))
+  ^{:doc "How much intensive tasks can we run. Which is 150% of available cores. Constant is machine dependant."}
+  available-tasks (m/round (* 1.5 available-cores)))
 
 ;; ## Image
 
-;; Let's start with setting dynamic variable which defines quality of the saved jpeg file. Values are from `0.0` to `1.0`.
-;; You can freely change this setting with `binding` macro. Default is 97% (0.97).
-(def ^:dynamic *jpeg-image-quality* 0.97)
+(def ^{:doc "Default quality of saved jpg (values: 0.0 (lowest) - 1.0 (highest)"
+       :metadoc/categories #{:image}
+       :metadoc/examples [(ex/example "Value" *jpeg-image-quality*)]} ^:dynamic *jpeg-image-quality* 0.97)
 
 ;; ### Load image
 
 ;; To load image from the file, just call `(load-image "filename.jpg")`. Idea is taken from Processing code. Loading is done via `ImageIcon` class and later converted to BufferedImage in ARGB mode.
 
 (defn load-image 
-  "Load image from file.
+  "Load Image from file.
 
-  * Input: image filename with absolute or relative path (relative to your project folder)
-  * Returns BufferedImage object"
+  * Input: Image filename with absolute or relative path (relative to your project folder)
+  * Returns BufferedImage object or nil when Image can't be loaded.
+
+  For supported formats check [[img-reader-formats]]."
+  {:metadoc/categories #{:image}}
   [^String filename]
   (try
     (let [^Image img (.getImage (ImageIcon. filename))
@@ -84,6 +121,11 @@
 
   * Input: image filename
   * Returns extension (without dot)"
+  {:metadoc/categories #{:image}
+   :metadoc/examples [(ex/example-session "Usage"
+                        (file-extension "image.png")
+                        (file-extension "no_extension")
+                        (file-extension "with.path/file.doc"))]}
   [filename]
   (second (re-find #"\.(\w+)$" filename)))
 
@@ -120,8 +162,29 @@
        (.dispose)))
    img))
 
+(def
+  ^{:doc "Supported writable image formats. Machine/configuration dependant."
+    :metadoc/categories #{:image}
+    :metadoc/examples [(ex/example "Set of writable image formats" img-writer-formats)]}
+  ^:static img-writer-formats (->> (ImageIO/getWriterFormatNames)
+                                   (seq)
+                                   (map s/lower-case)
+                                   (set)))
+
+(def
+  ^{:doc "Supported readable image formats. Machine/configuration dependant."
+    :metadoc/categories #{:image}
+    :metadoc/examples [(ex/example "Set of readable image formats" img-reader-formats)]}
+  ^:static img-reader-formats (->> (ImageIO/getReaderFormatNames)
+                                   (seq)
+                                   (map s/lower-case)
+                                   (set)))
+
 ;; Now we define multimethod which saves image. Multimethod is used here because some image types requires additional actions.
-(defmulti save-file-type (fn [filename _ _] (keyword (file-extension filename))))
+(defmulti save-file-type
+  "Save Image to the file. Preprocess if necessary (depends on file type). For supported formats check [[img-writer-formats]]."
+  ^{:metadoc/categories #{:image}}
+  (fn [filename _ _] (keyword (file-extension filename))))
 
 ;; JPG requires flatten image and we must set the quality defined in `*jpeg-image-quality*` variable.
 (defmethod save-file-type :jpg
@@ -1023,7 +1086,7 @@
   (mouse-y [m] "y position")
   (mouse-pos [m] "combined position"))
 
-(defprotocol MouseProto
+(defprotocol MouseButtonProto
   "Get mouse button status"
   (mouse-button [m] "get mouse button status :left :right :center or :none"))
 
@@ -1072,7 +1135,7 @@
 
 ;; ### Events function
 (extend MouseEvent
-  MouseProto
+  MouseButtonProto
   {:mouse-button #(condp = (.getButton ^MouseEvent %)
                     MouseEvent/BUTTON1 :left
                     MouseEvent/BUTTON2 :center
