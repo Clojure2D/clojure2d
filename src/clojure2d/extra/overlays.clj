@@ -63,11 +63,11 @@
                   (p/get-image-pixels))
          l1 (tinter1 rimg)
          l2 (tinter2 rimg)
-         canvas (with-canvas-> (create-canvas w h)
-                  (image (p/image-from-pixels l1))
-                  (draw-lines w h))]
+         cnvs (with-canvas-> (canvas w h)
+                (image (p/image-from-pixels l1))
+                (draw-lines w h))]
      
-     (let [l1 (p/get-canvas-pixels canvas)]
+     (let [l1 (p/get-canvas-pixels cnvs)]
        (p/image-from-pixels (p/blend-channels (partial p/blend-channel-xy blend-shift-and-add-f) l1 l2)))))
   ([p] (render-rgb-scanlines p {})))
 
@@ -157,7 +157,7 @@
    (let [fc (fn [_] 
               (c/lclamp255 (+ 100.0 (* 20.0 (r/grand)))))
          fa (constantly (int alpha))
-         p (p/filter-channels (partial p/filter-channel fc) nil nil (partial p/filter-channel fa) (p/make-pixels w h))]
+         p (p/filter-channels (partial p/filter-channel fc) nil nil (partial p/filter-channel fa) (p/pixels w h))]
      (p/set-channel p 1 (p/get-channel p 0))
      (p/set-channel p 2 (p/get-channel p 0))
      (p/image-from-pixels p)))
@@ -169,10 +169,10 @@
    (let [img (get-image img)
          w (width img)
          h (height img)
-         canvas (with-canvas-> (create-canvas w h)
-                  (image img)
-                  (image noise))]
-     (get-image canvas)))
+         cnvs (with-canvas-> (canvas w h)
+                (image img)
+                (image noise))]
+     (get-image cnvs)))
   ([img]
    (render-noise img (make-noise (width img) (height img)))))
 
@@ -206,7 +206,7 @@
                                                (int))]
                                      (aset pc (+ ^long m (* w ^long n)) bc)
                                      (aset pa (+ ^long m (* w ^long n)) a)))))))
-    (let [p (p/make-pixels w h)]
+    (let [p (p/pixels w h)]
       (p/set-channel p 0 pc)
       (p/set-channel p 3 pa)
       (let [res (p/filter-channels p/dilate-filter nil nil p/dilate-filter p)]
@@ -234,8 +234,8 @@
    (let [img (get-image img)
          w (width img)
          h (height img)
-         canvas (with-canvas-> (create-canvas w h)
-                  (apply-images img spots))]     
-     (get-image canvas)))
+         cnvs (with-canvas-> (canvas w h)
+                (apply-images img spots))]     
+     (get-image cnvs)))
   ([img] (render-spots img (make-spots (width img) (height img)))))
 

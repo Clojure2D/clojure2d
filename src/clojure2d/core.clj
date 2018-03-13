@@ -162,23 +162,24 @@
        (.dispose)))
    img))
 
+(defn- formats->names
+  "Convert possible formats to names' set."
+  [formats]
+  (->> (seq formats)
+       (map s/lower-case)
+       (set)))
+
 (def
   ^{:doc "Supported writable image formats. Machine/configuration dependant."
     :metadoc/categories #{:image}
     :metadoc/examples [(ex/example "Set of writable image formats" img-writer-formats)]}
-  ^:static img-writer-formats (->> (ImageIO/getWriterFormatNames)
-                                   (seq)
-                                   (map s/lower-case)
-                                   (set)))
+  img-writer-formats (formats->names (ImageIO/getWriterFormatNames)))
 
 (def
   ^{:doc "Supported readable image formats. Machine/configuration dependant."
     :metadoc/categories #{:image}
     :metadoc/examples [(ex/example "Set of readable image formats" img-reader-formats)]}
-  ^:static img-reader-formats (->> (ImageIO/getReaderFormatNames)
-                                   (seq)
-                                   (map s/lower-case)
-                                   (set)))
+  img-reader-formats (formats->names (ImageIO/getReaderFormatNames)))
 
 ;; Now we define multimethod which saves image. Multimethod is used here because some image types requires additional actions.
 (defmulti save-file-type
@@ -227,7 +228,7 @@
 (declare set-rendering-hints-by-key)
 
 (defn resize-image
-  "Resize image
+  "Resize Image.
 
   * Input: image and target width and height
   * Returns newly created resized image"
@@ -240,7 +241,7 @@
       (.dispose))
     target))
 
-(defn subimage
+(defn- get-subimage
   "Get subimage of give image"
   [^BufferedImage source x y w h]
   (.getSubimage source x y w h))
@@ -275,23 +276,24 @@
   (height [i])
   (save [i n])
   (convolve [i t])
+  (subimage [i x y w h])
   (get-pixel [i x y] "Retruns color"))
 
-(def convolution-matrices {:shadow (Kernel. 3 3 (float-array [0 1 2 -1 0 1 -2 -1 0]))
-                           :emboss (Kernel. 3 3 (float-array [0 2 4 -2 1 2 -4 -2 0]))
-                           :edges-1 (Kernel. 3 3 (float-array [1 2 1 2 -12 2 1 2 1]))
-                           :edges-2 (Kernel. 3 3 (float-array [1 0 -1 0 0 0 -1 0 1]))
-                           :edges-3 (Kernel. 3 3 (float-array [0 1 0 1 -4 1 0 1 0]))
-                           :edges-4 (Kernel. 3 3 (float-array [-1 -1 -1 -1 8 -1 -1 -1 -1]))
-                           :sharpen (Kernel. 3 3 (float-array [0 -1 0 -1 5 -1 0 -1 0]))
-                           :sobel-x (Kernel. 3 3 (float-array [1 0 -1 2 0 -2 1 0 -1]))
-                           :sobel-y (Kernel. 3 3 (float-array [1 2 1 0 0 0 -1 -2 -1]))
-                           :gradient-x (Kernel. 3 3 (float-array [-1 0 1 -1 0 1 -1 0 1]))
-                           :gradient-y (Kernel. 3 3 (float-array [-1 -1 -1 0 0 0 1 1 1]))
-                           :box-blur (Kernel. 3 3 (float-array (map #(/ (int %) 9.0) [1 1 1 1 1 1 1 1 1])))
+(def convolution-matrices {:shadow          (Kernel. 3 3 (float-array [0 1 2 -1 0 1 -2 -1 0]))
+                           :emboss          (Kernel. 3 3 (float-array [0 2 4 -2 1 2 -4 -2 0]))
+                           :edges-1         (Kernel. 3 3 (float-array [1 2 1 2 -12 2 1 2 1]))
+                           :edges-2         (Kernel. 3 3 (float-array [1 0 -1 0 0 0 -1 0 1]))
+                           :edges-3         (Kernel. 3 3 (float-array [0 1 0 1 -4 1 0 1 0]))
+                           :edges-4         (Kernel. 3 3 (float-array [-1 -1 -1 -1 8 -1 -1 -1 -1]))
+                           :sharpen         (Kernel. 3 3 (float-array [0 -1 0 -1 5 -1 0 -1 0]))
+                           :sobel-x         (Kernel. 3 3 (float-array [1 0 -1 2 0 -2 1 0 -1]))
+                           :sobel-y         (Kernel. 3 3 (float-array [1 2 1 0 0 0 -1 -2 -1]))
+                           :gradient-x      (Kernel. 3 3 (float-array [-1 0 1 -1 0 1 -1 0 1]))
+                           :gradient-y      (Kernel. 3 3 (float-array [-1 -1 -1 0 0 0 1 1 1]))
+                           :box-blur        (Kernel. 3 3 (float-array (map #(/ (int %) 9.0) [1 1 1 1 1 1 1 1 1])))
                            :gaussian-blur-3 (Kernel. 3 3 (float-array (map #(/ (int %) 16.0) [1 2 1 2 4 2 1 2 1])))
                            :gaussian-blur-5 (Kernel. 5 5 (float-array (map #(/ (int %) 256.0) [1 4 6 4 1 4 16 24 16 4 6 24 36 24 6 4 16 24 16 4 1 4 6 4 1])))
-                           :unsharp (Kernel. 5 5 (float-array (map #(/ (int %) -256.0) [1 4 6 4 1 4 16 24 16 4 6 24 -476 24 6 4 16 24 16 4 1 4 6 4 1])))})
+                           :unsharp         (Kernel. 5 5 (float-array (map #(/ (int %) -256.0) [1 4 6 4 1 4 16 24 16 4 6 24 -476 24 6 4 16 24 16 4 1 4 6 4 1])))})
 
 ;; Add ImageProto functions to BufferedImae
 (extend BufferedImage
@@ -308,12 +310,13 @@
                               (let [s (int (m/sqrt (count t)))]
                                 (Kernel. s s (float-array t))))]
                  (.filter ^ConvolveOp (ConvolveOp. kernel) i nil)))
+   :subimage get-subimage
    :get-pixel (fn [^BufferedImage i ^long x ^long y]
                 (if (bool-or (< x 0)
                              (< y 0)
                              (>= x (.getWidth i))
                              (>= y (.getHeight i)))
-                  (c/make-color 0 0 0)
+                  (c/color 0 0 0)
                   (let [b (int-array 1)
                         ^java.awt.image.Raster raster (.getRaster i)]
                     (.getDataElements raster x y b)
@@ -323,8 +326,8 @@
                           r (bit-and (>> v 16) 0xff)
                           a (bit-and (>> v 24) 0xff)]
                       (if (== (.getNumBands raster) 3)
-                        (c/make-color r g b)
-                        (c/make-color r g b a))))))})
+                        (c/color r g b)
+                        (c/color r g b a))))))})
 
 ;; Canvas type. Use `get-image` to extract image (`BufferedImage`).
 (deftype ^{:doc "Test"}
@@ -345,38 +348,39 @@
   (save [c n] (save-image buffer n) c)
   (convolve [_ t]
     (convolve buffer t))
+  (subimage [_ x y w h] (get-subimage buffer x y w h))
   (get-pixel [_ x y] (get-pixel buffer x y)))
 
 ;; Let's define three rendering quality options: `:low`, `:mid`, `:high` or `:highest`. Where `:low` is fastest but has poor quality and `:high`/`:highest` has best quality but may be slow. Rendering options are used when you create canvas.
-(def ^:static rendering-hints {:low [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF]
-                                     [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR]
-                                     [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED]
-                                     [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED]
-                                     [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED]
-                                     [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF]
-                                     [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_OFF]]
-                               :mid [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
-                                     [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BILINEAR]
-                                     [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED]
-                                     [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED]
-                                     [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED]
-                                     [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF]
-                                     [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]]
-                               :high [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
-                                      [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC]
-                                      [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY]
-                                      [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY]
-                                      [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY]
-                                      [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON]
-                                      [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]]
-                               :highest [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
-                                         [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC]
-                                         [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY]
-                                         [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY]
-                                         [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY]
-                                         [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON]
-                                         [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]
-                                         [RenderingHints/KEY_STROKE_CONTROL      RenderingHints/VALUE_STROKE_PURE]]})
+(def rendering-hints {:low [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF]
+                            [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR]
+                            [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED]
+                            [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED]
+                            [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED]
+                            [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF]
+                            [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_OFF]]
+                      :mid [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
+                            [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BILINEAR]
+                            [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED]
+                            [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED]
+                            [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED]
+                            [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF]
+                            [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]]
+                      :high [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
+                             [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC]
+                             [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY]
+                             [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY]
+                             [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY]
+                             [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON]
+                             [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]]
+                      :highest [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
+                                [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC]
+                                [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY]
+                                [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY]
+                                [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY]
+                                [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON]
+                                [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]
+                                [RenderingHints/KEY_STROKE_CONTROL      RenderingHints/VALUE_STROKE_PURE]]})
 
 (defn get-rendering-hints
   "Return rendering hints for a key or return default (or :high)."
@@ -457,7 +461,7 @@
 (declare set-color)
 (declare image)
 
-(defn create-canvas
+(defn canvas
   "Create and return canvas with `width`, `height` and quality hint name (keyword). Default hint is `:high`."
   ([^long width ^long height hint ^String font]
    (let
@@ -479,19 +483,16 @@
        (set-background Color/black))
      result))
   ([width height]
-   (create-canvas width height :high nil))
+   (canvas width height :high nil))
   ([width height hint]
-   (create-canvas width height hint nil)))
-
-;; alias for create-canvas
-(def make-canvas create-canvas)
+   (canvas width height hint nil)))
 
 (defn resize-canvas
   "Resize canvas to new dimensions. Creates and returns new canvas."
-  [^Canvas canvas width height]
-  (let [ncanvas (create-canvas width height (.hints canvas))]
+  [^Canvas c width height]
+  (let [ncanvas (canvas width height (.hints c))]
     (with-canvas-> ncanvas
-      (image (get-image canvas)))))
+      (image (get-image c)))))
 
 ;; ### Transformations
 ;;
@@ -897,13 +898,13 @@
   * clojure2d.math.vector.Vec4 or Vec3 object
   * individual r, g, b (and optional alpha) as integers from 0-255. They are converted to integer and clamped if necessary."
   ([f canvas c]
-   (f canvas (c/make-awt-color c)))
+   (f canvas (c/awt-color c)))
   ([f canvas c a]
-   (f canvas (c/make-awt-color c a)))
+   (f canvas (c/awt-color c a)))
   ([f canvas r g b a]
-   (f canvas (c/make-awt-color r g b a)))
+   (f canvas (c/awt-color r g b a)))
   ([f canvas r g b]
-   (f canvas (c/make-awt-color r g b))))
+   (f canvas (c/awt-color r g b))))
 
 (defn set-awt-color
   "Set color with valid java `Color` object. Use it when you're sure you pass `java.awt.Color`."
@@ -967,7 +968,7 @@
 (defn set-gradient
   "Set paint mode to gradient. Call with canvas only to reset."
   ([^Canvas canvas x1 y1 color1 x2 y2 color2]
-   (let [gp (java.awt.GradientPaint. x1 y1 (c/make-awt-color color1) x2 y2 (c/make-awt-color color2))
+   (let [gp (java.awt.GradientPaint. x1 y1 (c/awt-color color1) x2 y2 (c/awt-color color2))
          ^Graphics2D g (.graphics canvas)]
      (.setPaint g gp)
      canvas)))
@@ -1067,18 +1068,18 @@
 ;; To get mouse position call `(mouse-x e)` and `(mouse-y e)` where `e` is MouseEvent object.
 
 ;; Extract all keycodes from `KeyEvent` object and pack it to the map
-(def keycodes-map (->> KeyEvent
-                       (ref/reflect)
-                       (:members)
-                       (filter #(instance? clojure.reflect.Field %))
-                       (map #(str (:name %)))
-                       (filter #(re-matches #"VK_.*" %))
-                       (reduce #(assoc %1
-                                       (clojure.lang.Reflector/getStaticField "java.awt.event.KeyEvent" ^String %2)
-                                       (-> %2
-                                           (subs 3)
-                                           (clojure.string/lower-case)
-                                           (keyword))) {})))
+(def ^:private keycodes-map (->> KeyEvent
+                                 (ref/reflect)
+                                 (:members)
+                                 (filter #(instance? clojure.reflect.Field %))
+                                 (map #(str (:name %)))
+                                 (filter #(re-matches #"VK_.*" %))
+                                 (reduce #(assoc %1
+                                                 (clojure.lang.Reflector/getStaticField "java.awt.event.KeyEvent" ^String %2)
+                                                 (-> %2
+                                                     (subs 3)
+                                                     (clojure.string/lower-case)
+                                                     (keyword))) {})))
 
 (defprotocol MouseXYProto
   "Access to mouse position."
@@ -1104,6 +1105,10 @@
   (shift-down? [e])
   (alt-gr-down? [e]))
 
+(defprotocol PressedProto
+  (key-pressed? [w])
+  (mouse-pressed? [w]))
+
 ;; `Window` type definition, equiped with `get-image` method returning bound canvas' image.
 (defrecord Window [^JFrame frame
                    active?
@@ -1112,14 +1117,31 @@
                    ^double fps
                    ^long w
                    ^long h
-                   window-name]
+                   window-name
+                   events]
   ImageProto
   (get-image [_] (get-image @buffer))
   (width [_] w)
   (height [_] h)
   (save [w n] (save-image (get-image @buffer) n) w)
   (convolve [w n] (convolve @buffer n))
+  (subimage [_ x y w h] (get-subimage @buffer x y w h))
   (get-pixel [_ x y] (get-pixel @buffer x y))
+  PressedProto
+  (key-pressed? [_] (:key-pressed? @events))
+  (mouse-pressed? [_] (:mouse-pressed? @events))
+  ModifiersProto
+  (control-down? [_] (:control-down? @events))
+  (alt-down? [_] (:alt-down? @events)) 
+  (meta-down? [_] (:meta-down? @events))
+  (shift-down? [_] (:shift-down? @events))
+  (alt-gr-down? [_] (:alt-gr-down? @events))
+  KeyEventProto
+  (key-code [_] (:key-code @events))
+  (key-char [_] (:key-char @events))
+  (key-raw [_] (:key-raw @events))
+  MouseButtonProto
+  (mouse-button [_] (:mouse-button @events))
   MouseXYProto
   (mouse-pos [_]
     (let [^java.awt.Point p (.getMousePosition panel)]
@@ -1261,6 +1283,7 @@
                           (keyPressed [e] (process-state-and-event key-pressed e))
                           (keyReleased [e] (process-state-and-event key-released e))
                           (keyTyped [e] (process-state-and-event key-typed e))))
+
 (def key-event-processor (proxy [KeyAdapter] []
                            (keyPressed [e] (process-state-and-event key-event e))
                            (keyReleased [e] (process-state-and-event key-event e))
@@ -1276,6 +1299,37 @@
 (def mouse-motion-processor (proxy [MouseMotionAdapter] []
                               (mouseDragged [e] (process-state-and-event mouse-event e))
                               (mouseMoved [e] (process-state-and-event mouse-event e))))
+
+;;
+
+(defn- add-events-state-processors
+  "Add listeners for mouse and keyboard to store state"
+  [^Window w]
+  (let [mouse-events (proxy [MouseAdapter] []
+                       (mousePressed [e] (swap! (.events w) assoc
+                                                :mouse-pressed? true
+                                                :mouse-button (mouse-button e)
+                                                :control-down? (control-down? e)
+                                                :alt-down? (alt-down? e)
+                                                :meta-down? (meta-down? e)
+                                                :shift-down? (shift-down? e)
+                                                :alt-gr-down? (alt-gr-down? e)))
+                       (mouseReleased [_] (swap! (.events w) assoc :mouse-pressed? false)))
+        key-events (proxy [KeyAdapter] []
+                     (keyPressed [e] (swap! (.events w) assoc
+                                            :key-pressed? true
+                                            :key-code (key-code e)
+                                            :key-char (key-char e)
+                                            :key-raw (key-raw e)
+                                            :control-down? (control-down? e)
+                                            :alt-down? (alt-down? e)
+                                            :meta-down? (meta-down? e)
+                                            :shift-down? (shift-down? e)
+                                            :alt-gr-down? (alt-gr-down? e)))
+                     (keyReleased [_] (swap! (.events w) assoc :key-pressed? false)))]
+    (doto ^java.awt.Canvas (.panel w)
+      (.addMouseListener mouse-events)
+      (.addKeyListener key-events))))
 
 (defn close-window
   "Close window programatically"
@@ -1312,7 +1366,7 @@
   (.dispose frame))
 
 ;; Create lazy list of icons to be loaded by frame
-(def window-icons (map #(.getImage (ImageIcon. (resource (str "icons/i" % ".png")))) [10 16 20 24 30 32 40 44 64 128]))
+(def ^:private window-icons (map #(.getImage (ImageIcon. (resource (str "icons/i" % ".png")))) [10 16 20 24 30 32 40 44 64 128]))
 
 (defn- build-frame
   "Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event."
@@ -1324,8 +1378,6 @@
       (.setIconImages window-icons)
       (.add panel)
       (.setSize (Dimension. width height))
-      (.addKeyListener key-char-processor)
-      (.addKeyListener key-event-processor)
       (.invalidate)
       (.setResizable false)
       (.pack)
@@ -1337,6 +1389,7 @@
       (.setLocationRelativeTo nil)
       (.setVisible true))
     (doto panel
+      (.requestFocus)
       (.createBufferStrategy 2))))
 
 ;; Another internal function repaints panel with frames per seconds rate. If `draw` function is passed it is called before rapaint action. Function runs infinitely until window is closed. The cycle goes like this:
@@ -1478,13 +1531,15 @@
                           fps
                           width
                           height
-                          wname)
+                          wname
+                          (atom {}))
          setup-state (when setup (with-canvas-> canvas
                                    (setup window))) 
          refresh-screen-task (if (= refresher :fast)
                                refresh-screen-task-speed
                                refresh-screen-task-safety)]
      (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
+     (add-events-state-processors window)
      (change-state! wname state)
      (future (refresh-screen-task window draw-fun (or setup-state draw-state) (when hint (get-rendering-hints hint :mid))))
      window))
@@ -1499,7 +1554,7 @@
   ([canvas wname w h fps draw-fun]
    (show-window canvas wname w h fps draw-fun nil nil nil nil nil))
   ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint refresher]
-     :or {canvas (make-canvas 200 200)
+     :or {canvas (canvas 200 200)
           window-name (str "Clojure2D - " (to-hex (rand-int (Integer/MAX_VALUE)) 8))
           fps 60
           draw-fn nil
@@ -1695,21 +1750,21 @@
 ;; Mutable array2d creator helper
 ;;
 
-(defn make-2d-int-array
+(defn int-array-2d
   "Create 2d int array getter and setter methods. Array is mutable!"
   [^long sizex ^long sizey]
   (let [buff (int-array (* sizex sizey))]
     [#(aget ^ints buff (+ ^long %1 (* sizex ^long %2)))
      #(aset ^ints buff (+ ^long %1 (* sizex ^long %2)) ^int %3)]))
 
-(defn make-2d-long-array
+(defn long-array-2d
   "Create 2d int array getter and setter methods. Array is mutable!"
   [^long sizex ^long sizey]
   (let [buff (long-array (* sizex sizey))]
     [#(aget ^longs buff (+ ^long %1 (* sizex ^long %2)))
      #(aset ^longs buff (+ ^long %1 (* sizex ^long %2)) ^long %3)]))
 
-(defn make-2d-double-array
+(defn double-array-2d
   "Create 2d int array getter and setter methods. Array is mutable!"
   [^long sizex ^long sizey]
   (let [buff (double-array (* sizex sizey))]

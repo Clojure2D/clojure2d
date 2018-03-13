@@ -35,10 +35,10 @@
 (def cc (java.awt.Color. 245 245 220))
 
 (deftest type-conversion-test
-  (is (m/approx-eq 243.195 (to-luma :beige))) ;; => 243.19577500000003
-  (is (m/approx-eq 243.195 (to-luma cv3)))
-  (is (m/approx-eq 243.195 (to-luma cv4)))
-  (is (m/approx-eq 243.195 (to-luma cc)))
+  (is (m/approx-eq 243.195 (luma :beige))) ;; => 243.19577500000003
+  (is (m/approx-eq 243.195 (luma cv3)))
+  (is (m/approx-eq 243.195 (luma cv4)))
+  (is (m/approx-eq 243.195 (luma cc)))
 
   (is (= cv4 (to-color :beige)))
   (is (= cv4 (to-color cv3)))
@@ -53,15 +53,15 @@
   (is (= (v/vec4 245 245 220 100) (to-color (set-awt-alpha cc 100)))))
 
 (deftest make-color-test
-  (is (= cc (make-awt-color cv3 255)))
-  (is (= cc (make-awt-color 245 245 220)))
-  (is (= cc (make-awt-color 245 245 220 255)))
-  (is (= cv4 (make-color cv3 255)))
-  (is (= cv4 (make-color 245 245 220)))
-  (is (= cv4 (make-color 245 245 220 255))))
+  (is (= cc (awt-color cv3 255)))
+  (is (= cc (awt-color 245 245 220)))
+  (is (= cc (awt-color 245 245 220 255)))
+  (is (= cv4 (color cv3 255)))
+  (is (= cv4 (color 245 245 220)))
+  (is (= cv4 (color 245 245 220 255))))
 
 (deftest hue-test
-  (is (= (/ (* 255.0 60.0) 360.0) (get-hue (make-color :beige)))))
+  (is (= (/ (* 255.0 60.0) 360.0) (hue (color :beige)))))
 
 (deftest get-r255-test
   (let [r (r/irand 256)]

@@ -16,7 +16,7 @@
 (deftype Material [^Vec3 color ^double diffusion ^double specular ^double specularf0 ^double specularpow ^double reflection])
 (deftype HitData [^double d ^Material mat])
 
-(defn make-material
+(defn material
   "Create material information:
   - color - Vec3 with RGB: 0.0-1.0
   - diffusion - diffusion ratio: 0.0 - 1.0
@@ -47,26 +47,26 @@
 
 ;; signed distances
 
-(defmulti make-primitive (fn [n mat conf] n))
+(defmulti primitive (fn [n mat conf] n))
 
-(defmethod make-primitive :sphere [_ mat conf]
+(defmethod primitive :sphere [_ mat conf]
   (let [^double s (:r conf)]
     (fn [p]
       (HitData. (- ^double (v/mag p) s) mat))))
 
-(defmethod make-primitive :plane [_ mat conf]
+(defmethod primitive :plane [_ mat conf]
   (let [n (v/normalize (:normal conf))
         ^double dist (:dist-from-origin conf)]
     (fn [p]
       (HitData. (+ dist ^double (v/dot p n)) mat))))
 
-(defmethod make-primitive :box [_ mat conf]
+(defmethod primitive :box [_ mat conf]
   (let [b (:box conf)]
     (fn [p]
       (let [d (v/sub (v/abs p) b)]
         (HitData. (+ ^double (v/mag (v/emx d vzero)) (min 0.0 ^double (v/mx d))) mat)))))
 
-(defmethod make-primitive :torus [_ mat conf]
+(defmethod primitive :torus [_ mat conf]
   (let [^double small-radius (:small-radius conf)
         ^double large-radius (:large-radius conf)]
     (fn [^Vec3 p]
@@ -186,7 +186,7 @@
 
 ;; camera
 
-(defn make-camera
+(defn camera
   "create camera function.
   * ro - ray origin
   * ch - camera heading
@@ -250,7 +250,7 @@
 ;; ambient occlusion / global illumination
 ;; http://www.pouet.net/topic.php?which=6675
 
-(defn make-ao
+(defn ao
   "f - distance field
    p - current position
    n - normal 
@@ -276,7 +276,7 @@
           (m/constrain (- 1.0 occ) 0.0 1.0))))))
 
 ;; fog
-(defn make-distance-fog
+(defn distance-fog
   ""
   [fcol ^double factor]
   (fn ^Vec3 [^double t col]
@@ -285,7 +285,7 @@
 
 ;; shadow
 
-(defn make-soft-shadow
+(defn soft-shadow
   ""
   [^double k ^long steps ^double max-depth]
   (fn [f pos light]
@@ -318,7 +318,7 @@
 
 ;; ray marching
 
-(defn make-ray-marching
+(defn ray-marching
   "depth field ray marching
   tmin - starting distance > 0.005
   tmax - final distance
@@ -350,13 +350,13 @@
                     (unchecked-inc i)
                     (.mat d))))))))
   ([scene background tmin tmax steps]
-   (make-ray-marching scene background tmin tmax steps 1.0 0.00001)))
+   (ray-marching scene background tmin tmax steps 1.0 0.00001)))
 
 
 ;; light
 ;; ad-hoc Blinn-Phong model
 ;; http://renderwonk.com/publications/s2010-shading-course/gotanda/course_note_practical_implementation_at_triace.pdf
-(defn make-light
+(defn light
   ""
   [L scene diff-color spec-color astr]
   (fn [^Material mat shadow-f N D pos]

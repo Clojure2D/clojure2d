@@ -3,9 +3,21 @@ All notable changes to this project will be documented in this file. This change
 
 ## 0.1.0-SNAPSHOT
 
+### Added
+
+- key-pressed? mouse-pressed? (and other event values) functions available in `draw-fn` (via Window protocols)
+
 ### Changed
 
 - project dependencies to external `generateme/fastmath` library
+- set-background -> background
+- to-luma -> luma, get-hue -> hue
+- make-color, make-awt-color, make-canvas, make-2d-...-array changed to names without `make-` prefix
+- make-pixels -> pixels
+- make-effect* -> effect
+- almost all make- in raymarching are changed to version without prefix
+
+Prefix `make-` is reserved when function is created.
 
 ### Removed
 

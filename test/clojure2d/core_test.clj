@@ -6,13 +6,13 @@
 
 ;; global variables
 (def ^:const window-name "Testing clojure.core")
-(def canvas (make-canvas 100 100))
-(def canvas2 (make-canvas 100 100))
+(def canvas1 (canvas 100 100))
+(def canvas2 (canvas 100 100))
 
 (defn draw-on-canvas
   ""
-  [canvas fps]
-  (-> canvas
+  [c fps]
+  (-> c
       (set-background :black)
       (set-color :maroon)
       (line 0 (inc (mod fps 100)) 100 (inc (mod fps 100)))
@@ -21,9 +21,9 @@
 ;; window with draw function
 (defn draw
   "Draw function"
-  [canvas window fps _]
+  [c window fps _]
   (set-state! window (assoc (get-state window) :fps fps))
-  (draw-on-canvas canvas fps))
+  (draw-on-canvas c fps))
 
 (def window (atom nil))
 (def window-closed (atom nil))
@@ -35,11 +35,10 @@
 
 (defn build-up
   "Prepare data, events, etc."
-  {:expectations-options :before-run}
   []
-  (reset! window (show-window canvas window-name 150 150 60 draw)) 
+  (reset! window (show-window canvas1 window-name 150 150 60 draw)) 
   (set-state! @window {:a 1})
-  (reset! window-closed (show-window canvas "Testing clojure.core closed"))
+  (reset! window-closed (show-window canvas1 "Testing clojure.core closed"))
   (close-window @window-closed)
   (.dispatchEvent (:frame @window) (java.awt.event.KeyEvent. (:panel @window)
                                                              java.awt.event.KeyEvent/KEY_PRESSED
@@ -56,7 +55,6 @@
 
 (defn clean-up
   "Close window, remove files"
-  {:expectations-options :after-run}
   []
   (close-window @window)
   (when (window-active? @window-closed) (close-window @window-closed)))
@@ -76,15 +74,15 @@
 
 ;; resize image
 (deftest resize-test
-  (let [resized (resize-image (get-image canvas) 4 44)]
+  (let [resized (resize-image (get-image canvas1) 4 44)]
     (is (= 4 (width resized)))
     (is (= 44 (height resized)))))
 
 ;; Image proto
 (deftest image-proto-test
-  (is (= java.awt.image.BufferedImage (type (get-image canvas))))
-  (is (= 100 (width canvas)))
-  (is (= 100 (height canvas)))
+  (is (= java.awt.image.BufferedImage (type (get-image canvas1))))
+  (is (= 100 (width canvas1)))
+  (is (= 100 (height canvas1)))
   (is (= 100 (width (get-image @window)))))
 
 (deftest get-pixel-test
@@ -101,14 +99,14 @@
 (defn make-transformation
   "Translate canvas and check point position"
   [v]
-  (with-canvas-> canvas
+  (with-canvas-> canvas1
     (translate 100 100)
     (transform v)))
 
 (defn make-inv-transformation
   "Translate canvas and check point"
   [v]
-  (with-canvas-> canvas
+  (with-canvas-> canvas1
     (translate 100 100)
     (inv-transform v)))
 

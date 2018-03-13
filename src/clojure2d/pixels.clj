@@ -166,16 +166,16 @@
     (fn ^long [^long ch ^long idx]
       (+ ch (<< idx 2)))))
 
-(defn make-pixels
+(defn pixels
   "Create empty `Pixels` in given layout, sets valid channel value selector (pos) depending on layout"
   ([^ints a ^long w ^long h planar?]
    (let [size (* w h)
          pos (make-value-selector planar? size)]
      (Pixels. a w h planar? size pos)))
   ([w h]
-   (make-pixels w h true))
+   (pixels w h true))
   ([^long w ^long h planar?]
-   (make-pixels (int-array (* 4 w h)) w h planar?)))
+   (pixels (int-array (* 4 w h)) w h planar?)))
 
 (defn replace-pixels
   "Create new `Pixels` for given raw `ints` pixels"
@@ -221,7 +221,7 @@
          ^ints p (.. b
                      (getRaster)
                      (getPixels ^int x ^int y ^int w ^int h ^ints (int-array size)))
-         pixls (make-pixels p w h false)]
+         pixls (pixels p w h false)]
      (if planar?
        (to-planar pixls)
        pixls)))
@@ -382,7 +382,7 @@
 
 ;; ## Compose channels filter
 
-(defn make-compose-f
+(defn- make-compose-f
   "Create compose blending function"
   [n]
   (cond 
@@ -813,7 +813,7 @@
           cgamma (/ 1.0 color-gamma) ;; gamma factor for color
           mxlog (/ 1.0 (m/log (inc binsmax))) ;; logarithm of max value
           rmx (/ 1.0 binsmax) ;; reverse of max
-          ^Pixels p (make-pixels sizex sizey) ;; target
+          ^Pixels p (pixels sizex sizey) ;; target
           ^Vec4 multiplier (Vec4. 1.0 saturation brightness 1.0)] ;; multiply vector for brightness/saturation
       (dotimes [y sizey]
         (let [row+ (* y sizex+)

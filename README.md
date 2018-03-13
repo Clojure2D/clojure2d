@@ -13,6 +13,10 @@ Clojure2D is a library supporting generative coding or glitching. It's based on 
 ![ex22](results/small/ex22.jpg "Example 22")
 ![ex23](results/small/ex23.jpg "Example 23")
 
+## WARNING
+
+Refactoring in progress -> towards 0.1.0, check Changelog.
+
 ## Documentation
 
 [Codox - In progress!](https://clojure2d.github.io/clojure2d/docs/codox/)

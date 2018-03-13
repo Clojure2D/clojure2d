@@ -67,7 +67,7 @@
 (defprotocol ColorProto
   (to-color [c])
   (to-awt-color [c]) 
-  (to-luma [c])
+  (luma [c])
   (red [c])
   (green [c])
   (blue [c])
@@ -76,7 +76,7 @@
   (ch1 [c])
   (ch2 [c]))
 
-(defn- to-luma-fn
+(defn- luma-fn
   "Local luma conversion function"
   ^double [^double r ^double g ^double b]
   (+ (* 0.212671 r)
@@ -96,7 +96,7 @@
     (Color. (lclamp255 (.x c))
             (lclamp255 (.y c))
             (lclamp255 (.z c))))
-  (to-luma ^double [^Vec3 c] (to-luma-fn (.x c) (.y c) (.z c)))
+  (luma ^double [^Vec3 c] (luma-fn (.x c) (.y c) (.z c)))
   (red [^Vec3 c] (.x c))
   (green [^Vec3 c] (.y c))
   (blue [^Vec3 c] (.z c))
@@ -111,7 +111,7 @@
              (lclamp255 (.y c))
              (lclamp255 (.z c))
              (lclamp255 (.w c))))
-  (to-luma ^double [^Vec4 c] (to-luma-fn (.x c) (.y c) (.z c)))
+  (luma ^double [^Vec4 c] (luma-fn (.x c) (.y c) (.z c)))
   (red [^Vec4 c] (.x c))
   (green [^Vec4 c] (.y c))
   (blue [^Vec4 c] (.z c))
@@ -122,7 +122,7 @@
   clojure.lang.Keyword
   (to-color [n] (html-color n))
   (to-awt-color [n] (html-awt-color n))
-  (to-luma [n] (to-luma (html-color n)))
+  (luma [n] (luma (html-color n)))
   (red [n] (red (html-color n)))
   (green [n] (green (html-color n)))
   (blue [n] (blue (html-color n)))
@@ -137,7 +137,7 @@
            (.getBlue c)
            (.getAlpha c)))
   (to-awt-color [c] c)
-  (to-luma ^double [^Color c] (to-luma-fn (.getRed c) (.getGreen c) (.getBlue c)))
+  (luma ^double [^Color c] (luma-fn (.getRed c) (.getGreen c) (.getBlue c)))
   (red [^Color c] (.getRed c))
   (green [^Color c] (.getGreen c))
   (blue [^Color c] (.getBlue c))
@@ -158,7 +158,7 @@
   (ch2 [^long c] (bit-and 0xff c))
   (to-color [^long c] (Vec4. (red c) (green c) (blue c) (if (zero? (bit-and 0xff000000 c)) 255 (alpha c))))
   (to-awt-color [c] (to-awt-color (to-color c)))
-  (to-luma [c] (to-luma (to-color c))))
+  (luma [c] (luma (to-color c))))
 
 (defn set-alpha
   "Set alpha channel and return `Vec4` representation."
@@ -175,7 +175,7 @@
             (.getBlue cc)
             (lclamp255 a))))
 
-(defn make-awt-color
+(defn awt-color
   "Create java.awt.Color object. Use with `core/set-awt-color` or `core/set-awt-background`."
   ([c]
    (to-awt-color c))
@@ -191,7 +191,7 @@
            (lclamp255 b)
            (lclamp255 a))))
 
-(defn make-color
+(defn color
   "Create Vec4 object as color representation. Use with `core/set-color` or `core/set-background`."
   ([c]
    (to-color c))
@@ -208,9 +208,21 @@
           (clamp255 b)
           (clamp255 a))))
 
+(defn gray
+  "Create grayscale color based on intensity `v`. Optional parameter alpha `a`."
+  ([v] (color v v v))
+  ([v a] (color v v v a)))
+
+(defn awt-gray
+  "Create grayscale color based on intensity `v`. Optional parameter alpha `a`.
+
+  AWT version of [[gray]]."
+  ([v] (awt-color v v v))
+  ([v a] (awt-color v v v a)))
+
 (declare to-HSB)
 
-(defn get-hue
+(defn hue
   "Get hue value from color (any representation). Based on HSB colorspace."
   ^double [c]
   (let [^Vec4 ret (to-HSB (to-color c))]
@@ -1238,7 +1250,7 @@
 (defn to-Gray
   "RGB->Grayscale"
   [^Vec4 c]
-  (let [^double l (to-luma c)]
+  (let [^double l (luma c)]
     (Vec4. l l l (.w c))))
 
 ;; do nothing in reverse
@@ -1486,30 +1498,30 @@
 
 ;; List of paletton presets
 (def paletton-presets
-  {:pale-light [[0.24649 1.78676] [0.09956 1.95603] [0.17209 1.88583] [0.32122 1.65929] [0.39549 1.50186]]
-   :pastels-bright [[0.65667 1.86024] [0.04738 1.99142] [0.39536 1.89478] [0.90297 1.85419] [1.86422 1.8314]]
-   :shiny [[1.00926 2] [0.3587 2] [0.5609 2] [2 0.8502] [2 0.65438]]
-   :pastels-lightest [[0.34088 1.09786] [0.13417 1.62645] [0.23137 1.38072] [0.45993 0.92696] [0.58431 0.81098]]
-   :pastels-very-light [[0.58181 1.32382] [0.27125 1.81913] [0.44103 1.59111] [0.70192 1.02722] [0.84207 0.91425]]
-   :full [[1 1] [0.61056 1.24992] [0.77653 1.05996] [1.06489 0.77234] [1.25783 0.60685]]
-   :pastels-light [[0.37045 0.90707] [0.15557 1.28367] [0.25644 1.00735] [0.49686 0.809] [0.64701 0.69855]]
-   :pastels-med [[0.66333 0.8267] [0.36107 1.30435] [0.52846 0.95991] [0.78722 0.70882] [0.91265 0.5616]]
-   :darker [[0.93741 0.68672] [0.68147 0.88956] [0.86714 0.82989] [1.12072 0.5673] [1.44641 0.42034]]
-   :pastels-mid-pale [[0.38302 0.68001] [0.15521 0.98457] [0.26994 0.81586] [0.46705 0.54194] [0.64065 0.44875]]
-   :pastels [[0.66667 0.66667] [0.33333 1] [0.5 0.83333] [0.83333 0.5] [1 0.33333]]
-   :dark-neon [[0.94645 0.59068] [0.99347 0.91968] [0.93954 0.7292] [1.01481 0.41313] [1.04535 0.24368]]
-   :pastels-dark [[0.36687 0.39819] [0.25044 0.65561] [0.319 0.54623] [0.55984 0.37953] [0.70913 0.3436]]
-   :pastels-very-dark [[0.60117 0.41845] [0.36899 0.59144] [0.42329 0.44436] [0.72826 0.35958] [0.88393 0.27004]]
-   :dark [[1.31883 0.40212] [0.9768 0.25402] [1.27265 0.30941] [1.21289 0.60821] [1.29837 0.82751]]
-   :pastels-mid-dark [[0.26952 0.22044] [0.23405 0.52735] [0.23104 0.37616] [0.42324 0.20502] [0.54424 0.18483]]
-   :pastels-darkest [[0.53019 0.23973] [0.48102 0.50306] [0.50001 0.36755] [0.6643 0.32778] [0.77714 0.3761]]
-   :darkest [[1.46455 0.21042] [0.99797 0.16373] [0.96326 0.274] [1.56924 0.45022] [1.23016 0.66]]
-   :almost-black [[0.12194 0.15399] [0.34224 0.50742] [0.24211 0.34429] [0.31846 0.24986] [0.52251 0.33869]]
-   :almost-gray-dark [[0.10266 0.24053] [0.13577 0.39387] [0.11716 0.30603] [0.14993 0.22462] [0.29809 0.19255]]
-   :almost-gray-darker [[0.07336 0.36815] [0.18061 0.50026] [0.09777 0.314] [0.12238 0.25831] [0.14388 0.1883]]
-   :almost-gray-mid [[0.07291 0.59958] [0.19602 0.74092] [0.10876 0.5366] [0.15632 0.48229] [0.20323 0.42268]]
+  {:pale-light          [[0.24649 1.78676] [0.09956 1.95603] [0.17209 1.88583] [0.32122 1.65929] [0.39549 1.50186]]
+   :pastels-bright      [[0.65667 1.86024] [0.04738 1.99142] [0.39536 1.89478] [0.90297 1.85419] [1.86422 1.8314]]
+   :shiny               [[1.00926 2] [0.3587 2] [0.5609 2] [2 0.8502] [2 0.65438]]
+   :pastels-lightest    [[0.34088 1.09786] [0.13417 1.62645] [0.23137 1.38072] [0.45993 0.92696] [0.58431 0.81098]]
+   :pastels-very-light  [[0.58181 1.32382] [0.27125 1.81913] [0.44103 1.59111] [0.70192 1.02722] [0.84207 0.91425]]
+   :full                [[1 1] [0.61056 1.24992] [0.77653 1.05996] [1.06489 0.77234] [1.25783 0.60685]]
+   :pastels-light       [[0.37045 0.90707] [0.15557 1.28367] [0.25644 1.00735] [0.49686 0.809] [0.64701 0.69855]]
+   :pastels-med         [[0.66333 0.8267] [0.36107 1.30435] [0.52846 0.95991] [0.78722 0.70882] [0.91265 0.5616]]
+   :darker              [[0.93741 0.68672] [0.68147 0.88956] [0.86714 0.82989] [1.12072 0.5673] [1.44641 0.42034]]
+   :pastels-mid-pale    [[0.38302 0.68001] [0.15521 0.98457] [0.26994 0.81586] [0.46705 0.54194] [0.64065 0.44875]]
+   :pastels             [[0.66667 0.66667] [0.33333 1] [0.5 0.83333] [0.83333 0.5] [1 0.33333]]
+   :dark-neon           [[0.94645 0.59068] [0.99347 0.91968] [0.93954 0.7292] [1.01481 0.41313] [1.04535 0.24368]]
+   :pastels-dark        [[0.36687 0.39819] [0.25044 0.65561] [0.319 0.54623] [0.55984 0.37953] [0.70913 0.3436]]
+   :pastels-very-dark   [[0.60117 0.41845] [0.36899 0.59144] [0.42329 0.44436] [0.72826 0.35958] [0.88393 0.27004]]
+   :dark                [[1.31883 0.40212] [0.9768 0.25402] [1.27265 0.30941] [1.21289 0.60821] [1.29837 0.82751]]
+   :pastels-mid-dark    [[0.26952 0.22044] [0.23405 0.52735] [0.23104 0.37616] [0.42324 0.20502] [0.54424 0.18483]]
+   :pastels-darkest     [[0.53019 0.23973] [0.48102 0.50306] [0.50001 0.36755] [0.6643 0.32778] [0.77714 0.3761]]
+   :darkest             [[1.46455 0.21042] [0.99797 0.16373] [0.96326 0.274] [1.56924 0.45022] [1.23016 0.66]]
+   :almost-black        [[0.12194 0.15399] [0.34224 0.50742] [0.24211 0.34429] [0.31846 0.24986] [0.52251 0.33869]]
+   :almost-gray-dark    [[0.10266 0.24053] [0.13577 0.39387] [0.11716 0.30603] [0.14993 0.22462] [0.29809 0.19255]]
+   :almost-gray-darker  [[0.07336 0.36815] [0.18061 0.50026] [0.09777 0.314] [0.12238 0.25831] [0.14388 0.1883]]
+   :almost-gray-mid     [[0.07291 0.59958] [0.19602 0.74092] [0.10876 0.5366] [0.15632 0.48229] [0.20323 0.42268]]
    :almost-gray-lighter [[0.06074 0.82834] [0.14546 0.97794] [0.10798 0.76459] [0.15939 0.68697] [0.22171 0.62926]]
-   :almost-gray-light [[0.03501 1.59439] [0.23204 1.10483] [0.14935 1.33784] [0.07371 1.04897] [0.09635 0.91368]]})
+   :almost-gray-light   [[0.03501 1.59439] [0.23204 1.10483] [0.14935 1.33784] [0.07371 1.04897] [0.09635 0.91368]]})
 
 ;; List of preset names
 (def paletton-presets-names (keys paletton-presets))
@@ -1878,7 +1890,7 @@
         r (:r c)
         g (:g c)
         b (:b c)]
-    (make-awt-color r g b)))
+    (awt-color r g b)))
 
 (def html-awt-color (memoize html-color-fn))
 (def html-color (memoize #(to-color (html-awt-color %))))

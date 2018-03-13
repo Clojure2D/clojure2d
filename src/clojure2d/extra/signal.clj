@@ -329,15 +329,15 @@
 ;; Every effect is a function packed into `EffectsList` type. Function accepts `sample` as double and current `state` value. And returns type `SampleAndState` with resulting sample and new state. When called without parameters returns inital state.
 ;; `EffectsList` type should be treated and one node of the list of effects. Effects can be composed this way.
 ;;
-;; To create and effect use multimethod `make-effect` and pass effect name (keyword) and configuration map.
+;; To create and effect use multimethod `effect` and pass effect name (keyword) and configuration map.
 ;;
-;; `(make-effect :distort {:factor 0.43})`
+;; `(effect :distort {:factor 0.43})`
 ;;
 ;; To process sample call `single-pass` with effect and sample. Result is stored in `sample` type field. `single-pass` returns effect in new state, so the context is kept.
 ;;
-;; `(single-pass (make-effect :distort {:factor 0.43}) 0.5) => #object[clojure2d.extra.signal.EffectList 0x5e31cc40 "0.7688172043010754"]`
+;; `(single-pass (effect :distort {:factor 0.43}) 0.5) => #object[clojure2d.extra.signal.EffectList 0x5e31cc40 "0.7688172043010754"]`
 ;;
-;; To compose two or more effects call `compose-effects` functions. To reset state call `reset-effects`. To wrap effect function into `EffectsList` type call `make-effect-node`.
+;; To compose two or more effects call `compose-effects` functions. To reset state call `reset-effects`. To wrap effect function into `EffectsList` type call `effect-node`.
 ;;
 ;; `apply-effects` function processes whole `Signal` with provided effect. Optionally you can reset effects state every `reset` number of samples processed.
 
@@ -351,7 +351,7 @@
   Object
   (toString [_] (str sample)))
 
-(defn make-effect-node
+(defn effect-node
   "Create `EffectsList` node from effect function and initial state"
   [f]
   (EffectsList. 0.0 f (f) nil))
@@ -404,7 +404,7 @@
   [p t effects config config-back reset]
   (signal-to-pixels t (apply-effects effects (signal-from-pixels p config) reset) config-back))
 
-(defn make-effects-filter
+(defn effects-filter
   "Process `Pixels` as `Signal`. Provide configurations to properly convert Pixels to Signal and vice versa (default stored in `pixels-default-configuration` variable).
    Optionally set `reset` value (reinit effects' state after `reset` samples. Filter operates on one channel at time and is defined to be used with `filter-channels`. See `filter-pixels` to process lineary (and take benefit of layouts)"
   ([effects config config-back reset]
@@ -412,11 +412,11 @@
      (let [c {:channels [ch]}]
        (process-pixels p target effects (merge config c) (merge config-back c) reset))))
   ([effects]
-   (make-effects-filter effects {} {} 0))
+   (effects-filter effects {} {} 0))
   ([effects reset]
-   (make-effects-filter effects {} {} reset))
+   (effects-filter effects {} {} reset))
   ([effects config config-back]
-   (make-effects-filter effects config config-back 0)))
+   (effects-filter effects config config-back 0)))
 
 (defn apply-effects-to-pixels
   "Filter pixels as signal, directly. Pixels are not filtered channel by channel."
@@ -440,7 +440,7 @@
 
 ;; ## Effects / Filters
 
-(defmulti make-effect (fn [m conf] m))
+(defmulti effect (fn [m conf] m))
 
 ;; ### Simple Low/High pass filters
 ;;
@@ -458,10 +458,10 @@
         tau (/ (* cutoff m/TWO_PI))]
     (/ tinterval (+ tau tinterval))))
 
-(defmethod make-effect :simple-lowpass [_ {:keys [rate cutoff]
+(defmethod effect :simple-lowpass [_ {:keys [rate cutoff]
                                            :or {rate 44100.0 cutoff 2000.0}}]
   (let [alpha (calc-filter-alpha rate cutoff)] 
-    (make-effect-node (fn
+    (effect-node (fn
                         ([^double sample ^double prev]
                          (let [s1 (* sample alpha)
                                s2 (- prev (* prev alpha))
@@ -469,9 +469,9 @@
                            (SampleAndState. nprev nprev)))
                         ([] 0.0)))))
 
-(defmethod make-effect :simple-highpass [_ conf]
-  (let [lpfilter (make-effect :simple-lowpass conf)]
-    (make-effect-node (fn
+(defmethod effect :simple-highpass [_ conf]
+  (let [lpfilter (effect :simple-lowpass conf)]
+    (effect-node (fn
                         ([^double sample lp]
                          (let [^EffectsList res (single-pass lp sample)]
                            (SampleAndState. (- sample (.sample res)) res)))
@@ -622,7 +622,7 @@
 (defn make-biquad-filter
   "Create biquad effect based on passed configuration"
   [^BiquadConf c]
-  (make-effect-node (fn
+  (effect-node (fn
                       ([^double sample ^StateBiquad state]
                        (let [y (-> (* (.b0 c) sample)
                                    (+ (* (.b1 c) (.x1 state)))
@@ -642,7 +642,7 @@
 ;; * `:gain` - gain
 ;; * `:bw` - bandwidth (default: 1.0)
 ;; * `:fs` - sampling rate (defatult: 44100.0)
-(defmethod make-effect :biquad-eq [_ {:keys [fc gain bw fs]
+(defmethod effect :biquad-eq [_ {:keys [fc gain bw fs]
                                       :or {fc 0.0 gain 0.0 bw 1.0 fs 44100.0}}]
   (make-biquad-filter (biquad-eq-params fc gain bw fs)))
 
@@ -656,11 +656,11 @@
 ;; * `:gain` - gain
 ;; * `:slope` - shelf slope (default 1.5)
 ;; * `:fs` - sampling rate (default 44100.0)
-(defmethod make-effect :biquad-hs [_ {:keys [fc gain slope fs]
+(defmethod effect :biquad-hs [_ {:keys [fc gain slope fs]
                                       :or {fc 0.0 gain 0.0 slope 1.5 fs 44100.0}}]
   (make-biquad-filter (biquad-hs-params fc gain slope fs)))
 
-(defmethod make-effect :biquad-ls [_ {:keys [fc gain slope fs]
+(defmethod effect :biquad-ls [_ {:keys [fc gain slope fs]
                                       :or {fc 0.0 gain 0.0 slope 1.5 fs 44100.0}}]
   (make-biquad-filter (biquad-ls-params fc gain slope fs)))
 
@@ -680,9 +680,9 @@
       :or {fc 0.0 bw 1.0 fs 44100.0}}]
   (f fc bw fs))
 
-(defmethod make-effect :biquad-lp [_ conf] (make-biquad-filter (lhb-params biquad-lp-params conf)))
-(defmethod make-effect :biquad-hp [_ conf] (make-biquad-filter (lhb-params biquad-hp-params conf)))
-(defmethod make-effect :biquad-bp [_ conf] (make-biquad-filter (lhb-params biquad-bp-params conf)))
+(defmethod effect :biquad-lp [_ conf] (make-biquad-filter (lhb-params biquad-lp-params conf)))
+(defmethod effect :biquad-hp [_ conf] (make-biquad-filter (lhb-params biquad-hp-params conf)))
+(defmethod effect :biquad-bp [_ conf] (make-biquad-filter (lhb-params biquad-bp-params conf)))
 
 ;; ### DJ Equalizer
 ;;
@@ -696,13 +696,13 @@
 ;; * `:shelf-slope` - shelf slope for high frequency (default 1.5)
 ;; * `:peak-bw` - peak bandwidth for mid and low frequencies (default 1.0)
 ;; * `:rate` - sampling rate (default 44100.0)
-(defmethod make-effect :dj-eq [_ {:keys [hi mid low shelf-slope peak-bw rate]
+(defmethod effect :dj-eq [_ {:keys [hi mid low shelf-slope peak-bw rate]
                                   :or {hi 0.0 mid 0.0 low 0.0 shelf-slope 1.5 peak-bw 1.0 rate 44100.0}}]
   (let [b (compose-effects
-           (make-effect :biquad-hs {:fc 10000.0 :gain hi :slope shelf-slope :fs rate})
-           (make-effect :biquad-eq {:fc 1000.0 :gain mid :bw peak-bw :fs rate})
-           (make-effect :biquad-eq {:fc 100.0 :gain low :bw peak-bw :fs rate}))]
-    (make-effect-node (fn
+           (effect :biquad-hs {:fc 10000.0 :gain hi :slope shelf-slope :fs rate})
+           (effect :biquad-eq {:fc 1000.0 :gain mid :bw peak-bw :fs rate})
+           (effect :biquad-eq {:fc 100.0 :gain low :bw peak-bw :fs rate}))]
+    (effect-node (fn
                         ([sample state]
                          (let [^EffectsList res (single-pass state sample)]
                            (SampleAndState. (.sample res) res)))
@@ -713,10 +713,10 @@
 ;; Name: `:phaser-allpass`
 ;;
 ;; Configuration: `:delay` - delay factor (default: 0.5)
-(defmethod make-effect :phaser-allpass [_ {:keys [^double delay]
+(defmethod effect :phaser-allpass [_ {:keys [^double delay]
                                            :or {delay 0.5}}]
   (let [a1 (/ (- 1.0 delay) (inc delay))]
-    (make-effect-node (fn
+    (effect-node (fn
                         ([^double sample ^double zm1]
                          (let [y (+ zm1 (* sample (- a1)))
                                new-zm1 (+ sample (* y a1))]
@@ -730,9 +730,9 @@
 ;; Configuration: `:denom` (long, default 2.0)
 (deftype StateDivider [^double out ^double amp ^double count ^double lamp ^double last ^int zeroxs])
 
-(defmethod make-effect :divider [_ {:keys [^long denom]
+(defmethod effect :divider [_ {:keys [^long denom]
                                     :or {denom 2.0}}]
-  (make-effect-node
+  (effect-node
    (fn
      ([^double sample ^StateDivider state]
       (let [count (inc (.count state))
@@ -763,12 +763,12 @@
 ;; * `:phase` - deviation factor (default 0.00822)
 (deftype StateFm [^double pre ^double integral ^double t lp])
 
-(defmethod make-effect :fm [_ {:keys [^double quant ^double omega ^double phase]
+(defmethod effect :fm [_ {:keys [^double quant ^double omega ^double phase]
                                :or {quant 10.0 omega 0.014 phase 0.00822}}]
-  (let [lp-chain (compose-effects (make-effect :simple-lowpass {:rate 100000 :cutoff 25000})
-                                  (make-effect :simple-lowpass {:rate 100000 :cutoff 10000})
-                                  (make-effect :simple-lowpass {:rate 100000 :cutoff 1000}))]
-    (make-effect-node
+  (let [lp-chain (compose-effects (effect :simple-lowpass {:rate 100000 :cutoff 25000})
+                                  (effect :simple-lowpass {:rate 100000 :cutoff 10000})
+                                  (effect :simple-lowpass {:rate 100000 :cutoff 1000}))]
+    (effect-node
      (fn
        ([^double sample ^StateFm state]
         (let [sig (* sample phase)
@@ -794,10 +794,10 @@
 ;;
 ;; * `:rate` - sample rate (default 44100.0)
 ;; * `:freq` - cutoff frequency (default 1000.0)
-(defmethod make-effect :bandwidth-limit [_ {:keys [^double freq ^double rate]
+(defmethod effect :bandwidth-limit [_ {:keys [^double freq ^double rate]
                                             :or {freq 1000.0 rate 44100.0}}]
   (let [dx (/ freq rate)]
-    (make-effect-node (fn
+    (effect-node (fn
                         ([^double sample ^double state]
                          (let [res (if (>= sample state)
                                      (min (+ state dx) sample)
@@ -812,10 +812,10 @@
 ;; Confguration:
 ;;
 ;; * `:factor` - distortion factor (default 1.0)
-(defmethod make-effect :distort [_ {:keys [^double factor]
+(defmethod effect :distort [_ {:keys [^double factor]
                                     :or {factor 1.0}}]
   (let [nfact (inc factor)]
-    (make-effect-node (fn 
+    (effect-node (fn 
                         ([^double sample state]
                          (let [div (+ factor (m/abs sample))
                                res (* nfact (/ sample div))]
@@ -829,10 +829,10 @@
 ;; Confguration:
 ;;
 ;; * `:drive` - drive (default 2.0)
-(defmethod make-effect :foverdrive [_ {:keys [^double drive]
+(defmethod effect :foverdrive [_ {:keys [^double drive]
                                        :or {drive 2.0}}]
   (let [drivem1 (dec drive)]
-    (make-effect-node (fn
+    (effect-node (fn
                         ([^double sample state]
                          (let [fx (m/abs sample)
                                res (/ (* sample (+ fx drive)) (inc (+ (* sample sample) (* fx drivem1))))]
@@ -850,24 +850,24 @@
 ;; * `:rate` - input sample rate (default 44100.0)
 (deftype StateDecimator [^double count ^double last])
 
-(defmethod make-effect :decimator [_ {:keys [^double bits ^double fs ^double rate]
-                                      :or {bits 2.0 fs 4410.0 rate 44100.0}}]
+(defmethod effect :decimator [_ {:keys [^double bits ^double fs ^double rate]
+                                 :or {bits 2.0 fs 4410.0 rate 44100.0}}]
   (let [step (m/pow 0.5 (- bits 0.9999))
         stepr (/ step)
         ratio (/ fs rate)]
-    (make-effect-node (fn
-                        ([^double sample ^StateDecimator state]
-                         (let [ncount (+ (.count state) ratio)]
-                           (if (>= ncount 1.0)
-                             (let [delta (* step ^double (m/remainder (->> sample
-                                                                           m/sgn
-                                                                           (* step 0.5)
-                                                                           (+ sample)
-                                                                           (* stepr)) 1.0))
-                                   last (- sample delta)]
-                               (SampleAndState. last (StateDecimator. (dec ncount) last)))
-                             (SampleAndState. (.last state) (StateDecimator. ncount (.last state))))))
-                        ([] (StateDecimator. 0.0 0.0))))))
+    (effect-node (fn
+                   ([^double sample ^StateDecimator state]
+                    (let [ncount (+ (.count state) ratio)]
+                      (if (>= ncount 1.0)
+                        (let [delta (* step ^double (m/remainder (->> sample
+                                                                      m/sgn
+                                                                      (* step 0.5)
+                                                                      (+ sample)
+                                                                      (* stepr)) 1.0))
+                              last (- sample delta)]
+                          (SampleAndState. last (StateDecimator. (dec ncount) last)))
+                        (SampleAndState. (.last state) (StateDecimator. ncount (.last state))))))
+                   ([] (StateDecimator. 0.0 0.0))))))
 
 ;; ### BassTreble
 ;;
@@ -885,8 +885,8 @@
 (deftype StateBassTreble [^double xn1Bass ^double xn2Bass ^double yn1Bass ^double yn2Bass
                           ^double xn1Treble ^double xn2Treble ^double yn1Treble ^double yn2Treble])
 
-(defmethod make-effect :basstreble [_ {:keys [^double bass ^double treble ^double gain ^double rate ^double slope ^double bass-freq ^double treble-freq]
-                                       :or {bass 1.0 treble 1.0 gain 0.0 rate 44100.0 slope 0.4 bass-freq 250.0 treble-freq 4000.0}}]
+(defmethod effect :basstreble [_ {:keys [^double bass ^double treble ^double gain ^double rate ^double slope ^double bass-freq ^double treble-freq]
+                                  :or {bass 1.0 treble 1.0 gain 0.0 rate 44100.0 slope 0.4 bass-freq 250.0 treble-freq 4000.0}}]
   (let [data-gain (db-to-linear gain)
         wb (/ (* m/TWO_PI bass-freq) rate)
         wt (/ (* m/TWO_PI treble-freq) rate) 
@@ -916,23 +916,23 @@
         a0t (+ (- at+ (* at- cwt)) bswt)
         a1t (* 2.0 (- at- (* at+ cwt)))
         a2t (- (- at+ (* at- cwt)) bswt)]
-    (make-effect-node (fn
-                        ([^double sample ^StateBassTreble state]
-                         (let [outb (/ (-> (* b0b sample)
-                                           (+ (* b1b (.xn1Bass state)))
-                                           (+ (* b2b (.xn2Bass state)))
-                                           (- (* a1b (.yn1Bass state)))
-                                           (- (* a2b (.yn2Bass state)))) a0b)
-                               outt (/ (-> (* b0t outb)
-                                           (+ (* b1t (.xn1Treble state)))
-                                           (+ (* b2t (.xn2Treble state)))
-                                           (- (* a1t (.yn1Treble state)))
-                                           (- (* a2t (.yn2Treble state)))) a0t)]
-                           (SampleAndState. (* outt data-gain)
-                                            (StateBassTreble. sample (.xn1Bass state) outb (.yn1Bass state)
-                                                              outb (.xn1Treble state) outt (.yn1Treble state)))))
-                        ([] (StateBassTreble. 0.0 0.0 0.0 0.0
-                                              0.0 0.0 0.0 0.0))))))
+    (effect-node (fn
+                   ([^double sample ^StateBassTreble state]
+                    (let [outb (/ (-> (* b0b sample)
+                                      (+ (* b1b (.xn1Bass state)))
+                                      (+ (* b2b (.xn2Bass state)))
+                                      (- (* a1b (.yn1Bass state)))
+                                      (- (* a2b (.yn2Bass state)))) a0b)
+                          outt (/ (-> (* b0t outb)
+                                      (+ (* b1t (.xn1Treble state)))
+                                      (+ (* b2t (.xn2Treble state)))
+                                      (- (* a1t (.yn1Treble state)))
+                                      (- (* a2t (.yn2Treble state)))) a0t)]
+                      (SampleAndState. (* outt data-gain)
+                                       (StateBassTreble. sample (.xn1Bass state) outb (.yn1Bass state)
+                                                         outb (.xn1Treble state) outt (.yn1Treble state)))))
+                   ([] (StateBassTreble. 0.0 0.0 0.0 0.0
+                                         0.0 0.0 0.0 0.0))))))
 
 ;; ### Echo (audacity)
 ;;
@@ -948,16 +948,16 @@
 ;; See example 16
 (deftype StateEcho [^doubles buffer ^int position])
 
-(defmethod make-effect :echo [_ {:keys [^double delay ^double decay ^double rate]
-                                 :or {delay 0.5 decay 0.5 rate 44100.0}}]
+(defmethod effect :echo [_ {:keys [^double delay ^double decay ^double rate]
+                            :or {delay 0.5 decay 0.5 rate 44100.0}}]
   (let [buffer-len (int (min 10000000 (* delay rate)))]
-    (make-effect-node (fn
-                        ([^double sample ^StateEcho state]
-                         (let [result (+ sample (* decay (aget ^doubles (.buffer state) (.position state))))]
-                           (aset ^doubles (.buffer state) (.position state) result)
-                           (SampleAndState. result (StateEcho. (.buffer state) (rem (inc (.position state)) buffer-len)))))
-                        ([]
-                         (StateEcho. (double-array buffer-len 0.0) 0))))))
+    (effect-node (fn
+                   ([^double sample ^StateEcho state]
+                    (let [result (+ sample (* decay (aget ^doubles (.buffer state) (.position state))))]
+                      (aset ^doubles (.buffer state) (.position state) result)
+                      (SampleAndState. result (StateEcho. (.buffer state) (rem (inc (.position state)) buffer-len)))))
+                   ([]
+                    (StateEcho. (double-array buffer-len 0.0) 0))))))
 
 ;; ### Vcf303
 ;;
@@ -975,8 +975,8 @@
 ;; Warning: filter requires normalization
 (deftype StateVcf303 [^double d1 ^double d2 ^double c0 ^int env-pos ^Vec3 abc])
 
-(defmethod make-effect :vcf303 [_ {:keys [^double rate trigger ^double cutoff ^double resonance ^double env-mod ^double decay]
-                                   :or {rate 44100.0 trigger false cutoff 0.8 resonance 0.8 env-mod 0.5 decay 1.0}}]
+(defmethod effect :vcf303 [_ {:keys [^double rate trigger ^double cutoff ^double resonance ^double env-mod ^double decay]
+                              :or {rate 44100.0 trigger false cutoff 0.8 resonance 0.8 env-mod 0.5 decay 1.0}}]
   (let [scale (/ m/PI rate)
         e0 (* scale
               (m/exp (-> (- 5.613 (* 0.8 env-mod))
@@ -1002,22 +1002,22 @@
                                          (+ (* 2.1553 cutoff))
                                          (- (* 1.2 (- 1.0 resonance)))))) e0)
                         0.0)]    
-    (make-effect-node (fn
-                        ([^double sample ^StateVcf303 state]
-                         (let [^Vec3 abc (.abc state)
-                               result (-> (* (.x abc) (.d1 state))
-                                          (+ (* (.y abc) (.d2 state)))
-                                          (+ (* (.z abc) sample)))
-                               d2 (.d1 state)
-                               d1 result
-                               env-pos (inc (.env-pos state))]
-                           (if (>= env-pos 64)
-                             (let [c0 (* d (.c0 state))]
-                               (SampleAndState. result
-                                                (StateVcf303. d1 d2 c0 0 (recalc-abc c0))))
-                             (SampleAndState. result
-                                              (StateVcf303. d1 d2 (.c0 state) env-pos abc)))))
-                        ([] (StateVcf303. 0.0 0.0 init-c0 0 (recalc-abc init-c0)))))))
+    (effect-node (fn
+                   ([^double sample ^StateVcf303 state]
+                    (let [^Vec3 abc (.abc state)
+                          result (-> (* (.x abc) (.d1 state))
+                                     (+ (* (.y abc) (.d2 state)))
+                                     (+ (* (.z abc) sample)))
+                          d2 (.d1 state)
+                          d1 result
+                          env-pos (inc (.env-pos state))]
+                      (if (>= env-pos 64)
+                        (let [c0 (* d (.c0 state))]
+                          (SampleAndState. result
+                                           (StateVcf303. d1 d2 c0 0 (recalc-abc c0))))
+                        (SampleAndState. result
+                                         (StateVcf303. d1 d2 (.c0 state) env-pos abc)))))
+                   ([] (StateVcf303. 0.0 0.0 init-c0 0 (recalc-abc init-c0)))))))
 
 ;; ### Slew limiter (http://git.drobilla.net/cgit.cgi/omins.lv2.git/tree/src/slew_limiter.c)
 ;;
@@ -1029,16 +1029,16 @@
 ;; * `:maxrise` - maximum change for rising signal (in terms of 1/rate steps, default 500)
 ;; * `:maxfall` - maximum change for falling singal (default 500)
 
-(defmethod make-effect :slew-limit [_ {:keys [^double rate ^double maxrise ^double maxfall]
-                                       :or {rate 44100.0 maxrise 500.0 maxfall 500.0}}]
+(defmethod effect :slew-limit [_ {:keys [^double rate ^double maxrise ^double maxfall]
+                                  :or {rate 44100.0 maxrise 500.0 maxfall 500.0}}]
   (let [maxinc (/ maxrise rate)
         maxdec (- (/ maxfall rate))]
-    (make-effect-node (fn
-                        ([^double sample ^double prev]
-                         (let [increment (- sample prev) 
-                               nsample (+ prev (m/constrain increment maxdec maxinc))]
-                           (SampleAndState. nsample nsample)))
-                        ([] 0.0)))))
+    (effect-node (fn
+                   ([^double sample ^double prev]
+                    (let [increment (- sample prev) 
+                          nsample (+ prev (m/constrain increment maxdec maxinc))]
+                      (SampleAndState. nsample nsample)))
+                   ([] 0.0)))))
 
 ;; ### mdaThruZero
 ;;
@@ -1056,8 +1056,8 @@
 ;; Warning: like `:echo` internal state is kept in doubles array.
 (deftype StateMdaThruZero [^doubles buffer ^double ph ^long bp ^double f])
 
-(defmethod make-effect :mda-thru-zero [_ {:keys [^double rate ^double speed ^double depth ^double mix ^double depth-mod ^double feedback]
-                                          :or {rate 44100.0 speed 0.3 depth 0.43 mix 0.47 feedback 0.3 depth-mod 1.0}}]
+(defmethod effect :mda-thru-zero [_ {:keys [^double rate ^double speed ^double depth ^double mix ^double depth-mod ^double feedback]
+                                     :or {rate 44100.0 speed 0.3 depth 0.43 mix 0.47 feedback 0.3 depth-mod 1.0}}]
   (let [rat (/ (* (m/pow 10.0 (- 2.0 (* 3.0 speed))) 2.0) rate)
         dep (* 2000.0 (m/sq depth))
         dem (- dep (* dep depth-mod))
@@ -1065,22 +1065,22 @@
         wet mix
         dry (- 1.0 wet)
         fb (- (* 1.9 feedback) 0.95)]
-    (make-effect-node (fn
-                        ([^double sample ^StateMdaThruZero state]
-                         (let [ph (+ (.ph state) rat)
-                               ph (if (> ph 1.0) (- ph 2.0) ph)
-                               bp (bit-and (dec (.bp state)) 0x7ff)]
-                           (aset ^doubles (.buffer state) bp (+ sample (* fb (.f state))))
-                           (let [tmpf (+ dem (* dep (- 1.0 (m/sq ph))))
-                                 tmp (unchecked-int tmpf)
-                                 tmpf (- tmpf tmp)
-                                 tmp (bit-and (+ tmp bp) 0x7ff)
-                                 tmpi (bit-and (inc tmp) 0x7ff)
-                                 f (aget ^doubles (.buffer state) tmp)
-                                 f (+ (* tmpf (- (aget ^doubles (.buffer state) tmpi) f)) f)
-                                 result (+ (* sample dry) (* f wet))]
-                             (SampleAndState. result (StateMdaThruZero. (.buffer state) ph bp f)))))
-                        ([] (StateMdaThruZero. (double-array 2048) 0.0 0 0.0))))))
+    (effect-node (fn
+                   ([^double sample ^StateMdaThruZero state]
+                    (let [ph (+ (.ph state) rat)
+                          ph (if (> ph 1.0) (- ph 2.0) ph)
+                          bp (bit-and (dec (.bp state)) 0x7ff)]
+                      (aset ^doubles (.buffer state) bp (+ sample (* fb (.f state))))
+                      (let [tmpf (+ dem (* dep (- 1.0 (m/sq ph))))
+                            tmp (unchecked-int tmpf)
+                            tmpf (- tmpf tmp)
+                            tmp (bit-and (+ tmp bp) 0x7ff)
+                            tmpi (bit-and (inc tmp) 0x7ff)
+                            f (aget ^doubles (.buffer state) tmp)
+                            f (+ (* tmpf (- (aget ^doubles (.buffer state) tmpi) f)) f)
+                            result (+ (* sample dry) (* f wet))]
+                        (SampleAndState. result (StateMdaThruZero. (.buffer state) ph bp f)))))
+                   ([] (StateMdaThruZero. (double-array 2048) 0.0 0 0.0))))))
 
 ;; ## File operations
 

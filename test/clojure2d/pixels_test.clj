@@ -6,17 +6,17 @@
             [clojure.test :refer :all])
   (:import [clojure2d.pixels Pixels]))
 
-(def ^Pixels pixels-planar (p/make-pixels 100 99 true))
-(def ^Pixels pixels-interleaved (p/make-pixels 100 99 false))
+(def ^Pixels pixels-planar (p/pixels 100 99 true))
+(def ^Pixels pixels-interleaved (p/pixels 100 99 false))
 
 (defn pixels-fixture
   [f]
-  (p/set-color pixels-planar 10 10 (c/make-color 100 200 10 22))
-  (p/set-color pixels-planar 222 (c/make-color 1 2 3 4))
+  (p/set-color pixels-planar 10 10 (c/color 100 200 10 22))
+  (p/set-color pixels-planar 222 (c/color 1 2 3 4))
   (p/set-value pixels-planar 2 20 20 123)
   (p/set-value pixels-planar 1 5555 30)
-  (p/set-color pixels-interleaved 10 10 (c/make-color 100 200 10 22))
-  (p/set-color pixels-interleaved 222 (c/make-color 1 2 3 4))
+  (p/set-color pixels-interleaved 10 10 (c/color 100 200 10 22))
+  (p/set-color pixels-interleaved 222 (c/color 1 2 3 4))
   (p/set-value pixels-interleaved 2 20 20 123)
   (p/set-value pixels-interleaved 1 5555 30)
   (f))
@@ -25,12 +25,12 @@
 
 ;; protocol
 (deftest get-colot-test
-  (is (= (c/make-color 100 200 10 22) (p/get-color pixels-planar 10 10)))
-  (is (= (c/make-color 1 2 3 4) (p/get-color pixels-planar 222)))
-  (is (= (c/make-color 0 0 0 0) (p/get-color pixels-planar 10 11)))
-  (is (= (c/make-color 100 200 10 22) (p/get-color pixels-interleaved 10 10)))
-  (is (= (c/make-color 1 2 3 4) (p/get-color pixels-interleaved 222)))
-  (is (= (c/make-color 0 0 0 0) (p/get-color pixels-interleaved 10 11))))
+  (is (= (c/color 100 200 10 22) (p/get-color pixels-planar 10 10)))
+  (is (= (c/color 1 2 3 4) (p/get-color pixels-planar 222)))
+  (is (= (c/color 0 0 0 0) (p/get-color pixels-planar 10 11)))
+  (is (= (c/color 100 200 10 22) (p/get-color pixels-interleaved 10 10)))
+  (is (= (c/color 1 2 3 4) (p/get-color pixels-interleaved 222)))
+  (is (= (c/color 0 0 0 0) (p/get-color pixels-interleaved 10 11))))
 
 (deftest get-pixel-test
   (is (= 200 (p/get-value pixels-planar 1 10 10)))
