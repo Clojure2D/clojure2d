@@ -4,9 +4,7 @@
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.9.0"]
-                 ;; [net.littleredcomputer/sicmutils "0.10.0"] ;; have to be enabled for one of the examples 
-                 ;; 
-                 [metadoc "0.0.3"]
+                 [metadoc "0.1.0-SNAPSHOT"]
                  [generateme/fastmath "0.1.0-SNAPSHOT"]
                  ;; [org.bytedeco/javacv-platform "1.3.2"]
                  ]

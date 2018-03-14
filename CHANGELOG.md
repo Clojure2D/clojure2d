@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file. This change
 ### Added
 
 - key-pressed? mouse-pressed? (and other event values) functions available in `draw-fn` (via Window protocols)
+- lerp in color (to interpolate colors)
 
 ### Changed
 

@@ -160,6 +160,11 @@
   (to-awt-color [c] (to-awt-color (to-color c)))
   (luma [c] (luma (to-color c))))
 
+(defn lerp
+  "Lerp color between two values."
+  [c1 c2 t]
+  (v/interpolate (to-color c1) (to-color c2) t))
+
 (defn set-alpha
   "Set alpha channel and return `Vec4` representation."
   [c a]
