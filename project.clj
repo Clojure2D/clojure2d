@@ -10,6 +10,7 @@
                  ]
   :resource-path "resources/"
   :java-source-paths ["src"]
+  :javac-options ["-target" "1.7" "-source" "1.7"]
   :scm {:name "git"
         ::url "https://github.com/Clojure2D/clojure2d.git"}
   :repl-options {:timeout 120000}

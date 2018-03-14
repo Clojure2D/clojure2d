@@ -957,11 +957,10 @@
 (defn filled-with-stroke
   "Draw primitive filled and with stroke."
   [canvas color-filled color-stroke primitive-fn & attrs]
-  (let [f (partial primitive-fn canvas)] 
-    (set-color canvas color-filled)
-    (apply f (concat attrs false-list))
-    (set-color canvas color-stroke)
-    (apply f (concat attrs true-list))))
+  (set-color canvas color-filled)
+  (apply primitive-fn canvas (concat attrs false-list))
+  (set-color canvas color-stroke)
+  (apply primitive-fn canvas (concat attrs true-list)))
 
 ;; ### Gradient
 
