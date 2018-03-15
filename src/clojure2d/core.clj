@@ -21,12 +21,13 @@
 
   Protocols:
 
-  * [[ImageProto]] - basic Image operations (Image, Canvas, Window and Pixels (see [clojure2d.pixels]) implement this protocol.
+  * [[ImageProto]] - basic Image operations (Image, Canvas, Window and Pixels (see [[clojure2d.pixels]]) implement this protocol.
   * Various events protocols. Events and Window implement these:
     * [[MouseXYProto]] - mouse position related to Window.
     * [[MouseButtonProto]] - status of mouse buttons.
     * [[KeyEventProto]] - keyboard status
     * [[ModifiersProto]] - status of special keys (Ctrl, Meta, Alt, etc.)
+  * Additionally Window implements [[PressedProto]] in case you want to check in draw loop if your mouse or key is pressed.
 
   To draw on Canvas outside Window you have to create graphical context. Wrap your code into one of two functions:
 
@@ -42,8 +43,19 @@
 
   ### Canvas
 
+  ### Events
+
+  ### Window
+
+  ### States
+  
+  ### Utilities
   "
-  {:metadoc/categories {:image "Image functions."}}
+  {:metadoc/categories {:image "Image functions"
+                        :canvas "Canvas functions"
+                        :draw "Drawing functions"
+                        :display "Screen"
+                        :window "Window"}}
   (:require [clojure.java.io :refer :all]
             [clojure2d.color :as c]
             [fastmath.vector :as v]
@@ -183,8 +195,12 @@
 
 ;; Now we define multimethod which saves image. Multimethod is used here because some image types requires additional actions.
 (defmulti save-file-type
-  "Save Image to the file. Preprocess if necessary (depends on file type). For supported formats check [[img-writer-formats]]."
-  ^{:metadoc/categories #{:image}}
+  "Save Image to the file.
+
+  Preprocess if necessary (depends on file type). For supported formats check [[img-writer-formats]].
+
+  Dispatch is based on extension as keyword, ie. \".jpg\" -> `:jpg`."
+  {:metadoc/categories #{:image}}
   (fn [filename _ _] (keyword (file-extension filename))))
 
 ;; JPG requires flatten image and we must set the quality defined in `*jpeg-image-quality*` variable.
@@ -211,7 +227,10 @@
   "Save image to the file.
 
   * Input: image (`BufferedImage` object) and filename
-  * Side effect: saved image"
+  * Side effect: saved image
+
+  Image is saved using [[save-file-type]] multimethod."
+  {:metadoc/categories #{:image}}
   [b filename]
   (println (str "saving: " filename "..."))
   (make-parents filename)
@@ -232,6 +251,7 @@
 
   * Input: image and target width and height
   * Returns newly created resized image"
+  {:metadoc/categories #{:image}}
   [img width height]
   (let [^BufferedImage target (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)
         ^Graphics2D g (.createGraphics target)]
@@ -254,12 +274,14 @@
 
 (defn screen-width
   "Returns width of the screen."
-  {:examples [(ex/example "Example value" (screen-width))]}
+  {:metadoc/categories #{:display}
+   :metadoc/examples [(ex/example "Example value" (screen-width))]}
   [] (.getWidth (screen-size)))
 
 (defn screen-height 
-  "Returns height of the screen."
-  {:examples [(ex/example "Example value" (screen-height))]}
+  "Returns height of the screen." 
+  {:metadoc/categories #{:display}
+   :metadoc/examples [(ex/example "Example value" (screen-height))]}
   [] (.getHeight (screen-size)))
 
 ;; ## Canvas
@@ -271,29 +293,48 @@
 ;; Let's define protocol to equip Canvas and Window types (or any type with image inside) with `get-image` function. `get-image` extracts image. Additionally define width/height getters.
 (defprotocol ImageProto
   "Image Protocol"
-  (get-image [i] "Return BufferedImage")
-  (width [i])
-  (height [i])
-  (save [i n])
-  (convolve [i t])
-  (subimage [i x y w h])
-  (get-pixel [i x y] "Retruns color"))
+  (^{:metadoc/categories #{:image :canvas :window}} get-image [i] "Return BufferedImage")
+  (^{:metadoc/categories #{:image :canvas :window}} width [i] "Width of the image.")
+  (^{:metadoc/categories #{:image :canvas :window}} height [i] "Height of the image.")
+  (^{:metadoc/categories #{:image :canvas :window}} save [i n] "Save image")
+  (^{:metadoc/categories #{:image :canvas :window}} convolve [i t] "Convolve with Java ConvolveOp. See [[convolution-matrices]] for kernel names.")
+  (^{:metadoc/categories #{:image :canvas :window}} subimage [i x y w h] "Return part of the image.")
+  (^{:metadoc/categories #{:image :canvas :window}} get-pixel [i x y] "Retrun color from given position."))
 
-(def convolution-matrices {:shadow          (Kernel. 3 3 (float-array [0 1 2 -1 0 1 -2 -1 0]))
-                           :emboss          (Kernel. 3 3 (float-array [0 2 4 -2 1 2 -4 -2 0]))
-                           :edges-1         (Kernel. 3 3 (float-array [1 2 1 2 -12 2 1 2 1]))
-                           :edges-2         (Kernel. 3 3 (float-array [1 0 -1 0 0 0 -1 0 1]))
-                           :edges-3         (Kernel. 3 3 (float-array [0 1 0 1 -4 1 0 1 0]))
-                           :edges-4         (Kernel. 3 3 (float-array [-1 -1 -1 -1 8 -1 -1 -1 -1]))
-                           :sharpen         (Kernel. 3 3 (float-array [0 -1 0 -1 5 -1 0 -1 0]))
-                           :sobel-x         (Kernel. 3 3 (float-array [1 0 -1 2 0 -2 1 0 -1]))
-                           :sobel-y         (Kernel. 3 3 (float-array [1 2 1 0 0 0 -1 -2 -1]))
-                           :gradient-x      (Kernel. 3 3 (float-array [-1 0 1 -1 0 1 -1 0 1]))
-                           :gradient-y      (Kernel. 3 3 (float-array [-1 -1 -1 0 0 0 1 1 1]))
-                           :box-blur        (Kernel. 3 3 (float-array (map #(/ (int %) 9.0) [1 1 1 1 1 1 1 1 1])))
-                           :gaussian-blur-3 (Kernel. 3 3 (float-array (map #(/ (int %) 16.0) [1 2 1 2 4 2 1 2 1])))
-                           :gaussian-blur-5 (Kernel. 5 5 (float-array (map #(/ (int %) 256.0) [1 4 6 4 1 4 16 24 16 4 6 24 36 24 6 4 16 24 16 4 1 4 6 4 1])))
-                           :unsharp         (Kernel. 5 5 (float-array (map #(/ (int %) -256.0) [1 4 6 4 1 4 16 24 16 4 6 24 -476 24 6 4 16 24 16 4 1 4 6 4 1])))})
+(ex/defsnippet process-image-snippet
+  "Show built in convolution kernels."
+  (let [img (load-image "docs/cockatoo.jpg")
+        unique-name (str "images/core/" (first opts) ".jpg")]
+    (binding [*jpeg-image-quality* 0.7]
+      (save (f img) (str "docs/" unique-name)))
+    (str "../" unique-name)))
+
+(def ^{:metadoc/categories #{:image}
+       :metadoc/examples [(ex/example "List of kernels" (keys convolution-matrices))]}
+  convolution-matrices {:shadow          (Kernel. 3 3 (float-array [0 1 2 -1 0 1 -2 -1 0]))
+                        :emboss          (Kernel. 3 3 (float-array [0 2 4 -2 1 2 -4 -2 0]))
+                        :edges-1         (Kernel. 3 3 (float-array [1 2 1 2 -12 2 1 2 1]))
+                        :edges-2         (Kernel. 3 3 (float-array [1 0 -1 0 0 0 -1 0 1]))
+                        :edges-3         (Kernel. 3 3 (float-array [0 1 0 1 -4 1 0 1 0]))
+                        :edges-4         (Kernel. 3 3 (float-array [-1 -1 -1 -1 8 -1 -1 -1 -1]))
+                        :sharpen         (Kernel. 3 3 (float-array [0 -1 0 -1 5 -1 0 -1 0]))
+                        :sobel-x         (Kernel. 3 3 (float-array [1 0 -1 2 0 -2 1 0 -1]))
+                        :sobel-y         (Kernel. 3 3 (float-array [1 2 1 0 0 0 -1 -2 -1]))
+                        :gradient-x      (Kernel. 3 3 (float-array [-1 0 1 -1 0 1 -1 0 1]))
+                        :gradient-y      (Kernel. 3 3 (float-array [-1 -1 -1 0 0 0 1 1 1]))
+                        :box-blur        (Kernel. 3 3 (float-array (map #(/ (int %) 9.0) [1 1 1 1 1 1 1 1 1])))
+                        :gaussian-blur-3 (Kernel. 3 3 (float-array (map #(/ (int %) 16.0) [1 2 1 2 4 2 1 2 1])))
+                        :gaussian-blur-5 (Kernel. 5 5 (float-array (map #(/ (int %) 256.0) [1 4 6 4 1 4 16 24 16 4 6 24 36 24 6 4 16 24 16 4 1 4 6 4 1])))
+                        :unsharp         (Kernel. 5 5 (float-array (map #(/ (int %) -256.0) [1 4 6 4 1 4 16 24 16 4 6 24 -476 24 6 4 16 24 16 4 1 4 6 4 1])))})
+
+(defmacro ^:private make-conv-examples
+  []
+  `(ex/add-examples convolution-matrices
+     ~@(for [k (keys convolution-matrices)
+             :let [n (str "`(convolve img " k ")`")]]
+         `(ex/example-snippet ~n process-image-snippet :image (fn [~'img] (convolve ~'img ~k))))))
+
+(make-conv-examples)
 
 ;; Add ImageProto functions to BufferedImae
 (extend BufferedImage
