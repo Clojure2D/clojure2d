@@ -302,7 +302,7 @@
   (^{:metadoc/categories #{:image :canvas :window}} get-pixel [i x y] "Retrun color from given position."))
 
 (ex/defsnippet process-image-snippet
-  "Show built in convolution kernels."
+  "Process image with function `f` and save."
   (let [img (load-image "docs/cockatoo.jpg")
         unique-name (str "images/core/" (first opts) ".jpg")]
     (binding [*jpeg-image-quality* 0.7]
