@@ -58,8 +58,8 @@
          ^int w (width p)
          ^int h (height p)
          rimg (-> p
-                  (resize-image (unchecked-int (/ w scale)) (unchecked-int (/ h scale)))
-                  (resize-image w h)
+                  (resize (unchecked-int (/ w scale)) (unchecked-int (/ h scale)))
+                  (resize w h)
                   (p/get-image-pixels))
          l1 (tinter1 rimg)
          l2 (tinter2 rimg)

@@ -55,7 +55,8 @@
                         :canvas "Canvas functions"
                         :draw "Drawing functions"
                         :display "Screen"
-                        :window "Window"}}
+                        :window "Window"
+                        :transform "Transform canvas"}}
   (:require [clojure.java.io :refer :all]
             [clojure2d.color :as c]
             [fastmath.vector :as v]
@@ -244,14 +245,35 @@
 ;; ### Additional functions
 ;;
 ;; Just an image resizer with bicubic interpolation. Native `Graphics2D` method is called.
+
+(defprotocol ImageProto
+  "Image Protocol"
+  (^{:metadoc/categories #{:image :canvas :window}} get-image [i] "Return BufferedImage")
+  (^{:metadoc/categories #{:image :canvas :window}} width [i] "Width of the image.")
+  (^{:metadoc/categories #{:image :canvas :window}} height [i] "Height of the image.")
+  (^{:metadoc/categories #{:image :canvas :window}} save [i n] "Save image")
+  (^{:metadoc/categories #{:image :canvas :window}} convolve [i t] "Convolve with Java ConvolveOp. See [[convolution-matrices]] for kernel names.")
+  (^{:metadoc/categories #{:image :canvas :window}} subimage [i x y w h] "Return part of the image.")
+  (^{:metadoc/categories #{:image :canvas}} resize [i w h] "Resize image.")
+  (^{:metadoc/categories #{:image :canvas :window}} get-pixel [i x y] "Retrun color from given position."))
+
 (declare set-rendering-hints-by-key)
 
-(defn resize-image
+(ex/defsnippet process-image-snippet
+  "Process image with function `f` and save."
+  (let [img (load-image "docs/cockatoo.jpg")
+        unique-name (str "images/core/" (first opts) ".jpg")]
+    (binding [*jpeg-image-quality* 0.7]
+      (save (f img) (str "docs/" unique-name)))
+    (str "../" unique-name)))
+
+(defn- resize-image
   "Resize Image.
 
   * Input: image and target width and height
   * Returns newly created resized image"
-  {:metadoc/categories #{:image}}
+  {:metadoc/categories #{:image}
+   :metadoc/examples []}
   [img width height]
   (let [^BufferedImage target (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)
         ^Graphics2D g (.createGraphics target)]
@@ -265,6 +287,24 @@
   "Get subimage of give image"
   [^BufferedImage source x y w h]
   (.getSubimage source x y w h))
+
+(ex/add-examples resize
+  (ex/example-snippet "Resize image to 300x40" process-image-snippet :image (fn [img] (resize img 300 40))))
+
+(ex/add-examples subimage
+  (ex/example-snippet "Get subimage and resize." process-image-snippet :image (fn [img] (-> img
+                                                                                            (subimage 100 100 12 12)
+                                                                                            (resize 150 150)))))
+
+(ex/add-examples get-pixel
+  (ex/example "Get pixel from an image." (let [img (load-image "docs/cockatoo.jpg")]
+                                           (get-pixel img 100 100))))
+
+(ex/add-examples width
+  (ex/example "Width of the image" (width (load-image "docs/cockatoo.jpg"))))
+
+(ex/add-examples height
+  (ex/example "Height of the image" (height (load-image "docs/cockatoo.jpg"))))
 
 ;; ## Screen info
 
@@ -284,32 +324,10 @@
    :metadoc/examples [(ex/example "Example value" (screen-height))]}
   [] (.getHeight (screen-size)))
 
-;; ## Canvas
 ;;
-;; Canvas is an object you can draw on and which can be displayed in the window. Technically it's a type cosisting of `Graphics2D` object which is internally used to draw on the image, image (`BufferedImage` object), rendering quality hints and singletons for primitives. What is important: to draw on canvas you have to wrap your operations in `with-canvas->` macro. `with-canvas->` is responsible for creating and releasing `Graphics2D` object. Initially `Graphics2D` is set to `nil`.
-;; Canvas should be accelerated by Java and your video card.
-;; Reminder: Drawing on canvas is single threaded.
 
-;; Let's define protocol to equip Canvas and Window types (or any type with image inside) with `get-image` function. `get-image` extracts image. Additionally define width/height getters.
-(defprotocol ImageProto
-  "Image Protocol"
-  (^{:metadoc/categories #{:image :canvas :window}} get-image [i] "Return BufferedImage")
-  (^{:metadoc/categories #{:image :canvas :window}} width [i] "Width of the image.")
-  (^{:metadoc/categories #{:image :canvas :window}} height [i] "Height of the image.")
-  (^{:metadoc/categories #{:image :canvas :window}} save [i n] "Save image")
-  (^{:metadoc/categories #{:image :canvas :window}} convolve [i t] "Convolve with Java ConvolveOp. See [[convolution-matrices]] for kernel names.")
-  (^{:metadoc/categories #{:image :canvas :window}} subimage [i x y w h] "Return part of the image.")
-  (^{:metadoc/categories #{:image :canvas :window}} get-pixel [i x y] "Retrun color from given position."))
-
-(ex/defsnippet process-image-snippet
-  "Process image with function `f` and save."
-  (let [img (load-image "docs/cockatoo.jpg")
-        unique-name (str "images/core/" (first opts) ".jpg")]
-    (binding [*jpeg-image-quality* 0.7]
-      (save (f img) (str "docs/" unique-name)))
-    (str "../" unique-name)))
-
-(def ^{:metadoc/categories #{:image}
+(def ^{:doc "Java ConvolveOp kernels. See [[convolve]]."
+       :metadoc/categories #{:image}
        :metadoc/examples [(ex/example "List of kernels" (keys convolution-matrices))]}
   convolution-matrices {:shadow          (Kernel. 3 3 (float-array [0 1 2 -1 0 1 -2 -1 0]))
                         :emboss          (Kernel. 3 3 (float-array [0 2 4 -2 1 2 -4 -2 0]))
@@ -329,10 +347,10 @@
 
 (defmacro ^:private make-conv-examples
   []
-  `(ex/add-examples convolution-matrices
+  `(ex/add-examples convolve
      ~@(for [k (keys convolution-matrices)
-             :let [n (str "`(convolve img " k ")`")]]
-         `(ex/example-snippet ~n process-image-snippet :image (fn [~'img] (convolve ~'img ~k))))))
+             :let [n (str "Convolve image with " (name k) " kernel.")]]
+         (list 'ex/example-snippet n 'process-image-snippet :image (list 'fn '[img] (list 'convolve 'img k))))))
 
 (make-conv-examples)
 
@@ -352,6 +370,7 @@
                                 (Kernel. s s (float-array t))))]
                  (.filter ^ConvolveOp (ConvolveOp. kernel) i nil)))
    :subimage get-subimage
+   :resize resize-image
    :get-pixel (fn [^BufferedImage i ^long x ^long y]
                 (if (bool-or (< x 0)
                              (< y 0)
@@ -370,8 +389,12 @@
                         (c/color r g b)
                         (c/color r g b a))))))})
 
+;;
+
+(declare resize-canvas)
+
 ;; Canvas type. Use `get-image` to extract image (`BufferedImage`).
-(deftype ^{:doc "Test"}
+(defrecord ^{:doc "Test"}
     Canvas [^Graphics2D graphics
             ^BufferedImage buffer
             ^Line2D line-obj
@@ -389,42 +412,52 @@
   (save [c n] (save-image buffer n) c)
   (convolve [_ t]
     (convolve buffer t))
+  (resize [c w h] (resize-canvas c w h))
   (subimage [_ x y w h] (get-subimage buffer x y w h))
   (get-pixel [_ x y] (get-pixel buffer x y)))
 
-;; Let's define three rendering quality options: `:low`, `:mid`, `:high` or `:highest`. Where `:low` is fastest but has poor quality and `:high`/`:highest` has best quality but may be slow. Rendering options are used when you create canvas.
-(def rendering-hints {:low [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF]
-                            [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR]
-                            [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED]
-                            [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED]
-                            [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED]
-                            [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF]
-                            [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_OFF]]
-                      :mid [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
-                            [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BILINEAR]
-                            [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED]
-                            [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED]
-                            [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED]
-                            [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF]
-                            [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]]
-                      :high [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
+(def ^{:doc "Rendering hints define quality of drawing or window rendering.
+
+The differences are in interpolation, antialiasing, speed vs quality rendering etc. See the source code for the list of each value.
+
+The `:highest` is `:high` with `VALUE_STROKE_PURE` added. Be aware that this option can give very soft lines.
+
+Default hint for Canvas is `:high`. You can set also hint for Window which means that when display is refreshed this hint is applied (java defaults are used otherwise)."
+       :metadoc/categories #{:canvas :window}
+       :metadoc/examples [(ex/example "List of possible hints." (keys rendering-hints))]}
+  rendering-hints {:low [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF]
+                         [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR]
+                         [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED]
+                         [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED]
+                         [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED]
+                         [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF]
+                         [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_OFF]]
+                   :mid [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
+                         [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BILINEAR]
+                         [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED]
+                         [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_SPEED]
+                         [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_SPEED]
+                         [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_OFF]
+                         [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]]
+                   :high [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
+                          [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC]
+                          [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY]
+                          [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY]
+                          [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY]
+                          [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON]
+                          [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]]
+                   :highest [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
                              [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC]
                              [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY]
                              [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY]
                              [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY]
                              [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON]
-                             [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]]
-                      :highest [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
-                                [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC]
-                                [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY]
-                                [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY]
-                                [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY]
-                                [RenderingHints/KEY_FRACTIONALMETRICS   RenderingHints/VALUE_FRACTIONALMETRICS_ON]
-                                [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]
-                                [RenderingHints/KEY_STROKE_CONTROL      RenderingHints/VALUE_STROKE_PURE]]})
+                             [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]
+                             [RenderingHints/KEY_STROKE_CONTROL      RenderingHints/VALUE_STROKE_PURE]]})
 
-(defn get-rendering-hints
-  "Return rendering hints for a key or return default (or :high)."
+(defn- get-rendering-hints
+  "Return rendering hints for a key or return default (or :high).
+  This function is made to protect against user errors."
   ([hint default]
    (rendering-hints (or (some #{hint} (keys rendering-hints)) default)))
   ([hint]
@@ -444,23 +477,19 @@
     (set-rendering-hints g (hints rendering-hints))
     false))
 
-;; Following functions and macro are responsible for creating and releasing `Graphics2D` object for a canvas.
-;; You have to use `with-canvas->` macro to draw on canvas. Internally it's a threading macro and accepts only list of methods which first parameter is canvas object.
-;; Please do not use `flush-graphics` and `make-graphics` functions directly. Use `with-canvas->` macro instead. I do not check state of `Graphics2D` anywhere.
-;; There is one exception: `draw` function associated with Window is already wrapped in `with-canvas->` and you can freely use canvas object inside.
-;; Another note: `with-canvas->` creates it's own copy of `Canvas` object with set `Graphics2D`.
-;;
-;; Second alternative is `with-canvas []` with which is just wrapper (without threading). As a parameter you have to provide binding name for you canvas.
-;;
-;; Example `with-canvas [local-canvas canvas] (set-background local-canvas :black)`
+;; 
 
 (defn flush-graphics
-  "Dispose current `Graphics2D`"
+  "Dispose current `Graphics2D`
+
+  Do not use directly. Call [[with-canvas->]] or [[with-canvas]] macros."
   [^Canvas canvas]
   (.dispose ^Graphics2D (.graphics canvas)))
 
 (defn make-graphics
-  "Create new `Graphics2D` object and set renedering hints"
+  "Create new `Graphics2D` object and set rendering hints.
+
+  Do not use directly. Call [[with-canvas->]] or [[with-canvas]] macros."
   [^Canvas canvas]
   (let [^Graphics2D ng (.createGraphics ^BufferedImage (.buffer canvas))]
     (set-rendering-hints ng (or (.hints canvas) (rendering-hints :high)))
@@ -477,7 +506,12 @@
              (.font canvas))))
 
 (defmacro with-canvas->
-  "Threading macro which takes care to create and destroy `Graphics2D` object for drawings on canvas. Macro returns result of last call."
+  "Threading macro which takes care to create and destroy `Graphics2D` object for drawings on canvas. Macro returns result of last call.
+
+  Each function have to accept canvas as second parameter and have to return canvas.
+
+  See also [[with-canvas]]."
+  {:metadoc/categories #{:canvas}}
   [canvas & body]  
   `(let [newcanvas# (make-graphics ~canvas)
          result# (-> newcanvas#
@@ -487,7 +521,10 @@
        result#)))
 
 (defmacro with-canvas
-  "Macro which takes care to create and destroy `Graphics2D` object for drawings on canvas. Macro returns result of last call."
+  "Macro which takes care to create and destroy `Graphics2D` object for drawings on canvas. Macro returns result of last call.
+
+  See also [[with-canvas->]]." 
+  {:metadoc/categories #{:canvas}}
   [[c canvas] & body]
   `(let [~c (make-graphics ~canvas)
          result# (do ~@body)]
@@ -503,23 +540,38 @@
 (declare image)
 
 (defn canvas
-  "Create and return canvas with `width`, `height` and quality hint name (keyword). Default hint is `:high`."
+  "Create and return Canvas with `width`, `height` and optionally quality hint name (keyword) and font name.
+
+  Default hint is `:high`. Default font is system one.
+
+  Canvas is an object which keeps everything needed to draw Java2d primitives on it. As a drawing buffer `BufferedImage` is used. To draw on Canvas directly wrap your functions with [[with-canvas]] or [[with-canvas->]] macros to create graphical context.
+
+  Be aware that drawing on Canvas is single threaded.
+
+  Font you set while creating canvas will be default font. You can set another font in the code with [[set-font]] and [[set-font-attributes]] functions. However these set font temporary."
+  {:metadoc/categories #{:canvas}
+   :metadoc/examples [(ex/example "Canvas is the record." (canvas 20 30 :low))
+                      (ex/example-session "Check ImageProto on canvas."
+                        (width (canvas 10 20))
+                        (height (canvas 10 20))
+                        (get-image (canvas 5 6))
+                        (width (resize (canvas 1 2) 15 15))
+                        (height (subimage (canvas 10 10) 5 5 2 2)))]}
   ([^long width ^long height hint ^String font]
-   (let
-       [^BufferedImage buffer (.. GraphicsEnvironment 
-                                  (getLocalGraphicsEnvironment)
-                                  (getDefaultScreenDevice)
-                                  (getDefaultConfiguration)
-                                  (createCompatibleImage width height Transparency/TRANSLUCENT))        
-        result (Canvas. nil
-                        buffer
-                        (Line2D$Double.)
-                        (Rectangle2D$Double.)
-                        (Ellipse2D$Double.)
-                        (get-rendering-hints hint)
-                        width height
-                        nil
-                        (when font (java.awt.Font/decode font)))]
+   (let [^BufferedImage buffer (.. GraphicsEnvironment 
+                                   (getLocalGraphicsEnvironment)
+                                   (getDefaultScreenDevice)
+                                   (getDefaultConfiguration)
+                                   (createCompatibleImage width height Transparency/TRANSLUCENT))        
+         result (Canvas. nil
+                         buffer
+                         (Line2D$Double.)
+                         (Rectangle2D$Double.)
+                         (Ellipse2D$Double.)
+                         (get-rendering-hints hint)
+                         width height
+                         nil
+                         (when font (java.awt.Font/decode font)))]
      (with-canvas-> result
        (set-background Color/black))
      result))
@@ -528,12 +580,30 @@
   ([width height hint]
    (canvas width height hint nil)))
 
-(defn resize-canvas
+(defn- resize-canvas
   "Resize canvas to new dimensions. Creates and returns new canvas."
   [^Canvas c width height]
   (let [ncanvas (canvas width height (.hints c))]
     (with-canvas-> ncanvas
       (image (get-image c)))))
+
+;;
+
+(ex/add-examples with-canvas->
+  (ex/example-snippet "Draw on canvas" process-image-snippet :image (fn [img]
+                                                                      (with-canvas-> (canvas 100 100)
+                                                                        (image img 50 50 50 50)))))
+
+(ex/add-examples with-canvas
+  (ex/example-snippet "Draw on canvas" process-image-snippet :image (fn [img]
+                                                                      (with-canvas [c (canvas 200 200)]
+                                                                        (dotimes [i 50]
+                                                                          (let [x (r/irand -50 100)
+                                                                                y (r/irand -50 100)
+                                                                                w (r/irand (- 200 x))
+                                                                                h (r/irand (- 200 y))]
+                                                                            (image c img x y w h)))
+                                                                        c))))
 
 ;; ### Transformations
 ;;
@@ -542,6 +612,11 @@
 
 (defn scale
   "Scale canvas"
+  {:metadoc/categories #{:transform :canvas}
+   :metadoc/examples [(ex/example-snippet "Scale canvas" process-image-snippet :image (fn [img]
+                                                                                        (with-canvas-> (canvas 150 150)
+                                                                                          (scale 0.5)
+                                                                                          (image img 0 0))))]} 
   ([^Canvas canvas ^double scalex ^double scaley]
    (.scale ^Graphics2D (.graphics canvas) scalex scaley)
    canvas)
@@ -549,16 +624,31 @@
 
 (defn flip-x
   "Flip canvas over x axis"
+  {:metadoc/categories #{:transform :canvas}
+   :metadoc/examples [(ex/example-snippet "Scale canvas" process-image-snippet :image (fn [img]
+                                                                                        (with-canvas-> (canvas 150 150)
+                                                                                          (flip-x)
+                                                                                          (image img -150 0))))]}
   [canvas]
   (scale canvas -1.0 1.0))
 
 (defn flip-y
   "Flip canvas over y axis"
+  {:metadoc/categories #{:transform :canvas}
+   :metadoc/examples [(ex/example-snippet "Scale canvas" process-image-snippet :image (fn [img]
+                                                                                        (with-canvas-> (canvas 150 150)
+                                                                                          (flip-y)
+                                                                                          (image img 0 -150))))]}
   [canvas]
   (scale canvas 1.0 -1.0))
 
 (defn translate
   "Translate origin"
+  {:metadoc/categories #{:transform :canvas}
+   :metadoc/examples [(ex/example-snippet "Scale canvas" process-image-snippet :image (fn [img]
+                                                                                        (with-canvas-> (canvas 150 150)
+                                                                                          (translate 20 20)
+                                                                                          (image img 0 0))))]}
   ([^Canvas canvas ^double tx ^double ty]
    (.translate ^Graphics2D (.graphics canvas) tx ty)
    canvas)
@@ -567,25 +657,42 @@
 
 (defn rotate
   "Rotate canvas"
+  {:metadoc/categories #{:transform :canvas}
+   :metadoc/examples [(ex/example-snippet "Scale canvas" process-image-snippet :image (fn [img]
+                                                                                        (with-canvas-> (canvas 150 150)
+                                                                                          (translate 75 75)
+                                                                                          (rotate m/QUARTER_PI)
+                                                                                          (image img -75 -75))))]}
   [^Canvas canvas ^double angle]
   (.rotate ^Graphics2D (.graphics canvas) angle)
   canvas)
 
 (defn shear
   "Shear canvas"
+  {:metadoc/categories #{:transform :canvas}
+   :metadoc/examples [(ex/example-snippet "Scale canvas" process-image-snippet :image (fn [img]
+                                                                                        (with-canvas-> (canvas 150 150)
+                                                                                          (shear 0.2 0.4)
+                                                                                          (image img 0 0))))]}
   ([^Canvas canvas ^double sx ^double sy]
    (.shear ^Graphics2D (.graphics canvas) sx sy)
    canvas)
   ([canvas s] (shear canvas s s)))
 
 (defn push-matrix
-  "Remember current transformation state"
+  "Remember current transformation state.
+
+  See also [[pop-matrix]], [[reset-matrix]]."
+  {:metadoc/categories #{:transform :canvas}}
   [^Canvas canvas]
   (swap! (.transform-stack canvas) conj (.getTransform ^Graphics2D (.graphics canvas)))
   canvas)
 
 (defn pop-matrix
-  "Restore saved transformation state"
+  "Restore saved transformation state.
+
+  See also [[push-matrix]], [[reset-matrix]]."
+  {:metadoc/categories #{:transform :canvas}}
   [^Canvas canvas]
   (when (seq @(.transform-stack canvas))
     (let [v (peek @(.transform-stack canvas))]
@@ -593,8 +700,33 @@
       (.setTransform ^Graphics2D (.graphics canvas) v)))
   canvas)
 
+(def ^:private push-pop-matrix-example
+  (ex/example-snippet "Scale canvas" process-image-snippet :image
+    (fn [img]
+      (with-canvas [c (canvas 250 250)]
+        (translate c 125 125)
+        (doseq [a (range 0 m/TWO_PI 0.3)]
+          (let [x (* 80.0 (m/cos a))
+                y (* 80.0 (m/sin a))]
+            (-> c
+                (push-matrix)
+                (translate x y)
+                (rotate a)
+                (image img 0 0 20 20)
+                (pop-matrix))))
+        c))))
+
+(ex/add-examples push-matrix push-pop-matrix-example)
+(ex/add-examples pop-matrix push-pop-matrix-example)
+
 (defn transform
-  "Transform given point or coordinates with current transformation."
+  "Transform given point or coordinates with current transformation. See [[inv-transform]]."
+  {:metadoc/categories #{:transform :canvas}
+   :metadoc/examples [(ex/example "Transform point."
+                        (with-canvas [c (canvas 100 100)]
+                          (translate c 50 50)
+                          (rotate c m/HALF_PI)
+                          (transform c 10 10)))]}
   ([^Canvas canvas x y]
    (let [^Point2D p (.transform ^java.awt.geom.AffineTransform (.getTransform ^Graphics2D (.graphics canvas)) (Point2D$Double. x y) nil)]
      (Vec2. (.getX p) (.getY p))))
@@ -602,7 +734,13 @@
    (transform canvas (.x v) (.y v))))
 
 (defn inv-transform
-  "Inverse transform of given point or coordinates with current transformation."
+  "Inverse transform of given point or coordinates with current transformation. See [[transform]]."
+  {:metadoc/categories #{:transform :canvas}
+   :metadoc/examples [(ex/example "Invesre transform of point."
+                        (with-canvas [c (canvas 100 100)]
+                          (translate c 50 50)
+                          (rotate c m/HALF_PI)
+                          (inv-transform c 40 60)))]}
   ([^Canvas canvas x y]
    (let [^Point2D p (.inverseTransform ^java.awt.geom.AffineTransform (.getTransform ^Graphics2D (.graphics canvas)) (Point2D$Double. x y) nil)]
      (Vec2. (.getX p) (.getY p))))
@@ -610,7 +748,8 @@
    (inv-transform canvas (.x v) (.y v))))
 
 (defn reset-matrix
-  "Reset transformation"
+  "Reset transformations."
+  {:metadoc/categories #{:transform :canvas}}
   [^Canvas canvas]
   (.setTransform ^Graphics2D (.graphics canvas) (java.awt.geom.AffineTransform.))
   canvas)
@@ -625,20 +764,25 @@
 ;; 
 ;; All functions return canvas object
 
-(defn set-stroke
-  "Set stroke (line) attributes like `cap`, `join` and size. Default `CAP_ROUND` and `JOIN_BEVEL` are used. Default size is `1.0`."
-  ([^Canvas canvas size cap join]
-   (.setStroke ^Graphics2D (.graphics canvas) (BasicStroke. size cap join))
-   canvas)
-  ([canvas size cap]
-   (set-stroke canvas size cap BasicStroke/JOIN_BEVEL))
-  ([canvas size]
-   (set-stroke canvas size BasicStroke/CAP_ROUND BasicStroke/JOIN_BEVEL))
-  ([canvas]
-   (set-stroke canvas 1.0)))
+(ex/defsnippet drawing-snippet
+  "Draw something on canvas and save."
+  (let [canvas (canvas 200 200) 
+        unique-name (str "images/core/" (first opts) ".jpg")]
+    (with-canvas-> canvas
+      (set-background 0x30426a)
+      (set-color :white)
+      (f))
+    (binding [*jpeg-image-quality* 0.7]
+      (save canvas (str "docs/" unique-name)))
+    (str "../" unique-name)))
 
 (defn line
   "Draw line from point `(x1,y1)` to `(x2,y2)`"
+  {:metadoc/categories #{:draw}
+   :metadoc/examples [(ex/example-snippet "Draw some lines" drawing-snippet :image
+                        (fn [canvas] 
+                          (doseq [^long x (range 10 190 10)]
+                            (line canvas x 10 (- 190 x) 190))))]}
   ([^Canvas canvas x1 y1 x2 y2]
    (let [^Line2D l (.line-obj canvas)]
      (.setLine l x1 y1 x2 y2)
@@ -647,27 +791,79 @@
   ([canvas ^Vec2 v1 ^Vec2 v2]
    (line canvas (.x v1) (.y v1) (.x v2) (.y v2))))
 
-(comment {:examples [(ex/example-gen-image :simple "Sequence of points."
-                                           (doseq [x (range 10 159 10)] (point canvas x x)))
-                     (ex/example-gen-image :simple "Magnified point can look differently when different stroke settings are used."
-                                           (-> canvas
-                                               (scale 80.0)
-                                               (set-stroke 0.5)
-                                               (point 0.5 0.5)
-                                               (set-stroke 0.5 BasicStroke/CAP_SQUARE BasicStroke/JOIN_MITER)
-                                               (point 1.5 1.5)))]})
+(def ^{:doc "Stroke join types"
+       :metadoc/categories #{:draw}
+       :metadoc/examples [(ex/example "List of stroke join types" (keys stroke-joins))]}
+  stroke-joins {:bevel BasicStroke/JOIN_BEVEL
+                :mitter BasicStroke/JOIN_MITER
+                :round BasicStroke/JOIN_ROUND})
+
+(def ^{:doc "Stroke cap types"
+       :metadoc/categories #{:draw}
+       :metadoc/examples [(ex/example "List of stroke cap types" (keys stroke-caps))]}
+  stroke-caps {:round BasicStroke/CAP_ROUND
+               :butt BasicStroke/CAP_BUTT
+               :square BasicStroke/CAP_SQUARE})
+
+(declare rect)
+
+(defn set-stroke
+  "Set stroke (line) attributes like `cap`, `join` and size.
+
+  Default `:round` and `:bevel` are used. Default size is `1.0`.
+
+  See [[stroke-joins]] and [[stroke-caps]] for names."
+  {:metadoc/categories #{:draw}
+   :metadoc/examples [(ex/example-snippet "Various stroke settings." drawing-snippet :image
+                        (fn [canvas]
+                          (-> canvas
+                              (set-stroke 10 :round)
+                              (line 25 20 25 180)
+                              (set-stroke 10 :butt)
+                              (line 55 20 55 180)
+                              (set-stroke 10 :square)
+                              (line 85 20 85 180)
+                              (set-stroke 10 :round :bevel)
+                              (rect 120 20 60 40 true)
+                              (set-stroke 10 :round :mitter)
+                              (rect 120 80 60 40 true)
+                              (set-stroke 10 :round :round)
+                              (rect 120 140 60 40 true))))]}
+  ([^Canvas canvas size cap join]
+   (.setStroke ^Graphics2D (.graphics canvas) (BasicStroke. size
+                                                            (or (stroke-caps cap) BasicStroke/CAP_ROUND)
+                                                            (or (stroke-joins join) BasicStroke/JOIN_BEVEL)))
+   canvas)
+  ([canvas size cap]
+   (set-stroke canvas size cap :bevel))
+  ([canvas size]
+   (set-stroke canvas size :round :bevel))
+  ([canvas]
+   (set-stroke canvas 1.0)))
 
 (defn point
   "Draw point at `x`,`y` or `^Vec2` position.
 
-  It's implemented as a very short line. Consider using `(rect x y 1 1)` for speed when `x` and `y` are integers." 
+  It's implemented as a very short line. Consider using `(rect x y 1 1)` for speed when `x` and `y` are integers."
+  {:metadoc/categories #{:draw}
+   :metadoc/examples [(ex/example-snippet "Sequence of points." drawing-snippet :image
+                        (fn [canvas]
+                          (doseq [^long x (range 10 190 10)]
+                            (set-stroke canvas (/ x 20))
+                            (point canvas x x))))
+                      (ex/example-snippet "Magnified point can look differently when different stroke settings are used."
+                        drawing-snippet :image (fn [canvas]
+                                                 (-> canvas
+                                                     (scale 80.0)
+                                                     (set-stroke 0.5)
+                                                     (point 0.5 0.5)
+                                                     (set-stroke 0.5 :square)
+                                                     (point 1.5 1.5))))]}  
   ([canvas ^double x ^double y]
    (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
    canvas)
   ([canvas ^Vec2 vec]
    (point canvas (.x vec) (.y vec))))
-
-(comment show-window {:canvas (with-canvas-> (make-canvas 160 160))})
 
 (defn- draw-fill-or-stroke
   "Draw filled or outlined shape."
@@ -676,13 +872,16 @@
     (.draw g obj)
     (.fill g obj)))
 
-(comment   {:examples [(ex/example-gen-image :simple "Two squares, one filled and second as outline."
-                                             (-> canvas
-                                                 (rect 10 10 50 50) 
-                                                 (rect 60 60 90 90 true)))]})
-
 (defn rect
-  "Draw rectangle with top-left corner at `(x,y)` position with width `w` and height `h`. Optionally you can set `stroke?` (default: `false`) to `true` if you don't want to fill rectangle and draw outline only."
+  "Draw rectangle with top-left corner at `(x,y)` position with width `w` and height `h`. Optionally you can set `stroke?` (default: `false`) to `true` if you don't want to fill rectangle and draw outline only.
+
+  See also: [[crect]]."
+  {:metadoc/categories #{:draw}
+   :metadoc/examples [(ex/example-snippet "Two squares, one filled and second as outline." drawing-snippet :image
+                        (fn [canvas]
+                          (-> canvas
+                              (rect 30 30 50 50) 
+                              (rect 80 80 90 90 true))))]}
   ([^Canvas canvas x y w h stroke?]
    (let [^Rectangle2D r (.rect-obj canvas)] 
      (.setFrame r x y w h)
@@ -691,14 +890,15 @@
   ([canvas x y w h]
    (rect canvas x y w h false)))
 
-(comment   {:examples [(ex/example-gen-image :simple "Two squares, one centered."
-                                             (-> canvas
-                                                 (set-color :white 160)
-                                                 (rect 50 50 70 70) 
-                                                 (crect 50 50 70 70)))]})
-
 (defn crect
   "Centered version of [[rect]]."
+  {:metadoc/categories #{:draw}
+   :metadoc/examples [(ex/example-snippet "Two squares, regular and centered." drawing-snippet :image
+                        (fn [canvas]
+                          (-> canvas
+                              (set-color :white 160)
+                              (rect 50 50 100 100) 
+                              (crect 50 50 60 60))))]}
   ([canvas x y w h stroke?]
    (let [w2 (* 0.5 ^double w)
          h2 (* 0.5 ^double h)]
@@ -709,6 +909,16 @@
 
 (defn ellipse
   "Draw ellipse with middle at `(x,y)` position with width `w` and height `h`."
+  {:metadoc/categories #{:draw}
+   :metadoc/examples [(ex/example-snippet "A couple of ellises." drawing-snippet :image
+                        (fn [canvas]
+                          (-> canvas
+                              (set-color :white 200)
+                              (ellipse 100 100 50 150)
+                              (ellipse 100 100 150 50 true)
+                              (ellipse 100 100 20 20)
+                              (set-color :black 200)
+                              (ellipse 100 100 20 20 true))))]}
   ([^Canvas canvas x1 y1 w h stroke?]
    (let [^Ellipse2D e (.ellipse_obj canvas)]
      (.setFrame e (- ^double x1 (* ^double w 0.5)) (- ^double y1 (* ^double h 0.5)) w h)
@@ -719,6 +929,13 @@
 
 (defn triangle
   "Draw triangle with corners at 3 positions."
+  {:metadoc/categories #{:draw}
+   :metadoc/examples [(ex/example-snippet "Two triangles" drawing-snippet :image
+                        (fn [canvas]
+                          (-> canvas
+                              (triangle 30 30 170 100 30 170)
+                              (set-color :black)
+                              (triangle 170 30 170 170 30 100 true))))]}
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 stroke?]
    (let [^Path2D p (Path2D$Double.)]
      (doto p
@@ -734,7 +951,18 @@
 (defn triangle-strip
   "Draw triangle strip. Implementation of `Processing` `STRIP` shape.
 
-  Input: list of vertices as Vec2 vectors"
+  Input: list of vertices as Vec2 vectors.
+
+  See also: [[triangle-fan]]."
+  {:metadoc/categories #{:draw}
+   :metadoc/examples [(ex/example-snippet "Triangle strip" drawing-snippet :image
+                        (fn [canvas]
+                          (set-color canvas :white 190)
+                          (translate canvas 100 100)
+                          (let [s (for [a (range 0 65 3.0)]
+                                    (v/vec2 (* 90.0 (m/cos a))
+                                            (* 90.0 (m/sin a))))]
+                            (triangle-strip canvas s true))))]}
   ([canvas vs stroke?]
    (when (> (count vs) 2)
      (loop [^Vec2 v1 (first vs)
@@ -751,7 +979,20 @@
 (defn triangle-fan
   "Draw triangle fan. Implementation of `Processing` `FAN` shape.
 
-  Input: list of vertices as Vec2 vectors"
+  First point is common vertex of all triangles.
+  
+  Input: list of vertices as Vec2 vectors.
+
+  See also: [[triangle-strip]]."
+  {:metadoc/categories #{:draw}
+   :metadoc/examples [(ex/example-snippet "Triangle strip" drawing-snippet :image
+                        (fn [canvas]
+                          (set-color canvas :white 190)
+                          (translate canvas 100 100)
+                          (let [s (for [a (range 0 65 3.0)]
+                                    (v/vec2 (* 90.0 (m/cos a))
+                                            (* 90.0 (m/sin a))))]
+                            (triangle-fan canvas s true))))]}
   ([canvas vs stroke?]
    (when (> (count vs) 2)
      (let [^Vec2 v1 (first vs)]
@@ -766,7 +1007,20 @@
    (triangle-strip canvas vs false)))
 
 (defn path
-  "Draw path from lines. Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines)."
+  "Draw path from lines.
+
+  Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).
+
+  See also [[path-bezier]]."
+  {:metadoc/categories #{:draw}
+   :metadoc/examples [(ex/example-snippet "Triangle strip" drawing-snippet :image
+                        (fn [canvas]
+                          (set-color canvas :white 190)
+                          (translate canvas 100 100)
+                          (let [s (for [^double a (range 0 65 1.3)]
+                                    (v/vec2 (* (+ a 25) (m/cos a))
+                                            (* (+ a 25) (m/sin a))))]
+                            (path canvas s))) )]}
   ([^Canvas canvas vs close? stroke?]
    (when (seq vs)
      (let [^Path2D p (Path2D$Double.)
@@ -780,7 +1034,7 @@
   ([canvas vs close?] (path canvas vs close? true))
   ([canvas vs] (path canvas vs false true)))
 
-(defn calculate-bezier-control-points
+(defn- calculate-bezier-control-points
   "Calculate bezier spline control points. http://www.antigrain.com/research/bezier_interpolation/index.html"
   [v0 v1 v2 v3]
   (let [c1 (v/mult (v/add v0 v1) 0.5)
@@ -806,7 +1060,20 @@
     [cp1 cp2]))
 
 (defn path-bezier
-  "Draw path from quad curves. Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines)."
+  "Draw path from quad curves.
+
+  Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).
+
+  See also [[path]]."
+  {:metadoc/categories #{:draw}
+   :metadoc/examples [(ex/example-snippet "Triangle strip" drawing-snippet :image
+                        (fn [canvas]
+                          (set-color canvas :white 190)
+                          (translate canvas 100 100)
+                          (let [s (for [^double a (range 0 65 1.3)]
+                                    (v/vec2 (* (+ a 25) (m/cos a))
+                                            (* (+ a 25) (m/sin a))))]
+                            (path-bezier canvas s))) )]}  
   ([^Canvas canvas vs close? stroke?]
    (when (> (count vs) 3)
      (let [cl? (or (not stroke?) close?)
@@ -953,7 +1220,7 @@
   (.setColor ^Graphics2D (.graphics canvas) c)
   canvas)
 
-(def alpha-composite-src ^java.awt.Composite (java.awt.AlphaComposite/getInstance java.awt.AlphaComposite/SRC))
+(def ^:private alpha-composite-src ^java.awt.Composite (java.awt.AlphaComposite/getInstance java.awt.AlphaComposite/SRC))
 
 (defn set-awt-background
   "Set background color. Expects valid `Color` object."
@@ -973,12 +1240,22 @@
   canvas)
 
 (defn set-awt-xor-mode
-  "Set XOR graphics mode. If color is set to nil"
+  "Set XOR graphics mode.
+
+  To revert call [[set-paint-mode]]."
   [^Canvas canvas c]
   (let [^Graphics2D g (.graphics canvas)]
-    (if c
-      (.setXORMode g c)
-      (.setPaintMode g)))
+    (.setXORMode g c))
+  canvas)
+
+(defn set-paint-mode
+  "Set normal paint mode.
+
+  This is default mode.
+  
+  See [[set-gradient-mode]] or [[set-xor-mode]] for other types."
+  [^Canvas canvas]
+  (.setPaintMode ^Graphics2D (.graphics canvas))
   canvas)
 
 ;; Set color for primitive
@@ -1005,8 +1282,10 @@
 
 ;; ### Gradient
 
-(defn set-gradient
-  "Set paint mode to gradient. Call with canvas only to reset."
+(defn set-gradient-mode
+  "Set paint mode to gradient.
+
+  To revert call [[set-paint-mode]]"
   ([^Canvas canvas x1 y1 color1 x2 y2 color2]
    (let [gp (java.awt.GradientPaint. x1 y1 (c/awt-color color1) x2 y2 (c/awt-color color2))
          ^Graphics2D g (.graphics canvas)]

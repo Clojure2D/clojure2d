@@ -16,7 +16,9 @@ All notable changes to this project will be documented in this file. This change
 - make-color, make-awt-color, make-canvas, make-2d-...-array changed to names without `make-` prefix
 - make-pixels -> pixels
 - make-effect* -> effect
-- almost all make- in raymarching are changed to version without prefix
+	- almost all make- in raymarching are changed to version without prefix
+- `resize-image` and `resize-canvas` are now moved to ImageProto as `resize`
+- set-xor-mode, set-gradient-mode are reset now with set-paint-mode
 
 Prefix `make-` is reserved when function is created.
 

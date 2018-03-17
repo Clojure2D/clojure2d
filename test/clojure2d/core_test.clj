@@ -74,7 +74,7 @@
 
 ;; resize image
 (deftest resize-test
-  (let [resized (resize-image (get-image canvas1) 4 44)]
+  (let [resized (resize canvas1 4 44)]
     (is (= 4 (width resized)))
     (is (= 44 (height resized)))))
 
