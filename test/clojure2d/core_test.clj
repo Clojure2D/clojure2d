@@ -136,8 +136,7 @@
 (deftest state-test
   (is (:fps (get-state @window)))
   (is (window-active? @window))
-  (is (not (window-active? @window-closed)))
-  (is (pos? (count @global-state))))
+  (is (not (window-active? @window-closed))))
 
 (deftest function-test
   (is (= "D54" (to-hex 3412)))
