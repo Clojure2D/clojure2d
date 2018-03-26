@@ -555,11 +555,13 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   {:metadoc/categories #{:canvas}
    :metadoc/examples [(ex/example "Canvas is the record." (canvas 20 30 :low))
                       (ex/example-session "Check ImageProto on canvas."
-                        (width (canvas 10 20))
-                        (height (canvas 10 20))
-                        (get-image (canvas 5 6))
-                        (width (resize (canvas 1 2) 15 15))
-                        (height (subimage (canvas 10 10) 5 5 2 2)))]}
+                                          (width (canvas 10 20))
+                                          (height (canvas 10 20))
+                                          (get-image (canvas 5 6))
+                                          (width (resize (canvas 1 2) 15 15))
+                                          (height (subimage (canvas 10 10) 5 5 2 2)))
+                      
+                      ]}
   ([^long width ^long height hint ^String font]
    (let [^BufferedImage buffer (.. GraphicsEnvironment 
                                    (getLocalGraphicsEnvironment)

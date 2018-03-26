@@ -24,6 +24,7 @@
             [fastmath.core :as m]
             [fastmath.random :as r]
             [fastmath.vector :as v]
+            [fastmath.stats :as stat]
             [clojure.java.io :refer :all])
   (:import [fastmath.vector Vec3 Vec4]           
            java.awt.Color))
@@ -1063,7 +1064,7 @@
   "RGB->GLHS"
   [^Vec4 c]
   (let [mx (max (.x c) (.y c) (.z c))
-        md (m/med (.x c) (.y c) (.z c))
+        md (stat/median-3 (.x c) (.y c) (.z c))
         mn (min (.x c) (.y c) (.z c))]
     (if (== mx mn)
       (Vec4. mx 0 0 (.w c))
