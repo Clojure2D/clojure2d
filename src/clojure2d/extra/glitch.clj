@@ -264,8 +264,8 @@
   (let [nnx (m/round (inc (* nx scale)))
         nny (m/round (inc (* ny scale)))
         [bget bset] (int-array-2d grid-sx grid-sy)
-        noise (r/make-fbm-noise {:seed (or nseed (r/irand))
-                                 :lacunarity 2.1})]
+        noise (r/fbm-noise {:seed (or nseed (r/irand))
+                            :lacunarity 2.1})]
     (dotimes [y grid-sy]
       (bset 0 y 0) 
       (loop [currx (int 0)
@@ -273,9 +273,9 @@
              x (int 1)]
         (when (< x grid-sx)
           (let [xnnx (/ x nnx)
-                xx (* xnnx (m/round (* nnx (inc ^double (noise xnnx)))))
+                xx (* xnnx (m/round (* nnx (inc ^double (noise (+ 0.2 xnnx))))))
                 ynny (/ y nny)
-                yy (* ynny (m/round (* nny (inc ^double (noise ynny)))))
+                yy (* ynny (m/round (* nny (inc ^double (noise (- 0.4 ynny))))))
                 here (< ^double (noise (+ shiftx (/ (+ x xx) nx)) (+ shifty (/ (+ y yy) ny))) 0.5)
                 ncurrx (if (= current here) currx x)
                 ncurrent (if (= current here) current here)]

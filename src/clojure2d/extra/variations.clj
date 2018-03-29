@@ -1954,7 +1954,7 @@
 (defn make-perlin
   "Perlin noise"
   [amount {:keys [seed octaves scale]}]
-  (let [n (make-fbm-noise {:seed seed :octaves octaves})]
+  (let [n (fbm-noise {:seed seed :octaves octaves})]
     (make-noise-variation amount scale n)))
 (make-var-method perlin :regular)
 
@@ -1965,7 +1965,7 @@
 (defn make-perlin2
   "Perlin noise"
   [^double amount {:keys [^int seed ^int octaves ^double scale]}]
-  (let [n (make-fbm-noise {:seed seed :octaves octaves})]
+  (let [n (fbm-noise {:seed seed :octaves octaves})]
     (make-noise-variation2 amount scale n)))
 (make-var-method perlin2 :regular)
 

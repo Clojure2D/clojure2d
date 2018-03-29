@@ -147,7 +147,7 @@ All math functions are in [fastmath](https://github.com/generateme/fastmath) rep
 
 [Clojurians](https://clojurians.slack.com/archives/clojure2d)
 
-### How to support
+### How to help
 
 Yes! You can help with this project:
 
@@ -175,5 +175,5 @@ Or just Pull Request.
 
 ## License
 
-Copyright © 2016-2017 GenerateMe
+Copyright © 2016-2018 GenerateMe
 Distributed under the MIT Licence
