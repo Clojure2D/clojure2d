@@ -1724,7 +1724,9 @@ See [[set-color]]."
 (defmethod key-released :default [_ s]  s)
 
 ;; Multimethod used to process typed key
-(defmulti key-typed (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))
+(defmulti key-typed
+  ""
+  (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))
 ;; Do nothing on default
 (defmethod key-typed :default [_ s]  s)
 
