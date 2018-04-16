@@ -61,16 +61,12 @@
   (is (= cv4 (color 245 245 220 255))))
 
 (deftest hue-test
-  (is (= (/ (* 255.0 60.0) 360.0) (hue (color :beige)))))
-
-(deftest get-r255-test
-  (let [r (r/irand 256)]
-    (is (= (/ r 255.0) (get-r255 r)))))
+  (is (= 60.0 (hue (color :beige)))))
 
 ;; test blends
-(def c50 (get-r255 50))
-(def c100 (get-r255 100))
-(def c200 (get-r255 200))
+(def c50 (* rev255 50))
+(def c100 (* rev255 100))
+(def c200 (* rev255 200))
 
 (deftest blend-test
   (is (== c100 (blend-none c100 1)))
@@ -79,12 +75,12 @@
   (is (== 1.0 (blend-none 1 0)))
 
   (is (== 1.0 (blend-add c100 c200)))
-  (is (== (get-r255 150) (blend-add c50 c100)))
+  (is (== (* rev255 150) (blend-add c50 c100)))
   (is (== 1.0 (blend-add 0 1)))
   (is (== 1.0 (blend-add 1 0)))
 
   (is (== (m/frac (+ c100 c200)) (blend-madd c100 c200)))
-  (is (== (get-r255 150) (blend-madd c50 c100)))
+  (is (== (* rev255 150) (blend-madd c50 c100)))
   (is (== 0.0 (blend-madd 0 1)))
   (is (== 0.0 (blend-madd 1 0)))
 
@@ -99,6 +95,40 @@
   (is (== 0.0 (blend-msubtract 1 0))))
 
 ;; test color converters
+
+(defn colorspace-validity
+  "Test if colorspace conversion works properly"
+  [cs]
+  (let [[to from] (colorspaces cs)
+        c (concat (map to-color (vals html-colors-map))
+                  (repeatedly 100000 #(v/vec4 (v/generate-vec3 (fn [] (r/irand 256))) 255)))]
+    (empty? (filter false? (map = c (map (comp (fn [v] (v/applyf v #(m/round %))) from to) c))))))
+
+(deftest colorspace-test
+  (is (colorspace-validity :RGB))
+  (is (colorspace-validity :sRGB))
+  (is (colorspace-validity :Cubehelix))
+  (is (colorspace-validity :YIQ))
+  (is (colorspace-validity :YUV))
+  (is (colorspace-validity :YCgCo))
+  (is (colorspace-validity :YCbCr))
+  (is (colorspace-validity :YDbDr))
+  (is (colorspace-validity :YPbPr))
+  (is (colorspace-validity :GLHS))
+  (is (colorspace-validity :HCL))
+  (is (colorspace-validity :HSL))
+  (is (colorspace-validity :HSB))
+  (is (colorspace-validity :HSV))
+  (is (colorspace-validity :HSI))
+  (is (colorspace-validity :HWB))
+  (is (colorspace-validity :CMY))
+  (is (colorspace-validity :LAB))
+  (is (colorspace-validity :LUV))
+  (is (colorspace-validity :XYZ))
+  (is (colorspace-validity :YXY))
+  (is (colorspace-validity :OHTA)))
+
+(from-YIQ (to-YIQ (color 222 32 224)))
 
 ;; test iq palette generator
 

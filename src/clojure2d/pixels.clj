@@ -386,7 +386,7 @@
   "Create compose blending function"
   [n]
   (cond 
-    (keyword? n) (partial blend-channel (partial c/blend-values (n c/blends)))
+    (keyword? n) (partial blend-channel (partial c/blend-values (c/blends n)))
     (nil? n) nil
     :else (partial blend-channel (partial c/blend-values n))))
 
@@ -827,9 +827,9 @@
                       loghit (* (m/log (inc hit)) mxlog) ;; log map for hit, result: 0.0-1.0
                       ;; loghit (m/log2 (inc (* rmx hit))) ;; log map for hit, result: 0.0-1.0
                       alpha (m/pow loghit agamma) ;; gamma for alpha
-                      col1 (aget ^doubles c/r255 (m/constrain (* rhit (aget ch1 idx)) 0 255)) ;; normalized red
-                      col2 (aget ^doubles c/r255 (m/constrain (* rhit (aget ch2 idx)) 0 255)) ;; green
-                      col3 (aget ^doubles c/r255 (m/constrain (* rhit (aget ch3 idx)) 0 255)) ;; and blue
+                      col1 (* c/rev255 (m/constrain (* rhit (aget ch1 idx)) 0 255)) ;; normalized red
+                      col2 (* c/rev255 (m/constrain (* rhit (aget ch2 idx)) 0 255)) ;; green
+                      col3 (* c/rev255 (m/constrain (* rhit (aget ch3 idx)) 0 255)) ;; and blue
                       c1 (* 255.0 (+ (* intensity col1)
                                      (* rintensity (m/pow col1 cgamma)))) ;; interpolate between color and gamma(color), intensity based
                       c2 (* 255.0 (+ (* intensity col2)

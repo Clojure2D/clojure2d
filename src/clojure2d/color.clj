@@ -27,7 +27,7 @@
             [fastmath.stats :as stat]
             [fastmath.interpolation :as i]
             [clojure.java.io :refer :all])
-  (:import [fastmath.vector Vec3 Vec4]           
+  (:import [fastmath.vector Vec2 Vec3 Vec4]           
            java.awt.Color))
 
 (set! *warn-on-reflection* true)
@@ -238,12 +238,23 @@
   ([v] (awt-color v v v))
   ([v a] (awt-color v v v a)))
 
-(declare to-HSB)
+(declare to-HC)
+(declare to-HC-polar)
 
 (defn hue
-  "Get hue value from color (any representation). Based on HSB colorspace."
+  "Get hue value from color (any representation). Returns angle (0-360).
+  
+  Uses hexagonal transformation."
   ^double [c]
-  (let [^Vec4 ret (to-HSB (to-color c))]
+  (let [^Vec4 ret (to-HC (to-color c))]
+    (.x ret)))
+
+(defn hue-polar
+  "Get hue value from color (any representation). Returns angle (0-360).
+  
+  Uses polar transformation."
+  ^double [c]
+  (let [^Vec4 ret (to-HC-polar (to-color c))]
     (.x ret)))
 
 ;; ## Blending / Composing
@@ -253,34 +264,26 @@
 ;; Some blending functions require additional parameter. You can set it with following variable.
 (def ^:dynamic ^double *blend-threshold* 0.5)
 
-;; Prepare look-up table for int->double conversion.
-(def r255 (double-array (map #(/ ^double % 255.0) (range 256))))
-
-(defn get-r255 
-  "Return color value (0-1) by index"
-  ^double [^long idx]
-  (aget ^doubles r255 idx))
+(def ^:const ^double rev255 (/ 255.0))
 
 ;; Blend colors functions
 
 (defn blend-values
-  "Blend channel values with blending function."
-  [f a b]
-  (let [aa (get-r255 a)
-        bb (get-r255 b)]
-    (* 255.0 ^double (f aa bb))))
+  "Blend individual values (0-255)"
+  [f ^double a ^double b]
+  (* 255.0 ^double (f (* rev255 a) (* rev255 b))))
 
 (defn blend-colors
   "Blend colors with blending function. Do not blend alpha on default."
   (^Vec4 [f c1 c2 alpha?]
-   (let [^Vec4 cc1 (to-color c1)
-         ^Vec4 cc2 (to-color c2)]
-     (Vec4. (blend-values f (.x cc1) (.x cc2))
-            (blend-values f (.y cc1) (.y cc2))
-            (blend-values f (.z cc1) (.z cc2))
+   (let [^Vec4 cc1 (v/div (to-color c1) 255.0)
+         ^Vec4 cc2 (v/div (to-color c2) 255.0)]
+     (Vec4. (* 255.0 ^double (f (.x cc1) (.x cc2)))
+            (* 255.0 ^double (f (.y cc1) (.y cc2)))
+            (* 255.0 ^double (f (.z cc1) (.z cc2)))
             (if alpha?
-              (blend-values f (.w cc1) (.w cc2))
-              (.w cc1)))))
+              (* 255.0 ^double (f (.w cc1) (.w cc2)))
+              (* 255.0 (.w cc1))))))
   (^Vec4 [f c1 c2] (blend-colors c1 c2 false)))
 
 ;; Plenty of blending functions. Bleding functions operate on 0.0-1.0 values and return new value in the same range.
@@ -425,21 +428,21 @@
   ^double [^double a ^double b]
   (let [aa (unchecked-long (* a 255.0))
         bb (unchecked-long (* b 255.0))]
-    (get-r255 (bit-and 0xff (bit-or aa bb)))))
+    (* rev255 (bit-and 0xff (bit-or aa bb)))))
 
 (defn blend-and
   "Bitwise and"
   ^double [^double a ^double b]
   (let [aa (unchecked-long (* a 255.0))
         bb (unchecked-long (* b 255.0))]
-    (get-r255 (bit-and 0xff (bit-and aa bb)))))
+    (* rev255 (bit-and 0xff (bit-and aa bb)))))
 
 (defn blend-xor
   "Bitwise xor"
   ^double [^double a ^double b]
   (let [aa (unchecked-long (* a 255.0))
         bb (unchecked-long (* b 255.0))]
-    (get-r255 (bit-and 0xff (bit-xor aa bb)))))
+    (* rev255 (bit-and 0xff (bit-xor aa bb)))))
 
 (defn blend-exclusion
   "Exclusion"
@@ -670,7 +673,7 @@
         i3 (/ (+ 510.0 (.x c) (.z c) (- (+ (.y c) (.y c)))) 4.0)]
     (Vec4. i1 i2 i3 (.w c))))
 
-(def ^:const ^double c46 (/ 4.0 6.0))
+(def ^:private ^:const ^double c46 (/ 4.0 6.0))
 
 (defn from-OHTA
   "OHTA -> RGB"
@@ -685,7 +688,7 @@
 
 ;; ### sRGB
 
-(def ^:const ^double gamma-factor (/ 2.4))
+(def ^:private ^:const ^double gamma-factor (/ 2.4))
 
 (defn to-linear
   "Gamma correction"
@@ -721,9 +724,9 @@
 
 ;; ### XYZ
 
-(def ^:const ^double xyz-xmax 0.9504716671128306)
-(def ^:const ^double xyz-ymax 0.9999570331323426)
-(def ^:const ^double xyz-zmax 1.0889782052041752)
+(def ^:private ^:const ^double xyz-xmax 0.9504716671128306)
+(def ^:private ^:const ^double xyz-ymax 0.9999570331323426)
+(def ^:private ^:const ^double xyz-zmax 1.0889782052041752)
 
 (defn to-XYZ-raw
   "Pure RGB->XYZ conversion without corrections."
@@ -900,131 +903,194 @@
         X (* x Yy)
         Z (* (- 1.0 x y) Yy)] (from-XYZ- (Vec4. X Y Z (.w c)))))
 
-;; ### HCL
+;; Hue based
 
-(defn to-HCL
-  "RGB->HCL"
+(defn- to-HC
+  "Calculate hue and chroma"
   [^Vec4 c]
-  (let [mx (max (.x c) (.y c) (.z c))
-        chr (- mx (min (.x c) (.y c) (.z c)))
-        h (* 255.0 (/ (if (zero? chr) 0.0
-                          (if (== mx (.x c))
-                            (rem (+ 6.0 (/ (- (.y c) (.z c)) chr)) 6.0)
-                            (if (== mx (.y c))
-                              (+ 2.0 (/ (- (.z c) (.x c)) chr))
-                              (+ 4.0 (/ (- (.x c) (.y c)) chr))))) 6.0))
-        luma (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))]
-    (Vec4. h chr luma (.w c))))
+  (let [M (max (.x c) (.y c) (.z c))
+        m (min (.x c) (.y c) (.z c))
+        C (- M m)
+        ^double h (if (zero? C)
+                    0.0
+                    (let [rC (/ C)]
+                      (cond
+                        (== M (.x c)) (mod (* rC (- (.y c) (.z c))) 6.0)
+                        (== M (.y c)) (+ 2.0 (* rC (- (.z c) (.x c))))
+                        :else (+ 4.0 (* rC (- (.x c) (.y c)))))))]
+    (Vec4. (* 60.0 h) C M m)))
 
-(defn from-HCL
-  "HCL->RGB"
+;; maxh 359.80503179148246
+(defn- to-HC-polar
+  "Calculate hue and chroma - polar version"
   [^Vec4 c]
-  (let [h (* 6.0 (get-r255 (.x c)))
-        chr (.y c)
-        l (.z c)
-        x (* chr (- 1.0 (m/abs (dec (rem h 2.0)))))
-        ^Vec3 rgb (cond
-                    (and (<= 0.0 h) (< h 1.0)) (Vec3. chr x 0.0)
-                    (and (<= 1.0 h) (< h 2.0)) (Vec3. x chr 0.0)
-                    (and (<= 2.0 h) (< h 3.0)) (Vec3. 0.0 chr x)
-                    (and (<= 3.0 h) (< h 4.0)) (Vec3. 0.0 x chr)
-                    (and (<= 4.0 h) (< h 5.0)) (Vec3. x 0.0 chr)
-                    :else                      (Vec3. chr 0.0 x))
-        m (- l (* 0.298839 (.x rgb)) (* 0.586811 (.y rgb)) (* 0.114350 (.z rgb)))]
-    (Vec4. (+ (.x rgb) m) (+ (.y rgb) m) (+ (.z rgb) m) (.w c))))
+  (let [a (* 0.5 (- (+ (.x c) (.x c)) (.y c) (.z c)))
+        b (* 0.8660254037844386 (- (.y c) (.z c)))
+        h (m/degrees (m/atan2 b a))
+        c2 (m/hypot-sqrt a b)]
+    (Vec4. (if (neg? h) (+ 360.0 h) h) c2 (max (.x c) (.y c) (.z c)) (min (.x c) (.y c) (.z c)))))
 
-;; ### HSB
+(defn- from-HCX
+  "Convert HCX to RGB"
+  [^double h ^double c ^double x]
+  (cond
+    (<= 0.0 h 1.0) (Vec3. c x 0.0)
+    (<= 1.0 h 2.0) (Vec3. x c 0.0)
+    (<= 2.0 h 3.0) (Vec3. 0.0 c x)
+    (<= 3.0 h 4.0) (Vec3. 0.0 x c)
+    (<= 4.0 h 5.0) (Vec3. x 0.0 c)
+    :else (Vec3. c 0.0 x)))
 
-(defn to-HSB
-  "RGB->HSB"
+(def ^:private ^:const ^double n360->255 (/ 255.0 359.7647058823529))
+(def ^:private ^:const ^double n255->360 (/ 359.7647058823529 255.0))
+
+(defn- normalize-HSx
+  "Make output range 0-255"
   [^Vec4 c]
-  (let [mn (min (.x c) (.y c) (.z c))
-        mx (max (.x c) (.y c) (.z c))
-        delta (- mx mn)
-        hsb (if (zero? mx) (Vec3. 0.0 0.0 0.0)
-                (let [s (* 255.0 (/ delta mx))
-                      h (if (zero? delta) 0.0
-                            (/ (if (== mx (.x c))
-                                 (/ (- (.y c) (.z c)) delta)
-                                 (if (== mx (.y c))
-                                   (+ 2.0 (/ (- (.z c) (.x c)) delta))
-                                   (+ 4.0 (/ (- (.x c) (.y c)) delta)))) 6.0))]
-                  (Vec3. (* 255.0 (if (neg? h) (inc h) h)) s mx)))]
-    (v/vec4 hsb (.w c))))
+  (Vec4. (* n360->255 (.x c))
+         (* 255.0 (.y c))
+         (* 255.0 (.z c))
+         (.w c)))
 
-(defn from-HSB
-  "HSB->RGB"
+(defn- denormalize-HSx 
+  "Make output range native to HSx colorspaces"
   [^Vec4 c]
-  (if (zero? (.y c)) (Vec4. (.z c) (.z c) (.z c) (.w c))
-      (let [h (get-r255 (.x c))
-            s (get-r255 (.y c))
-            b (get-r255 (.z c))
-            h (* 6.0 (- h (m/floor h)))
-            f (- h (m/floor h))
-            p (* b (- 1.0 s))
-            q (* b (- 1.0 (* s f)))
-            t (* b (- 1.0 (* s (- 1.0 f))))
-            rgb (case (unchecked-int h)
-                  0 (Vec3. b t p)
-                  1 (Vec3. q b p)
-                  2 (Vec3. p b t)
-                  3 (Vec3. p q b)
-                  4 (Vec3. t p b)
-                  5 (Vec3. b p q))            ]
-        (v/vec4 (v/mult rgb 255.0)(.w c)))))
+  (Vec4. (* n255->360 (.x c))
+         (/ (.y c) 255.0)
+         (/ (.z c) 255.0)
+         (.w c)))
 
-;; ### HSI
+;; HSI
 
-(def ^:const ^double to-hsi-const (/ m/TWO_PI))
+(defn to-HSI-raw
+  "RGB -> HSI
 
-(defn to-HSI
-  "RGB->HSI"
+  Output ranges:
+
+  * H - 0.0 - 360.0
+  * S - 0.0 - 1.0
+  * I - 0.0 - 1.0"
   [^Vec4 c]
-  (let [i (/ (+ (.x c) (.y c) (.z c)) 3.0)]
-    (if (zero? i) (Vec4. 0.0 0.0 0.0 (.w c))
-        (let [s (- 1.0 (/ (min (.x c) (.y c) (.z c)) i))
-              alpha (* 0.5 (- (* 2.0 (.x c)) (.y c) (.z c)))
-              beta (* 0.8660254037844385 (- (.y c) (.z c)))
-              hue (* to-hsi-const (m/atan2 beta alpha))
-              hue (if (neg? hue) (inc hue) hue)]
-          (Vec4. (* 255.0 hue) (* 255.0 s) i (.w c))))))
+  (let [^Vec4 hc (to-HC c)
+        I (/ (+ (.x c) (.y c) (.z c)) 3.0)
+        S (if (zero? I) 0.0
+              (- 1.0 (/ (.w hc) I)))]
+    (Vec4. (.x hc) S (/ I 255.0) (.w c))))
 
-(def ^:const ^double from-hsi-const (/ m/PI 180.0))
-
-(defn from-hsi-helper
-  ""
-  ^double [^Vec4 cc ^double h]
-  (* (.z cc) (-> (.y cc) 
-                 (* (m/cos (* h from-hsi-const)))
-                 (/ (m/cos (* (- 60.0 h) from-hsi-const)))
-                 inc)))
-
-(defn from-HSI
-  "HSI->RGB"
+(defn from-HSI-raw
+  "HSI -> RGB"
   [^Vec4 c]
-  (let [^Vec4 cc (v/applyf c get-r255)
-        h (* 360.0 (.x cc))
-        h (- h (* 360.0 (m/floor (/ h 360.0))))
-        v1 (* (.z cc) (- 1.0 (.y cc)))
-        rgb (cond
-              (< h 120.0) (let [b v1
-                                r (from-hsi-helper cc h)
-                                g (- (* 3.0 (.z cc)) r b)]
-                            (Vec3. r g b))
-              (< h 240.0) (let [r v1
-                                g (from-hsi-helper cc (- h 120.0))
-                                b (- (* 3.0 (.z cc)) r g)]
-                            (Vec3. r g b))
-              :else (let [g v1
-                          b (from-hsi-helper cc (- h 240.0))
-                          r (- (* 3.0 (.z cc)) g b)]
-                      (Vec3. r g b)))]
-    (v/vec4 (v/mult rgb 255.0) (.w c))))
+  (let [h' (/ (.x c) 60.0)
+        z (- 1.0 (m/abs (dec (mod h' 2.0))))
+        C (/ (* 3.0 (.z c) (.y c)) (inc z))
+        X (* C z)
+        m (* (.z c) (- 1.0 (.y c)))
+        rgb' (v/add (from-HCX h' C X) (Vec3. m m m))]
+    (v/vec4 (v/mult rgb' 255.0) (.w c))))
+
+(def ^{:doc "RGB -> HSI, normalized"} to-HSI (comp normalize-HSx to-HSI-raw))
+(def ^{:doc "HSI -> RGB, normalized"} from-HSI (comp from-HSI-raw denormalize-HSx))
+
+;; HSV
+
+(defn to-HSV-raw
+  "RGB -> HSV
+  
+  Output ranges:
+
+  * H - 0.0 - 360.0
+  * S - 0.0 - 1.0
+  * V - 0.0 - 1.0"
+  [^Vec4 c]
+  (let [^Vec4 hc (to-HC c)
+        V (.z hc)
+        S (if (zero? V) 0.0
+              (/ (.y hc) V))]
+    (Vec4. (.x hc) S (/ V 255.0) (.w c))))
+
+(defn from-HSV-raw
+  "HSV -> RGB"
+  [^Vec4 c]
+  (let [C (* (.y c) (.z c))
+        h' (/ (.x c) 60.0)
+        X (* C (- 1.0 (m/abs (dec (mod h' 2.0)))))
+        m (- (.z c) C)
+        ^Vec3 rgb' (v/add (from-HCX h' C X) (Vec3. m m m))]
+    (v/vec4 (v/mult rgb' 255.0) (.w c))))
+
+(def ^{:doc "RGB -> HSV, normalized"} to-HSV (comp normalize-HSx to-HSV-raw))
+(def ^{:doc "HSV -> RGB, normalized"} from-HSV (comp from-HSV-raw denormalize-HSx))
+
+;; HSL
+
+(defn to-HSL-raw
+  "RGB -> HSL
+  
+  Output ranges:
+
+  * H - 0.0 - 360.0
+  * S - 0.0 - 1.0
+  * L - 0.0 - 1.0"
+  [^Vec4 c]
+  (let [^Vec4 hc (to-HC c)
+        L (/ (* 0.5 (+ (.z hc) (.w hc))) 255.0)
+        S (if (== 1.0 L) 0.0
+              (/ (.y hc) (- 1.0 (m/abs (dec (+ L L))))))]
+    (Vec4. (.x hc) (/ S 255.0) L (.w c))))
+
+(defn from-HSL-raw
+  "HSL -> RGB"
+  [^Vec4 c]
+  (let [C (* (.y c) (- 1.0 (m/abs (dec (+ (.z c) (.z c))))))
+        h' (/ (.x c) 60.0)
+        X (* C (- 1.0 (m/abs (dec (mod h' 2.0)))))
+        m (- (.z c) (* 0.5 C))
+        ^Vec3 rgb' (v/add (from-HCX h' C X) (Vec3. m m m))]
+    (v/vec4 (v/mult rgb' 255.0) (.w c))))
+
+(def ^{:doc "RGB -> HSL, normalized"} to-HSL (comp normalize-HSx to-HSL-raw))
+(def ^{:doc "HSL -> RGB, normalized"} from-HSL (comp from-HSL-raw denormalize-HSx))
+
+;; HCL
+
+(defn to-HCL-raw
+  "RGB -> HCL
+  
+  Output ranges:
+
+  * H - 0.0 - 360.0
+  * C - 0.0 - 1.0
+  * L - 0.0 - 1.0"
+  [^Vec4 c]
+  (let [^Vec4 hc (to-HC c)
+        L (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))]
+    (Vec4. (.x hc) (/ (.y hc) 255.0) (/ L 255.0) (.w c))))
+
+(defn from-HCL-raw
+  "HCL -> RGB"
+  [^Vec4 c]
+  (let [h' (/ (.x c) 60.0)
+        X (* (.y c) (- 1.0 (m/abs (dec (mod h' 2.0)))))
+        ^Vec3 rgb' (v/add (from-HCX h' (.y c) X))
+        m (- (.z c) (* 0.298839 (.x rgb')) (* 0.586811 (.y rgb')) (* 0.114350 (.z rgb')))]
+    (v/vec4 (v/mult (v/add rgb' (Vec3. m m m)) 255.0) (.w c))))
+
+(def ^{:doc "RGB -> HCL, normalized"} to-HCL (comp normalize-HSx to-HCL-raw))
+(def ^{:doc "HCL -> RGB, normalized"} from-HCL (comp from-HCL-raw denormalize-HSx))
+
+;; HSB = HSV
+
+(def ^{:doc "RGB -> HSB(V), normalized (see [[to-HSV]])"} to-HSB to-HSV)
+(def ^{:doc "HSB(V) -> RGB, normalized (see [[from-HSV]])"} from-HSB from-HSV)
+(def ^{:doc "RGB -> HSB(V) (see [[to-HSV-raw]])"} to-HSB-raw to-HSV-raw)
+(def ^{:doc "HSB(V) -> RGB (see [[from-HSV-raw]])"} from-HSB-raw from-HSV-raw)
 
 ;; ### HWB
 
 (defn to-HWB
-  "RGB->HWB"
+  "RGB -> HWB, normalized
+
+  Hue range is from 1.0 to 255.0. Values less than 1.0 is considered as undefined."
   [^Vec4 c]
   (let [w (min (.x c) (.y c) (.z c))
         v (max (.x c) (.y c) (.z c))
@@ -1041,7 +1107,7 @@
     (Vec4. h w (- 255.0 v) (.w c))))
 
 (defn from-HWB
-  "HWB->RGB"
+  "HWB -> RGB, normalized"
   [^Vec4 c]
   (if (< (.x c) 1.0) 
     (let [v (- 255.0 (.z c))]
@@ -1072,8 +1138,14 @@
 (def ^:const ^double weight-mid 0.1)
 (def ^:const ^double weight-min 0.2)
 
-(defn to-GLHS
-  "RGB->GLHS"
+(defn to-GLHS-raw
+  "RGB -> GLHS
+
+  Output ranges:
+
+  * L - 0.0 - 255.0
+  * H - 0.0 - 360.0
+  * S - 0.0 - 1.0"
   [^Vec4 c]
   (let [mx (max (.x c) (.y c) (.z c))
         md (stat/median-3 (.x c) (.y c) (.z c))
@@ -1093,31 +1165,40 @@
             f (if (even? k)
                 e
                 (* (- mx md) r))
-            h (* 255.0 (/ (+ k f) 6.0))
-            lq (* (+ (* weight-mid e) weight-max) 255.0)
-            s (* 255.0 (if (<= l lq)
-                         (/ (- l mn) l)
-                         (/ (- mx l) (- 255.0 l))))]
+            h (* 60.0 (+ k f))
+            lq (* 255.0 (+ (* weight-mid e) weight-max))
+            s (if (<= l lq)
+                (/ (- l mn) l)
+                (/ (- mx l) (- 255.0 l)))]
         (Vec4. l h s (.w c))))))
 
-(defn from-GLHS
-  "GLHS->RGB"
+(defn to-GLHS
+  "RGB -> GLHS, normalized"
+  [c]
+  (let [^Vec4 cc (to-GLHS-raw c)]
+    (Vec4. (.x cc)
+           (m/norm (.y cc) 0.0 359.7647058823529 0.0 255.0)
+           (* 255.0 (.z cc))
+           (.w cc))))
+
+(defn from-GLHS-raw
+  "GLHS -> RGB"
   [^Vec4 c]
   (if (zero? (.z c))
     (Vec4. (.x c) (.x c) (.x c) (.w c))
-    (let [h (* 6.0 (/ (.y c) 255.0))
+    (let [h (/ (.y c) 60.0)
           k (long (m/floor h))
           f (- h k)
           fp (if (even? k) f (- 1.0 f))
           wfw (+ (* weight-mid fp) weight-max)
           lq (* 255.0 wfw)
-          s (/ (.z c) 255.0)
+          s (.z c)
           ^Vec3 rgb (if (<= (.x c) lq)
                       (let [mn (* (- 1.0 s) (.x c))
                             md (/ (+ (* fp (.x c)) (* mn (- (* (- 1.0 fp) weight-max) (* fp weight-min)))) wfw)
                             mx (/ (- (- (.x c) (* md weight-mid)) (* mn weight-min)) weight-max)]
                         (Vec3. mn md mx))
-                      (let [mx (+ (.z c) (* (- 1.0 s) (.x c)))
+                      (let [mx (+ (* s 255.0) (* (- 1.0 s) (.x c)))
                             md (/ (- (* (- 1.0 fp) (.x c)) (* mx (- (* (- 1.0 fp) weight-max) (* fp weight-min))))
                                   (+ (* (- 1.0 fp) weight-mid) weight-min))
                             mn (/ (- (- (.x c) (* mx weight-max)) (* md weight-mid)) weight-min)]
@@ -1131,137 +1212,321 @@
         5 (Vec4. (.z rgb) (.x rgb) (.y rgb) (.w c))
         6 (Vec4. (.z rgb) (.y rgb) (.x rgb) (.w c))))))
 
+(defn from-GLHS
+  "GLHS -> RGB"
+  [^Vec4 c]
+  (from-GLHS-raw (Vec4. (.x c)
+                        (m/norm (.y c) 0.0 255.0 0.0 359.7647058823529)
+                        (/ (.z c) 255.0)
+                        (.w c))))
+
 ;; ### YPbPr
 
-(defn to-YPbPr
-  "RGB -> YPbPr, normalized"
+(defn to-YPbPr-raw
+  "RGB -> YPbPr
+
+  Output range:
+
+  * Y - 0.0 - 255.0
+  * Pb - -236.59 - 236.59
+  * Pr - -200.79 - 200.79"
   [^Vec4 c]
   (let [y (+ (* 0.2126 (.x c))
              (* 0.7152 (.y c))
              (* 0.0722 (.z c)))
-        pb (m/norm (- (.z c) y) -236.589 236.589 0.0 255.0)
-        pr (m/norm (- (.x c) y) -200.787 200.787 0.0 255.0)]
+        pb (- (.z c) y)
+        pr (- (.x c) y)]
     (Vec4. y pb pr (.w c))))
 
-(defn from-YPbPr
+(defn to-YPbPr
+  "RGB -> YPbPr, normalized"
+  [c]
+  (let [^Vec4 cc (to-YPbPr-raw c)]
+    (Vec4. (.x cc)
+           (m/norm (.y cc) -236.589 236.589 0.0 255.0)
+           (m/norm (.z cc) -200.787 200.787 0.0 255.0)
+           (.w cc))))
+
+(defn from-YPbPr-raw
   "YPbPr -> RGB"
   [^Vec4 c]
-  (let [b (+ (.x c) (m/norm (.y c) 0.0 255.0 -236.589 236.589))
-        r (+ (.x c) (m/norm (.z c) 0.0 255.0 -200.787 200.787))
+  (let [b (+ (.x c) (.y c))
+        r (+ (.x c) (.z c))
         g (/ (- (.x c) (* 0.2126 r) (* 0.0722 b)) 0.7152)]
     (Vec4. r g b (.w c))))
 
+(defn from-YPbPr
+  "YPbPr -> RGB, normalized"
+  [^Vec4 c]
+  (from-YPbPr-raw (Vec4. (.x c)
+                         (m/norm (.y c) 0.0 255.0 -236.589 236.589)
+                         (m/norm (.z c) 0.0 255.0 -200.787 200.787)
+                         (.w c))))
+
 ;; ### YDbDr
 
-(defn to-YDbDr
-  "RGB->YDbDr"
+(defn to-YDbDr-raw
+  "RGB -> YDbDr
+
+  Output range:
+
+  * Y - 0.0 - 255.0
+  * Db - -339.915 - 339.915
+  * Dr - -339.915 - 339.915"
   [^Vec4 c]
   (let [Y (+ (* 0.299 (.x c)) (* 0.587 (.y c)) (* 0.114 (.z c)))
         Db (+ (* -0.45 (.x c)) (* -0.883 (.y c)) (* 1.333 (.z c)))
         Dr (+ (* -1.333 (.x c)) (* 1.116 (.y c)) (* 0.217 (.z c)))]
-    (Vec4. Y
-           (m/norm Db -339.91499999999996 339.91499999999996 0.0 255.0)
-           (m/norm Dr -339.91499999999996 339.915 0.0 255.0)
-           (.w c))))
+    (Vec4. Y Db Dr (.w c))))
 
-(defn from-YDbDr
-  "YDbDr->RGB"
+(defn to-YDbDr
+  "RGB -> YDbDr"
+  [c]
+  (let [^Vec4 cc (to-YDbDr-raw c)]
+    (Vec4. (.x cc)
+           (m/norm (.y cc) -339.91499999999996 339.91499999999996 0.0 255.0)
+           (m/norm (.z cc) -339.91499999999996 339.915 0.0 255.0)
+           (.w cc))))
+
+(defn from-YDbDr-raw
+  "YDbDr -> RGB"
   [^Vec4 c]
   (let [Y (.x c)
-        Db (m/norm (.y c) 0.0 255.0 -339.91499999999996 339.91499999999996)
-        Dr (m/norm (.z c) 0.0 255.0 -339.91499999999996 339.915)
+        Db (.y c)
+        Dr (.z c)
         r (+ Y (* 9.2303716147657e-05 Db) (* -0.52591263066186533 Dr))
         g (+ Y (* -0.12913289889050927 Db) (* 0.26789932820759876 Dr))
         b (+ Y (* 0.66467905997895482 Db) (* -7.9202543533108e-05 Dr))]
     (Vec4. r g b (.w c))))
 
+(defn from-YDbDr
+  "YDbDr -> RGB, normalized"
+  [^Vec4 c]
+  (from-YDbDr-raw (Vec4. (.x c)
+                         (m/norm (.y c) 0.0 255.0 -339.91499999999996 339.91499999999996)
+                         (m/norm (.z c) 0.0 255.0 -339.91499999999996 339.915)
+                         (.w c))))
+
+
 ;; ### YCbCr
 
 ;; JPEG version
 
-(defn to-YCbCr
-  "RGB->YCbCr"
+(def ^:private ^:const y-norm (v/vec4 0.0 127.5 127.5 0.0))
+
+(defn to-YCbCr-raw
+  "RGB -> YCbCr, normalized"
   [^Vec4 c]
   (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
-        Cb (+ 127.5 (* -0.168736 (.x c)) (* -0.331264 (.y c)) (* 0.5 (.z c)))
-        Cr (+ 127.5 (* 0.5 (.x c)) (* -0.418688 (.y c)) (* -0.081312 (.z c)))]
+        Cb (+ (* -0.168736 (.x c)) (* -0.331264 (.y c)) (* 0.5 (.z c)))
+        Cr (+ (* 0.5 (.x c)) (* -0.418688 (.y c)) (* -0.081312 (.z c)))]
     (Vec4. Y Cb Cr (.w c))))
 
-(defn from-YCbCr
-  "YCbCr->RGB"
+(defn to-YCbCr
+  "RGB -> YCbCr, normalized"
+  [c]
+  (v/add (to-YCbCr-raw c) y-norm))
+
+(defn from-YCbCr-raw
+  "YCbCr -> RGB"
   [^Vec4 c]
-  (let [Cb (- (.y c) 127.5)
-        Cr (- (.z c) 127.5)
+  (let [Cb (.y c)
+        Cr (.z c)
         r (+ (* 0.99999999999914679361 (.x c)) (* -1.2188941887145875e-06 Cb) (* 1.4019995886561440468 Cr))
         g (+ (* 0.99999975910502514331 (.x c)) (* -0.34413567816504303521 Cb) (* -0.71413649331646789076 Cr))
         b (+ (* 1.00000124040004623180 (.x c)) (* 1.77200006607230409200 Cb) (* 2.1453384174593273e-06 Cr))]
     (Vec4. r g b (.w c))))
 
+(defn from-YCbCr
+  "YCbCr -> RGB, normalized"
+  [c]
+  (from-YCbCr-raw (v/sub c y-norm)))
+
 ;; ### YUV
 
-(defn to-YUV
-  "RGB->YUV"
-  [^Vec4 c]
-  (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
-        U (+ (* -0.147 (.x c)) (* -0.289 (.y c)) (* 0.436 (.z c)))
-        V (+ (* 0.615 (.x c)) (* -0.515 (.y c)) (* -0.1 (.z c)))]
-    (Vec4. Y 
-           (m/norm U -111.17999999999999 111.17999999999999 0.0 255.0)
-           (m/norm V -156.82500000000002 156.825 0.0 255.0)
-           (.w c))))
+(defn to-YUV-raw
+  "RGB -> YUV
 
-(defn from-YUV
-  "YUV->RGB"
+  Output range:
+
+  * Y - 0.0 - 255.0
+  * U - -111.18 - 111.18
+  * V - -156.83 - 156.83"
+  [^Vec4 c]
+  (Vec4. (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
+         (+ (* -0.147 (.x c)) (* -0.289 (.y c)) (* 0.436 (.z c)))
+         (+ (* 0.615 (.x c)) (* -0.515 (.y c)) (* -0.1 (.z c)))
+         (.w c)))
+
+(defn to-YUV
+  "RGB -> YUV, normalized"
+  [c]
+  (let [^Vec4 cc (to-YUV-raw c)]
+    (Vec4. (.x cc)
+           (m/norm (.y cc) -111.17999999999999 111.17999999999999 0.0 255.0)
+           (m/norm (.z cc) -156.82500000000002 156.825 0.0 255.0)
+           (.w cc))))
+
+(defn from-YUV-raw
+  "YUV -> RGB"
   [^Vec4 c]
   (let [Y (.x c)
-        U (m/norm (.y c) 0.0 255.0 -111.17999999999999 111.17999999999999)
-        V (m/norm (.z c) 0.0 255.0 -156.82500000000002 156.825)
+        U (.y c)
+        V (.z c)
         r (+ Y (* -3.945707070708279e-05 U) (* 1.1398279671717170825 V))
         g (+ Y (* -0.3946101641414141437 U) (* -0.5805003156565656797 V))
         b (+ Y (* 2.0319996843434342537 U) (* -4.813762626262513e-04 V))]
     (Vec4. r g b (.w c))))
 
+(defn from-YUV
+  "YUV -> RGB, normalized"
+  [^Vec4 c] 
+  (from-YUV-raw (Vec4. (.x c)
+                       (m/norm (.y c) 0.0 255.0 -111.17999999999999 111.17999999999999)
+                       (m/norm (.z c) 0.0 255.0 -156.82500000000002 156.825)
+                       (.w c))))
+
 ;; ### YIQ
 
-(defn to-YIQ
-  "RGB->YIQ"
-  [^Vec4 c]
-  (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
-        I (+ (* 0.595716 (.x c)) (* -0.274453 (.y c)) (* -0.321263 (.z c)))
-        Q (+ (* 0.211456 (.x c)) (* -0.522591 (.y c)) (* 0.311135 (.z c)))]
-    (Vec4. Y 
-           (m/norm I -151.90758 151.90758 0.0 255.0)
-           (m/norm Q -133.260705 133.260705 0.0 255.0)
-           (.w c))))
+(defn to-YIQ-raw
+  "RGB -> YIQ
 
-(defn from-YIQ
-  "YIQ->RGB"
+  Output range:
+
+  * Y - 0.0 - 255.0
+  * I - -151.9 - 151.9
+  * Q - -133.3 - 133.3"
+  [^Vec4 c]
+  (Vec4. (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
+         (+ (* 0.595716 (.x c)) (* -0.274453 (.y c)) (* -0.321263 (.z c)))
+         (+ (* 0.211456 (.x c)) (* -0.522591 (.y c)) (* 0.311135 (.z c)))
+         (.w c)))
+
+(defn to-YIQ
+  "RGB -> YIQ, normalized"
+  [c]
+  (let [^Vec4 cc (to-YIQ-raw c)]
+    (Vec4. (.x cc)
+           (m/norm (.y cc) -151.90758 151.90758 0.0 255.0)
+           (m/norm (.z cc) -133.260705 133.260705 0.0 255.0)
+           (.w cc))))
+
+(defn from-YIQ-raw
+  "YIQ -> RGB"
   [^Vec4 c]
   (let [Y (.x c)
-        I (m/norm (.y c) 0.0 255.0 -151.90758 151.90758)
-        Q (m/norm (.z c) 0.0 255.0 -133.260705 133.260705)
+        I (.y c)
+        Q (.z c)
         r (+ Y (* +0.9562957197589482261 I) (* 0.6210244164652610754 Q))
         g (+ Y (* -0.2721220993185104464 I) (* -0.6473805968256950427 Q))
         b (+ Y (* -1.1069890167364901945 I) (* 1.7046149983646481374 Q))]
     (Vec4. r g b (.w c))))
 
+(defn from-YIQ
+  "YIQ -> RGB, normalized"
+  [^Vec4 c]
+  (let [I (m/norm (.y c) 0.0 255.0 -151.90758 151.90758)
+        Q (m/norm (.z c) 0.0 255.0 -133.260705 133.260705)]
+    (from-YIQ-raw (Vec4. (.x c) I Q (.w c)))))
+
 ;; ### YCgCo
 
-(defn to-YCgCo
-  "RGB->YCgCo"
+(defn to-YCgCo-raw
+  "RGB -> YCgCo
+
+  Output range:
+  
+  * Y - 0.0 - 255.0
+  * Cg - -127.5 - 127.5
+  * Co - -127.5 - 127.5"
   [^Vec4 c]
-  (let [Y (+ (* 0.25 (.x c)) (* 0.5 (.y c)) ( * 0.25 (.z c)))
-        Cg (+ 127.5 (+ (* -0.25 (.x c)) (* 0.5 (.y c)) ( * -0.25 (.z c))))
-        Co (+ 127.5 (+ (* 0.5 (.x c)) (* -0.5 (.z c))))]
+  (let [Y (+ (* 0.25 (.x c)) (* 0.5 (.y c)) (* 0.25 (.z c)))
+        Cg (+ (* -0.25 (.x c)) (* 0.5 (.y c)) (* -0.25 (.z c)))
+        Co (+ (* 0.5 (.x c)) (* -0.5 (.z c)))]
     (Vec4. Y Cg Co (.w c))))
 
-(defn from-YCgCo
-  "YCgCo->RGB"
+(defn to-YCgCo
+  "RGB -> YCgCo, normalized"
+  [c]
+  (v/add (to-YCgCo-raw c) y-norm))
+
+(defn from-YCgCo-raw
+  "YCgCo -> RGB"
   [^Vec4 c]
-  (let [Cg (- (.y c) 127.5)
-        Co (- (.z c) 127.5)
+  (let [Cg (.y c)
+        Co (.z c)
         tmp (- (.x c) Cg)]
     (Vec4. (+ Co tmp) (+ (.x c) Cg) (- tmp Co) (.w c))))
+
+(defn from-YCgCo
+  "YCgCo -> RGB, normalized"
+  [c]
+  (from-YCgCo-raw (v/sub c y-norm)))
+
+;; Cubehelix
+
+(def ^:private ^:const ^:double ch-a -0.14861)
+(def ^:private ^:const ^:double ch-b 1.78277)
+(def ^:private ^:const ^:double ch-c -0.29227)
+(def ^:private ^:const ^:double ch-d -0.90649)
+(def ^:private ^:const ^:double ch-e 1.97294)
+(def ^:private ^:const ^:double ch-ed (* ch-e ch-d))
+(def ^:private ^:const ^:double ch-eb (* ch-e ch-b))
+(def ^:private ^:const ^:double ch-bc-da (- (* ch-b ch-c) (* ch-d ch-a)))
+(def ^:private ^:const ^:double ch-bc-da+ed-eb-r (/ (+ ch-bc-da ch-ed (- ch-eb))))
+
+(defn to-Cubehelix-raw
+  "RGB -> Cubehelix
+
+  Output range:
+
+  * h - 0.0 - 360.0
+  * s - 0.0 - 4.614
+  * l - 0.0 - 1.0"
+  [^Vec4 c]
+  (let [r (/ (.x c) 255.0)
+        g (/ (.y c) 255.0)
+        b (/ (.z c) 255.0)
+        l (* ch-bc-da+ed-eb-r (+ (* ch-bc-da b) (* ch-ed r) (- (* ch-eb g))))
+        bl (- b l)
+        k (/ (- (* ch-e (- g l)) (* ch-c bl)) ch-d)
+        s (/ (m/sqrt (+ (* k k) (* bl bl)))
+             (* ch-e l (- 1.0 l)))]
+    (if (Double/isNaN s)
+      (Vec4. 0.0 0.0 l (.w c))
+      (let [h (- (* (m/atan2 k bl) m/rad-in-deg) 120.0)]
+        (Vec4. (if (neg? h) (+ h 360.0) h) s l (.w c))))))
+
+(defn to-Cubehelix
+  "RGB -> Cubehelix, normalized"
+  [^Vec4 c]
+  (let [^Vec4 cc (to-Cubehelix-raw c)]
+    (Vec4. (m/norm (.x cc) 0.0 359.9932808311505 0.0 255.0)
+           (m/norm (.y cc) 0.0 4.61438686803972 0.0 255.0)
+           (* 255.0 (.z cc))
+           (.w c))))
+
+(defn from-Cubehelix-raw
+  "Cubehelix -> RGB"
+  [^Vec4 c]
+  (let [h (* (+ (.x c) 120.0) m/deg-in-rad)
+        l (.z c)
+        a (* (.y c) l (- 1.0 l))
+        cosh (m/cos h)
+        sinh (m/sin h)]
+    (Vec4. (* 255.0 (+ l (* a (+ (* ch-a cosh) (* ch-b sinh)))))
+           (* 255.0 (+ l (* a (+ (* ch-c cosh) (* ch-d sinh)))))
+           (* 255.0 (+ l (* a ch-e cosh)))
+           (.w c))))
+
+(defn from-Cubehelix
+  "Cubehelix -> RGB, normalized"
+  [^Vec4 c]
+  (let [cc (Vec4. (m/norm (.x c) 0.0 255.0 0.0 359.9932808311505)
+                  (m/norm (.y c) 0.0 255.0 0.0 4.61438686803972)
+                  (/ (.z c) 255.0)
+                  (.w c))]
+    (from-Cubehelix-raw cc)))
 
 ;; ### Grayscale
 
@@ -1288,6 +1553,8 @@
                   :HCL   [to-HCL from-HCL]
                   :HSB   [to-HSB from-HSB]
                   :HSI   [to-HSI from-HSI]
+                  :HSL   [to-HSL from-HSL]
+                  :HSV   [to-HSV from-HSV]
                   :HWB   [to-HWB from-HWB]
                   :GLHS  [to-GLHS from-GLHS]
                   :YPbPr [to-YPbPr from-YPbPr]
@@ -1298,7 +1565,8 @@
                   :YIQ   [to-YIQ from-YIQ]
                   :Gray  [to-Gray from-Gray]
                   :sRGB  [to-sRGB from-sRGB]
-                  :RGB   [to-RGB from-RGB]})
+                  :Cubehelix [to-Cubehelix from-Cubehelix]
+                  :RGB   [identity identity]})
 
 ;; List of color spaces names
 (def colorspaces-names (keys colorspaces))
@@ -1650,286 +1918,158 @@
   ([f pal]
    (partial nearest-color f pal)))
 
-(defn- html-color-fn
-  "Return color by name from html color list"
-  [n]
-  (let [html-colors {:aquamarine
-                     {:hex "7FFFD4", :rgb {:r 127, :g 255, :b 212}},
-                     :lime {:hex "00FF00", :rgb {:r 0, :g 255, :b 0}},
-                     :deepskyblue
-                     {:hex "00BFFF", :rgb {:r 0, :g 191, :b 255}},
-                     :darksalmon
-                     {:hex "E9967A", :rgb {:r 233, :g 150, :b 122}},
-                     :antiquewhite
-                     {:hex "FAEBD7", :rgb {:r 250, :g 235, :b 215}},
-                     :mediumturquoise
-                     {:hex "48D1CC", :rgb {:r 72, :g 209, :b 204}},
-                     :slategray
-                     {:hex "708090", :rgb {:r 112, :g 128, :b 144}},
-                     :sienna
-                     {:hex "A0522D", :rgb {:r 160, :g 82, :b 45}},
-                     :orange
-                     {:hex "FFA500", :rgb {:r 255, :g 165, :b 0}},
-                     :navajowhite
-                     {:hex "FFDEAD", :rgb {:r 255, :g 222, :b 173}},
-                     :lavenderblush
-                     {:hex "FFF0F5", :rgb {:r 255, :g 240, :b 245}},
-                     :firebrick
-                     {:hex "B22222", :rgb {:r 178, :g 34, :b 34}},
-                     :orangered
-                     {:hex "FF4500", :rgb {:r 255, :g 69, :b 0}},
-                     :palevioletred
-                     {:hex "DB7093", :rgb {:r 219, :g 112, :b 147}},
-                     :lawngreen
-                     {:hex "7CFC00", :rgb {:r 124, :g 252, :b 0}},
-                     :seashell
-                     {:hex "FFF5EE", :rgb {:r 255, :g 245, :b 238}},
-                     :lightpink
-                     {:hex "FFB6C1", :rgb {:r 255, :g 182, :b 193}},
-                     :darkolivegreen
-                     {:hex "556B2F", :rgb {:r 85, :g 107, :b 47}},
-                     :aliceblue
-                     {:hex "F0F8FF", :rgb {:r 240, :g 248, :b 255}},
-                     :gray
-                     {:hex "808080", :rgb {:r 128, :g 128, :b 128}},
-                     :lightsteelblue
-                     {:hex "B0C4DE", :rgb {:r 176, :g 196, :b 222}},
-                     :whitesmoke
-                     {:hex "F5F5F5", :rgb {:r 245, :g 245, :b 245}},
-                     :darkgoldenrod
-                     {:hex "B8860B", :rgb {:r 184, :g 134, :b 11}},
-                     :tan
-                     {:hex "D2B48C", :rgb {:r 210, :g 180, :b 140}},
-                     :bisque
-                     {:hex "FFE4C4", :rgb {:r 255, :g 228, :b 196}},
-                     :white
-                     {:hex "FFFFFF", :rgb {:r 255, :g 255, :b 255}},
-                     :lightgreen
-                     {:hex "90EE90", :rgb {:r 144, :g 238, :b 144}},
-                     :darkseagreen
-                     {:hex "8FBC8F", :rgb {:r 143, :g 188, :b 143}},
-                     :crimson
-                     {:hex "DC143C", :rgb {:r 220, :g 20, :b 60}},
-                     :darkslategray
-                     {:hex "2F4F4F", :rgb {:r 47, :g 79, :b 79}},
-                     :mistyrose
-                     {:hex "FFE4E1", :rgb {:r 255, :g 228, :b 225}},
-                     :chocolate
-                     {:hex "D2691E", :rgb {:r 210, :g 105, :b 30}},
-                     :yellow
-                     {:hex "FFFF00", :rgb {:r 255, :g 255, :b 0}},
-                     :cadetblue
-                     {:hex "5F9EA0", :rgb {:r 95, :g 158, :b 160}},
-                     :navy {:hex "000080", :rgb {:r 0, :g 0, :b 128}},
-                     :ghostwhite
-                     {:hex "F8F8FF", :rgb {:r 248, :g 248, :b 255}},
-                     :seagreen
-                     {:hex "2E8B57", :rgb {:r 46, :g 139, :b 87}},
-                     :green {:hex "008000", :rgb {:r 0, :g 128, :b 0}},
-                     :mediumseagreen
-                     {:hex "3CB371", :rgb {:r 60, :g 179, :b 113}},
-                     :indigo
-                     {:hex "4B0082", :rgb {:r 75, :g 0, :b 130}},
-                     :olivedrab
-                     {:hex "6B8E23", :rgb {:r 107, :g 142, :b 35}},
-                     :cyan {:hex "00FFFF", :rgb {:r 0, :g 255, :b 255}},
-                     :peachpuff
-                     {:hex "FFDAB9", :rgb {:r 255, :g 218, :b 185}},
-                     :limegreen
-                     {:hex "32CD32", :rgb {:r 50, :g 205, :b 50}},
-                     :mediumslateblue
-                     {:hex "7B68EE", :rgb {:r 123, :g 104, :b 238}},
-                     :violet
-                     {:hex "EE82EE", :rgb {:r 238, :g 130, :b 238}},
-                     :sandybrown
-                     {:hex "F4A460", :rgb {:r 244, :g 164, :b 96}},
-                     :yellowgreen
-                     {:hex "9ACD32", :rgb {:r 154, :g 205, :b 50}},
-                     :mediumspringgreen
-                     {:hex "00FA9A", :rgb {:r 0, :g 250, :b 154}},
-                     :steelblue
-                     {:hex "4682B4", :rgb {:r 70, :g 130, :b 180}},
-                     :rosybrown
-                     {:hex "BC8F8F", :rgb {:r 188, :g 143, :b 143}},
-                     :cornflowerblue
-                     {:hex "6495ED", :rgb {:r 100, :g 149, :b 237}},
-                     :ivory
-                     {:hex "FFFFF0", :rgb {:r 255, :g 255, :b 240}},
-                     :lightgoldenrodyellow
-                     {:hex "FAFAD2", :rgb {:r 250, :g 250, :b 210}},
-                     :salmon
-                     {:hex "FA8072", :rgb {:r 250, :g 128, :b 114}},
-                     :darkcyan
-                     {:hex "008B8B", :rgb {:r 0, :g 139, :b 139}},
-                     :peru
-                     {:hex "CD853F", :rgb {:r 205, :g 133, :b 63}},
-                     :cornsilk
-                     {:hex "FFF8DC", :rgb {:r 255, :g 248, :b 220}},
-                     :lightslategray
-                     {:hex "778899", :rgb {:r 119, :g 136, :b 153}},
-                     :blueviolet
-                     {:hex "8A2BE2", :rgb {:r 138, :g 43, :b 226}},
-                     :forestgreen
-                     {:hex "228B22", :rgb {:r 34, :g 139, :b 34}},
-                     :lightseagreen
-                     {:hex "20B2AA", :rgb {:r 32, :g 178, :b 170}},
-                     :gold {:hex "FFD700", :rgb {:r 255, :g 215, :b 0}},
-                     :gainsboro
-                     {:hex "DCDCDC", :rgb {:r 220, :g 220, :b 220}},
-                     :darkorchid
-                     {:hex "9932CC", :rgb {:r 153, :g 50, :b 204}},
-                     :burlywood
-                     {:hex "DEB887", :rgb {:r 222, :g 184, :b 135}},
-                     :lightskyblue
-                     {:hex "87CEFA", :rgb {:r 135, :g 206, :b 250}},
-                     :chartreuse
-                     {:hex "7FFF00", :rgb {:r 127, :g 255, :b 0}},
-                     :snow
-                     {:hex "FFFAFA", :rgb {:r 255, :g 250, :b 250}},
-                     :moccasin
-                     {:hex "FFE4B5", :rgb {:r 255, :g 228, :b 181}},
-                     :honeydew
-                     {:hex "F0FFF0", :rgb {:r 240, :g 255, :b 240}},
-                     :aqua {:hex "00FFFF", :rgb {:r 0, :g 255, :b 255}},
-                     :darkred
-                     {:hex "8B0000", :rgb {:r 139, :g 0, :b 0}},
-                     :mediumorchid
-                     {:hex "BA55D3", :rgb {:r 186, :g 85, :b 211}},
-                     :lightsalmon
-                     {:hex "FFA07A", :rgb {:r 255, :g 160, :b 122}},
-                     :saddlebrown
-                     {:hex "8B4513", :rgb {:r 139, :g 69, :b 19}},
-                     :wheat
-                     {:hex "F5DEB3", :rgb {:r 245, :g 222, :b 179}},
-                     :springgreen
-                     {:hex "00FF7F", :rgb {:r 0, :g 255, :b 127}},
-                     :darkblue
-                     {:hex "00008B", :rgb {:r 0, :g 0, :b 139}},
-                     :powderblue
-                     {:hex "B0E0E6", :rgb {:r 176, :g 224, :b 230}},
-                     :turquoise
-                     {:hex "40E0D0", :rgb {:r 64, :g 224, :b 208}},
-                     :blanchedalmond
-                     {:hex "FFEBCD", :rgb {:r 255, :g 235, :b 205}},
-                     :papayawhip
-                     {:hex "FFEFD5", :rgb {:r 255, :g 239, :b 213}},
-                     :slateblue
-                     {:hex "6A5ACD", :rgb {:r 106, :g 90, :b 205}},
-                     :lightblue
-                     {:hex "ADD8E6", :rgb {:r 173, :g 216, :b 230}},
-                     :skyblue
-                     {:hex "87CEEB", :rgb {:r 135, :g 206, :b 235}},
-                     :red {:hex "FF0000", :rgb {:r 255, :g 0, :b 0}},
-                     :lightyellow
-                     {:hex "FFFFE0", :rgb {:r 255, :g 255, :b 224}},
-                     :blue {:hex "0000FF", :rgb {:r 0, :g 0, :b 255}},
-                     :palegreen
-                     {:hex "98FB98", :rgb {:r 152, :g 251, :b 152}},
-                     :greenyellow
-                     {:hex "ADFF2F", :rgb {:r 173, :g 255, :b 47}},
-                     :khaki
-                     {:hex "F0E68C", :rgb {:r 240, :g 230, :b 140}},
-                     :maroon {:hex "800000", :rgb {:r 128, :g 0, :b 0}},
-                     :midnightblue
-                     {:hex "191970", :rgb {:r 25, :g 25, :b 112}},
-                     :floralwhite
-                     {:hex "FFFAF0", :rgb {:r 255, :g 250, :b 240}},
-                     :deeppink
-                     {:hex "FF1493", :rgb {:r 255, :g 20, :b 147}},
-                     :paleturquoise
-                     {:hex "AFEEEE", :rgb {:r 175, :g 238, :b 238}},
-                     :darkkhaki
-                     {:hex "BDB76B", :rgb {:r 189, :g 183, :b 107}},
-                     :azure
-                     {:hex "F0FFFF", :rgb {:r 240, :g 255, :b 255}},
-                     :indianred
-                     {:hex "CD5C5C", :rgb {:r 205, :g 92, :b 92}},
-                     :darkviolet
-                     {:hex "9400D3", :rgb {:r 148, :g 0, :b 211}},
-                     :mediumpurple
-                     {:hex "9370DB", :rgb {:r 147, :g 112, :b 219}},
-                     :fuchsia
-                     {:hex "FF00FF", :rgb {:r 255, :g 0, :b 255}},
-                     :coral
-                     {:hex "FF7F50", :rgb {:r 255, :g 127, :b 80}},
-                     :mediumvioletred
-                     {:hex "C71585", :rgb {:r 199, :g 21, :b 133}},
-                     :lemonchiffon
-                     {:hex "FFFACD", :rgb {:r 255, :g 250, :b 205}},
-                     :mediumblue
-                     {:hex "0000CD", :rgb {:r 0, :g 0, :b 205}},
-                     :darkmagenta
-                     {:hex "8B008B", :rgb {:r 139, :g 0, :b 139}},
-                     :goldenrod
-                     {:hex "DAA520", :rgb {:r 218, :g 165, :b 32}},
-                     :darkorange
-                     {:hex "FF8C00", :rgb {:r 255, :g 140, :b 0}},
-                     :orchid
-                     {:hex "DA70D6", :rgb {:r 218, :g 112, :b 214}},
-                     :plum
-                     {:hex "DDA0DD", :rgb {:r 221, :g 160, :b 221}},
-                     :pink
-                     {:hex "FFC0CB", :rgb {:r 255, :g 192, :b 203}},
-                     :teal {:hex "008080", :rgb {:r 0, :g 128, :b 128}},
-                     :magenta
-                     {:hex "FF00FF", :rgb {:r 255, :g 0, :b 255}},
-                     :lightgrey
-                     {:hex "D3D3D3", :rgb {:r 211, :g 211, :b 211}},
-                     :purple
-                     {:hex "800080", :rgb {:r 128, :g 0, :b 128}},
-                     :dodgerblue
-                     {:hex "1E90FF", :rgb {:r 30, :g 144, :b 255}},
-                     :darkturquoise
-                     {:hex "00CED1", :rgb {:r 0, :g 206, :b 209}},
-                     :mintcream
-                     {:hex "F5FFFA", :rgb {:r 245, :g 255, :b 250}},
-                     :hotpink
-                     {:hex "FF69B4", :rgb {:r 255, :g 105, :b 180}},
-                     :thistle
-                     {:hex "D8BFD8", :rgb {:r 216, :g 191, :b 216}},
-                     :royalblue
-                     {:hex "4169E1", :rgb {:r 65, :g 105, :b 225}},
-                     :darkgreen
-                     {:hex "006400", :rgb {:r 0, :g 100, :b 0}},
-                     :darkslateblue
-                     {:hex "483D8B", :rgb {:r 72, :g 61, :b 139}},
-                     :silver
-                     {:hex "C0C0C0", :rgb {:r 192, :g 192, :b 192}},
-                     :darkgray
-                     {:hex "A9A9A9", :rgb {:r 169, :g 169, :b 169}},
-                     :oldlace
-                     {:hex "FDF5E6", :rgb {:r 253, :g 245, :b 230}},
-                     :mediumaquamarine
-                     {:hex "66CDAA", :rgb {:r 102, :g 205, :b 170}},
-                     :brown
-                     {:hex "A52A2A", :rgb {:r 165, :g 42, :b 42}},
-                     :olive
-                     {:hex "808000", :rgb {:r 128, :g 128, :b 0}},
-                     :lightcoral
-                     {:hex "F08080", :rgb {:r 240, :g 128, :b 128}},
-                     :tomato
-                     {:hex "FF6347", :rgb {:r 255, :g 99, :b 71}},
-                     :lightcyan
-                     {:hex "E0FFFF", :rgb {:r 224, :g 255, :b 255}},
-                     :linen
-                     {:hex "FAF0E6", :rgb {:r 250, :g 240, :b 230}},
-                     :lavender
-                     {:hex "E6E6FA", :rgb {:r 230, :g 230, :b 250}},
-                     :dimgray
-                     {:hex "696969", :rgb {:r 105, :g 105, :b 105}},
-                     :palegoldenrod
-                     {:hex "EEE8AA", :rgb {:r 238, :g 232, :b 170}},
-                     :beige
-                     {:hex "F5F5DC", :rgb {:r 245, :g 245, :b 220}},
-                     :black {:hex "000000", :rgb {:r 0, :g 0, :b 0}}}
-        c (:rgb (html-colors n))
-        r (:r c)
-        g (:g c)
-        b (:b c)]
-    (awt-color r g b)))
+(def html-colors-map {:aliceblue 0xf0f8ff,
+                      :antiquewhite 0xfaebd7,
+                      :amber (color 178 140 0)
+                      :aqua 0x00ffff,
+                      :aquamarine 0x7fffd4,
+                      :azure 0xf0ffff,
+                      :beige 0xf5f5dc,
+                      :bisque 0xffe4c4,
+                      :black 0x000000,
+                      :blanchedalmond 0xffebcd,
+                      :blue 0x0000ff,
+                      :blueviolet 0x8a2be2,
+                      :brown 0xa52a2a,
+                      :burlywood 0xdeb887,
+                      :cadetblue 0x5f9ea0,
+                      :chartreuse 0x7fff00,
+                      :chocolate 0xd2691e,
+                      :coral 0xff7f50,
+                      :cornflowerblue 0x6495ed,
+                      :cornsilk 0xfff8dc,
+                      :crimson 0xdc143c,
+                      :cyan 0x00ffff,
+                      :darkblue 0x00008b,
+                      :darkcyan 0x008b8b,
+                      :darkgoldenrod 0xb8860b,
+                      :darkgray 0xa9a9a9,
+                      :darkgreen 0x006400,
+                      :darkgrey 0xa9a9a9,
+                      :darkkhaki 0xbdb76b,
+                      :darkmagenta 0x8b008b,
+                      :darkolivegreen 0x556b2f,
+                      :darkorange 0xff8c00,
+                      :darkorchid 0x9932cc,
+                      :darkred 0x8b0000,
+                      :darksalmon 0xe9967a,
+                      :darkseagreen 0x8fbc8f,
+                      :darkslateblue 0x483d8b,
+                      :darkslategray 0x2f4f4f,
+                      :darkslategrey 0x2f4f4f,
+                      :darkturquoise 0x00ced1,
+                      :darkviolet 0x9400d3,
+                      :deeppink 0xff1493,
+                      :deepskyblue 0x00bfff,
+                      :dimgray 0x696969,
+                      :dimgrey 0x696969,
+                      :dodgerblue 0x1e90ff,
+                      :firebrick 0xb22222,
+                      :floralwhite 0xfffaf0,
+                      :forestgreen 0x228b22,
+                      :fuchsia 0xff00ff,
+                      :gainsboro 0xdcdcdc,
+                      :ghostwhite 0xf8f8ff,
+                      :gold 0xffd700,
+                      :goldenrod 0xdaa520,
+                      :gray 0x808080,
+                      :green 0x008000,
+                      :greenyellow 0xadff2f,
+                      :grey 0x808080,
+                      :honeydew 0xf0fff0,
+                      :hotpink 0xff69b4,
+                      :indianred 0xcd5c5c,
+                      :indigo 0x4b0082,
+                      :ivory 0xfffff0,
+                      :khaki 0xf0e68c,
+                      :lavender 0xe6e6fa,
+                      :lavenderblush 0xfff0f5,
+                      :lawngreen 0x7cfc00,
+                      :lemonchiffon 0xfffacd,
+                      :lightblue 0xadd8e6,
+                      :lightcoral 0xf08080,
+                      :lightcyan 0xe0ffff,
+                      :lightgoldenrodyellow 0xfafad2,
+                      :lightgray 0xd3d3d3,
+                      :lightgreen 0x90ee90,
+                      :lightgrey 0xd3d3d3,
+                      :lightpink 0xffb6c1,
+                      :lightsalmon 0xffa07a,
+                      :lightseagreen 0x20b2aa,
+                      :lightskyblue 0x87cefa,
+                      :lightslategray 0x778899,
+                      :lightslategrey 0x778899,
+                      :lightsteelblue 0xb0c4de,
+                      :lightyellow 0xffffe0,
+                      :lime 0x00ff00,
+                      :limegreen 0x32cd32,
+                      :linen 0xfaf0e6,
+                      :magenta 0xff00ff,
+                      :maroon 0x800000,
+                      :mediumaquamarine 0x66cdaa,
+                      :mediumblue 0x0000cd,
+                      :mediumorchid 0xba55d3,
+                      :mediumpurple 0x9370db,
+                      :mediumseagreen 0x3cb371,
+                      :mediumslateblue 0x7b68ee,
+                      :mediumspringgreen 0x00fa9a,
+                      :mediumturquoise 0x48d1cc,
+                      :mediumvioletred 0xc71585,
+                      :midnightblue 0x191970,
+                      :mintcream 0xf5fffa,
+                      :mistyrose 0xffe4e1,
+                      :moccasin 0xffe4b5,
+                      :navajowhite 0xffdead,
+                      :navy 0x000080,
+                      :oldlace 0xfdf5e6,
+                      :olive 0x808000,
+                      :olivedrab 0x6b8e23,
+                      :orange 0xffa500,
+                      :orangered 0xff4500,
+                      :orchid 0xda70d6,
+                      :palegoldenrod 0xeee8aa,
+                      :palegreen 0x98fb98,
+                      :paleturquoise 0xafeeee,
+                      :palevioletred 0xdb7093,
+                      :papayawhip 0xffefd5,
+                      :peachpuff 0xffdab9,
+                      :peru 0xcd853f,
+                      :pink 0xffc0cb,
+                      :plum 0xdda0dd,
+                      :powderblue 0xb0e0e6,
+                      :purple 0x800080,
+                      :rebeccapurple 0x663399,
+                      :red 0xff0000,
+                      :rosybrown 0xbc8f8f,
+                      :royalblue 0x4169e1,
+                      :saddlebrown 0x8b4513,
+                      :salmon 0xfa8072,
+                      :sandybrown 0xf4a460,
+                      :seagreen 0x2e8b57,
+                      :seashell 0xfff5ee,
+                      :sienna 0xa0522d,
+                      :silver 0xc0c0c0,
+                      :skyblue 0x87ceeb,
+                      :slateblue 0x6a5acd,
+                      :slategray 0x708090,
+                      :slategrey 0x708090,
+                      :snow 0xfffafa,
+                      :springgreen 0x00ff7f,
+                      :steelblue 0x4682b4,
+                      :tan 0xd2b48c,
+                      :teal 0x008080,
+                      :thistle 0xd8bfd8,
+                      :tomato 0xff6347,
+                      :turquoise 0x40e0d0,
+                      :violet 0xee82ee,
+                      :wheat 0xf5deb3,
+                      :white 0xffffff,
+                      :whitesmoke 0xf5f5f5,
+                      :yellow 0xffff00,
+                      :yellowgreen 0x9acd32})
 
-(def html-awt-color (memoize html-color-fn))
-(def html-color (memoize #(to-color (html-awt-color %))))
+(def html-awt-color (memoize (comp to-awt-color html-colors-map)))
+(def html-color (memoize (comp to-color html-colors-map)))
 
 ;;
 

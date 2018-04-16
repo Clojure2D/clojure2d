@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file. This change
 
 - project dependencies to external `generateme/fastmath` library
 - to-luma -> luma, get-hue -> hue
+- hue returns angle (0 - 360)
 - make-color, make-awt-color, make-canvas, make-2d-...-array changed to names without `make-` prefix
 - make-pixels -> pixels
 - make-effect* -> effect
