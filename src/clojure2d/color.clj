@@ -26,8 +26,9 @@
             [fastmath.vector :as v]
             [fastmath.stats :as stat]
             [fastmath.interpolation :as i]
+            [fastmath.easings :as e]
             [clojure.java.io :refer :all])
-  (:import [fastmath.vector Vec2 Vec3 Vec4]           
+  (:import [fastmath.vector Vec3 Vec4]           
            java.awt.Color))
 
 (set! *warn-on-reflection* true)
@@ -960,6 +961,15 @@
          (/ (.z c) 255.0)
          (.w c)))
 
+(defn- wrap-hue 
+  "Wrap hue to enable interpolations"
+  ^double [^double h]
+  (cond
+    (neg? h) (+ h 360.0)
+    (> h 360.0) (- h 360.0)
+    :else h))
+
+
 ;; HSI
 
 (defn to-HSI-raw
@@ -980,7 +990,7 @@
 (defn from-HSI-raw
   "HSI -> RGB"
   [^Vec4 c]
-  (let [h' (/ (.x c) 60.0)
+  (let [h' (/ (wrap-hue (.x c)) 60.0)
         z (- 1.0 (m/abs (dec (mod h' 2.0))))
         C (/ (* 3.0 (.z c) (.y c)) (inc z))
         X (* C z)
@@ -1012,7 +1022,7 @@
   "HSV -> RGB"
   [^Vec4 c]
   (let [C (* (.y c) (.z c))
-        h' (/ (.x c) 60.0)
+        h' (/ (wrap-hue (.x c)) 60.0)
         X (* C (- 1.0 (m/abs (dec (mod h' 2.0)))))
         m (- (.z c) C)
         ^Vec3 rgb' (v/add (from-HCX h' C X) (Vec3. m m m))]
@@ -1042,7 +1052,7 @@
   "HSL -> RGB"
   [^Vec4 c]
   (let [C (* (.y c) (- 1.0 (m/abs (dec (+ (.z c) (.z c))))))
-        h' (/ (.x c) 60.0)
+        h' (/ (wrap-hue (.x c)) 60.0)
         X (* C (- 1.0 (m/abs (dec (mod h' 2.0)))))
         m (- (.z c) (* 0.5 C))
         ^Vec3 rgb' (v/add (from-HCX h' C X) (Vec3. m m m))]
@@ -1069,7 +1079,7 @@
 (defn from-HCL-raw
   "HCL -> RGB"
   [^Vec4 c]
-  (let [h' (/ (.x c) 60.0)
+  (let [h' (/ (wrap-hue (.x c)) 60.0)
         X (* (.y c) (- 1.0 (m/abs (dec (mod h' 2.0)))))
         ^Vec3 rgb' (v/add (from-HCX h' (.y c) X))
         m (- (.z c) (* 0.298839 (.x rgb')) (* 0.586811 (.y rgb')) (* 0.114350 (.z rgb')))]
@@ -1186,7 +1196,7 @@
   [^Vec4 c]
   (if (zero? (.z c))
     (Vec4. (.x c) (.x c) (.x c) (.w c))
-    (let [h (/ (.y c) 60.0)
+    (let [h (/ (wrap-hue (.y c)) 60.0)
           k (long (m/floor h))
           f (- h k)
           fp (if (even? k) f (- 1.0 f))
@@ -1623,6 +1633,16 @@
      (fn [^double t]
        (let [ct (m/constrain t 0.0 1.0)]
          (from (v/vec4 (i0 ct) (i1 ct) (i2 ct) (i3 ct))))))))
+
+(defn gradient-easing
+  "Create gradient between two sets of given colorspace values."
+  [colorspace-fn easing ^Vec4 v1 ^Vec4 v2]
+  (fn [^double t]
+    (colorspace-fn (v/interpolate v1 v2 (easing t)))))
+
+(def cubehelix-gradient (partial gradient-easing from-Cubehelix-raw))
+
+
 
 ;; ### Colourlovers
 
@@ -2073,6 +2093,42 @@
 
 ;;
 
+;; http://iquilezles.org/www/articles/palettes/palettes.htm
+
+(def ^:private ^:const vec3-05 (Vec3. 0.5 0.5 0.5))
+(def ^:private ^:const vec3-10 (Vec3. 1.0 1.0 1.0))
+
+
+(def gradient-presets
+  {:iq-1 (iq-palette-gradient vec3-05 vec3-05 vec3-10
+                              (Vec3. 0.0 0.33 0.67))
+   :iq-2 (iq-palette-gradient vec3-05 vec3-05 vec3-10
+                              (Vec3. 0.0 0.1 0.2))
+   :iq-3 (iq-palette-gradient vec3-05 vec3-05 vec3-10 
+                              (Vec3. 0.3 0.2 0.2))
+   :iq-4 (iq-palette-gradient vec3-05 vec3-05
+                              (Vec3. 1.0 1.0 0.5)
+                              (Vec3. 0.8 0.9 0.3))
+   :iq-5 (iq-palette-gradient vec3-05 vec3-05
+                              (Vec3. 1.0 0.7 0.4)
+                              (Vec3. 0.0 0.15 0.2))
+   :iq-6 (iq-palette-gradient vec3-05 vec3-05
+                              (Vec3. 2.0 1.0 0.0)
+                              (Vec3. 0.5 0.2 0.25))
+   :iq-7 (iq-palette-gradient (Vec3. 0.8 0.5 0.4)
+                              (Vec3. 0.2 0.4 0.2)
+                              (Vec3. 2.0 1.0 1.0)
+                              (Vec3. 0.0 0.25 0.25))
+   :cubehelix (cubehelix-gradient e/linear (Vec4. 300.0 0.5 0.0 255.0) (Vec4. -240 0.5 1.0 255.0))
+   :warm (cubehelix-gradient e/linear (Vec4. -100.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
+   :cool (cubehelix-gradient e/linear (Vec4. 260.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
+   :rainbow (fn [^double t] (let [ts (m/abs (- t 0.5))]
+                              (from-Cubehelix-raw (Vec4. (- (* t 360.0) 100.0)
+                                                         (- 1.5 (* 1.5 ts))
+                                                         (- 0.8 (* 0.9 ts))
+                                                         255.0))))
+   })
+
 (defn- d3->palette
   "Convert d3 string to palette"
   [s]
@@ -2085,7 +2141,7 @@
         names (map #(keyword (str name "-" (count %))) pals)]
     (into {} (map vector names pals))))
 
-(def ^{:doc "D3 color presets."} scale-chromatic
+(def ^{:doc "Color palette presets."} palette-presets
   (merge
    (d3->palettes "brbg" ["d8b365f5f5f55ab4ac",
                          "a6611adfc27d80cdc1018571",
@@ -2105,6 +2161,196 @@
                          "762a839970abc2a5cfe7d4e8f7f7f7d9f0d3a6dba05aae611b7837",
                          "40004b762a839970abc2a5cfe7d4e8d9f0d3a6dba05aae611b783700441b",
                          "40004b762a839970abc2a5cfe7d4e8f7f7f7d9f0d3a6dba05aae611b783700441b"])
+   (d3->palettes "piyg" ["e9a3c9f7f7f7a1d76a",
+                         "d01c8bf1b6dab8e1864dac26",
+                         "d01c8bf1b6daf7f7f7b8e1864dac26",
+                         "c51b7de9a3c9fde0efe6f5d0a1d76a4d9221",
+                         "c51b7de9a3c9fde0eff7f7f7e6f5d0a1d76a4d9221",
+                         "c51b7dde77aef1b6dafde0efe6f5d0b8e1867fbc414d9221",
+                         "c51b7dde77aef1b6dafde0eff7f7f7e6f5d0b8e1867fbc414d9221",
+                         "8e0152c51b7dde77aef1b6dafde0efe6f5d0b8e1867fbc414d9221276419",
+                         "8e0152c51b7dde77aef1b6dafde0eff7f7f7e6f5d0b8e1867fbc414d9221276419"])
+   (d3->palettes "puor" ["998ec3f7f7f7f1a340",
+                         "5e3c99b2abd2fdb863e66101",
+                         "5e3c99b2abd2f7f7f7fdb863e66101",
+                         "542788998ec3d8daebfee0b6f1a340b35806",
+                         "542788998ec3d8daebf7f7f7fee0b6f1a340b35806",
+                         "5427888073acb2abd2d8daebfee0b6fdb863e08214b35806",
+                         "5427888073acb2abd2d8daebf7f7f7fee0b6fdb863e08214b35806",
+                         "2d004b5427888073acb2abd2d8daebfee0b6fdb863e08214b358067f3b08",
+                         "2d004b5427888073acb2abd2d8daebf7f7f7fee0b6fdb863e08214b358067f3b08"])
+   (d3->palettes "rdbu" ["ef8a62f7f7f767a9cf",
+                         "ca0020f4a58292c5de0571b0",
+                         "ca0020f4a582f7f7f792c5de0571b0",
+                         "b2182bef8a62fddbc7d1e5f067a9cf2166ac",
+                         "b2182bef8a62fddbc7f7f7f7d1e5f067a9cf2166ac",
+                         "b2182bd6604df4a582fddbc7d1e5f092c5de4393c32166ac",
+                         "b2182bd6604df4a582fddbc7f7f7f7d1e5f092c5de4393c32166ac",
+                         "67001fb2182bd6604df4a582fddbc7d1e5f092c5de4393c32166ac053061",
+                         "67001fb2182bd6604df4a582fddbc7f7f7f7d1e5f092c5de4393c32166ac053061"])
+   (d3->palettes "rdgy" ["ef8a62ffffff999999",
+                         "ca0020f4a582bababa404040",
+                         "ca0020f4a582ffffffbababa404040",
+                         "b2182bef8a62fddbc7e0e0e09999994d4d4d",
+                         "b2182bef8a62fddbc7ffffffe0e0e09999994d4d4d",
+                         "b2182bd6604df4a582fddbc7e0e0e0bababa8787874d4d4d",
+                         "b2182bd6604df4a582fddbc7ffffffe0e0e0bababa8787874d4d4d",
+                         "67001fb2182bd6604df4a582fddbc7e0e0e0bababa8787874d4d4d1a1a1a",
+                         "67001fb2182bd6604df4a582fddbc7ffffffe0e0e0bababa8787874d4d4d1a1a1a"])
+   (d3->palettes "rdylbu" ["fc8d59ffffbf91bfdb",
+                           "d7191cfdae61abd9e92c7bb6",
+                           "d7191cfdae61ffffbfabd9e92c7bb6",
+                           "d73027fc8d59fee090e0f3f891bfdb4575b4",
+                           "d73027fc8d59fee090ffffbfe0f3f891bfdb4575b4",
+                           "d73027f46d43fdae61fee090e0f3f8abd9e974add14575b4",
+                           "d73027f46d43fdae61fee090ffffbfe0f3f8abd9e974add14575b4",
+                           "a50026d73027f46d43fdae61fee090e0f3f8abd9e974add14575b4313695",
+                           "a50026d73027f46d43fdae61fee090ffffbfe0f3f8abd9e974add14575b4313695"])
+   (d3->palettes "rdylgn" ["fc8d59ffffbf91cf60",
+                           "d7191cfdae61a6d96a1a9641",
+                           "d7191cfdae61ffffbfa6d96a1a9641",
+                           "d73027fc8d59fee08bd9ef8b91cf601a9850",
+                           "d73027fc8d59fee08bffffbfd9ef8b91cf601a9850",
+                           "d73027f46d43fdae61fee08bd9ef8ba6d96a66bd631a9850",
+                           "d73027f46d43fdae61fee08bffffbfd9ef8ba6d96a66bd631a9850",
+                           "a50026d73027f46d43fdae61fee08bd9ef8ba6d96a66bd631a9850006837",
+                           "a50026d73027f46d43fdae61fee08bffffbfd9ef8ba6d96a66bd631a9850006837"])
+   (d3->palettes "spectral" ["fc8d59ffffbf99d594",
+                             "d7191cfdae61abdda42b83ba",
+                             "d7191cfdae61ffffbfabdda42b83ba",
+                             "d53e4ffc8d59fee08be6f59899d5943288bd",
+                             "d53e4ffc8d59fee08bffffbfe6f59899d5943288bd",
+                             "d53e4ff46d43fdae61fee08be6f598abdda466c2a53288bd",
+                             "d53e4ff46d43fdae61fee08bffffbfe6f598abdda466c2a53288bd",
+                             "9e0142d53e4ff46d43fdae61fee08be6f598abdda466c2a53288bd5e4fa2",
+                             "9e0142d53e4ff46d43fdae61fee08bffffbfe6f598abdda466c2a53288bd5e4fa2"])
+   (d3->palettes "bugn" ["e5f5f999d8c92ca25f",
+                         "edf8fbb2e2e266c2a4238b45",
+                         "edf8fbb2e2e266c2a42ca25f006d2c",
+                         "edf8fbccece699d8c966c2a42ca25f006d2c",
+                         "edf8fbccece699d8c966c2a441ae76238b45005824",
+                         "f7fcfde5f5f9ccece699d8c966c2a441ae76238b45005824",
+                         "f7fcfde5f5f9ccece699d8c966c2a441ae76238b45006d2c00441b"])
+   (d3->palettes "bupu" ["e0ecf49ebcda8856a7",
+                         "edf8fbb3cde38c96c688419d",
+                         "edf8fbb3cde38c96c68856a7810f7c",
+                         "edf8fbbfd3e69ebcda8c96c68856a7810f7c",
+                         "edf8fbbfd3e69ebcda8c96c68c6bb188419d6e016b",
+                         "f7fcfde0ecf4bfd3e69ebcda8c96c68c6bb188419d6e016b",
+                         "f7fcfde0ecf4bfd3e69ebcda8c96c68c6bb188419d810f7c4d004b"])
+   (d3->palettes "gnbu" ["e0f3dba8ddb543a2ca",
+                         "f0f9e8bae4bc7bccc42b8cbe",
+                         "f0f9e8bae4bc7bccc443a2ca0868ac",
+                         "f0f9e8ccebc5a8ddb57bccc443a2ca0868ac",
+                         "f0f9e8ccebc5a8ddb57bccc44eb3d32b8cbe08589e",
+                         "f7fcf0e0f3dbccebc5a8ddb57bccc44eb3d32b8cbe08589e",
+                         "f7fcf0e0f3dbccebc5a8ddb57bccc44eb3d32b8cbe0868ac084081"])
+   (d3->palettes "orrd" ["fee8c8fdbb84e34a33",
+                         "fef0d9fdcc8afc8d59d7301f",
+                         "fef0d9fdcc8afc8d59e34a33b30000",
+                         "fef0d9fdd49efdbb84fc8d59e34a33b30000",
+                         "fef0d9fdd49efdbb84fc8d59ef6548d7301f990000",
+                         "fff7ecfee8c8fdd49efdbb84fc8d59ef6548d7301f990000",
+                         "fff7ecfee8c8fdd49efdbb84fc8d59ef6548d7301fb300007f0000"])
+   (d3->palettes "pubu" ["ece7f2a6bddb2b8cbe",
+                         "f1eef6bdc9e174a9cf0570b0",
+                         "f1eef6bdc9e174a9cf2b8cbe045a8d",
+                         "f1eef6d0d1e6a6bddb74a9cf2b8cbe045a8d",
+                         "f1eef6d0d1e6a6bddb74a9cf3690c00570b0034e7b",
+                         "fff7fbece7f2d0d1e6a6bddb74a9cf3690c00570b0034e7b",
+                         "fff7fbece7f2d0d1e6a6bddb74a9cf3690c00570b0045a8d023858"])
+   (d3->palettes "pubugn" ["ece2f0a6bddb1c9099",
+                           "f6eff7bdc9e167a9cf02818a",
+                           "f6eff7bdc9e167a9cf1c9099016c59",
+                           "f6eff7d0d1e6a6bddb67a9cf1c9099016c59",
+                           "f6eff7d0d1e6a6bddb67a9cf3690c002818a016450",
+                           "fff7fbece2f0d0d1e6a6bddb67a9cf3690c002818a016450",
+                           "fff7fbece2f0d0d1e6a6bddb67a9cf3690c002818a016c59014636"])
+   (d3->palettes "purd" ["e7e1efc994c7dd1c77",
+                         "f1eef6d7b5d8df65b0ce1256",
+                         "f1eef6d7b5d8df65b0dd1c77980043",
+                         "f1eef6d4b9dac994c7df65b0dd1c77980043",
+                         "f1eef6d4b9dac994c7df65b0e7298ace125691003f",
+                         "f7f4f9e7e1efd4b9dac994c7df65b0e7298ace125691003f",
+                         "f7f4f9e7e1efd4b9dac994c7df65b0e7298ace125698004367001f"])
+   (d3->palettes "rdpu" ["fde0ddfa9fb5c51b8a",
+                         "feebe2fbb4b9f768a1ae017e",
+                         "feebe2fbb4b9f768a1c51b8a7a0177",
+                         "feebe2fcc5c0fa9fb5f768a1c51b8a7a0177",
+                         "feebe2fcc5c0fa9fb5f768a1dd3497ae017e7a0177",
+                         "fff7f3fde0ddfcc5c0fa9fb5f768a1dd3497ae017e7a0177",
+                         "fff7f3fde0ddfcc5c0fa9fb5f768a1dd3497ae017e7a017749006a"])
+   (d3->palettes "ylgn" ["f7fcb9addd8e31a354",
+                         "ffffccc2e69978c679238443",
+                         "ffffccc2e69978c67931a354006837",
+                         "ffffccd9f0a3addd8e78c67931a354006837",
+                         "ffffccd9f0a3addd8e78c67941ab5d238443005a32",
+                         "ffffe5f7fcb9d9f0a3addd8e78c67941ab5d238443005a32",
+                         "ffffe5f7fcb9d9f0a3addd8e78c67941ab5d238443006837004529"])
+   (d3->palettes "ylgnbu" ["edf8b17fcdbb2c7fb8",
+                           "ffffcca1dab441b6c4225ea8",
+                           "ffffcca1dab441b6c42c7fb8253494",
+                           "ffffccc7e9b47fcdbb41b6c42c7fb8253494",
+                           "ffffccc7e9b47fcdbb41b6c41d91c0225ea80c2c84",
+                           "ffffd9edf8b1c7e9b47fcdbb41b6c41d91c0225ea80c2c84",
+                           "ffffd9edf8b1c7e9b47fcdbb41b6c41d91c0225ea8253494081d58"])
+   (d3->palettes "ylorbr" ["fff7bcfec44fd95f0e",
+                           "ffffd4fed98efe9929cc4c02",
+                           "ffffd4fed98efe9929d95f0e993404",
+                           "ffffd4fee391fec44ffe9929d95f0e993404",
+                           "ffffd4fee391fec44ffe9929ec7014cc4c028c2d04",
+                           "ffffe5fff7bcfee391fec44ffe9929ec7014cc4c028c2d04",
+                           "ffffe5fff7bcfee391fec44ffe9929ec7014cc4c02993404662506"])
+   (d3->palettes "ylorrd" ["ffeda0feb24cf03b20",
+                           "ffffb2fecc5cfd8d3ce31a1c",
+                           "ffffb2fecc5cfd8d3cf03b20bd0026",
+                           "ffffb2fed976feb24cfd8d3cf03b20bd0026",
+                           "ffffb2fed976feb24cfd8d3cfc4e2ae31a1cb10026",
+                           "ffffccffeda0fed976feb24cfd8d3cfc4e2ae31a1cb10026",
+                           "ffffccffeda0fed976feb24cfd8d3cfc4e2ae31a1cbd0026800026"])
+   (d3->palettes "blues" ["deebf79ecae13182bd",
+                          "eff3ffbdd7e76baed62171b5",
+                          "eff3ffbdd7e76baed63182bd08519c",
+                          "eff3ffc6dbef9ecae16baed63182bd08519c",
+                          "eff3ffc6dbef9ecae16baed64292c62171b5084594",
+                          "f7fbffdeebf7c6dbef9ecae16baed64292c62171b5084594",
+                          "f7fbffdeebf7c6dbef9ecae16baed64292c62171b508519c08306b"])
+   (d3->palettes "greens" ["e5f5e0a1d99b31a354",
+                           "edf8e9bae4b374c476238b45",
+                           "edf8e9bae4b374c47631a354006d2c",
+                           "edf8e9c7e9c0a1d99b74c47631a354006d2c",
+                           "edf8e9c7e9c0a1d99b74c47641ab5d238b45005a32",
+                           "f7fcf5e5f5e0c7e9c0a1d99b74c47641ab5d238b45005a32",
+                           "f7fcf5e5f5e0c7e9c0a1d99b74c47641ab5d238b45006d2c00441b"])
+   (d3->palettes "greys" ["f0f0f0bdbdbd636363",
+                          "f7f7f7cccccc969696525252",
+                          "f7f7f7cccccc969696636363252525",
+                          "f7f7f7d9d9d9bdbdbd969696636363252525",
+                          "f7f7f7d9d9d9bdbdbd969696737373525252252525",
+                          "fffffff0f0f0d9d9d9bdbdbd969696737373525252252525",
+                          "fffffff0f0f0d9d9d9bdbdbd969696737373525252252525000000"])
+   (d3->palettes "oranges" ["fee6cefdae6be6550d",
+                            "feeddefdbe85fd8d3cd94701",
+                            "feeddefdbe85fd8d3ce6550da63603",
+                            "feeddefdd0a2fdae6bfd8d3ce6550da63603",
+                            "feeddefdd0a2fdae6bfd8d3cf16913d948018c2d04",
+                            "fff5ebfee6cefdd0a2fdae6bfd8d3cf16913d948018c2d04",
+                            "fff5ebfee6cefdd0a2fdae6bfd8d3cf16913d94801a636037f2704"])
+   (d3->palettes "purples" ["efedf5bcbddc756bb1",
+                            "f2f0f7cbc9e29e9ac86a51a3",
+                            "f2f0f7cbc9e29e9ac8756bb154278f",
+                            "f2f0f7dadaebbcbddc9e9ac8756bb154278f",
+                            "f2f0f7dadaebbcbddc9e9ac8807dba6a51a34a1486",
+                            "fcfbfdefedf5dadaebbcbddc9e9ac8807dba6a51a34a1486",
+                            "fcfbfdefedf5dadaebbcbddc9e9ac8807dba6a51a354278f3f007d"])
+   (d3->palettes "reds" ["fee0d2fc9272de2d26",
+                         "fee5d9fcae91fb6a4acb181d",
+                         "fee5d9fcae91fb6a4ade2d26a50f15",
+                         "fee5d9fcbba1fc9272fb6a4ade2d26a50f15",
+                         "fee5d9fcbba1fc9272fb6a4aef3b2ccb181d99000d",
+                         "fff5f0fee0d2fcbba1fc9272fb6a4aef3b2ccb181d99000d",
+                         "fff5f0fee0d2fcbba1fc9272fb6a4aef3b2ccb181da50f1567000d"])
+   
    
    {:accent (d3->palette "7fc97fbeaed4fdc086ffff99386cb0f0027fbf5b17666666")
     :dark2 (d3->palette "1b9e77d95f027570b3e7298a66a61ee6ab02a6761d666666")
@@ -2134,4 +2380,44 @@
     :viridis (d3->palette "44015444025645045745055946075a46085c460a5d460b5e470d60470e6147106347116447136548146748166848176948186a481a6c481b6d481c6e481d6f481f70482071482173482374482475482576482677482878482979472a7a472c7a472d7b472e7c472f7d46307e46327e46337f463480453581453781453882443983443a83443b84433d84433e85423f854240864241864142874144874045884046883f47883f48893e49893e4a893e4c8a3d4d8a3d4e8a3c4f8a3c508b3b518b3b528b3a538b3a548c39558c39568c38588c38598c375a8c375b8d365c8d365d8d355e8d355f8d34608d34618d33628d33638d32648e32658e31668e31678e31688e30698e306a8e2f6b8e2f6c8e2e6d8e2e6e8e2e6f8e2d708e2d718e2c718e2c728e2c738e2b748e2b758e2a768e2a778e2a788e29798e297a8e297b8e287c8e287d8e277e8e277f8e27808e26818e26828e26828e25838e25848e25858e24868e24878e23888e23898e238a8d228b8d228c8d228d8d218e8d218f8d21908d21918c20928c20928c20938c1f948c1f958b1f968b1f978b1f988b1f998a1f9a8a1e9b8a1e9c891e9d891f9e891f9f881fa0881fa1881fa1871fa28720a38620a48621a58521a68522a78522a88423a98324aa8325ab8225ac8226ad8127ad8128ae8029af7f2ab07f2cb17e2db27d2eb37c2fb47c31b57b32b67a34b67935b77937b87838b9773aba763bbb753dbc743fbc7340bd7242be7144bf7046c06f48c16e4ac16d4cc26c4ec36b50c46a52c56954c56856c66758c7655ac8645cc8635ec96260ca6063cb5f65cb5e67cc5c69cd5b6ccd5a6ece5870cf5773d05675d05477d1537ad1517cd2507fd34e81d34d84d44b86d54989d5488bd6468ed64590d74393d74195d84098d83e9bd93c9dd93ba0da39a2da37a5db36a8db34aadc32addc30b0dd2fb2dd2db5de2bb8de29bade28bddf26c0df25c2df23c5e021c8e020cae11fcde11dd0e11cd2e21bd5e21ad8e219dae319dde318dfe318e2e418e5e419e7e419eae51aece51befe51cf1e51df4e61ef6e620f8e621fbe723fde725")
     :viridis-magma (d3->palette "00000401000501010601010802010902020b02020d03030f03031204041405041606051806051a07061c08071e0907200a08220b09240c09260d0a290e0b2b100b2d110c2f120d31130d34140e36150e38160f3b180f3d19103f1a10421c10441d11471e114920114b21114e22115024125325125527125829115a2a115c2c115f2d11612f116331116533106734106936106b38106c390f6e3b0f703d0f713f0f72400f74420f75440f764510774710784910784a10794c117a4e117b4f127b51127c52137c54137d56147d57157e59157e5a167e5c167f5d177f5f187f601880621980641a80651a80671b80681c816a1c816b1d816d1d816e1e81701f81721f817320817521817621817822817922827b23827c23827e24828025828125818326818426818627818827818928818b29818c29818e2a81902a81912b81932b80942c80962c80982d80992d809b2e7f9c2e7f9e2f7fa02f7fa1307ea3307ea5317ea6317da8327daa337dab337cad347cae347bb0357bb2357bb3367ab5367ab73779b83779ba3878bc3978bd3977bf3a77c03a76c23b75c43c75c53c74c73d73c83e73ca3e72cc3f71cd4071cf4070d0416fd2426fd3436ed5446dd6456cd8456cd9466bdb476adc4869de4968df4a68e04c67e24d66e34e65e44f64e55064e75263e85362e95462ea5661eb5760ec5860ed5a5fee5b5eef5d5ef05f5ef1605df2625df2645cf3655cf4675cf4695cf56b5cf66c5cf66e5cf7705cf7725cf8745cf8765cf9785df9795df97b5dfa7d5efa7f5efa815ffb835ffb8560fb8761fc8961fc8a62fc8c63fc8e64fc9065fd9266fd9467fd9668fd9869fd9a6afd9b6bfe9d6cfe9f6dfea16efea36ffea571fea772fea973feaa74feac76feae77feb078feb27afeb47bfeb67cfeb77efeb97ffebb81febd82febf84fec185fec287fec488fec68afec88cfeca8dfecc8ffecd90fecf92fed194fed395fed597fed799fed89afdda9cfddc9efddea0fde0a1fde2a3fde3a5fde5a7fde7a9fde9aafdebacfcecaefceeb0fcf0b2fcf2b4fcf4b6fcf6b8fcf7b9fcf9bbfcfbbdfcfdbf")
     :viridis-inferno (d3->palette "00000401000501010601010802010a02020c02020e03021004031204031405041706041907051b08051d09061f0a07220b07240c08260d08290e092b10092d110a30120a32140b34150b37160b39180c3c190c3e1b0c411c0c431e0c451f0c48210c4a230c4c240c4f260c51280b53290b552b0b572d0b592f0a5b310a5c320a5e340a5f3609613809623909633b09643d09653e0966400a67420a68440a68450a69470b6a490b6a4a0c6b4c0c6b4d0d6c4f0d6c510e6c520e6d540f6d550f6d57106e59106e5a116e5c126e5d126e5f136e61136e62146e64156e65156e67166e69166e6a176e6c186e6d186e6f196e71196e721a6e741a6e751b6e771c6d781c6d7a1d6d7c1d6d7d1e6d7f1e6c801f6c82206c84206b85216b87216b88226a8a226a8c23698d23698f24699025689225689326679526679727669827669a28659b29649d29649f2a63a02a63a22b62a32c61a52c60a62d60a82e5fa92e5eab2f5ead305dae305cb0315bb1325ab3325ab43359b63458b73557b93556ba3655bc3754bd3853bf3952c03a51c13a50c33b4fc43c4ec63d4dc73e4cc83f4bca404acb4149cc4248ce4347cf4446d04545d24644d34743d44842d54a41d74b3fd84c3ed94d3dda4e3cdb503bdd513ade5238df5337e05536e15635e25734e35933e45a31e55c30e65d2fe75e2ee8602de9612bea632aeb6429eb6628ec6726ed6925ee6a24ef6c23ef6e21f06f20f1711ff1731df2741cf3761bf37819f47918f57b17f57d15f67e14f68013f78212f78410f8850ff8870ef8890cf98b0bf98c0af98e09fa9008fa9207fa9407fb9606fb9706fb9906fb9b06fb9d07fc9f07fca108fca309fca50afca60cfca80dfcaa0ffcac11fcae12fcb014fcb216fcb418fbb61afbb81dfbba1ffbbc21fbbe23fac026fac228fac42afac62df9c72ff9c932f9cb35f8cd37f8cf3af7d13df7d340f6d543f6d746f5d949f5db4cf4dd4ff4df53f4e156f3e35af3e55df2e661f2e865f2ea69f1ec6df1ed71f1ef75f1f179f2f27df2f482f3f586f3f68af4f88ef5f992f6fa96f8fb9af9fc9dfafda1fcffa4")
-    :viridis-plasma (d3->palette "0d088710078813078916078a19068c1b068d1d068e20068f2206902406912605912805922a05932c05942e05952f059631059733059735049837049938049a3a049a3c049b3e049c3f049c41049d43039e44039e46039f48039f4903a04b03a14c02a14e02a25002a25102a35302a35502a45601a45801a45901a55b01a55c01a65e01a66001a66100a76300a76400a76600a76700a86900a86a00a86c00a86e00a86f00a87100a87201a87401a87501a87701a87801a87a02a87b02a87d03a87e03a88004a88104a78305a78405a78606a68707a68808a68a09a58b0aa58d0ba58e0ca48f0da4910ea3920fa39410a29511a19613a19814a099159f9a169f9c179e9d189d9e199da01a9ca11b9ba21d9aa31e9aa51f99a62098a72197a82296aa2395ab2494ac2694ad2793ae2892b02991b12a90b22b8fb32c8eb42e8db52f8cb6308bb7318ab83289ba3388bb3488bc3587bd3786be3885bf3984c03a83c13b82c23c81c33d80c43e7fc5407ec6417dc7427cc8437bc9447aca457acb4679cc4778cc4977cd4a76ce4b75cf4c74d04d73d14e72d24f71d35171d45270d5536fd5546ed6556dd7566cd8576bd9586ada5a6ada5b69db5c68dc5d67dd5e66de5f65de6164df6263e06363e16462e26561e26660e3685fe4695ee56a5de56b5de66c5ce76e5be76f5ae87059e97158e97257ea7457eb7556eb7655ec7754ed7953ed7a52ee7b51ef7c51ef7e50f07f4ff0804ef1814df1834cf2844bf3854bf3874af48849f48948f58b47f58c46f68d45f68f44f79044f79143f79342f89441f89540f9973ff9983ef99a3efa9b3dfa9c3cfa9e3bfb9f3afba139fba238fca338fca537fca636fca835fca934fdab33fdac33fdae32fdaf31fdb130fdb22ffdb42ffdb52efeb72dfeb82cfeba2cfebb2bfebd2afebe2afec029fdc229fdc328fdc527fdc627fdc827fdca26fdcb26fccd25fcce25fcd025fcd225fbd324fbd524fbd724fad824fada24f9dc24f9dd25f8df25f8e125f7e225f7e425f6e626f6e826f5e926f5eb27f4ed27f3ee27f3f027f2f227f1f426f1f525f0f724f0f921")}))
+    :viridis-plasma (d3->palette "0d088710078813078916078a19068c1b068d1d068e20068f2206902406912605912805922a05932c05942e05952f059631059733059735049837049938049a3a049a3c049b3e049c3f049c41049d43039e44039e46039f48039f4903a04b03a14c02a14e02a25002a25102a35302a35502a45601a45801a45901a55b01a55c01a65e01a66001a66100a76300a76400a76600a76700a86900a86a00a86c00a86e00a86f00a87100a87201a87401a87501a87701a87801a87a02a87b02a87d03a87e03a88004a88104a78305a78405a78606a68707a68808a68a09a58b0aa58d0ba58e0ca48f0da4910ea3920fa39410a29511a19613a19814a099159f9a169f9c179e9d189d9e199da01a9ca11b9ba21d9aa31e9aa51f99a62098a72197a82296aa2395ab2494ac2694ad2793ae2892b02991b12a90b22b8fb32c8eb42e8db52f8cb6308bb7318ab83289ba3388bb3488bc3587bd3786be3885bf3984c03a83c13b82c23c81c33d80c43e7fc5407ec6417dc7427cc8437bc9447aca457acb4679cc4778cc4977cd4a76ce4b75cf4c74d04d73d14e72d24f71d35171d45270d5536fd5546ed6556dd7566cd8576bd9586ada5a6ada5b69db5c68dc5d67dd5e66de5f65de6164df6263e06363e16462e26561e26660e3685fe4695ee56a5de56b5de66c5ce76e5be76f5ae87059e97158e97257ea7457eb7556eb7655ec7754ed7953ed7a52ee7b51ef7c51ef7e50f07f4ff0804ef1814df1834cf2844bf3854bf3874af48849f48948f58b47f58c46f68d45f68f44f79044f79143f79342f89441f89540f9973ff9983ef99a3efa9b3dfa9c3cfa9e3bfb9f3afba139fba238fca338fca537fca636fca835fca934fdab33fdac33fdae32fdaf31fdb130fdb22ffdb42ffdb52efeb72dfeb82cfeba2cfebb2bfebd2afebe2afec029fdc229fdc328fdc527fdc627fdc827fdca26fdcb26fccd25fcce25fcd025fcd225fbd324fbd524fbd724fad824fada24f9dc24f9dd25f8df25f8e125f7e225f7e425f6e626f6e826f5e926f5eb27f4ed27f3ee27f3f027f2f227f1f426f1f525f0f724f0f921")
+
+    :microsoft-1 [(color 91 155 213) (color 237 125 49) (color 164 164 164) (color 255 192 0) (color 68 113 196) (color 112 173 71) (color 36 94 145) (color 158 72 14)],
+    :microsoft-2 [(color 91 155 213) (color 164 164 164) (color 68 113 196) (color 36 94 145) (color 99 99 99) (color 37 68 119) (color 124 175 221) (color 183 183 183)],
+    :microsoft-3 [(color 237 125 49) (color 255 192 0) (color 112 173 71) (color 158 72 14) (color 153 115 0) (color 67 103 43) (color 240 151 90) (color 255 205 51)],
+    :microsoft-4 [(color 112 173 71) (color 68 113 196) (color 255 192 0) (color 67 103 43) (color 37 68 119) (color 153 115 0) (color 139 193 103) (color 105 142 208)]
+    
+    :tableau-10 [(color 31 119 180) (color 255 127 14) (color 44 160 44) (color 214 39 40) (color 148 103 189) (color 140 86 75) (color 227 119 194) (color 127 127 127) (color 188 189 34) (color 23 190 207)] 
+    :tableau-10-light [(color 174 199 232) (color 255 187 120) (color 152 223 138) (color 255 152 150) (color 197 176 213) (color 196 156 148) (color 247 182 210) (color 199 199 199) (color 219 219 141) (color 158 218 229)] 
+    :tableau-10-medium [(color 162 162 162) (color 255 158 74) (color 237 102 93) (color 173 139 201) (color 114 158 206) (color 103 191 92) (color 237 151 202) (color 205 204 93) (color 168 120 110) (color 109 204 218)] 
+    :tableau-20 [(color 152 223 138) (color 255 187 120) (color 255 127 14) (color 174 199 232) (color 44 160 44) (color 31 119 180) (color 255 152 150) (color 214 39 40) (color 197 176 213) (color 148 103 189) (color 247 182 210) (color 227 119 194) (color 196 156 148) (color 140 86 75) (color 127 127 127) (color 219 219 141) (color 199 199 199) (color 188 189 34) (color 158 218 229) (color 23 190 207)] 
+    :blue-red-6 [(color 240 39 32) (color 234 107 115) (color 172 97 60) (color 107 163 214) (color 44 105 176) (color 233 195 155)] 
+    :blue-red-12 [(color 172 135 99) (color 255 182 176) (color 240 39 32) (color 181 200 226) (color 172 97 60) (color 44 105 176) (color 233 195 155) (color 221 201 180) (color 181 223 253) (color 107 163 214) (color 244 115 122) (color 189 10 54)] 
+    :color-blind-10 [(color 0 107 164) (color 255 128 14) (color 171 171 171) (color 89 89 89) (color 95 158 209) (color 200 82 0) (color 137 137 137) (color 162 200 236) (color 255 188 121) (color 207 207 207)] 
+    :gray-5 [(color 96 99 106) (color 165 172 175) (color 65 68 81) (color 143 135 130) (color 207 207 207)] 
+    :green-orange-6 [(color 255 217 74) (color 255 127 15) (color 60 183 204) (color 57 115 124) (color 50 162 81) (color 184 90 13)] 
+    :green-orange-12 [(color 134 180 169) (color 255 185 119) (color 255 127 15) (color 172 217 141) (color 60 183 204) (color 50 162 81) (color 255 217 74) (color 184 90 13) (color 152 217 228) (color 57 115 124) (color 204 201 77) (color 130 133 59)] 
+    :purple-gray-6 [(color 123 102 210) (color 220 95 189) (color 148 145 123) (color 153 86 136) (color 208 152 238) (color 215 213 197)] 
+    :purple-gray-12 [(color 171 106 213) (color 255 192 218) (color 220 95 189) (color 166 153 232) (color 123 102 210) (color 95 90 65) (color 216 152 186) (color 208 152 238) (color 180 177 155) (color 153 86 136) (color 219 212 197) (color 139 124 110)] 
+    :traffic-light [(color 177 3 24) (color 219 161 58) (color 48 147 67) (color 216 37 38) (color 255 193 86) (color 105 183 100) (color 242 108 100) (color 255 221 113) (color 159 205 153)]
+
+    :tableau-10-2 [(color 79 122 166) (color 240 142 57) (color 223 88 92) (color 120 183 178) (color 91 160 82) (color 236 200 84) (color 175 123 161) (color 253 158 169) (color 155 117 97) (color 186 176 172)] 
+    :tableau-20-2 [(color 78 121 167) (color 160 203 232) (color 242 142 43) (color 255 190 125) (color 89 161 79) (color 140 209 125) (color 182 153 45) (color 241 206 99) (color 73 152 148) (color 134 188 182) (color 225 87 89) (color 255 157 154) (color 121 112 110) (color 186 176 172) (color 211 114 149) (color 250 191 210) (color 176 122 161) (color 212 166 200) (color 157 118 96) (color 215 181 166)] 
+    :miller-stone [(color 244 121 66) (color 251 176 78) (color 185 170 151) (color 126 117 109) (color 191 187 96) (color 99 139 102) (color 162 206 170) (color 132 157 177) (color 215 206 159) (color 79 105 128)] 
+    :nuriel-stone [(color 129 117 170) (color 111 184 153) (color 49 161 179) (color 204 178 43) (color 163 159 201) (color 148 208 192) (color 149 156 158) (color 2 123 142) (color 159 143 18)] 
+    :superfishel-stone [(color 99 136 180) (color 255 174 52) (color 239 111 106) (color 140 194 202) (color 85 173 137) (color 195 188 63) (color 187 118 147) (color 186 160 148) (color 169 181 174) (color 118 118 118)] 
+    :jewel-bright [(color 235 30 44) (color 253 111 48) (color 249 167 41) (color 249 210 60) (color 95 187 104) (color 100 205 204) (color 145 220 234) (color 164 164 213) (color 187 201 229)] 
+    :seattle-grays [(color 118 127 139) (color 179 183 184) (color 92 96 104) (color 211 211 211) (color 152 156 163)] 
+    :summer [(color 143 178 2) (color 185 202 93) (color 207 62 83) (color 241 120 141) (color 0 162 179) (color 151 207 208) (color 243 165 70) (color 247 196 128)] 
+    :winter [(color 144 114 143) (color 185 160 180) (color 157 155 61) (color 206 203 118) (color 225 87 89) (color 255 152 136) (color 107 107 107) (color 186 178 174) (color 170 135 128) (color 218 182 175)] 
+    :blue-red-brown [(color 70 111 157) (color 145 179 215) (color 237 68 74) (color 254 181 162) (color 157 118 96) (color 215 181 166) (color 56 150 196) (color 160 212 238) (color 186 126 69) (color 233 184 127) (color 200 19 59) (color 234 135 131)] 
+    :green-orange-teal [(color 78 159 80) (color 135 209 128) (color 239 138 12) (color 252 198 109) (color 60 168 188) (color 152 217 228) (color 148 163 35) (color 195 206 61) (color 160 132 0) (color 247 212 42) (color 38 137 126) (color 141 191 168)] 
+    :purple-pink-gray [(color 128 116 168) (color 198 193 240) (color 196 100 135) (color 255 190 209) (color 156 146 144) (color 197 191 190) (color 155 147 201) (color 221 181 213) (color 124 114 112) (color 244 152 182) (color 177 115 160) (color 199 153 188)] 
+    :traffic-light-2 [(color 182 10 28) (color 227 152 2) (color 48 145 67) (color 224 53 49) (color 240 189 39) (color 81 179 100) (color 255 104 76) (color 255 218 102) (color 138 206 126)] 
+    :color-blind [(color 17 112 170) (color 252 125 11) (color 163 172 185) (color 87 96 108) (color 95 162 206) (color 200 82 0) (color 123 132 143) (color 163 204 233) (color 255 188 121) (color 200 208 217)] 
+    :tableau-classic-medium [(color 114 158 206) (color 255 158 74) (color 103 191 92) (color 237 102 93) (color 173 139 201) (color 168 120 110) (color 237 151 202) (color 162 162 162) (color 205 204 93) (color 109 204 218)] 
+    :tableau-classic-20 [(color 31 119 180) (color 174 199 232) (color 255 127 14) (color 255 187 120) (color 44 160 44) (color 152 223 138) (color 214 39 40) (color 255 152 150) (color 148 103 189) (color 197 176 213) (color 140 86 75) (color 196 156 148) (color 227 119 194) (color 247 182 210) (color 127 127 127) (color 199 199 199) (color 188 189 34) (color 219 219 141) (color 23 190 207) (color 158 218 229)]
+    
+    }))
+
+

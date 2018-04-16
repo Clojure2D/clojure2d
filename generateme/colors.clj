@@ -4,12 +4,12 @@
             [fastmath.core :as m]
             [fastmath.vector :as v]))
 
-(def canv (canvas 1000 300))
+(def canv (canvas 800 300))
 
 (def window (show-window {:canvas canv}))
 
 (with-canvas [c canv] 
-  (let [col (c/scale-chromatic :prgn-7)
+  (let [col (c/palette-presets :summer)
         p0 (c/gradient col :RGB :linear)
         p1 (c/gradient col :LUV :cubic-spline)]
     (dotimes [x (width c)]
