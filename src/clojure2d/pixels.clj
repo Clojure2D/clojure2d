@@ -874,3 +874,4 @@
         ch3 (future (amap ^doubles (.ch3 a) idx ret (+ (aget ^doubles (.ch3 a) idx) (aget ^doubles (.ch3 b) idx))))
         ^doubles bins (amap ^doubles (.bins a) idx ret (+ (aget ^doubles (.bins a) idx) (aget ^doubles (.bins b) idx)))]
     (BinPixels. bins @ch1 @ch2 @ch3 (.sizex a) (.sizey a) (.sizex+ a) (.fnormx a) (.fnormy a))))
+

@@ -800,7 +800,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
        :metadoc/categories #{:draw}
        :metadoc/examples [(ex/example "List of stroke join types" (keys stroke-joins))]}
   stroke-joins {:bevel BasicStroke/JOIN_BEVEL
-                :mitter BasicStroke/JOIN_MITER
+                :miter BasicStroke/JOIN_MITER
                 :round BasicStroke/JOIN_ROUND})
 
 (def ^{:doc "Stroke cap types"
@@ -811,40 +811,97 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
                :square BasicStroke/CAP_SQUARE})
 
 (declare rect)
+(declare triangle)
 
 (defn set-stroke
-  "Set stroke (line) attributes like `cap`, `join` and size.
+  "Set stroke (line) attributes like `cap`, `join`,  size and `miter-limit`.
 
-  Default `:round` and `:bevel` are used. Default size is `1.0`.
+  Default `:round` and `:bevel` are used. Default size and miter-limit are `1.0`.
 
-  See [[stroke-joins]] and [[stroke-caps]] for names."
+  See [[stroke-joins]] and [[stroke-caps]] for names.
+
+  See [[set-stroke-custom]]."
   {:metadoc/categories #{:draw}
    :metadoc/examples [(ex/example-snippet "Various stroke settings." drawing-snippet :image
-                        (fn [canvas]
-                          (-> canvas
-                              (set-stroke 10 :round)
-                              (line 25 20 25 180)
-                              (set-stroke 10 :butt)
-                              (line 55 20 55 180)
-                              (set-stroke 10 :square)
-                              (line 85 20 85 180)
-                              (set-stroke 10 :round :bevel)
-                              (rect 120 20 60 40 true)
-                              (set-stroke 10 :round :mitter)
-                              (rect 120 80 60 40 true)
-                              (set-stroke 10 :round :round)
-                              (rect 120 140 60 40 true))))]}
-  ([^Canvas canvas size cap join]
+                                          (fn [canvas]
+                                            (-> canvas
+                                                (set-stroke 10 :round)
+                                                (line 25 20 25 180)
+                                                (set-stroke 10 :butt)
+                                                (line 55 20 55 180)
+                                                (set-stroke 10 :square)
+                                                (line 85 20 85 180)
+                                                (set-stroke 10 :round :bevel)
+                                                (rect 120 20 60 40 true)
+                                                (set-stroke 10 :round :miter)
+                                                (rect 120 80 60 40 true)
+                                                (set-stroke 10 :round :round)
+                                                (rect 120 140 60 40 true))))
+                      (ex/example-snippet "Miter limit" drawing-snippet :image
+                                          (fn [canvas]
+                                            (-> canvas
+                                                (set-stroke 10 :square :miter)
+                                                (triangle 70 50 170 50 170 70 true)
+                                                (set-stroke 10 :square :miter 5.0)
+                                                (triangle 70 100 170 100 170 120 true)
+                                                (set-stroke 10 :square :miter 25.0)
+                                                (triangle 70 150 170 150 170 170 true))))]}
+  ([^Canvas canvas size cap join miter-limit]
    (.setStroke ^Graphics2D (.graphics canvas) (BasicStroke. size
                                                             (or (stroke-caps cap) BasicStroke/CAP_ROUND)
-                                                            (or (stroke-joins join) BasicStroke/JOIN_BEVEL)))
+                                                            (or (stroke-joins join) BasicStroke/JOIN_BEVEL)
+                                                            (float miter-limit)))
    canvas)
+  ([canvas size cap join]
+   (set-stroke canvas size cap join 1.0))
   ([canvas size cap]
-   (set-stroke canvas size cap :bevel))
+   (set-stroke canvas size cap :bevel 1.0))
   ([canvas size]
-   (set-stroke canvas size :round :bevel))
+   (set-stroke canvas size :round :bevel 1.0))
   ([canvas]
    (set-stroke canvas 1.0)))
+
+(defn set-stroke-custom
+  "Create custom stroke.
+
+  Provide map with following entries, see more in [JavaDoc](https://docs.oracle.com/javase/7/docs/api/java/awt/BasicStroke.html):
+
+  * :size - size of the stroke (default: 1.0)
+  * :cap - [[stroke-caps]] (default: :butt)
+  * :join - [[stroke-joins]] (default: :round)
+  * :miter-limit - line joins trim factor (default: 1.0)
+  * :dash - array with dash pattern, (default: nil)
+  * :dash-phase - offset to start pattern (default: 0.0)
+
+  See also [[set-stroke]]."
+  {:metadoc/categories #{:draw}
+   :metadoc/examples [(ex/example-snippet "Custom strokes" drawing-snippet :image
+                                          (fn [canvas]
+                                            (-> canvas
+                                                (set-stroke-custom {:size 2.0 :dash [4.0] :dash-phase 2.0})
+                                                (line 20 20 180 20)
+                                                (set-stroke-custom {:size 2.0 :dash [20.0] :dash-phase 10})
+                                                (line 20 50 180 50)
+                                                (set-stroke-custom {:size 2.0 :dash [10.0 2.0 2.0 2.0]})
+                                                (line 20 80 180 80)
+                                                (set-stroke-custom {:size 1.0 :dash [4.0] :dash-phase 2.0})
+                                                (rect 20 110 160 10 true)
+                                                (set-stroke-custom {:size 1.0 :dash [10.0 5.0] :join :miter})
+                                                (rect 20 140 160 10 :true)
+                                                (set-stroke-custom {:size 1.0 :dash [10.0 2.0 2.0 2.0]})
+                                                (rect 20 170 160 10 :true))))]}
+  [^Canvas canvas {:keys [size cap join miter-limit dash dash-phase]
+                   :or {size 1.0 cap :butt join :round miter-limit 1.0 dash nil dash-phase 0.0}}]
+  (if dash
+    (do
+      (.setStroke ^Graphics2D (.graphics canvas) (BasicStroke. size
+                                                               (or (stroke-caps cap) BasicStroke/CAP_BUTT)
+                                                               (or (stroke-joins join) BasicStroke/JOIN_ROUND)
+                                                               (float miter-limit)
+                                                               (float-array dash)
+                                                               (float dash-phase)))
+      canvas) 
+    (set-stroke canvas size cap join miter-limit)))
 
 (defn point
   "Draw point at `x`,`y` or `^Vec2` position.
@@ -852,18 +909,18 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   It's implemented as a very short line. Consider using `(rect x y 1 1)` for speed when `x` and `y` are integers."
   {:metadoc/categories #{:draw}
    :metadoc/examples [(ex/example-snippet "Sequence of points." drawing-snippet :image
-                        (fn [canvas]
-                          (doseq [^long x (range 10 190 10)]
-                            (set-stroke canvas (/ x 20))
-                            (point canvas x x))))
+                                          (fn [canvas]
+                                            (doseq [^long x (range 10 190 10)]
+                                              (set-stroke canvas (/ x 20))
+                                              (point canvas x x))))
                       (ex/example-snippet "Magnified point can look differently when different stroke settings are used."
-                        drawing-snippet :image (fn [canvas]
-                                                 (-> canvas
-                                                     (scale 80.0)
-                                                     (set-stroke 0.5)
-                                                     (point 0.5 0.5)
-                                                     (set-stroke 0.5 :square)
-                                                     (point 1.5 1.5))))]}  
+                                          drawing-snippet :image (fn [canvas]
+                                                                   (-> canvas
+                                                                       (scale 80.0)
+                                                                       (set-stroke 0.5)
+                                                                       (point 0.5 0.5)
+                                                                       (set-stroke 0.5 :square)
+                                                                       (point 1.5 1.5))))]}  
   ([canvas ^double x ^double y]
    (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
    canvas)
@@ -2104,7 +2161,7 @@ See [[set-color]]."
   "Create counter function, each call returns next number."
   ([^long v]
    (let [tick (atom (dec v))]
-     (fn [] (swap! tick #(inc ^long %)))))
+     (fn ^long [] (swap! tick #(inc ^long %)))))
   ([]
    (make-counter 0)))
 
