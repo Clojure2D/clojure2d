@@ -366,7 +366,7 @@
   (let [bpal (condp #(> ^double %1 ^double %2) (r/drand 1.0)
                0.1 (let [num (r/irand 5 20)]
                      {:type :iq
-                      :palette (c/make-iq-random-palette num)})
+                      :palette (m/sample (c/iq-palette-random-gradient) num)})
                0.5 {:type :colourlovers
                     :palette (rand-nth c/colourlovers-palettes)}
                0.6 (let [preset (rand-nth (keys c/paletton-presets))

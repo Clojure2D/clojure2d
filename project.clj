@@ -4,8 +4,8 @@
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.9.0"]
-                 [metadoc "0.1.0-RC1"]
-                 [generateme/fastmath "0.1.0-RC3"]
+                 [metadoc "0.2.0"]
+                 [generateme/fastmath "0.1.2-SNAPSHOT"]
                  ;; [org.bytedeco/javacv-platform "1.3.2"]
                  ]
   :resource-path "resources/"
