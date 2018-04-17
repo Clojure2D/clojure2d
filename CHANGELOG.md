@@ -7,7 +7,13 @@ All notable changes to this project will be documented in this file. This change
 
 - key-pressed? mouse-pressed? (and other event values) functions available in `draw-fn` (via Window protocols)
 - lerp in color (to interpolate colors)
-- set-stroke-custom - to set custom stoke patter
+- set-stroke-custom - to set custom stoke pattern
+- to-XXX* / from-XXX* are now normalized (0-255) colorspace conversion functions.
+- color distances
+- color interpolators
+- color preset palettes (Brewer, Tableaus, Microsoft)
+- color gradients
+- color tweaking functions
 
 ### Changed
 
@@ -20,6 +26,7 @@ All notable changes to this project will be documented in this file. This change
 	- almost all make- in raymarching are changed to version without prefix
 - `resize-image` and `resize-canvas` are now moved to ImageProto as `resize`
 - xor-mode, gradient-mode are reset with paint-mode
+- to-XXX/from-XXX in colorspaces are raw conversions now
 
 Prefix `make-` is reserved when function is created.
 
