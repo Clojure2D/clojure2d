@@ -325,9 +325,9 @@
 (defn blend-machine-random-config
   ""
   []
-  (let [cs1 (r/randval 0.9 (rand-nth c/colorspaces-names) nil) ; let's convert to some colorspace (or leave rgb)
-        cs2 (r/randval 0.2 (r/randval 0.9 (rand-nth c/colorspaces-names) nil) cs1) ; maybe different cs on second image?
-        outcs (r/randval 0.2 (r/randval 0.9 (rand-nth c/colorspaces-names) nil) cs1) ; maybe some random colorspace on output?
+  (let [cs1 (r/randval 0.9 (rand-nth c/colorspaces-list) nil) ; let's convert to some colorspace (or leave rgb)
+        cs2 (r/randval 0.2 (r/randval 0.9 (rand-nth c/colorspaces-list) nil) cs1) ; maybe different cs on second image?
+        outcs (r/randval 0.2 (r/randval 0.9 (rand-nth c/colorspaces-list) nil) cs1) ; maybe some random colorspace on output?
         bl1 (r/randval 0.85 (rand-nth c/blends-names) nil)    ; ch1 blend
         bl2 (r/randval 0.85 (rand-nth c/blends-names) nil) ; ch2 blend
         bl3 (r/randval 0.85 (rand-nth c/blends-names) nil)] ; ch3 blend
@@ -352,10 +352,10 @@
          cs2-sel (if cs2-to first second)
          cs-sel (if cs-to first second)
          result (p/compose-channels blend-ch1 blend-ch2 blend-ch3 nil
-                                    (if in-cs1 (p/filter-colors (cs1-sel (in-cs1 c/colorspaces)) p1) p1)
-                                    (if in-cs2 (p/filter-colors (cs2-sel (in-cs2 c/colorspaces)) p2) p2))]
+                                    (if in-cs1 (p/filter-colors (cs1-sel (in-cs1 c/colorspaces*)) p1) p1)
+                                    (if in-cs2 (p/filter-colors (cs2-sel (in-cs2 c/colorspaces*)) p2) p2))]
      (if out-cs
-       (p/filter-colors (cs-sel (out-cs c/colorspaces)) result)
+       (p/filter-colors (cs-sel (out-cs c/colorspaces*)) result)
        result))))
 
 ;; color reducer machine

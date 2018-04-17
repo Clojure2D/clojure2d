@@ -86,6 +86,25 @@
      (* 0.715160 g)
      (* 0.072169 b)))
 
+(declare to-HC)
+(declare to-HC-polar)
+
+(defn hue
+  "Get hue value from color (any representation). Returns angle (0-360).
+  
+  Uses hexagonal transformation."
+  ^double [c]
+  (let [^Vec4 ret (to-HC (to-color c))]
+    (.x ret)))
+
+(defn hue-polar
+  "Get hue value from color (any representation). Returns angle (0-360).
+  
+  Uses polar transformation."
+  ^double [c]
+  (let [^Vec4 ret (to-HC-polar (to-color c))]
+    (.x ret)))
+
 (declare html-awt-color)
 (declare html-color)
 
@@ -122,6 +141,7 @@
   (ch1 [^Vec4 c] (.y c))
   (ch2 [^Vec4 c] (.z c))
   (alpha [^Vec4 c] (.w c))
+  (hue [^Vec4 c] )
   clojure.lang.Keyword
   (to-color [n] (html-color n))
   (to-awt-color [n] (html-awt-color n))
@@ -238,25 +258,6 @@
   AWT version of [[gray]]."
   ([v] (awt-color v v v))
   ([v a] (awt-color v v v a)))
-
-(declare to-HC)
-(declare to-HC-polar)
-
-(defn hue
-  "Get hue value from color (any representation). Returns angle (0-360).
-  
-  Uses hexagonal transformation."
-  ^double [c]
-  (let [^Vec4 ret (to-HC (to-color c))]
-    (.x ret)))
-
-(defn hue-polar
-  "Get hue value from color (any representation). Returns angle (0-360).
-  
-  Uses polar transformation."
-  ^double [c]
-  (let [^Vec4 ret (to-HC-polar (to-color c))]
-    (.x ret)))
 
 ;; ## Blending / Composing
 
@@ -656,38 +657,43 @@
 
 (defn to-CMY
   "RGB -> CMY"
-  [^Vec4 c]
-  (Vec4. (- 255.0 (.x c))
-         (- 255.0 (.y c))
-         (- 255.0 (.z c))
-         (.w c)))
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (Vec4. (- 255.0 (.x c))
+           (- 255.0 (.y c))
+           (- 255.0 (.z c))
+           (.w c))))
 
 (def from-CMY to-CMY)
+(def to-CMY* to-CMY)
+(def from-CMY* to-CMY)
 
 ;; ### OHTA
 
-(defn to-OHTA-raw
+(defn to-OHTA
   "RGB -> OHTA"
-  [^Vec4 c]
-  (let [i1 (/ (+ (.x c) (.y c) (.z c)) 3.0)
+  [c] 
+  (let [^Vec4 c (to-color c)
+        i1 (/ (+ (.x c) (.y c) (.z c)) 3.0)
         i2 (* 0.5 (- (.x c) (.z c)))
         i3 (* 0.25 (- (* 2.0 (.y c)) (.x c) (.z c)))]
     (Vec4. i1 i2 i3 (.w c))))
 
 (def ^:private ^:const ohta-s (Vec4. 0.0 127.5 127.5 0.0))
 
-(defn to-OHTA
+(defn to-OHTA*
   ""
   [c]
-  (v/add (to-OHTA-raw c) ohta-s))
+  (v/add (to-OHTA c) ohta-s))
 
 (def ^:private ^:const ^double c23- (/ -2.0 3.0))
 (def ^:private ^:const ^double c43 (/ 4.0 3.0))
 
-(defn from-OHTA-raw
+(defn from-OHTA
   "OHTA -> RGB"
-  [^Vec4 c]
-  (let [i1 (.x c)
+  [c]
+  (let [^Vec4 c (to-color c)
+        i1 (.x c)
         i2 (.y c)
         i3 (.z c)
         r (+ i1 i2 (* c23- i3))
@@ -695,10 +701,10 @@
         b (+ i1 (- i2) (* c23- i3))]
     (Vec4. r g b (.w c))))
 
-(defn from-OHTA
+(defn from-OHTA*
   ""
   [c]
-  (from-OHTA-raw (v/sub c ohta-s)))
+  (from-OHTA (v/sub c ohta-s)))
 
 ;; ### sRGB
 
@@ -720,21 +726,26 @@
 
 (defn to-sRGB
   "Linear RGB to non-linear sRGB"
-  [^Vec4 c]
-  (v/vec4 (-> (Vec3. (.x c) (.y c) (.z c))
-              (v/div 255.0)
-              (v/applyf from-linear)
-              (v/mult 255.0))
-          (.w c)))
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (v/vec4 (-> (Vec3. (.x c) (.y c) (.z c))
+                (v/div 255.0)
+                (v/applyf from-linear)
+                (v/mult 255.0))
+            (.w c))))
 
 (defn from-sRGB
   "Non-linear sRGB to linear RGB"
-  [^Vec4 c]
-  (v/vec4 (-> (Vec3. (.x c) (.y c) (.z c))
-              (v/div 255.0)
-              (v/applyf to-linear)
-              (v/mult 255.0))
-          (.w c)))
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (v/vec4 (-> (Vec3. (.x c) (.y c) (.z c))
+                (v/div 255.0)
+                (v/applyf to-linear)
+                (v/mult 255.0))
+            (.w c))))
+
+(def to-sRGB* to-sRGB)
+(def from-sRGB* from-sRGB)
 
 ;; ### XYZ
 
@@ -749,19 +760,20 @@
          (+ (* (.x c) 0.2126) (* (.y c) 0.7152) (* (.z c) 0.0722))
          (+ (* (.x c) 0.0193) (* (.y c) 0.1192) (* (.z c) 0.9505))))
 
-(defn to-XYZ-raw
-  "RGB->XYZ with corrections"
-  [^Vec4 c]
-  (let [xyz-raw (to-XYZ- (-> (Vec3. (.x c) (.y c) (.z c))
-                             (v/div 255.0)
-                             (v/applyf to-linear)
-                             (v/mult 100.0)))]
-    (v/vec4 xyz-raw (.w c))))
-
 (defn to-XYZ
+  "RGB->XYZ with corrections"
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (let [xyz-raw (to-XYZ- (-> (Vec3. (.x c) (.y c) (.z c))
+                               (v/div 255.0)
+                               (v/applyf to-linear)
+                               (v/mult 100.0)))]
+      (v/vec4 xyz-raw (.w c)))))
+
+(defn to-XYZ*
   "Normlized RGB->XYZ"
   [c]
-  (let [^Vec4 cc (to-XYZ-raw c)]
+  (let [^Vec4 cc (to-XYZ c)]
     (Vec4. (m/norm (.x cc) 0.0 D65X 0.0 255.0)
            (m/norm (.y cc) 0.0 D65Y 0.0 255.0)
            (m/norm (.z cc) 0.0 D65Z 0.0 255.0)
@@ -774,21 +786,23 @@
          (+ (* (.x v) -0.9689) (* (.y v)  1.8758) (* (.z v)  0.0415))
          (+ (* (.x v)  0.0557) (* (.y v) -0.2040) (* (.z v)  1.0570))))
 
-(defn from-XYZ-raw
+(defn from-XYZ
   "XYZ->RGB conversion with corrections"
-  [^Vec4 c]
-  (let [^Vec3 rgb-raw (v/mult (v/applyf (from-XYZ- (v/div (Vec3. (.x c) (.y c) (.z c)) 100.0)) from-linear) 255.0)]
+  [c] 
+  (let [^Vec4 c (to-color c)
+        ^Vec3 rgb-raw (v/mult (v/applyf (from-XYZ- (v/div (Vec3. (.x c) (.y c) (.z c)) 100.0)) from-linear) 255.0)]
     (v/vec4 rgb-raw (.w c))))
 
-(defn from-XYZ
+(defn from-XYZ*
   "XYZ->RGB normalized"
-  [^Vec4 c]
-  (let [x (m/norm (.x c) 0.0 255.0 0.0 D65X)
+  [c]
+  (let [^Vec4 c (to-color c)
+        x (m/norm (.x c) 0.0 255.0 0.0 D65X)
         y (m/norm (.y c) 0.0 255.0 0.0 D65Y)
         z (m/norm (.z c) 0.0 255.0 0.0 D65Z)]
-    (from-XYZ-raw (Vec4. x y z (.w c)))))
+    (from-XYZ (Vec4. x y z (.w c)))))
 
-;; ### LUV
+;;
 
 (def ^:const ^double CIEEpsilon (/ 216.0 24389.0))
 (def ^:const ^double CIEK (/ 24389.0 27.0))
@@ -805,31 +819,28 @@
     (m/pow v OneThird)
     (/ (+ 16.0 (* v CIEK)) 116.0)))
 
-(defn to-LAB-raw
+(defn to-LAB
   "RGB->LAB"
-  [^Vec4 c]
-  (let [^Vec4 xyz (to-XYZ-raw c)
-        x (/ (.x xyz) D65X)
-        y (/ (.y xyz) D65Y)
-        z (/ (.z xyz) D65Z)
-        x (to-lab-correct x)
-        y (to-lab-correct y)
-        z (to-lab-correct z)
+  [c]
+  (let [^Vec4 xyz (to-XYZ c)
+        x (to-lab-correct (/ (.x xyz) D65X))
+        y (to-lab-correct (/ (.y xyz) D65Y))
+        z (to-lab-correct (/ (.z xyz) D65Z))
         L (- (* y 116.0) 16.0)
         a (* 500.0 (- x y))
         b (* 200.0 (- y z))]
-    (Vec4. L a b (.w c))))
+    (Vec4. L a b (.w xyz))))
 
-(defn to-LAB
+(defn to-LAB*
   "RGB -> LAB, normalized"
   [c]
-  (let [^Vec4 cc (to-LAB-raw c)]
+  (let [^Vec4 cc (to-LAB c)]
     (Vec4. (m/norm (.x cc) 0.0 100.0 0.0 255.0)
            (m/norm (.y cc) -86.18463649762525 98.25421868616114 0.0 255.0)
            (m/norm (.z cc) -107.8636810449517 94.4824854464446 0.0 255.0)
            (.w cc))))
 
-(defn from-lab-correct
+(defn- from-lab-correct
   "LAB correction"
   ^double [^double v]
   (let [v3 (* v v v)]
@@ -837,29 +848,31 @@
       v3
       (/ (- (* 116.0 v) 16.0) CIEK))))
 
-(defn from-LAB-raw
+(defn from-LAB
   "LAB->RGB normalized"
-  [^Vec4 c]
-  (let [y (/ (+ (.x c) 16.0) 116.0)
+  [c]
+  (let [^Vec4 c (to-color c)
+        y (/ (+ (.x c) 16.0) 116.0)
         x (* D65X (from-lab-correct (+ y (/ (.y c) 500.0))))
         z (* D65Z (from-lab-correct (- y (/ (.z c) 200.0))))]
-    (from-XYZ-raw (Vec4. x (* D65Y (from-lab-correct y)) z (.w c)))))
+    (from-XYZ (Vec4. x (* D65Y (from-lab-correct y)) z (.w c)))))
 
-(defn from-LAB
+(defn from-LAB*
   "LAB -> RGB, normalized"
-  [^Vec4 c]
-  (from-LAB-raw (Vec4. (m/norm (.x c) 0.0 255.0 0.0 100.0)
-                       (m/norm (.y c) 0.0 255.0 -86.18463649762525 98.25421868616114)
-                       (m/norm (.z c) 0.0 255.0 -107.8636810449517 94.4824854464446)
-                       (.w c))))
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (from-LAB (Vec4. (m/norm (.x c) 0.0 255.0 0.0 100.0)
+                     (m/norm (.y c) 0.0 255.0 -86.18463649762525 98.25421868616114)
+                     (m/norm (.z c) 0.0 255.0 -107.8636810449517 94.4824854464446)
+                     (.w c)))))
 
 
 ;;
 
-(defn to-LUV-raw
+(defn to-LUV
   ""
   [c]
-  (let [^Vec4 cc (to-XYZ-raw c)
+  (let [^Vec4 cc (to-XYZ c)
         uv-factor (/ (+ (.x cc) (* 15.0 (.y cc)) (* 3.0 (.z cc))))
         var-u (* 4.0 (.x cc) uv-factor)
         var-v (* 9.0 (.y cc) uv-factor)
@@ -870,35 +883,37 @@
            (* 13.0 L (- var-v REF-V))
            (.w cc))))
 
-(defn to-LUV
+(defn to-LUV*
   ""
   [c]
-  (let [^Vec4 cc (to-LUV-raw c)]
+  (let [^Vec4 cc (to-LUV c)]
     (Vec4. (m/norm (.x cc) 0.0 100.0 0.0 255.0)
            (m/norm (.y cc) -83.07975193131836 175.05303573649485 0.0 255.0)
            (m/norm (.z cc) -134.1160763907768 107.40136474095397 0.0 255.0)
            (.w cc))))
 
-(defn from-LUV-raw
+(defn from-LUV
   ""
-  [^Vec4 c]
-  (let [var-y (from-lab-correct (/ (+ (.x c) 16.0) 116.0))
+  [c]
+  (let [^Vec4 c (to-color c)
+        var-y (from-lab-correct (/ (+ (.x c) 16.0) 116.0))
         var-u (+ REF-U (/ (.y c) (* 13.0 (.x c))))
         var-v (+ REF-V (/ (.z c) (* 13.0 (.x c))))
         Y (* 100.0 var-y)
         X (/ (* -9.0 Y var-u) (- (* (- var-u 4.0) var-v) (* var-u var-v)))]
-    (from-XYZ-raw (Vec4. X
-                         Y
-                         (/ (- (* 9.0 Y) (* 15.0 var-v Y) (* var-v X)) (* 3.0 var-v))
-                         (.w c)))))
+    (from-XYZ (Vec4. X
+                     Y
+                     (/ (- (* 9.0 Y) (* 15.0 var-v Y) (* var-v X)) (* 3.0 var-v))
+                     (.w c)))))
 
-(defn from-LUV
+(defn from-LUV*
   ""
-  [^Vec4 c]
-  (from-LUV-raw (Vec4. (m/norm (.x c) 0.0 255.0 0.0 100.0)
-                       (m/norm (.y c) 0.0 255.0 -83.07975193131836 175.05303573649485)
-                       (m/norm (.z c) 0.0 255.0 -134.1160763907768 107.40136474095397)
-                       (.w c))))
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (from-LUV (Vec4. (m/norm (.x c) 0.0 255.0 0.0 100.0)
+                     (m/norm (.y c) 0.0 255.0 -83.07975193131836 175.05303573649485)
+                     (m/norm (.z c) 0.0 255.0 -134.1160763907768 107.40136474095397)
+                     (.w c)))))
 
 ;; HLab
 
@@ -906,10 +921,10 @@
 (def ^:private ^:const ^double Kb (* (/ 70.0 218.11) (+ D65Y D65Z)))
 
 
-(defn to-HLAB-raw
+(defn to-HunterLAB
   ""
   [c]
-  (let [^Vec4 cc (to-XYZ-raw c)
+  (let [^Vec4 cc (to-XYZ c)
         X (/ (.x cc) D65X)
         Y (/ (.y cc) D65Y)
         Z (/ (.z cc) D65Z)
@@ -919,40 +934,42 @@
            (* Kb (/ (- Y Z) sqrtY))
            (.w cc))))
 
-(defn to-HLAB
+(defn to-HunterLAB*
   ""
   [c]
-  (let [^Vec4 cc (to-HLAB-raw c)]
+  (let [^Vec4 cc (to-HunterLAB c)]
     (Vec4. (m/norm (.x cc) 0.0 100.0 0.0 255.0)
            (m/norm (.y cc) -69.08211393661531 109.48378856734126 0.0 255.0)
            (m/norm (.z cc) -199.78221402287008  55.7203132978682 0.0 255.0)
            (.w cc))))
 
-(defn from-HLAB-raw
+(defn from-HunterLAB
   ""
-  [^Vec4 c]
-  (let [Y (* 100.0 (m/sq (/ (.x c) D65Y)))
+  [c]
+  (let [^Vec4 c (to-color c)
+        Y (* 100.0 (m/sq (/ (.x c) D65Y)))
         Y' (/ Y D65Y)
         sqrtY' (m/sqrt Y')
         X (* D65X (+ (* (/ (.y c) Ka) sqrtY') Y'))
         Z (- (* D65Z (- (* (/ (.z c) Kb) sqrtY') Y')))]
-    (from-XYZ-raw (Vec4. X Y Z (.w c)))))
+    (from-XYZ (Vec4. X Y Z (.w c)))))
 
-(defn from-HLAB
+(defn from-HunterLAB*
   ""
-  [^Vec4 c]
-  (from-HLAB-raw (Vec4. (m/norm (.x c) 0.0 255.0 0.0 100.0)
-                        (m/norm (.y c) 0.0 255.0 -69.08211393661531 109.48378856734126)
-                        (m/norm (.z c) 0.0 255.0 -199.78221402287008  55.7203132978682)
-                        (.w c))))
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (from-HunterLAB (Vec4. (m/norm (.x c) 0.0 255.0 0.0 100.0)
+                           (m/norm (.y c) 0.0 255.0 -69.08211393661531 109.48378856734126)
+                           (m/norm (.z c) 0.0 255.0 -199.78221402287008  55.7203132978682)
+                           (.w c)))))
 
 
 ;;
 
-(defn to-LCH-raw
+(defn to-LCH
   ""
   [c]
-  (let [^Vec4 cc (to-LAB-raw c)
+  (let [^Vec4 cc (to-LAB c)
         H (m/atan2 (.z cc) (.y cc))
         Hd (if (pos? H)
              (m/degrees H)
@@ -960,64 +977,68 @@
         C (m/hypot-sqrt (.y cc) (.z cc))]
     (Vec4. (.x cc) C Hd (.w cc))))
 
-(defn to-LCH
+(defn to-LCH*
   ""
   [c]
-  (let [^Vec4 cc (to-LCH-raw c)]
+  (let [^Vec4 cc (to-LCH c)]
     (Vec4. (m/norm (.x cc) 0.0 100.0 0.0 255.0)
            (m/norm (.y cc) 0.0 133.81586201619496 0.0 255.0)
            (m/norm (.z cc) 2.1135333225536313E-5  360.0 0.0 255.0)
            (.w cc))))
 
-(defn from-LCH-raw
-  ""
-  [^Vec4 c]
-  (let [h (m/radians (.z c))
-        a (* (.y c) (m/cos h))
-        b (* (.y c) (m/sin h))]
-    (from-LAB-raw (Vec4. (.x c) a b (.w c)))))
-
 (defn from-LCH
   ""
-  [^Vec4 c]
-  (from-LCH-raw (Vec4. (m/norm (.x c) 0.0 255.0 0.0 100.0)
-                       (m/norm (.y c) 0.0 255.0 0.0 133.81586201619496)
-                       (m/norm (.z c) 0.0 255.0 2.1135333225536313E-5 360.0)
-                       (.w c))))
+  [c]
+  (let [^Vec4 c (to-color c)
+        h (m/radians (.z c))
+        a (* (.y c) (m/cos h))
+        b (* (.y c) (m/sin h))]
+    (from-LAB (Vec4. (.x c) a b (.w c)))))
+
+(defn from-LCH*
+  ""
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (from-LCH (Vec4. (m/norm (.x c) 0.0 255.0 0.0 100.0)
+                     (m/norm (.y c) 0.0 255.0 0.0 133.81586201619496)
+                     (m/norm (.z c) 0.0 255.0 2.1135333225536313E-5 360.0)
+                     (.w c)))))
 
 ;; ### YXy (xyY)
 
-(defn to-YXY-raw
+(defn to-YXY
   "RGB->YXY"
   [c]
-  (let [^Vec4 xyz (to-XYZ-raw c)
+  (let [^Vec4 xyz (to-XYZ c)
         d (/ (+ (.x xyz) (.y xyz) (.z xyz)))] 
     (Vec4. (.y xyz) (* (.x xyz) d) (* (.y xyz) d) (.w xyz))))
 
-(defn to-YXY
+(defn to-YXY*
   ""
   [c]
-  (let [^Vec4 cc (to-YXY-raw c)]
+  (let [^Vec4 cc (to-YXY c)]
     (Vec4. (m/norm (.x cc) 0.0 100.0 0.0 255.0)
            (m/norm (.y cc) 0.15001662234042548 0.640074499456775 0.0 255.0)
            (m/norm (.z cc) 0.0600066489361702 0.6000000000000001 0.0 255.0)
            (.w cc))))
 
-(defn from-YXY-raw
+(defn from-YXY
   "YXY->RGB"
-  [^Vec4 c]
-  (let [Yy (/ (.x c) (.z c))
+  [c]
+  (let [^Vec4 c (to-color c)
+        Yy (/ (.x c) (.z c))
         X (* (.y c) Yy)
         Z (* (- 1.0 (.y c) (.z c)) Yy)]
-    (from-XYZ-raw (Vec4. X (.x c) Z (.w c)))))
+    (from-XYZ (Vec4. X (.x c) Z (.w c)))))
 
-(defn from-YXY
+(defn from-YXY*
   ""
-  [^Vec4 c]
-  (from-YXY-raw (Vec4. (m/norm (.x c) 0.0 255.0 0.0 100.0)
-                       (m/norm (.y c) 0.0 255.0 0.15001662234042548 0.640074499456775)
-                       (m/norm (.z c) 0.0 255.0 0.0600066489361702 0.6000000000000001)
-                       (.w c))))
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (from-YXY (Vec4. (m/norm (.x c) 0.0 255.0 0.0 100.0)
+                     (m/norm (.y c) 0.0 255.0 0.15001662234042548 0.640074499456775)
+                     (m/norm (.z c) 0.0 255.0 0.0600066489361702 0.6000000000000001)
+                     (.w c)))))
 
 ;; Hue based
 
@@ -1036,7 +1057,6 @@
                         :else (+ 4.0 (* rC (- (.x c) (.y c)))))))]
     (Vec4. (* 60.0 h) C M m)))
 
-;; maxh 359.80503179148246
 (defn- to-HC-polar
   "Calculate hue and chroma - polar version"
   [^Vec4 c]
@@ -1087,7 +1107,7 @@
 
 ;; HSI
 
-(defn to-HSI-raw
+(defn to-HSI
   "RGB -> HSI
 
   Output ranges:
@@ -1095,17 +1115,19 @@
   * H - 0.0 - 360.0
   * S - 0.0 - 1.0
   * I - 0.0 - 1.0"
-  [^Vec4 c]
-  (let [^Vec4 hc (to-HC c)
+  [c]
+  (let [^Vec4 c (to-color c)
+        ^Vec4 hc (to-HC c)
         I (/ (+ (.x c) (.y c) (.z c)) 3.0)
         S (if (zero? I) 0.0
               (- 1.0 (/ (.w hc) I)))]
     (Vec4. (.x hc) S (/ I 255.0) (.w c))))
 
-(defn from-HSI-raw
+(defn from-HSI
   "HSI -> RGB"
-  [^Vec4 c]
-  (let [h' (/ (wrap-hue (.x c)) 60.0)
+  [c]
+  (let [^Vec4 c (to-color c)
+        h' (/ (wrap-hue (.x c)) 60.0)
         z (- 1.0 (m/abs (dec (mod h' 2.0))))
         C (/ (* 3.0 (.z c) (.y c)) (inc z))
         X (* C z)
@@ -1113,12 +1135,12 @@
         rgb' (v/add (from-HCX h' C X) (Vec3. m m m))]
     (v/vec4 (v/mult rgb' 255.0) (.w c))))
 
-(def ^{:doc "RGB -> HSI, normalized"} to-HSI (comp normalize-HSx to-HSI-raw))
-(def ^{:doc "HSI -> RGB, normalized"} from-HSI (comp from-HSI-raw denormalize-HSx))
+(def ^{:doc "RGB -> HSI, normalized"} to-HSI* (comp normalize-HSx to-HSI))
+(def ^{:doc "HSI -> RGB, normalized"} from-HSI* (comp from-HSI denormalize-HSx to-color))
 
 ;; HSV
 
-(defn to-HSV-raw
+(defn to-HSV
   "RGB -> HSV
   
   Output ranges:
@@ -1126,29 +1148,31 @@
   * H - 0.0 - 360.0
   * S - 0.0 - 1.0
   * V - 0.0 - 1.0"
-  [^Vec4 c]
-  (let [^Vec4 hc (to-HC c)
+  [c]
+  (let [^Vec4 c (to-color c)
+        ^Vec4 hc (to-HC c)
         V (.z hc)
         S (if (zero? V) 0.0
               (/ (.y hc) V))]
     (Vec4. (.x hc) S (/ V 255.0) (.w c))))
 
-(defn from-HSV-raw
+(defn from-HSV
   "HSV -> RGB"
-  [^Vec4 c]
-  (let [C (* (.y c) (.z c))
+  [c]
+  (let [^Vec4 c (to-color c)
+        C (* (.y c) (.z c))
         h' (/ (wrap-hue (.x c)) 60.0)
         X (* C (- 1.0 (m/abs (dec (mod h' 2.0)))))
         m (- (.z c) C)
         ^Vec3 rgb' (v/add (from-HCX h' C X) (Vec3. m m m))]
     (v/vec4 (v/mult rgb' 255.0) (.w c))))
 
-(def ^{:doc "RGB -> HSV, normalized"} to-HSV (comp normalize-HSx to-HSV-raw))
-(def ^{:doc "HSV -> RGB, normalized"} from-HSV (comp from-HSV-raw denormalize-HSx))
+(def ^{:doc "RGB -> HSV, normalized"} to-HSV* (comp normalize-HSx to-HSV))
+(def ^{:doc "HSV -> RGB, normalized"} from-HSV* (comp from-HSV denormalize-HSx to-color))
 
 ;; HSL
 
-(defn to-HSL-raw
+(defn to-HSL
   "RGB -> HSL
   
   Output ranges:
@@ -1156,29 +1180,31 @@
   * H - 0.0 - 360.0
   * S - 0.0 - 1.0
   * L - 0.0 - 1.0"
-  [^Vec4 c]
-  (let [^Vec4 hc (to-HC c)
+  [c]
+  (let [^Vec4 c (to-color c)
+        ^Vec4 hc (to-HC c)
         L (/ (* 0.5 (+ (.z hc) (.w hc))) 255.0)
         S (if (== 1.0 L) 0.0
               (/ (.y hc) (- 1.0 (m/abs (dec (+ L L))))))]
     (Vec4. (.x hc) (/ S 255.0) L (.w c))))
 
-(defn from-HSL-raw
+(defn from-HSL
   "HSL -> RGB"
-  [^Vec4 c]
-  (let [C (* (.y c) (- 1.0 (m/abs (dec (+ (.z c) (.z c))))))
+  [c]
+  (let [^Vec4 c (to-color c)
+        C (* (.y c) (- 1.0 (m/abs (dec (+ (.z c) (.z c))))))
         h' (/ (wrap-hue (.x c)) 60.0)
         X (* C (- 1.0 (m/abs (dec (mod h' 2.0)))))
         m (- (.z c) (* 0.5 C))
         ^Vec3 rgb' (v/add (from-HCX h' C X) (Vec3. m m m))]
     (v/vec4 (v/mult rgb' 255.0) (.w c))))
 
-(def ^{:doc "RGB -> HSL, normalized"} to-HSL (comp normalize-HSx to-HSL-raw))
-(def ^{:doc "HSL -> RGB, normalized"} from-HSL (comp from-HSL-raw denormalize-HSx))
+(def ^{:doc "RGB -> HSL, normalized"} to-HSL* (comp normalize-HSx to-HSL))
+(def ^{:doc "HSL -> RGB, normalized"} from-HSL* (comp from-HSL denormalize-HSx to-color))
 
 ;; HCL
 
-(defn to-HCL-raw
+(defn to-HCL
   "RGB -> HCL
   
   Output ranges:
@@ -1186,38 +1212,41 @@
   * H - 0.0 - 360.0
   * C - 0.0 - 1.0
   * L - 0.0 - 1.0"
-  [^Vec4 c]
-  (let [^Vec4 hc (to-HC c)
+  [c]
+  (let [^Vec4 c (to-color c)
+        ^Vec4 hc (to-HC c)
         L (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))]
     (Vec4. (.x hc) (/ (.y hc) 255.0) (/ L 255.0) (.w c))))
 
-(defn from-HCL-raw
+(defn from-HCL
   "HCL -> RGB"
-  [^Vec4 c]
-  (let [h' (/ (wrap-hue (.x c)) 60.0)
+  [c]
+  (let [^Vec4 c (to-color c)
+        h' (/ (wrap-hue (.x c)) 60.0)
         X (* (.y c) (- 1.0 (m/abs (dec (mod h' 2.0)))))
         ^Vec3 rgb' (v/add (from-HCX h' (.y c) X))
         m (- (.z c) (* 0.298839 (.x rgb')) (* 0.586811 (.y rgb')) (* 0.114350 (.z rgb')))]
     (v/vec4 (v/mult (v/add rgb' (Vec3. m m m)) 255.0) (.w c))))
 
-(def ^{:doc "RGB -> HCL, normalized"} to-HCL (comp normalize-HSx to-HCL-raw))
-(def ^{:doc "HCL -> RGB, normalized"} from-HCL (comp from-HCL-raw denormalize-HSx))
+(def ^{:doc "RGB -> HCL, normalized"} to-HCL* (comp normalize-HSx to-HCL))
+(def ^{:doc "HCL -> RGB, normalized"} from-HCL* (comp from-HCL denormalize-HSx to-color))
 
 ;; HSB = HSV
 
 (def ^{:doc "RGB -> HSB(V), normalized (see [[to-HSV]])"} to-HSB to-HSV)
 (def ^{:doc "HSB(V) -> RGB, normalized (see [[from-HSV]])"} from-HSB from-HSV)
-(def ^{:doc "RGB -> HSB(V) (see [[to-HSV-raw]])"} to-HSB-raw to-HSV-raw)
-(def ^{:doc "HSB(V) -> RGB (see [[from-HSV-raw]])"} from-HSB-raw from-HSV-raw)
+(def ^{:doc "RGB -> HSB(V) (see [[to-HSV-raw]])"} to-HSB* to-HSV*)
+(def ^{:doc "HSB(V) -> RGB (see [[from-HSV-raw]])"} from-HSB* from-HSV*)
 
 ;; ### HWB
 
-(defn to-HWB-raw
+(defn to-HWB
   "RGB -> HWB, normalized
 
   Hue range is from 1.0 to 255.0. Values less than 1.0 is considered as undefined."
-  [^Vec4 c]
-  (let [w (min (.x c) (.y c) (.z c))
+  [c]
+  (let [^Vec4 c (to-color c)
+        w (min (.x c) (.y c) (.z c))
         v (max (.x c) (.y c) (.z c))
         h (if (== w v) 0
               (let [^double f (condp m/eq w
@@ -1231,47 +1260,47 @@
                 (* 60.0 (- p (/ f (- v w))))))]
     (Vec4. h (/ w 255.0) (- 1.0 (/ v 255.0)) (.w c))))
 
-(defn to-HWB
+(defn to-HWB*
   ""
   [c]
-  (let [^Vec4 cc (to-HWB-raw c)]
+  (let [^Vec4 cc (to-HWB c)]
     (Vec4. (* 255.0 (/ (.x cc) 360.0))
            (* 255.0 (.y cc))
            (* 255.0 (.z cc))
            (.w cc))))
 
-(test-colors to-HWB)
-
-(defn from-HWB-raw
-  "HWB -> RGB, normalized"
-  [^Vec4 c]
-  (if (zero? (.x c)) 
-    (let [v (* 255.0 (- 1.0 (.z c)))]
-      (Vec4. v v v (.w c)))
-    (let [h (/ (.x c) 60.0)
-          v (- 1.0 (.z c))
-          w (.y c)
-          i (unchecked-int (m/floor h))
-          f (- h i)
-          f (if (odd? (int i)) (- 1.0 f) f)
-          n (+ w (* f (- v w)))
-          rgb (case i
-                0 (Vec3. v n w)
-                1 (Vec3. n v w)
-                2 (Vec3. w v n)
-                3 (Vec3. w n v)
-                4 (Vec3. n w v)
-                5 (Vec3. v w n)
-                6 (Vec3. v n w))]
-      (v/vec4 (v/mult rgb 255.0) (.w c)))))
-
 (defn from-HWB
+  "HWB -> RGB, normalized"
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (if (zero? (.x c)) 
+      (let [v (* 255.0 (- 1.0 (.z c)))]
+        (Vec4. v v v (.w c)))
+      (let [h (/ (.x c) 60.0)
+            v (- 1.0 (.z c))
+            w (.y c)
+            i (unchecked-int (m/floor h))
+            f (- h i)
+            f (if (odd? (int i)) (- 1.0 f) f)
+            n (+ w (* f (- v w)))
+            rgb (case i
+                  0 (Vec3. v n w)
+                  1 (Vec3. n v w)
+                  2 (Vec3. w v n)
+                  3 (Vec3. w n v)
+                  4 (Vec3. n w v)
+                  5 (Vec3. v w n)
+                  6 (Vec3. v n w))]
+        (v/vec4 (v/mult rgb 255.0) (.w c))))))
+
+(defn from-HWB*
   ""
-  [^Vec4 c]
-  (from-HWB-raw (Vec4. (* 360.0 (/ (.x c) 255.0))
-                       (/ (.y c) 255.0)
-                       (/ (.z c) 255.0)
-                       (.w c))))
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (from-HWB (Vec4. (* 360.0 (/ (.x c) 255.0))
+                     (/ (.y c) 255.0)
+                     (/ (.z c) 255.0)
+                     (.w c)))))
 
 ;; ### GLHS
 ;;
@@ -1282,20 +1311,21 @@
 (def ^:const ^double weight-mid 0.1)
 (def ^:const ^double weight-min 0.2)
 
-(defn to-GLHS-raw
+(defn to-GLHS
   "RGB -> GLHS
 
   Output ranges:
 
-  * L - 0.0 - 255.0
+  * L - 0.0 - 1.0
   * H - 0.0 - 360.0
   * S - 0.0 - 1.0"
-  [^Vec4 c]
-  (let [mx (max (.x c) (.y c) (.z c))
+  [c]
+  (let [^Vec4 c (to-color c)
+        mx (max (.x c) (.y c) (.z c))
         md (stat/median-3 (.x c) (.y c) (.z c))
         mn (min (.x c) (.y c) (.z c))]
     (if (== mx mn)
-      (Vec4. mx 0 0 (.w c))
+      (Vec4. (/ mx 255.0) 0 0 (.w c))
       (let [l (+ (* weight-max mx) (* weight-mid md) (* weight-min mn))
             r (/ (- mx mn))
             e (* (- md mn) r)
@@ -1314,59 +1344,62 @@
             s (if (<= l lq)
                 (/ (- l mn) l)
                 (/ (- mx l) (- 255.0 l)))]
-        (Vec4. l h s (.w c))))))
+        (Vec4. (/ l 255.0) h s (.w c))))))
 
-(defn to-GLHS
+(defn to-GLHS*
   "RGB -> GLHS, normalized"
   [c]
-  (let [^Vec4 cc (to-GLHS-raw c)]
-    (Vec4. (.x cc)
+  (let [^Vec4 cc (to-GLHS c)]
+    (Vec4. (* 255.0 (.x cc))
            (m/norm (.y cc) 0.0 359.7647058823529 0.0 255.0)
            (* 255.0 (.z cc))
            (.w cc))))
 
-(defn from-GLHS-raw
-  "GLHS -> RGB"
-  [^Vec4 c]
-  (if (zero? (.z c))
-    (Vec4. (.x c) (.x c) (.x c) (.w c))
-    (let [h (/ (wrap-hue (.y c)) 60.0)
-          k (long (m/floor h))
-          f (- h k)
-          fp (if (even? k) f (- 1.0 f))
-          wfw (+ (* weight-mid fp) weight-max)
-          lq (* 255.0 wfw)
-          s (.z c)
-          ^Vec3 rgb (if (<= (.x c) lq)
-                      (let [mn (* (- 1.0 s) (.x c))
-                            md (/ (+ (* fp (.x c)) (* mn (- (* (- 1.0 fp) weight-max) (* fp weight-min)))) wfw)
-                            mx (/ (- (- (.x c) (* md weight-mid)) (* mn weight-min)) weight-max)]
-                        (Vec3. mn md mx))
-                      (let [mx (+ (* s 255.0) (* (- 1.0 s) (.x c)))
-                            md (/ (- (* (- 1.0 fp) (.x c)) (* mx (- (* (- 1.0 fp) weight-max) (* fp weight-min))))
-                                  (+ (* (- 1.0 fp) weight-mid) weight-min))
-                            mn (/ (- (- (.x c) (* mx weight-max)) (* md weight-mid)) weight-min)]
-                        (Vec3. mn md mx)))]
-      (case k
-        0 (Vec4. (.z rgb) (.y rgb) (.x rgb) (.w c))
-        1 (Vec4. (.y rgb) (.z rgb) (.x rgb) (.w c))
-        2 (Vec4. (.x rgb) (.z rgb) (.y rgb) (.w c))
-        3 (Vec4. (.x rgb) (.y rgb) (.z rgb) (.w c))
-        4 (Vec4. (.y rgb) (.x rgb) (.z rgb) (.w c))
-        5 (Vec4. (.z rgb) (.x rgb) (.y rgb) (.w c))
-        6 (Vec4. (.z rgb) (.y rgb) (.x rgb) (.w c))))))
-
 (defn from-GLHS
   "GLHS -> RGB"
-  [^Vec4 c]
-  (from-GLHS-raw (Vec4. (.x c)
-                        (m/norm (.y c) 0.0 255.0 0.0 359.7647058823529)
-                        (/ (.z c) 255.0)
-                        (.w c))))
+  [c]
+  (let [^Vec4 c (to-color c)
+        l (* 255.0 (.x c))]
+    (if (zero? (.z c))
+      (Vec4. l l l (.w c))
+      (let [h (/ (wrap-hue (.y c)) 60.0)
+            k (long (m/floor h))
+            f (- h k)
+            fp (if (even? k) f (- 1.0 f))
+            wfw (+ (* weight-mid fp) weight-max)
+            lq (* 255.0 wfw)
+            s (.z c)
+            ^Vec3 rgb (if (<= l lq)
+                        (let [mn (* (- 1.0 s) l)
+                              md (/ (+ (* fp l) (* mn (- (* (- 1.0 fp) weight-max) (* fp weight-min)))) wfw)
+                              mx (/ (- (- l (* md weight-mid)) (* mn weight-min)) weight-max)]
+                          (Vec3. mn md mx))
+                        (let [mx (+ (* s 255.0) (* (- 1.0 s) l))
+                              md (/ (- (* (- 1.0 fp) l) (* mx (- (* (- 1.0 fp) weight-max) (* fp weight-min))))
+                                    (+ (* (- 1.0 fp) weight-mid) weight-min))
+                              mn (/ (- (- l (* mx weight-max)) (* md weight-mid)) weight-min)]
+                          (Vec3. mn md mx)))]
+        (case k
+          0 (Vec4. (.z rgb) (.y rgb) (.x rgb) (.w c))
+          1 (Vec4. (.y rgb) (.z rgb) (.x rgb) (.w c))
+          2 (Vec4. (.x rgb) (.z rgb) (.y rgb) (.w c))
+          3 (Vec4. (.x rgb) (.y rgb) (.z rgb) (.w c))
+          4 (Vec4. (.y rgb) (.x rgb) (.z rgb) (.w c))
+          5 (Vec4. (.z rgb) (.x rgb) (.y rgb) (.w c))
+          6 (Vec4. (.z rgb) (.y rgb) (.x rgb) (.w c)))))))
+
+(defn from-GLHS*
+  "GLHS -> RGB"
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (from-GLHS (Vec4. (/ (.x c) 255.0)
+                      (m/norm (.y c) 0.0 255.0 0.0 359.7647058823529)
+                      (/ (.z c) 255.0)
+                      (.w c)))))
 
 ;; ### YPbPr
 
-(defn to-YPbPr-raw
+(defn to-YPbPr
   "RGB -> YPbPr
 
   Output range:
@@ -1374,42 +1407,45 @@
   * Y - 0.0 - 255.0
   * Pb - -236.59 - 236.59
   * Pr - -200.79 - 200.79"
-  [^Vec4 c]
-  (let [y (+ (* 0.2126 (.x c))
+  [c]
+  (let [^Vec4 c (to-color c)
+        y (+ (* 0.2126 (.x c))
              (* 0.7152 (.y c))
              (* 0.0722 (.z c)))
         pb (- (.z c) y)
         pr (- (.x c) y)]
     (Vec4. y pb pr (.w c))))
 
-(defn to-YPbPr
+(defn to-YPbPr*
   "RGB -> YPbPr, normalized"
   [c]
-  (let [^Vec4 cc (to-YPbPr-raw c)]
+  (let [^Vec4 cc (to-YPbPr c)]
     (Vec4. (.x cc)
            (m/norm (.y cc) -236.589 236.589 0.0 255.0)
            (m/norm (.z cc) -200.787 200.787 0.0 255.0)
            (.w cc))))
 
-(defn from-YPbPr-raw
+(defn from-YPbPr
   "YPbPr -> RGB"
-  [^Vec4 c]
-  (let [b (+ (.x c) (.y c))
+  [c]
+  (let [^Vec4 c (to-color c)
+        b (+ (.x c) (.y c))
         r (+ (.x c) (.z c))
         g (/ (- (.x c) (* 0.2126 r) (* 0.0722 b)) 0.7152)]
     (Vec4. r g b (.w c))))
 
-(defn from-YPbPr
+(defn from-YPbPr*
   "YPbPr -> RGB, normalized"
-  [^Vec4 c]
-  (from-YPbPr-raw (Vec4. (.x c)
-                         (m/norm (.y c) 0.0 255.0 -236.589 236.589)
-                         (m/norm (.z c) 0.0 255.0 -200.787 200.787)
-                         (.w c))))
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (from-YPbPr (Vec4. (.x c)
+                       (m/norm (.y c) 0.0 255.0 -236.589 236.589)
+                       (m/norm (.z c) 0.0 255.0 -200.787 200.787)
+                       (.w c)))))
 
 ;; ### YDbDr
 
-(defn to-YDbDr-raw
+(defn to-YDbDr
   "RGB -> YDbDr
 
   Output range:
@@ -1417,25 +1453,27 @@
   * Y - 0.0 - 255.0
   * Db - -339.915 - 339.915
   * Dr - -339.915 - 339.915"
-  [^Vec4 c]
-  (let [Y (+ (* 0.299 (.x c)) (* 0.587 (.y c)) (* 0.114 (.z c)))
+  [c] 
+  (let [^Vec4 c (to-color c)
+        Y (+ (* 0.299 (.x c)) (* 0.587 (.y c)) (* 0.114 (.z c)))
         Db (+ (* -0.45 (.x c)) (* -0.883 (.y c)) (* 1.333 (.z c)))
         Dr (+ (* -1.333 (.x c)) (* 1.116 (.y c)) (* 0.217 (.z c)))]
     (Vec4. Y Db Dr (.w c))))
 
-(defn to-YDbDr
+(defn to-YDbDr*
   "RGB -> YDbDr"
   [c]
-  (let [^Vec4 cc (to-YDbDr-raw c)]
+  (let [^Vec4 cc (to-YDbDr c)]
     (Vec4. (.x cc)
            (m/norm (.y cc) -339.91499999999996 339.91499999999996 0.0 255.0)
            (m/norm (.z cc) -339.91499999999996 339.915 0.0 255.0)
            (.w cc))))
 
-(defn from-YDbDr-raw
+(defn from-YDbDr
   "YDbDr -> RGB"
-  [^Vec4 c]
-  (let [Y (.x c)
+  [c]
+  (let [^Vec4 c (to-color c)
+        Y (.x c)
         Db (.y c)
         Dr (.z c)
         r (+ Y (* 9.2303716147657e-05 Db) (* -0.52591263066186533 Dr))
@@ -1443,13 +1481,14 @@
         b (+ Y (* 0.66467905997895482 Db) (* -7.9202543533108e-05 Dr))]
     (Vec4. r g b (.w c))))
 
-(defn from-YDbDr
+(defn from-YDbDr*
   "YDbDr -> RGB, normalized"
-  [^Vec4 c]
-  (from-YDbDr-raw (Vec4. (.x c)
-                         (m/norm (.y c) 0.0 255.0 -339.91499999999996 339.91499999999996)
-                         (m/norm (.z c) 0.0 255.0 -339.91499999999996 339.915)
-                         (.w c))))
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (from-YDbDr (Vec4. (.x c)
+                       (m/norm (.y c) 0.0 255.0 -339.91499999999996 339.91499999999996)
+                       (m/norm (.z c) 0.0 255.0 -339.91499999999996 339.915)
+                       (.w c)))))
 
 
 ;; ### YCbCr
@@ -1458,37 +1497,39 @@
 
 (def ^:private ^:const y-norm ohta-s)
 
-(defn to-YCbCr-raw
+(defn to-YCbCr
   "RGB -> YCbCr, normalized"
-  [^Vec4 c]
-  (let [Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
+  [c]
+  (let [^Vec4 c (to-color c)
+        Y (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
         Cb (+ (* -0.168736 (.x c)) (* -0.331264 (.y c)) (* 0.5 (.z c)))
         Cr (+ (* 0.5 (.x c)) (* -0.418688 (.y c)) (* -0.081312 (.z c)))]
     (Vec4. Y Cb Cr (.w c))))
 
-(defn to-YCbCr
+(defn to-YCbCr*
   "RGB -> YCbCr, normalized"
   [c]
-  (v/add (to-YCbCr-raw c) y-norm))
+  (v/add (to-YCbCr c) y-norm))
 
-(defn from-YCbCr-raw
+(defn from-YCbCr
   "YCbCr -> RGB"
-  [^Vec4 c]
-  (let [Cb (.y c)
+  [c]
+  (let [^Vec4 c (to-color c)
+        Cb (.y c)
         Cr (.z c)
         r (+ (* 0.99999999999914679361 (.x c)) (* -1.2188941887145875e-06 Cb) (* 1.4019995886561440468 Cr))
         g (+ (* 0.99999975910502514331 (.x c)) (* -0.34413567816504303521 Cb) (* -0.71413649331646789076 Cr))
         b (+ (* 1.00000124040004623180 (.x c)) (* 1.77200006607230409200 Cb) (* 2.1453384174593273e-06 Cr))]
     (Vec4. r g b (.w c))))
 
-(defn from-YCbCr
+(defn from-YCbCr*
   "YCbCr -> RGB, normalized"
   [c]
-  (from-YCbCr-raw (v/sub c y-norm)))
+  (from-YCbCr (v/sub (to-color c) y-norm)))
 
 ;; ### YUV
 
-(defn to-YUV-raw
+(defn to-YUV
   "RGB -> YUV
 
   Output range:
@@ -1496,25 +1537,27 @@
   * Y - 0.0 - 255.0
   * U - -111.18 - 111.18
   * V - -156.83 - 156.83"
-  [^Vec4 c]
-  (Vec4. (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
-         (+ (* -0.147 (.x c)) (* -0.289 (.y c)) (* 0.436 (.z c)))
-         (+ (* 0.615 (.x c)) (* -0.515 (.y c)) (* -0.1 (.z c)))
-         (.w c)))
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (Vec4. (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
+           (+ (* -0.147 (.x c)) (* -0.289 (.y c)) (* 0.436 (.z c)))
+           (+ (* 0.615 (.x c)) (* -0.515 (.y c)) (* -0.1 (.z c)))
+           (.w c))))
 
-(defn to-YUV
+(defn to-YUV*
   "RGB -> YUV, normalized"
   [c]
-  (let [^Vec4 cc (to-YUV-raw c)]
+  (let [^Vec4 cc (to-YUV c)]
     (Vec4. (.x cc)
            (m/norm (.y cc) -111.17999999999999 111.17999999999999 0.0 255.0)
            (m/norm (.z cc) -156.82500000000002 156.825 0.0 255.0)
            (.w cc))))
 
-(defn from-YUV-raw
+(defn from-YUV
   "YUV -> RGB"
-  [^Vec4 c]
-  (let [Y (.x c)
+  [c]
+  (let [^Vec4 c (to-color c)
+        Y (.x c)
         U (.y c)
         V (.z c)
         r (+ Y (* -3.945707070708279e-05 U) (* 1.1398279671717170825 V))
@@ -1522,17 +1565,18 @@
         b (+ Y (* 2.0319996843434342537 U) (* -4.813762626262513e-04 V))]
     (Vec4. r g b (.w c))))
 
-(defn from-YUV
+(defn from-YUV*
   "YUV -> RGB, normalized"
-  [^Vec4 c] 
-  (from-YUV-raw (Vec4. (.x c)
-                       (m/norm (.y c) 0.0 255.0 -111.17999999999999 111.17999999999999)
-                       (m/norm (.z c) 0.0 255.0 -156.82500000000002 156.825)
-                       (.w c))))
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (from-YUV (Vec4. (.x c)
+                     (m/norm (.y c) 0.0 255.0 -111.17999999999999 111.17999999999999)
+                     (m/norm (.z c) 0.0 255.0 -156.82500000000002 156.825)
+                     (.w c)))))
 
 ;; ### YIQ
 
-(defn to-YIQ-raw
+(defn to-YIQ
   "RGB -> YIQ
 
   Output range:
@@ -1540,25 +1584,27 @@
   * Y - 0.0 - 255.0
   * I - -151.9 - 151.9
   * Q - -133.3 - 133.3"
-  [^Vec4 c]
-  (Vec4. (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
-         (+ (* 0.595716 (.x c)) (* -0.274453 (.y c)) (* -0.321263 (.z c)))
-         (+ (* 0.211456 (.x c)) (* -0.522591 (.y c)) (* 0.311135 (.z c)))
-         (.w c)))
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (Vec4. (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))
+           (+ (* 0.595716 (.x c)) (* -0.274453 (.y c)) (* -0.321263 (.z c)))
+           (+ (* 0.211456 (.x c)) (* -0.522591 (.y c)) (* 0.311135 (.z c)))
+           (.w c))))
 
-(defn to-YIQ
+(defn to-YIQ*
   "RGB -> YIQ, normalized"
   [c]
-  (let [^Vec4 cc (to-YIQ-raw c)]
+  (let [^Vec4 cc (to-YIQ c)]
     (Vec4. (.x cc)
            (m/norm (.y cc) -151.90758 151.90758 0.0 255.0)
            (m/norm (.z cc) -133.260705 133.260705 0.0 255.0)
            (.w cc))))
 
-(defn from-YIQ-raw
+(defn from-YIQ
   "YIQ -> RGB"
-  [^Vec4 c]
-  (let [Y (.x c)
+  [c]
+  (let [^Vec4 c (to-color c)
+        Y (.x c)
         I (.y c)
         Q (.z c)
         r (+ Y (* +0.9562957197589482261 I) (* 0.6210244164652610754 Q))
@@ -1566,16 +1612,17 @@
         b (+ Y (* -1.1069890167364901945 I) (* 1.7046149983646481374 Q))]
     (Vec4. r g b (.w c))))
 
-(defn from-YIQ
+(defn from-YIQ*
   "YIQ -> RGB, normalized"
-  [^Vec4 c]
-  (let [I (m/norm (.y c) 0.0 255.0 -151.90758 151.90758)
+  [c]
+  (let [^Vec4 c (to-color c)
+        I (m/norm (.y c) 0.0 255.0 -151.90758 151.90758)
         Q (m/norm (.z c) 0.0 255.0 -133.260705 133.260705)]
-    (from-YIQ-raw (Vec4. (.x c) I Q (.w c)))))
+    (from-YIQ (Vec4. (.x c) I Q (.w c)))))
 
 ;; ### YCgCo
 
-(defn to-YCgCo-raw
+(defn to-YCgCo
   "RGB -> YCgCo
 
   Output range:
@@ -1583,29 +1630,31 @@
   * Y - 0.0 - 255.0
   * Cg - -127.5 - 127.5
   * Co - -127.5 - 127.5"
-  [^Vec4 c]
-  (let [Y (+ (* 0.25 (.x c)) (* 0.5 (.y c)) (* 0.25 (.z c)))
+  [c]
+  (let [^Vec4 c (to-color c)
+        Y (+ (* 0.25 (.x c)) (* 0.5 (.y c)) (* 0.25 (.z c)))
         Cg (+ (* -0.25 (.x c)) (* 0.5 (.y c)) (* -0.25 (.z c)))
         Co (+ (* 0.5 (.x c)) (* -0.5 (.z c)))]
     (Vec4. Y Cg Co (.w c))))
 
-(defn to-YCgCo
+(defn to-YCgCo*
   "RGB -> YCgCo, normalized"
   [c]
-  (v/add (to-YCgCo-raw c) y-norm))
+  (v/add (to-YCgCo c) y-norm))
 
-(defn from-YCgCo-raw
+(defn from-YCgCo
   "YCgCo -> RGB"
-  [^Vec4 c]
-  (let [Cg (.y c)
+  [c]
+  (let [^Vec4 c (to-color c)
+        Cg (.y c)
         Co (.z c)
         tmp (- (.x c) Cg)]
     (Vec4. (+ Co tmp) (+ (.x c) Cg) (- tmp Co) (.w c))))
 
-(defn from-YCgCo
+(defn from-YCgCo*
   "YCgCo -> RGB, normalized"
   [c]
-  (from-YCgCo-raw (v/sub c y-norm)))
+  (from-YCgCo (v/sub (to-color c) y-norm)))
 
 ;; Cubehelix
 
@@ -1619,7 +1668,7 @@
 (def ^:private ^:const ^:double ch-bc-da (- (* ch-b ch-c) (* ch-d ch-a)))
 (def ^:private ^:const ^:double ch-bc-da+ed-eb-r (/ (+ ch-bc-da ch-ed (- ch-eb))))
 
-(defn to-Cubehelix-raw
+(defn to-Cubehelix
   "RGB -> Cubehelix
 
   Output range:
@@ -1627,8 +1676,9 @@
   * h - 0.0 - 360.0
   * s - 0.0 - 4.614
   * l - 0.0 - 1.0"
-  [^Vec4 c]
-  (let [r (/ (.x c) 255.0)
+  [c]
+  (let [^Vec4 c (to-color c)
+        r (/ (.x c) 255.0)
         g (/ (.y c) 255.0)
         b (/ (.z c) 255.0)
         l (* ch-bc-da+ed-eb-r (+ (* ch-bc-da b) (* ch-ed r) (- (* ch-eb g))))
@@ -1641,19 +1691,20 @@
       (let [h (- (* (m/atan2 k bl) m/rad-in-deg) 120.0)]
         (Vec4. (if (neg? h) (+ h 360.0) h) s l (.w c))))))
 
-(defn to-Cubehelix
+(defn to-Cubehelix*
   "RGB -> Cubehelix, normalized"
-  [^Vec4 c]
-  (let [^Vec4 cc (to-Cubehelix-raw c)]
+  [c]
+  (let [^Vec4 cc (to-Cubehelix c)]
     (Vec4. (m/norm (.x cc) 0.0 359.9932808311505 0.0 255.0)
            (m/norm (.y cc) 0.0 4.61438686803972 0.0 255.0)
            (* 255.0 (.z cc))
-           (.w c))))
+           (.w cc))))
 
-(defn from-Cubehelix-raw
+(defn from-Cubehelix
   "Cubehelix -> RGB"
-  [^Vec4 c]
-  (let [h (* (+ (.x c) 120.0) m/deg-in-rad)
+  [c]
+  (let [^Vec4 c (to-color c)
+        h (* (+ (.x c) 120.0) m/deg-in-rad)
         l (.z c)
         a (* (.y c) l (- 1.0 l))
         cosh (m/cos h)
@@ -1663,69 +1714,93 @@
            (* 255.0 (+ l (* a ch-e cosh)))
            (.w c))))
 
-(defn from-Cubehelix
+(defn from-Cubehelix*
   "Cubehelix -> RGB, normalized"
-  [^Vec4 c]
-  (let [cc (Vec4. (m/norm (.x c) 0.0 255.0 0.0 359.9932808311505)
+  [c]
+  (let [^Vec4 c (to-color c)
+        cc (Vec4. (m/norm (.x c) 0.0 255.0 0.0 359.9932808311505)
                   (m/norm (.y c) 0.0 255.0 0.0 4.61438686803972)
                   (/ (.z c) 255.0)
                   (.w c))]
-    (from-Cubehelix-raw cc)))
+    (from-Cubehelix cc)))
 
 ;; ### Grayscale
 
 (defn to-Gray
   "RGB->Grayscale"
-  [^Vec4 c]
-  (let [^double l (luma c)]
+  [c]
+  (let [^Vec4 c (to-color c)
+        ^double l (luma c)]
     (Vec4. l l l (.w c))))
 
+(def to-Gray* to-Gray)
+
 ;; do nothing in reverse
-(def from-Gray identity)
+(def from-Gray to-color)
+(def from-Gray* to-color)
 
 ;; Just for a case "do nothing"
-(def to-RGB identity)
-(def from-RGB identity)
+(def to-RGB to-color)
+(def from-RGB to-color)
+(def to-RGB* to-color)
+(def from-RGB* to-color)
+
 
 ;; List of all color spaces with functions
-(def colorspaces {:CMY   [to-CMY from-CMY to-CMY from-CMY]
-                  :OHTA  [to-OHTA from-OHTA to-OHTA-raw from-OHTA-raw]
-                  :XYZ   [to-XYZ from-XYZ to-XYZ-raw from-XYZ-raw]
-                  :YXY   [to-YXY from-YXY to-YXY-raw from-YXY-raw]
-                  :LUV   [to-LUV from-LUV to-LUV-raw from-LUV-raw]
-                  :LAB   [to-LAB from-LAB to-LAB-raw from-LAB-raw]
-                  :HLAB  [to-HLAB from-HLAB to-HLAB-raw from-HLAB-raw]
-                  :LCH   [to-LCH from-LCH to-LCH-raw from-LCH-raw]
-                  :HCL   [to-HCL from-HCL to-HCL-raw from-HCL-raw]
-                  :HSB   [to-HSB from-HSB to-HSB-raw from-HSB-raw]
-                  :HSI   [to-HSI from-HSI to-HSI-raw from-HSI-raw]
-                  :HSL   [to-HSL from-HSL to-HSL-raw from-HSL-raw]
-                  :HSV   [to-HSV from-HSV to-HSV-raw from-HSV-raw]
-                  :HWB   [to-HWB from-HWB to-HWB-raw from-HWB-raw]
-                  :GLHS  [to-GLHS from-GLHS to-GLHS-raw from-GLHS-raw]
-                  :YPbPr [to-YPbPr from-YPbPr to-YPbPr-raw from-YPbPr-raw]
-                  :YDbDr [to-YDbDr from-YDbDr to-YDbDr-raw from-YDbDr-raw]
-                  :YCbCr [to-YCbCr from-YCbCr to-YCbCr-raw from-YCbCr-raw]
-                  :YCgCo [to-YCgCo from-YCgCo to-YCgCo-raw from-YCgCo-raw]
-                  :YUV   [to-YUV from-YUV to-YUV-raw from-YUV-raw]
-                  :YIQ   [to-YIQ from-YIQ to-YIQ-raw from-YIQ-raw]
-                  :Gray  [to-Gray from-Gray to-Gray from-Gray]
-                  :sRGB  [to-sRGB from-sRGB to-sRGB from-sRGB]
-                  :Cubehelix [to-Cubehelix from-Cubehelix to-Cubehelix-raw from-Cubehelix-raw]
-                  :RGB   [identity identity identity identity]})
+(def colorspaces {:CMY   [to-CMY from-CMY]
+                  :OHTA  [to-OHTA from-OHTA]
+                  :XYZ   [to-XYZ from-XYZ]
+                  :YXY   [to-YXY from-YXY]
+                  :LUV   [to-LUV from-LUV]
+                  :LAB   [to-LAB from-LAB]
+                  :HunterLAB  [to-HunterLAB from-HunterLAB]
+                  :LCH   [to-LCH from-LCH]
+                  :HCL   [to-HCL from-HCL]
+                  :HSB   [to-HSB from-HSB]
+                  :HSI   [to-HSI from-HSI]
+                  :HSL   [to-HSL from-HSL]
+                  :HSV   [to-HSV from-HSV]
+                  :HWB   [to-HWB from-HWB]
+                  :GLHS  [to-GLHS from-GLHS]
+                  :YPbPr [to-YPbPr from-YPbPr]
+                  :YDbDr [to-YDbDr from-YDbDr]
+                  :YCbCr [to-YCbCr from-YCbCr]
+                  :YCgCo [to-YCgCo from-YCgCo]
+                  :YUV   [to-YUV from-YUV]
+                  :YIQ   [to-YIQ from-YIQ]
+                  :Gray  [to-Gray from-Gray]
+                  :sRGB  [to-sRGB from-sRGB]
+                  :Cubehelix [to-Cubehelix from-Cubehelix]
+                  :RGB   [to-color to-color]})
+
+(def colorspaces* {:CMY   [to-CMY* from-CMY*]
+                   :OHTA  [to-OHTA* from-OHTA*]
+                   :XYZ   [to-XYZ* from-XYZ*]
+                   :YXY   [to-YXY* from-YXY*]
+                   :LUV   [to-LUV* from-LUV*]
+                   :LAB   [to-LAB* from-LAB*]
+                   :HunterLAB  [to-HunterLAB* from-HunterLAB*]
+                   :LCH   [to-LCH* from-LCH*]
+                   :HCL   [to-HCL* from-HCL*]
+                   :HSB   [to-HSB* from-HSB*]
+                   :HSI   [to-HSI* from-HSI*]
+                   :HSL   [to-HSL* from-HSL*]
+                   :HSV   [to-HSV* from-HSV*]
+                   :HWB   [to-HWB* from-HWB*]
+                   :GLHS  [to-GLHS* from-GLHS*]
+                   :YPbPr [to-YPbPr* from-YPbPr*]
+                   :YDbDr [to-YDbDr* from-YDbDr*]
+                   :YCbCr [to-YCbCr* from-YCbCr*]
+                   :YCgCo [to-YCgCo* from-YCgCo*]
+                   :YUV   [to-YUV* from-YUV*]
+                   :YIQ   [to-YIQ* from-YIQ*]
+                   :Gray  [to-Gray from-Gray]
+                   :sRGB  [to-sRGB* from-sRGB*]
+                   :Cubehelix [to-Cubehelix* from-Cubehelix*]
+                   :RGB   [to-color to-color]})
 
 ;; List of color spaces names
-(def colorspaces-names (keys colorspaces))
-
-(defn to-cs
-  "Return colorspace converter by keyword (RGB -> ...)"
-  [cs]
-  ((cs colorspaces) 0))
-
-(defn from-cs
-  "Return colorspace converter by keyword (... -> RGB)"
-  [cs]
-  ((cs colorspaces) 1))
+(def colorspaces-list (keys colorspaces))
 
 (defn make-color-converter
   "Create fn which converts provided color and scale values from provided range (to simulate Processing `colorMode` fn)"
@@ -2017,16 +2092,16 @@
 (defn delta-c
   "Delta C* distance"
   [c1 c2]
-  (let [^Vec4 c1 (to-LAB-raw (to-color c1))
-        ^Vec4 c2 (to-LAB-raw (to-color c2))]
+  (let [^Vec4 c1 (to-LAB (to-color c1))
+        ^Vec4 c2 (to-LAB (to-color c2))]
     (- (m/hypot-sqrt (.y c2) (.z c2))
        (m/hypot-sqrt (.y c1) (.z c1)))))
 
 (defn delta-h
   "Delta H* distance"
   [c1 c2]
-  (let [^Vec4 c1 (to-LAB-raw (to-color c1))
-        ^Vec4 c2 (to-LAB-raw (to-color c2))
+  (let [^Vec4 c1 (to-LAB (to-color c1))
+        ^Vec4 c2 (to-LAB (to-color c2))
         xde (- (m/hypot-sqrt (.y c2) (.z c2))
                (m/hypot-sqrt (.y c1) (.z c1)))]
     (m/safe-sqrt (- (+ (m/sq (- (.y c1) (.y c2)))
@@ -2041,7 +2116,7 @@
   ([c1 c2]
    (v/dist (to-color c1) (to-color c2))))
 
-(def delta-ecie (partial euclidean to-LAB-raw))
+(def delta-ecie (partial euclidean to-LAB))
 
 (defn nearest-color
   "Find nearest color from a set. Input: distance function (default euclidean), list of target colors and source color."
@@ -2263,7 +2338,7 @@
   ([colorspace-fn v1 v2]
    (gradient-easing colorspace-fn e/linear v1 v2)))
 
-(def cubehelix-gradient (partial gradient-easing from-Cubehelix-raw))
+(def cubehelix-gradient (partial gradient-easing from-Cubehelix))
 
 ;; http://iquilezles.org/www/articles/palettes/palettes.htm
 
@@ -2294,10 +2369,10 @@
    :warm (cubehelix-gradient e/linear (Vec4. -100.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
    :cool (cubehelix-gradient e/linear (Vec4. 260.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
    :rainbow (fn [^double t] (let [ts (m/abs (- t 0.5))]
-                              (from-Cubehelix-raw (Vec4. (- (* t 360.0) 100.0)
-                                                         (- 1.5 (* 1.5 ts))
-                                                         (- 0.8 (* 0.9 ts))
-                                                         255.0))))})
+                              (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
+                                                     (- 1.5 (* 1.5 ts))
+                                                     (- 0.8 (* 0.9 ts))
+                                                     255.0))))})
 
 (defn- d3->palette
   "Convert d3 string to palette"
