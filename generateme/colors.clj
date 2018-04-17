@@ -9,9 +9,9 @@
 (def window (show-window {:canvas canv}))
 
 (with-canvas [c canv] 
-  (let [col (c/palette-presets :summer)
-        p0 (c/gradient col :RGB :linear)
-        p1 (c/gradient col :LUV :cubic-spline)]
+  (let [col [:yellow :navy]
+        p0 (c/gradient col :LCH)
+        p1 (c/gradient col :HSL)]
     (dotimes [x (width c)]
       (let [t (m/norm x 0 (width c) 0 1)]
         (set-color c (p0 t))
@@ -21,3 +21,4 @@
 
 
 
+(count (c/palette-presets :summer))

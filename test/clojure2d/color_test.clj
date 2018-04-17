@@ -123,12 +123,12 @@
   (is (colorspace-validity :HWB))
   (is (colorspace-validity :CMY))
   (is (colorspace-validity :LAB))
+  (is (colorspace-validity :HLAB))
+  (is (colorspace-validity :LCH))
   (is (colorspace-validity :LUV))
   (is (colorspace-validity :XYZ))
   (is (colorspace-validity :YXY))
   (is (colorspace-validity :OHTA)))
-
-(from-YIQ (to-YIQ (color 222 32 224)))
 
 ;; test iq palette generator
 
