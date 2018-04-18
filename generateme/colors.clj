@@ -9,16 +9,12 @@
 (def window (show-window {:canvas canv}))
 
 (with-canvas [c canv] 
-  (let [col [:yellow :navy]
-        p0 (c/gradient col :LCH)
-        p1 (c/gradient col :HSL)]
+  (let [col (c/resample 112 (c/colourlovers-palettes 5) :LAB :cubic-spline)
+        p0 (c/gradient col)
+        p1 (c/gradient (c/colourlovers-palettes 5))]
     (dotimes [x (width c)]
       (let [t (m/norm x 0 (width c) 0 1)]
         (set-color c (p0 t))
         (line c x 0 x 150)
         (set-color c (p1 t))
         (line c x 150 x 300)))))
-
-
-
-(count (c/palette-presets :summer))

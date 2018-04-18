@@ -1,25 +1,98 @@
-;; # Namespace scope
-;;
-;; Color management functions:
-;;
-;; * Color is represented by Vec3, Vec4 or java.awt.Color
-;; * Blending functions
-;; * Color space converters
-;; * Palette collections: 200 5-color palettes from colourlovers, paletton colors generator, Inigo Quilez palette generator
-;; * Nearest color filter
-;;
-;; Generally color is represented by Vec4 containing R,G,B,A values from 0 to 255. Three conversion functions are defined by `ColorProto` which extends Vec3, Vec4, Keyword and java.awt.Color types.
-;; Functions are:
-;;
-;; * `to-color` to get Vec4 object
-;; * `to-awt-color` to get `java.awt.Color` object
-;; * `to-luma` to get brightness as `double`
-;;
-;; `Vec4` is clojure2d color representation.
-;; Keyword can be used when representing one of 140 html/css colornames (https://www.w3schools.com/colors/colors_names.asp). Eg. :linen
-;;
-
 (ns clojure2d.color
+  "Color functions.
+
+  This namespace contains color manipulation functions which can be divided into following groups:
+
+  * Representation
+  * Channel manipulations
+  * Conversions
+  * Blending
+  * Palettes / gradients
+  * Distances
+
+  ## Representation
+
+  Color can be represented by following types:
+  
+  * fastmath `Vec4` - this is core type representing 3 color channels and alpha (RGBA). Values are `double` type from `[0-255]` range. [[color]], [[gray]] creators returns `Vec4` representation. To ensure `Vec4` use [[to-color]] function.
+  * fastmath `Vec3` - 3 color channels, assuming `alpha` set to value of `255`.
+  * `java.awt.Color` - Java AWT representation. Creators are [[awt-color]], [[awt-gray]]. Use [[to-awt-color]] to convert to this representations.
+  * `keyword` - one of the HTML CSS names (see [[html-colors-map]] for list)
+  * `Integer` - packed ARGB value. Example: `0xffaa01`.
+  * `String` - 6 chars string containg hexadecimal representation \"ffaa01\"
+  * any `seqable` - list, vector containing 2-4 elements. Conversion is done by applying content to [[color]] function.
+  * `nil` - returning `nil` during color conversion.
+
+  To create color from individual channel values use [[color]] function. To create gray for given intensity call [[gray]].
+
+  By default color is treated as `RGB` with values from ranges `[0.0-255.0]` inclusive.
+  
+  ## Color/ channel manipulations
+
+  You can access individual channels by calling on of the following:
+
+  * [[red]] or [[ch0]] - to get first channel value.
+  * [[green]] or [[ch1]] - to get second channel value.
+  * [[blue]] or [[ch2]] - to get third channel value.
+  * [[alpha]] - to get alpha value.
+  * [[luma]] - to get luma or brightness (range from `0` (black) to `255` (white)).
+  * [[hue]] - to get hue value in degrees (range from 0 to 360). Hexagon projection.
+  * [[hue-polar]] - to get hue from polar transformation.
+
+  [[set-ch0]], [[set-ch1]], [[set-ch2]] and [[set-alpha]] return new color with respective channel set to new value.
+
+  To make color darker/brighter use [[darken]] / [[lighten]] functions. Operations are done in `Lab` color space.
+
+  To change saturation call [[saturate]] / [[desaturate]]. Operations are done in `LCH` color space.
+  
+  ## Conversions
+
+  Color can be converted from RGB to other color space (and back). List of color spaces are listed under [[colorspaces-list]] variable. There are two types of conversions:
+
+  * raw - with names `to-XXX` and `from-XXX` where `XXX` is color space name. Every color space has it's own value range for each channel. `(comp from-XXX to-XXX)` acts almost as identity.
+  * normalized - with names `to-XXX*` and `from-XXX*` where `XXX` is color space name. `to-XXX*` returns values normalized to `[0-255]` range. `from-XXX*` expects also channel values in range `[0-255]`.
+
+  NOTE: there is no information which color space is used. It's just a matter of your code interpretation.
+
+  Color space conversion functions are collected in two maps [[colorspaces]] for raw and [[colorspaces*]] for normalized functions. Keys are color space names as `keyword` and values are vectors with `to-` fn as first and `from-` fn as second element.
+  
+  ## Blending
+
+  You can blend two colors (or individual channels) using one of the methods from [[blends-list]]. All functions are collected in [[blends]] map with names as names and blending function as value.
+  
+  ## Palettes / gradients
+
+  ### Palette
+
+  Palette is just sequence of colors.
+
+  There are plenty of them predefined or can be generated:
+
+  * [[colourlovers-palettes]] contains 500 top palettes in vector from [colourlovers](http://www.colourlovers.com/) website.
+  * [[palette-presets]] contains 256 Brewer, categorical, veridis, tableau, microsoft palettes as map. See [[palette-presets-list]] for names.
+  * [[paletton-palette]] function to generate palette of type: `:monochromatic`, `:triad`, `:tetrad` with complementary color for given hue and configuration. See also [Paletton](http://paletton.com) website for details.
+
+  ### Gradient
+
+  Gradient is continuous functions which accepts value from `[0-1]` range and returns color. Call [[gradient]], [[gradient-easing]] or [[iq-palette-gradient]] to create one.
+
+  Predefined gradients are collected in [[gradient-presets]] map. You can find them `cubehelix` based and generated from [Inigo Quilez](http://iquilezles.org/www/articles/palettes/palettes.htm) settings.
+
+  ### Conversions
+
+  To convert palette to gradient call [[gradient]] function. You can set interpolation method and colorspace.
+
+  To convert gradient to palette call `sample` function from fastmath library.
+
+  Call [[resample]] to resample palette to other number of colors. Internally input palette is converted to gradient and sampled back.
+
+  To make gradient from two colors you can use also [[gradient-easing]] where you interpolate between to colors using one of the easings functions from `fastmath`.
+
+  Linear gradient between colors is defined as [[lerp]] function.
+  
+  ## Distances
+
+  Several functions to calculate distance between colors (`euclidean`, `delta-xxx` etc.)."
   (:require [clojure.xml :as xml]
             [fastmath.core :as m]
             [fastmath.random :as r]
@@ -29,7 +102,8 @@
             [fastmath.easings :as e]
             [clojure.java.io :refer :all])
   (:import [fastmath.vector Vec3 Vec4]           
-           java.awt.Color))
+           [java.awt Color]
+           [clojure.lang Seqable]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -104,6 +178,90 @@
   ^double [c]
   (let [^Vec4 ret (to-HC-polar (to-color c))]
     (.x ret)))
+
+(defn lerp
+  "Lerp color between two values."
+  [c1 c2 t]
+  (v/interpolate (to-color c1) (to-color c2) t))
+
+(defn set-alpha
+  "Set alpha channel and return `Vec4` representation."
+  [c a]
+  (let [^Vec4 v (to-color c)]
+    (Vec4. (.x v) (.y v) (.z v) a)))
+
+(defn set-ch0
+  "Set alpha channel and return `Vec4` representation."
+  [c val]
+  (let [^Vec4 v (to-color c)]
+    (Vec4. val (.y v) (.z v) (.w v))))
+
+(defn set-ch1
+  "Set alpha channel and return `Vec4` representation."
+  [c val]
+  (let [^Vec4 v (to-color c)]
+    (Vec4. (.x v) val (.z v) (.w v))))
+
+(defn set-ch2
+  "Set alpha channel and return `Vec4` representation."
+  [c val]
+  (let [^Vec4 v (to-color c)]
+    (Vec4. (.x v) (.y v) val (.w v))))
+
+
+(defn set-awt-alpha
+  "Set alpha channel and return `Color` representation."
+  [c a]
+  (let [^Color cc (to-awt-color c)]
+    (Color. (.getRed cc)
+            (.getGreen cc)
+            (.getBlue cc)
+            (lclamp255 a))))
+
+(defn awt-color
+  "Create java.awt.Color object. Use with `core/set-awt-color` or `core/set-awt-background`."
+  ([c]
+   (to-awt-color c))
+  ([c a]
+   (set-awt-alpha c a))
+  ([r g b]
+   (Color. (lclamp255 r)
+           (lclamp255 g)
+           (lclamp255 b)))
+  ([r g b a]
+   (Color. (lclamp255 r)
+           (lclamp255 g)
+           (lclamp255 b)
+           (lclamp255 a))))
+
+(defn color
+  "Create Vec4 object as color representation. Use with `core/set-color` or `core/set-background`."
+  ([c]
+   (to-color c))
+  ([c a]
+   (set-alpha c a))
+  ([r g b]
+   (Vec4. (clamp255 r)
+          (clamp255 g)
+          (clamp255 b)
+          255.0))
+  ([r g b a]
+   (Vec4. (clamp255 r)
+          (clamp255 g)
+          (clamp255 b)
+          (clamp255 a))))
+
+(defn gray
+  "Create grayscale color based on intensity `v`. Optional parameter alpha `a`."
+  ([v] (color v v v))
+  ([v a] (color v v v a)))
+
+(defn awt-gray
+  "Create grayscale color based on intensity `v`. Optional parameter alpha `a`.
+
+  AWT version of [[gray]]."
+  ([v] (awt-color v v v))
+  ([v a] (awt-color v v v a)))
 
 (declare html-awt-color)
 (declare html-color)
@@ -192,72 +350,18 @@
   (ch2 [^String c] (ch2 (Long/parseLong c 16)))
   (to-color [^String c] (to-color (Long/parseLong c 16)))
   (to-awt-color [c] (to-awt-color (to-color c)))
+  (luma [c] (luma (to-color c)))
+  Seqable
+  (to-color [c] (apply color c))
+  (alpha [c] (alpha (to-color c)))
+  (red [c] (red (to-color c)))
+  (green [c] (green (to-color c)))
+  (blue [c] (blue (to-color c)))
+  (ch0 [c] (ch0 (to-color c)))
+  (ch1 [c] (ch1 (to-color c)))
+  (ch2 [c] (ch2 (to-color c)))
+  (to-awt-color [c] (to-awt-color (to-color c)))
   (luma [c] (luma (to-color c))))
-
-(defn lerp
-  "Lerp color between two values."
-  [c1 c2 t]
-  (v/interpolate (to-color c1) (to-color c2) t))
-
-(defn set-alpha
-  "Set alpha channel and return `Vec4` representation."
-  [c a]
-  (let [^Vec4 v (to-color c)]
-    (Vec4. (.x v) (.y v) (.z v) a)))
-
-(defn set-awt-alpha
-  "Set alpha channel and return `Color` representation."
-  [c a]
-  (let [^Color cc (to-awt-color c)]
-    (Color. (.getRed cc)
-            (.getGreen cc)
-            (.getBlue cc)
-            (lclamp255 a))))
-
-(defn awt-color
-  "Create java.awt.Color object. Use with `core/set-awt-color` or `core/set-awt-background`."
-  ([c]
-   (to-awt-color c))
-  ([c a]
-   (set-awt-alpha c a))
-  ([r g b]
-   (Color. (lclamp255 r)
-           (lclamp255 g)
-           (lclamp255 b)))
-  ([r g b a]
-   (Color. (lclamp255 r)
-           (lclamp255 g)
-           (lclamp255 b)
-           (lclamp255 a))))
-
-(defn color
-  "Create Vec4 object as color representation. Use with `core/set-color` or `core/set-background`."
-  ([c]
-   (to-color c))
-  ([c a]
-   (set-alpha c a))
-  ([r g b]
-   (Vec4. (clamp255 r)
-          (clamp255 g)
-          (clamp255 b)
-          255.0))
-  ([r g b a]
-   (Vec4. (clamp255 r)
-          (clamp255 g)
-          (clamp255 b)
-          (clamp255 a))))
-
-(defn gray
-  "Create grayscale color based on intensity `v`. Optional parameter alpha `a`."
-  ([v] (color v v v))
-  ([v a] (color v v v a)))
-
-(defn awt-gray
-  "Create grayscale color based on intensity `v`. Optional parameter alpha `a`.
-
-  AWT version of [[gray]]."
-  ([v] (awt-color v v v))
-  ([v a] (awt-color v v v a)))
 
 ;; ## Blending / Composing
 
@@ -622,7 +726,7 @@
              :lightthreshold blend-lightthreshold})
 
 ;; All names as list
-(def blends-names (keys blends))
+(def blends-list (sort (keys blends)))
 
 ;; ## Colorspace functions
 ;;
@@ -1239,6 +1343,9 @@
 (def ^{:doc "HSB(V) -> RGB (see [[from-HSV-raw]])"} from-HSB* from-HSV*)
 
 ;; ### HWB
+
+;; HWB - A More Intuitive Hue-Based Color Model
+;; by Alvy Ray Smitch and Eric Ray Lyons, 1995-1996
 
 (defn to-HWB
   "RGB -> HWB, normalized
@@ -2092,16 +2199,16 @@
 (defn delta-c
   "Delta C* distance"
   [c1 c2]
-  (let [^Vec4 c1 (to-LAB (to-color c1))
-        ^Vec4 c2 (to-LAB (to-color c2))]
+  (let [^Vec4 c1 (to-LAB c1)
+        ^Vec4 c2 (to-LAB c2)]
     (- (m/hypot-sqrt (.y c2) (.z c2))
        (m/hypot-sqrt (.y c1) (.z c1)))))
 
 (defn delta-h
   "Delta H* distance"
   [c1 c2]
-  (let [^Vec4 c1 (to-LAB (to-color c1))
-        ^Vec4 c2 (to-LAB (to-color c2))
+  (let [^Vec4 c1 (to-LAB c1)
+        ^Vec4 c2 (to-LAB c2)
         xde (- (m/hypot-sqrt (.y c2) (.z c2))
                (m/hypot-sqrt (.y c1) (.z c1)))]
     (m/safe-sqrt (- (+ (m/sq (- (.y c1) (.y c2)))
@@ -2116,7 +2223,43 @@
   ([c1 c2]
    (v/dist (to-color c1) (to-color c2))))
 
-(def delta-ecie (partial euclidean to-LAB))
+(def delta-e-cie (partial euclidean to-LAB))
+
+(defn delta-e-cmc
+  "1:1"
+  (^double [c1 c2] (delta-e-cmc 1.0 1.0 c1 c2))
+  (^double [^double l ^double c c1 c2]
+   (let [^Vec4 c1 (to-LAB c1)
+         ^Vec4 c2 (to-LAB c2)
+         L1 (.x c1)
+         L2 (.x c2)
+         a1 (.y c1)
+         a2 (.y c2)
+         b1 (.z c1)
+         b2 (.z c2)
+         H (m/degrees (m/atan2 b1 a1))
+         H1 (if (neg? H) (+ H 360.0) H)
+         C1 (m/hypot-sqrt a1 b1)
+         C2 (m/hypot-sqrt a2 b2)
+         dC (- C1 C2)
+         dL (- L1 L2)
+         da (- a1 a2)
+         db (- b1 b2)
+         dH (- (+ (m/sq da) (m/sq db)) (m/sq dC))
+         C12 (* C1 C1)
+         C14 (* C12 C12)
+         F (m/sqrt (/ C14 (+ C14 1900.0)))
+         T (if (<= 164.0 H1 345.0)
+             (+ 0.56 (m/abs (* 0.2 (m/cos (m/radians (+ H1 168.0))))))
+             (+ 0.36 (m/abs (* 0.4 (m/cos (m/radians (+ H1 35.0)))))))
+         SL (if (< L1 16.0)
+              0.511
+              (/ (* 0.040975 L1)
+                 (inc (* 0.01765 L1))))
+         SC (+ 0.638 (/ (* 0.0638 C1)
+                        (inc (* 0.0131 C1))))
+         SH (* SC (inc (* F (dec T))))]
+     (m/sqrt (+ (m/sq (/ dL (* l SL))) (m/sq (/ dC (* c SC))) (/ dH (m/sq SH)))))))
 
 (defn nearest-color
   "Find nearest color from a set. Input: distance function (default euclidean), list of target colors and source color."
@@ -2300,6 +2443,27 @@
 
 ;;
 
+(defn change-luma
+  ""
+  ([^double amt col]
+   (let [^Vec4 c (to-LAB col)]
+     (from-LAB (Vec4. (+ (.x c) amt) (.y c) (.z c) (.w c))))))
+
+(def darken (partial change-luma -10.0))
+(def lighten (partial change-luma 10.0))
+
+(defn change-saturation
+  ""
+  ([^double amt col]
+   (let [^Vec4 c (to-LCH col)
+         ns (+ (.y c) amt)]
+     (from-LCH (Vec4. (.x c) (if (neg? ns) 0.0 ns) (.z c) (.w c))))))
+
+(def saturate (partial change-saturation 8.0))
+(def desaturate (partial change-saturation -8.0))
+
+;;
+
 (defn gradient
   "Create gradient function from palette (list of colors).
 
@@ -2310,7 +2474,7 @@
   ([palette colorspace] (gradient palette colorspace :linear nil))
   ([palette colorspace interpolator] (gradient palette colorspace interpolator nil))
   ([palette colorspace interpolator domain]
-   (let [[_ _ to from] (colorspaces colorspace)
+   (let [[to from] (colorspaces colorspace)
          cpalette (->> palette
                        (map to-color)
                        (map to))
@@ -2323,7 +2487,7 @@
          i0 ((i/interpolators-list interpolator) r c0)
          i1 ((i/interpolators-list interpolator) r c1)
          i2 ((i/interpolators-list interpolator) r c2)
-         i3 ((i/interpolators-list interpolator) r c3)]
+         i3 ((i/interpolators-list interpolator) r c3)] 
      (fn [^double t]
        (let [ct (m/constrain t 0.0 1.0)]
          (from (v/vec4 (i0 ct) (i1 ct) (i2 ct) (i3 ct))))))))
@@ -2339,6 +2503,11 @@
    (gradient-easing colorspace-fn e/linear v1 v2)))
 
 (def cubehelix-gradient (partial gradient-easing from-Cubehelix))
+
+(defn resample
+  ""
+  [col-no palette & gradient-params]
+  (m/sample (apply gradient palette gradient-params) col-no))
 
 ;; http://iquilezles.org/www/articles/palettes/palettes.htm
 
@@ -2373,6 +2542,9 @@
                                                      (- 1.5 (* 1.5 ts))
                                                      (- 0.8 (* 0.9 ts))
                                                      255.0))))})
+
+(def gradient-presets-list (sort (keys gradient-presets)))
+
 
 (defn- d3->palette
   "Convert d3 string to palette"
@@ -2663,4 +2835,4 @@
     :tableau-classic-medium [(color 114 158 206) (color 255 158 74) (color 103 191 92) (color 237 102 93) (color 173 139 201) (color 168 120 110) (color 237 151 202) (color 162 162 162) (color 205 204 93) (color 109 204 218)] 
     :tableau-classic-20 [(color 31 119 180) (color 174 199 232) (color 255 127 14) (color 255 187 120) (color 44 160 44) (color 152 223 138) (color 214 39 40) (color 255 152 150) (color 148 103 189) (color 197 176 213) (color 140 86 75) (color 196 156 148) (color 227 119 194) (color 247 182 210) (color 127 127 127) (color 199 199 199) (color 188 189 34) (color 219 219 141) (color 23 190 207) (color 158 218 229)]}))
 
-
+(def palette-presets-list (sort (keys palette-presets)))

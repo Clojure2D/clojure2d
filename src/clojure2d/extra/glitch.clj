@@ -328,9 +328,9 @@
   (let [cs1 (r/randval 0.9 (rand-nth c/colorspaces-list) nil) ; let's convert to some colorspace (or leave rgb)
         cs2 (r/randval 0.2 (r/randval 0.9 (rand-nth c/colorspaces-list) nil) cs1) ; maybe different cs on second image?
         outcs (r/randval 0.2 (r/randval 0.9 (rand-nth c/colorspaces-list) nil) cs1) ; maybe some random colorspace on output?
-        bl1 (r/randval 0.85 (rand-nth c/blends-names) nil)    ; ch1 blend
-        bl2 (r/randval 0.85 (rand-nth c/blends-names) nil) ; ch2 blend
-        bl3 (r/randval 0.85 (rand-nth c/blends-names) nil)] ; ch3 blend
+        bl1 (r/randval 0.85 (rand-nth c/blends-list) nil)    ; ch1 blend
+        bl2 (r/randval 0.85 (rand-nth c/blends-list) nil) ; ch2 blend
+        bl3 (r/randval 0.85 (rand-nth c/blends-list) nil)] ; ch3 blend
     {:switch (r/brand 0.5)
      :in-cs1 cs1
      :in-cs2 cs2
