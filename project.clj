@@ -29,11 +29,14 @@
                              [lein-bikeshed "0.5.0"]
                              [com.jakemccrary/lein-test-refresh "0.22.0"]
                              [lein-codox "0.10.3"]]
+                   :source-paths ["example"]
                    :dependencies [[codox-theme-rdash "0.1.2"]
-                                  [criterium "0.4.4"]]
+                                  [criterium "0.4.4"]
+                                  [hiccup "1.0.5"]]
                    :codox {:themes [:rdash]
                            :metadata {:doc/format :markdown}
                            :output-path "docs/codox/"
+                           :source-paths ["src"]
                            :source-uri "https://github.com/Clojure2D/clojure2d/blob/master/{filepath}#L{line}"
                            :exclude-vars nil
                            :doc-paths ["docs/tutorials/"]

@@ -19,7 +19,7 @@
   * `java.awt.Color` - Java AWT representation. Creators are [[awt-color]], [[awt-gray]]. Use [[to-awt-color]] to convert to this representations.
   * `keyword` - one of the HTML CSS names (see [[html-colors-map]] for list)
   * `Integer` - packed ARGB value. Example: `0xffaa01`.
-  * `String` - 6 chars string containg hexadecimal representation \"ffaa01\"
+  * `String` - CSS (\"#ab1122\") or 6 chars string containg hexadecimal representation (\"ffaa01\")
   * any `seqable` - list, vector containing 2-4 elements. Conversion is done by applying content to [[color]] function.
   * `nil` - returning `nil` during color conversion.
 
@@ -44,6 +44,8 @@
   To make color darker/brighter use [[darken]] / [[lighten]] functions. Operations are done in `Lab` color space.
 
   To change saturation call [[saturate]] / [[desaturate]]. Operations are done in `LCH` color space.
+
+  You can also rely on `VectorProto` from `fastmath` library and treat colors as vectors.
   
   ## Conversions
 
@@ -93,6 +95,12 @@
   ## Distances
 
   Several functions to calculate distance between colors (`euclidean`, `delta-xxx` etc.)."
+  {:metadoc/categories {:ops "Color/channel operations"
+                        :conv "Color conversions"
+                        :bl "Color blendings"
+                        :gr "Gradients"
+                        :pal "Palettes"
+                        :interp "Interpolation"}}
   (:require [clojure.xml :as xml]
             [fastmath.core :as m]
             [fastmath.random :as r]
@@ -114,26 +122,32 @@
 ;; First define some clamping functions
 
 (defn clamp255
-  "Clamp to 0-255 double"
+  "Constrain value `a` to 0-255 double.
+
+  Use to ensure that value is in RGB range.
+  Accepts and returns `double`.
+
+  See also [[lclamp255]], [[clamp]] and [[lclamp]]."
+  {:metadoc/categories #{:ops}}
   ^double [^double a]
   (m/constrain a 0 255))
 
 (defn lclamp255
-  "Clamp to 0-255 long"
+  "Constrain value `a` to 0-255 long (rounding if necessary).
+
+  Use to ensure that value is in RGB range.
+
+  See also [[clamp255]], [[clamp]] and [[lclamp]]."
+  {:metadoc/categories #{:ops}}
   ^long [^double a]
   (m/constrain (m/round a) 0 255))
 
-(defn mod255
-  "Leave 8 bits from long. Wraps input to 0-255 integer"
-  ^long [^long a]
-  (bit-and 0xff a))
-
-(defmacro clamp1
+(defmacro ^:private clamp1
   "Clamp to 0.0-1.0"
   [v]
   `(m/constrain ~v 0.0 1.0))
 
-(defmacro mod1
+(defmacro ^:private mod1
   "Cut to 0.0-1.0"
   [v]
   `(m/frac ~v))
@@ -142,16 +156,17 @@
 
 ;; Define `ColorProto` for representation conversions.
 (defprotocol ColorProto
-  (to-color [c])
-  (to-awt-color [c]) 
-  (luma [c])
-  (red [c])
-  (green [c])
-  (blue [c])
-  (alpha [c])
-  (ch0 [c])
-  (ch1 [c])
-  (ch2 [c]))
+  "Basic color operations"
+  (^{:metadoc/categories #{:ops}} to-color [c] "Convert any color representation to `Vec4` vector.")
+  (^{:metadoc/categories #{:ops}} to-awt-color [c] "Convert any color representation to `java.awt.Color`.") 
+  (^{:metadoc/categories #{:ops}} luma [c] "Returns luma")
+  (^{:metadoc/categories #{:ops}} red [c] "Returns red (first channel) value. See also [[ch0]].")
+  (^{:metadoc/categories #{:ops}} green [c] "Returns green (second channel) value. See also [[ch1]].") 
+  (^{:metadoc/categories #{:ops}} blue [c] "Returns blue (third channel) value. See also [[ch2]].")
+  (^{:metadoc/categories #{:ops}} alpha [c] "Returns alpha value.")
+  (^{:metadoc/categories #{:ops}} ch0 [c] "Returns first channel value. See also [[red]]")
+  (^{:metadoc/categories #{:ops}} ch1 [c] "Returns second channel value. See also [[green]]")
+  (^{:metadoc/categories #{:ops}} ch2 [c] "Returns third channel value. See also [[blue]]"))
 
 (defn- luma-fn
   "Local luma conversion function"
@@ -164,53 +179,60 @@
 (declare to-HC-polar)
 
 (defn hue
-  "Get hue value from color (any representation). Returns angle (0-360).
+  "Hue value of color (any representation). Returns angle (0-360).
   
-  Uses hexagonal transformation."
+  Uses hexagonal transformation. See also [[hue-polar]]."
+  {:metadoc/categories #{:ops}}
   ^double [c]
-  (let [^Vec4 ret (to-HC (to-color c))]
-    (.x ret)))
+  (let [^Vec4 ret (to-HC (to-color c))] (.x ret)))
 
 (defn hue-polar
-  "Get hue value from color (any representation). Returns angle (0-360).
+  "Hue value of color (any representation). Returns angle (0-360).
   
-  Uses polar transformation."
+  Uses polar transformation. See also [[hue]]."
+  {:metadoc/categories #{:ops}}
   ^double [c]
-  (let [^Vec4 ret (to-HC-polar (to-color c))]
-    (.x ret)))
+  (let [^Vec4 ret (to-HC-polar (to-color c))] (.x ret)))
 
 (defn lerp
-  "Lerp color between two values."
+  "Lineary interpolate color between two values.
+
+  See also [[gradient]] or `fastmath` vector interpolations."
+  {:metadoc/categories #{:interp}}
   [c1 c2 t]
   (v/interpolate (to-color c1) (to-color c2) t))
 
 (defn set-alpha
-  "Set alpha channel and return `Vec4` representation."
+  "Set alpha channel and return new color"
+  {:metadoc/categories #{:ops}}
   [c a]
   (let [^Vec4 v (to-color c)]
     (Vec4. (.x v) (.y v) (.z v) a)))
 
 (defn set-ch0
-  "Set alpha channel and return `Vec4` representation."
+  "Set alpha channel and return new color."
+  {:metadoc/categories #{:ops}}
   [c val]
   (let [^Vec4 v (to-color c)]
     (Vec4. val (.y v) (.z v) (.w v))))
 
 (defn set-ch1
-  "Set alpha channel and return `Vec4` representation."
+  "Set alpha channel and return new color."
+  {:metadoc/categories #{:ops}}
   [c val]
   (let [^Vec4 v (to-color c)]
     (Vec4. (.x v) val (.z v) (.w v))))
 
 (defn set-ch2
-  "Set alpha channel and return `Vec4` representation."
+  "Set alpha channel and return new color"
+  {:metadoc/categories #{:ops}}
   [c val]
   (let [^Vec4 v (to-color c)]
     (Vec4. (.x v) (.y v) val (.w v))))
 
-
 (defn set-awt-alpha
   "Set alpha channel and return `Color` representation."
+  {:metadoc/categories #{:ops}}
   [c a]
   (let [^Color cc (to-awt-color c)]
     (Color. (.getRed cc)
@@ -219,7 +241,10 @@
             (lclamp255 a))))
 
 (defn awt-color
-  "Create java.awt.Color object. Use with `core/set-awt-color` or `core/set-awt-background`."
+  "Create java.awt.Color object.
+
+  See also [[color]], [[gray]]."
+  {:metadoc/categories #{:ops}}
   ([c]
    (to-awt-color c))
   ([c a]
@@ -235,7 +260,17 @@
            (lclamp255 a))))
 
 (defn color
-  "Create Vec4 object as color representation. Use with `core/set-color` or `core/set-background`."
+  "Create Vec4 object as color representation.
+
+  Arity: 
+
+  * 1 - convert to `Vec4` from any color. Same as [[to-color]]
+  * 2 - sets color alpha
+  * 3 - sets r,g,b with alpha 255
+  * 4 - sets r,g,b and alpha
+  
+  See also [[awt-color]], [[awt-gray]]."
+  {:metadoc/categories #{:ops}}
   ([c]
    (to-color c))
   ([c a]
@@ -251,20 +286,41 @@
           (clamp255 b)
           (clamp255 a))))
 
+(defn clamp
+  "Clamp all color channels to `[0-255]` range."
+  {:metadoc/categories #{:ops}}
+  [c]
+  (v/applyf (to-color c) clamp255))
+
+(defn lclamp
+  "Clamp all color channels to `[0-255]` range. Round if necessary."
+  {:metadoc/categories #{:ops}}
+  [c]
+  (v/applyf (to-color c) lclamp255))
+
 (defn gray
-  "Create grayscale color based on intensity `v`. Optional parameter alpha `a`."
+  "Create grayscale color based on intensity `v`. Optional parameter alpha `a`.
+
+  See also [[color]]"
+  {:metadoc/categories #{:ops}}
   ([v] (color v v v))
   ([v a] (color v v v a)))
 
 (defn awt-gray
   "Create grayscale color based on intensity `v`. Optional parameter alpha `a`.
 
-  AWT version of [[gray]]."
+  AWT version of [[gray]]. See also [[awt-color]]"
+  {:metadoc/categories #{:ops}}
   ([v] (awt-color v v v))
   ([v a] (awt-color v v v a)))
 
 (declare html-awt-color)
 (declare html-color)
+
+(defn- strip-css
+  "Remove # from beginning of the string."
+  [^String s]
+  (if (= (first s) \#) (subs s 1) s))
 
 ;; Equip `Vec3`, `Vec4`, `Keyword` and `java.awt.Color` types with `ColorProto` functions.
 ;; For keyword use one of 140 names from html/css palettes (list: https://www.w3schools.com/colors/colors_names.asp)
@@ -341,14 +397,14 @@
   (to-awt-color [c] (to-awt-color (to-color c)))
   (luma [c] (luma (to-color c)))
   String
-  (alpha [^String c] (alpha (Long/parseLong c 16)))
-  (red [^String c] (red (Long/parseLong c 16)))
-  (green [^String c] (green (Long/parseLong c 16)))
-  (blue [^String c] (blue (Long/parseLong c 16)))
-  (ch0 [^String c] (ch0 (Long/parseLong c 16)))
-  (ch1 [^String c] (ch1 (Long/parseLong c 16)))
-  (ch2 [^String c] (ch2 (Long/parseLong c 16)))
-  (to-color [^String c] (to-color (Long/parseLong c 16)))
+  (alpha [^String c] (alpha (Long/parseLong (strip-css c) 16)))
+  (red [^String c] (red (Long/parseLong (strip-css c) 16)))
+  (green [^String c] (green (Long/parseLong (strip-css c) 16)))
+  (blue [^String c] (blue (Long/parseLong (strip-css c) 16)))
+  (ch0 [^String c] (ch0 (Long/parseLong (strip-css c) 16)))
+  (ch1 [^String c] (ch1 (Long/parseLong (strip-css c) 16)))
+  (ch2 [^String c] (ch2 (Long/parseLong (strip-css c) 16)))
+  (to-color [^String c] (to-color (Long/parseLong (strip-css c) 16)))
   (to-awt-color [c] (to-awt-color (to-color c)))
   (luma [c] (luma (to-color c)))
   Seqable
@@ -363,115 +419,138 @@
   (to-awt-color [c] (to-awt-color (to-color c)))
   (luma [c] (luma (to-color c))))
 
-;; ## Blending / Composing
+(defn format-css
+  "Convert color to css string."
+  {:metadoc/categories #{:ops}}
+  [c]
+  (str "#" (format "%02x" (lclamp255 (red c))) (format "%02x" (lclamp255 (green c))) (format "%02x" (lclamp255 (blue c)))))
 
-;; Several color blending / composing functions. Used to compose two images (`Pixels`). See `core.pixels` namespace for filters.
+;; ---------- blending
 
-;; Some blending functions require additional parameter. You can set it with following variable.
-(def ^:dynamic ^double *blend-threshold* 0.5)
+(def ^:dynamic ^{:metadoc/categories #{:bl} :doc "Some blend functions can be parametrized with `threshold` value. Default `0.5`."} ^double *blend-threshold* 0.5)
 
-(def ^:const ^double rev255 (/ 255.0))
+(def ^{:metadoc/categories #{:ops} :doc "Scaling factor to convert color value from range `[0-255]` to `[0-1]`."} ^:const ^double rev255 (/ 255.0))
 
 ;; Blend colors functions
 
 (defn blend-values
-  "Blend individual values (0-255)"
+  "Blend two values `a` and `b` from range `[0,255]` using blending function `f`.
+
+  Result is from range `[0,255]`."
+  {:metadoc/categories #{:bl}}
   [f ^double a ^double b]
   (* 255.0 ^double (f (* rev255 a) (* rev255 b))))
 
 (defn blend-colors
-  "Blend colors with blending function. Do not blend alpha on default."
+  "Blend colors with blending function. Set `alpha?` if you want to blend alpha channel (default: `false`)."
+  {:metadoc/categories #{:bl}}
   (^Vec4 [f c1 c2 alpha?]
-   (let [^Vec4 cc1 (v/div (to-color c1) 255.0)
-         ^Vec4 cc2 (v/div (to-color c2) 255.0)]
+   (let [^Vec4 cc1 (v/mult (to-color c1) rev255)
+         ^Vec4 cc2 (v/mult (to-color c2) rev255)]
      (Vec4. (* 255.0 ^double (f (.x cc1) (.x cc2)))
             (* 255.0 ^double (f (.y cc1) (.y cc2)))
             (* 255.0 ^double (f (.z cc1) (.z cc2)))
             (if alpha?
               (* 255.0 ^double (f (.w cc1) (.w cc2)))
               (* 255.0 (.w cc1))))))
-  (^Vec4 [f c1 c2] (blend-colors c1 c2 false)))
+  (^Vec4 [f c1 c2] (blend-colors f c1 c2 false)))
 
 ;; Plenty of blending functions. Bleding functions operate on 0.0-1.0 values and return new value in the same range.
 
 (defn blend-none
   "Return first value only. Do nothing."
+  {:metadoc/categories #{:bl}}
   ^double [a b] a)
 
 (defn blend-add
-  "Add"
+  "Add channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (clamp1 (+ a b)))
 
 (defn blend-madd
-  "Modulus add"
+  "Modulus add channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (mod1 (+ a b)))
 
 (defn blend-subtract
-  "Subtract"
+  "Subtract channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (clamp1 (- a b)))
 
 (defn blend-msubtract
-  "Modulus subtract"
+  "Modulus subtract channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (mod1 (- a b)))
 
 (defn blend-linearburn
-  "Linear burn"
+  "Linear burn channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (clamp1 (dec (+ a b))))
 
 (defn blend-mlinearburn
-  "Modulus linear burn"
+  "Modulus linear burn channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (mod1 (dec (+ a b))))
 
 (defn blend-darken
-  "Darken"
+  "Darken channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b] 
   (min a b))
 
 (defn blend-lighten
-  "Lighten"
+  "Lighten channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (max a b))
 
 (defn blend-multiply
-  "Multiply"
+  "Multiply channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (* a b))
 
 (defn blend-screen
-  "Screen"
+  "Screen channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (let [ra (- 1.0 a)
         rb (- 1.0 b)]
     (- 1.0 (* rb ra))))
 
 (defn blend-dodge
-  "Dodge"
+  "Dodge channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (clamp1 (/ a (- 1.0 b))))
 
 (defn blend-mdodge
-  "Modulus dodge"
+  "Modulus dodge channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (mod1 (/ a (max 0.0001 (- 1.0 b)))))
 
 (defn blend-burn
-  "Burn"
+  "Burn channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (clamp1 (- 1.0 (/ (- 1.0 a) b))))
 
 (defn blend-mburn
-  "Modulus burn"
+  "Modulus burn channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (mod1 (- 1.0 (/ (- 1.0 a) (max 0.0001 b)))))
 
 (defn blend-hardmix
-  "Hard mix"
+  "Hard mix channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (let [t (- 1.0 b)]
     (cond (< a t) 0.0
@@ -479,7 +558,8 @@
           :else a)))
 
 (defn blend-linearlight
-  "Linear light"
+  "Linear light channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (clamp1 (-> b
               (+ a)
@@ -487,7 +567,8 @@
               (- 1.0))))
 
 (defn blend-mlinearlight
-  "Modulus linear light"
+  "Modulus linear light channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (mod1 (-> b
             (+ a)
@@ -495,7 +576,8 @@
             (- 1.0))))
 
 (defn blend-pegtoplight
-  "Pegtop light"
+  "Pegtop light channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (let [ab (* a b)]
     (clamp1 (->> b
@@ -505,7 +587,8 @@
                  (+ ab)))))
 
 (defn blend-mpegtoplight
-  "Modulus pegtop light"
+  "Modulus pegtop light channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (let [ab (* a b)]
     (mod1 (->> b
@@ -515,49 +598,54 @@
                (+ ab)))))
 
 (defn blend-difference
-  "Difference"
+  "Difference channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (m/abs (- a b)))
 
 (defn blend-divide
-  "Divide"
+  "Divide channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (clamp1 (/ a (+ b m/EPSILON))))
 
 (defn blend-mdivide
-  "Modulus divide"
+  "Modulus divide channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (mod1 (/ a (+ b m/EPSILON))))
 
 (defn blend-or
-  "Bitwise or"
+  "Bitwise or of channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (let [aa (unchecked-long (* a 255.0))
         bb (unchecked-long (* b 255.0))]
     (* rev255 (bit-and 0xff (bit-or aa bb)))))
 
 (defn blend-and
-  "Bitwise and"
+  "Bitwise and of channel values."
   ^double [^double a ^double b]
   (let [aa (unchecked-long (* a 255.0))
         bb (unchecked-long (* b 255.0))]
     (* rev255 (bit-and 0xff (bit-and aa bb)))))
 
 (defn blend-xor
-  "Bitwise xor"
+  "Bitwise xor of channel values."
+  {:metadoc/categories #{:bl}}
   ^double [^double a ^double b]
   (let [aa (unchecked-long (* a 255.0))
         bb (unchecked-long (* b 255.0))]
     (* rev255 (bit-and 0xff (bit-xor aa bb)))))
 
 (defn blend-exclusion
-  "Exclusion"
+  "Exclusion of channel values."
   ^double [^double a ^double b]
   (let [ab (* a b)]
     (- (+ a b) (+ ab ab))))
 
-(defn blend-pinlight-raw
-  "Internal pinlight"
+(defn- blend-pinlight-raw
+  "Internal pinlight channel values."
   ^double [^double a ^double b]
   (let [c (- (+ a a) 1.0)]
     (cond (< b c) c
@@ -565,24 +653,28 @@
           :else (+ c 1.0))))
 
 (defn blend-pinlight
-  "Pinlight"
+  "Pinlight of  channel values."
+  {:metadoc/categories #{:bl}}
   ^double [a b]
   (clamp1 (blend-pinlight-raw a b)))
 
 (defn blend-mpinlight
-  "Modulus pinlight"
+  "Modulus pinlight channel values."
+  {:metadoc/categories #{:bl}}
   ^double [a b]
   (mod1 (blend-pinlight-raw a b)))
 
 (defn blend-opacity
   "Opacity (with `*blend-threshold*`)"
+  {:metadoc/categories #{:bl}}
   (^double [^double a ^double b ^double thr]
    (m/mlerp a b thr))
   (^double [^double a ^double b]
    (m/lerp a b *blend-threshold*)))
 
-(defn blend-overlay-raw
+(defn- blend-overlay-raw
   "Internal overlay (with `*blend-threshold*`)"
+  {:metadoc/categories #{:bl}}
   (^double [^double a ^double b ^double thr]
    (if (< a thr)
      (* 2.0 (* a b))
@@ -591,16 +683,18 @@
    (blend-overlay-raw a b *blend-threshold*)))
 
 (defn blend-overlay
-  "Overlay"
+  "Overlay channel values."
+  {:metadoc/categories #{:bl}}
   ^double [a b]
   (clamp1 (blend-overlay-raw a b)))
 
 (defn blend-moverlay
-  "Modulus overlay"
+  "Modulus overlay channel values."
+  {:metadoc/categories #{:bl}}
   ^double [a b]
   (mod1 (blend-overlay-raw a b)))
 
-(defn blend-hardlight-raw
+(defn- blend-hardlight-raw
   "Internal hardlight (with `*blend-threshold*`)"
   (^double [^double a ^double b ^double thr]
    (if (< b thr)
@@ -610,16 +704,18 @@
    (blend-hardlight-raw a b *blend-threshold*)))
 
 (defn blend-hardlight
-  "Hardlight"
+  "Hardlight channel values."
+  {:metadoc/categories #{:bl}}
   ^double [a b]
   (clamp1 (blend-hardlight-raw a b)))
 
 (defn blend-mhardlight
-  "Modulus hardlight"
+  "Modulus hardlight channel values."
+  {:metadoc/categories #{:bl}}
   ^double [a b]
   (mod1 (blend-hardlight-raw a b)))
 
-(defn blend-softlight-raw
+(defn- blend-softlight-raw
   "Internal softlight (with `*blend-threshold*`)"
   (^double [^double a ^double b ^double thr]
    (if (< a thr)
@@ -637,16 +733,18 @@
    (blend-softlight-raw a b *blend-threshold*)))
 
 (defn blend-softlight
-  "Softlight"
+  "Softlight channel values."
+  {:metadoc/categories #{:bl}}
   ^double [a b]
   (clamp1 (blend-softlight-raw a b)))
 
 (defn blend-msoftlight
-  "Modulus softlight"
+  "Modulus softlight channel values."
+  {:metadoc/categories #{:bl}}
   ^double [a b]
   (mod1 (blend-softlight-raw a b)))
 
-(defn blend-vividlight-raw
+(defn- blend-vividlight-raw
   "Internal vividlight (with `*blend-threshold*`)"
   (^double [^double a ^double b ^double thr]
    (if (< a thr)
@@ -660,73 +758,87 @@
    (blend-vividlight-raw a b *blend-threshold*)))
 
 (defn blend-vividlight
-  "Vividlight"
+  "Vividlight channel values."
+  {:metadoc/categories #{:bl}}
   ^double [a b]
   (clamp1 (blend-vividlight-raw a b)))
 
 (defn blend-mvividlight
-  "Modulus vividlight"
+  "Modulus vividlight channel values."
+  {:metadoc/categories #{:bl}}
   ^double [a b]
   (mod1 (blend-vividlight-raw a b)))
 
 (defn blend-darkthreshold
-  "Dark thresholded (with `*blend-threshold*`)"
+  "Dark thresholded (with `*blend-threshold*`) channel values."
+  {:metadoc/categories #{:bl}}
   (^double [^double a ^double b ^double thr]
    (if (< a thr) a b))
   (^double [a b]
    (blend-darkthreshold a b *blend-threshold*)))
 
 (defn blend-lightthreshold
-  "Light thresholded (with `*blend-threshold*`)"
+  "Light thresholded (with `*blend-threshold*`) channel values."
+  {:metadoc/categories #{:bl}}
   (^double [^double a ^double b ^double thr]
    (if (> a thr) a b))
   (^double [a b]
    (blend-lightthreshold a b *blend-threshold*)))
 
 ;; List of all blend functions stored in `blends` map
-(def blends {:none blend-none
-             :add blend-add
-             :madd blend-madd
-             :subtract blend-subtract
-             :msubtract blend-msubtract
-             :linearburn blend-linearburn
-             :mlinearburn blend-mlinearburn
-             :multiply blend-multiply
-             :darken blend-darken
-             :lighten blend-lighten
-             :screen blend-screen
-             :dodge blend-dodge
-             :mdodge blend-mdodge
-             :burn blend-burn
-             :mburn blend-mburn
-             :hardmix blend-hardmix
-             :linearlight blend-linearlight
-             :mlinearlight blend-mlinearlight
-             :pegtoplight blend-pegtoplight
-             :mpegtoplight blend-mpegtoplight
-             :difference blend-difference
-             :divide blend-divide
-             :mdivide blend-mdivide
-             :or blend-or
-             :and blend-and
-             :xor blend-xor
-             :exclusion blend-exclusion
-             :pinlight blend-pinlight
-             :mpinlight blend-mpinlight
-             :opacity blend-opacity
-             :overlay blend-overlay
-             :moverlay blend-moverlay
-             :hardlight blend-hardlight
-             :mhardlight blend-hardlight
-             :softlight blend-softlight
-             :msoftlight blend-msoftlight
-             :vividlight blend-vividlight
-             :mvividlight blend-mvividlight
-             :darkthreshold blend-darkthreshold
-             :lightthreshold blend-lightthreshold})
+(def
+  ^{:metadoc/categories #{:bl}
+    :doc "Map of all blending functions.
+
+* key - name as keyword
+* value - function
+
+See [[blends-list]] for names."}
+  blends {:none blend-none
+          :add blend-add
+          :madd blend-madd
+          :subtract blend-subtract
+          :msubtract blend-msubtract
+          :linearburn blend-linearburn
+          :mlinearburn blend-mlinearburn
+          :multiply blend-multiply
+          :darken blend-darken
+          :lighten blend-lighten
+          :screen blend-screen
+          :dodge blend-dodge
+          :mdodge blend-mdodge
+          :burn blend-burn
+          :mburn blend-mburn
+          :hardmix blend-hardmix
+          :linearlight blend-linearlight
+          :mlinearlight blend-mlinearlight
+          :pegtoplight blend-pegtoplight
+          :mpegtoplight blend-mpegtoplight
+          :difference blend-difference
+          :divide blend-divide
+          :mdivide blend-mdivide
+          :or blend-or
+          :and blend-and
+          :xor blend-xor
+          :exclusion blend-exclusion
+          :pinlight blend-pinlight
+          :mpinlight blend-mpinlight
+          :opacity blend-opacity
+          :overlay blend-overlay
+          :moverlay blend-moverlay
+          :hardlight blend-hardlight
+          :mhardlight blend-hardlight
+          :softlight blend-softlight
+          :msoftlight blend-msoftlight
+          :vividlight blend-vividlight
+          :mvividlight blend-mvividlight
+          :darkthreshold blend-darkthreshold
+          :lightthreshold blend-lightthreshold})
 
 ;; All names as list
-(def blends-list (sort (keys blends)))
+(def ^{:metadoc/categories #{:bl}
+       :doc "List of all blending functions."}  
+  blends-list (sort (keys blends)))
 
 ;; ## Colorspace functions
 ;;
@@ -908,11 +1020,11 @@
 
 ;;
 
-(def ^:const ^double CIEEpsilon (/ 216.0 24389.0))
-(def ^:const ^double CIEK (/ 24389.0 27.0))
-(def ^:const ^double OneThird (/ 1.0 3.0))
-(def ^:const ^double REF-U (/ (* 4.0 D65X) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
-(def ^:const ^double REF-V (/ (* 9.0 D65Y) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
+(def ^:private ^:const ^double CIEEpsilon (/ 216.0 24389.0))
+(def ^:private ^:const ^double CIEK (/ 24389.0 27.0))
+(def ^:private ^:const ^double OneThird (/ 1.0 3.0))
+(def ^:private ^:const ^double REF-U (/ (* 4.0 D65X) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
+(def ^:private ^:const ^double REF-V (/ (* 9.0 D65Y) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
 
 ;; ### LAB
 
@@ -977,15 +1089,18 @@
   ""
   [c]
   (let [^Vec4 cc (to-XYZ c)
-        uv-factor (/ (+ (.x cc) (* 15.0 (.y cc)) (* 3.0 (.z cc))))
-        var-u (* 4.0 (.x cc) uv-factor)
-        var-v (* 9.0 (.y cc) uv-factor)
-        var-y (to-lab-correct (/ (.y cc) 100.0))
-        L (- (* 116.0 var-y) 16.0)] 
-    (Vec4. L
-           (* 13.0 L (- var-u REF-U))
-           (* 13.0 L (- var-v REF-V))
-           (.w cc))))
+        uv-factor (+ (.x cc) (* 15.0 (.y cc)) (* 3.0 (.z cc)))]
+    (if (zero? uv-factor)
+      (Vec4. 0.0 0.0 0.0 (.w cc))
+      (let [uv-factor* (/ uv-factor)
+            var-u (* 4.0 (.x cc) uv-factor*)
+            var-v (* 9.0 (.y cc) uv-factor*)
+            var-y (to-lab-correct (/ (.y cc) 100.0))
+            L (- (* 116.0 var-y) 16.0)] 
+        (Vec4. L
+               (* 13.0 L (- var-u REF-U))
+               (* 13.0 L (- var-v REF-V))
+               (.w cc))))))
 
 (defn to-LUV*
   ""
@@ -999,16 +1114,18 @@
 (defn from-LUV
   ""
   [c]
-  (let [^Vec4 c (to-color c)
-        var-y (from-lab-correct (/ (+ (.x c) 16.0) 116.0))
-        var-u (+ REF-U (/ (.y c) (* 13.0 (.x c))))
-        var-v (+ REF-V (/ (.z c) (* 13.0 (.x c))))
-        Y (* 100.0 var-y)
-        X (/ (* -9.0 Y var-u) (- (* (- var-u 4.0) var-v) (* var-u var-v)))]
-    (from-XYZ (Vec4. X
-                     Y
-                     (/ (- (* 9.0 Y) (* 15.0 var-v Y) (* var-v X)) (* 3.0 var-v))
-                     (.w c)))))
+  (let [^Vec4 c (to-color c)]
+    (if (zero? (.x c))
+      (Vec4. 0.0 0.0 0.0 (.w c))
+      (let [var-y (from-lab-correct (/ (+ (.x c) 16.0) 116.0))
+            var-u (+ REF-U (/ (.y c) (* 13.0 (.x c))))
+            var-v (+ REF-V (/ (.z c) (* 13.0 (.x c))))
+            Y (* 100.0 var-y)
+            X (/ (* -9.0 Y var-u) (- (* (- var-u 4.0) var-v) (* var-u var-v)))]
+        (from-XYZ (Vec4. X
+                         Y
+                         (/ (- (* 9.0 Y) (* 15.0 var-v Y) (* var-v X)) (* 3.0 var-v))
+                         (.w c)))))))
 
 (defn from-LUV*
   ""
@@ -1024,19 +1141,20 @@
 (def ^:private ^:const ^double Ka (* (/ 175.0 198.04) (+ D65X D65Y)))
 (def ^:private ^:const ^double Kb (* (/ 70.0 218.11) (+ D65Y D65Z)))
 
-
 (defn to-HunterLAB
   ""
   [c]
   (let [^Vec4 cc (to-XYZ c)
         X (/ (.x cc) D65X)
         Y (/ (.y cc) D65Y)
-        Z (/ (.z cc) D65Z)
-        sqrtY (m/sqrt Y)]
-    (Vec4. (* 100.0 sqrtY)
-           (* Ka (/ (- X Y) sqrtY))
-           (* Kb (/ (- Y Z) sqrtY))
-           (.w cc))))
+        Z (/ (.z cc) D65Z)]
+    (if (zero? Y)
+      (Vec4. 0.0 0.0 0.0 (.w cc))
+      (let [sqrtY (m/sqrt Y)]
+        (Vec4. (* 100.0 sqrtY)
+               (* Ka (/ (- X Y) sqrtY))
+               (* Kb (/ (- Y Z) sqrtY))
+               (.w cc))))))
 
 (defn to-HunterLAB*
   ""
@@ -1050,13 +1168,15 @@
 (defn from-HunterLAB
   ""
   [c]
-  (let [^Vec4 c (to-color c)
-        Y (* 100.0 (m/sq (/ (.x c) D65Y)))
-        Y' (/ Y D65Y)
-        sqrtY' (m/sqrt Y')
-        X (* D65X (+ (* (/ (.y c) Ka) sqrtY') Y'))
-        Z (- (* D65Z (- (* (/ (.z c) Kb) sqrtY') Y')))]
-    (from-XYZ (Vec4. X Y Z (.w c)))))
+  (let [^Vec4 c (to-color c)]
+    (if (zero? (.x c))
+      (Vec4. 0.0 0.0 0.0 (.w c))
+      (let [Y (* 100.0 (m/sq (/ (.x c) D65Y)))
+            Y' (/ Y D65Y)
+            sqrtY' (m/sqrt Y')
+            X (* D65X (+ (* (/ (.y c) Ka) sqrtY') Y'))
+            Z (- (* D65Z (- (* (/ (.z c) Kb) sqrtY') Y')))]
+        (from-XYZ (Vec4. X Y Z (.w c)))))))
 
 (defn from-HunterLAB*
   ""
@@ -1114,34 +1234,41 @@
   "RGB->YXY"
   [c]
   (let [^Vec4 xyz (to-XYZ c)
-        d (/ (+ (.x xyz) (.y xyz) (.z xyz)))] 
-    (Vec4. (.y xyz) (* (.x xyz) d) (* (.y xyz) d) (.w xyz))))
+        d (+ (.x xyz) (.y xyz) (.z xyz))]
+    (if (zero? d)
+      (Vec4. 0.0 0.3127159072215825 0.3290014805066623 (.w xyz))
+      (Vec4. (.y xyz)
+             (/ (.x xyz) d)
+             (/ (.y xyz) d)
+             (.w xyz)))))
 
 (defn to-YXY*
   ""
   [c]
   (let [^Vec4 cc (to-YXY c)]
     (Vec4. (m/norm (.x cc) 0.0 100.0 0.0 255.0)
-           (m/norm (.y cc) 0.15001662234042548 0.640074499456775 0.0 255.0)
-           (m/norm (.z cc) 0.0600066489361702 0.6000000000000001 0.0 255.0)
+           (m/norm (.y cc) 0.0 0.640074499456775 0.0 255.0)
+           (m/norm (.z cc) 0.0 0.6000000000000001 0.0 255.0)
            (.w cc))))
 
 (defn from-YXY
   "YXY->RGB"
   [c]
-  (let [^Vec4 c (to-color c)
-        Yy (/ (.x c) (.z c))
-        X (* (.y c) Yy)
-        Z (* (- 1.0 (.y c) (.z c)) Yy)]
-    (from-XYZ (Vec4. X (.x c) Z (.w c)))))
+  (let [^Vec4 c (to-color c)]
+    (if (zero? (.x c))
+      (Vec4. 0.0 0.0 0.0 (.w c))
+      (let [Yy (/ (.x c) (.z c))
+            X (* (.y c) Yy) 
+            Z (* (- 1.0 (.y c) (.z c)) Yy)]
+        (from-XYZ (Vec4. X (.x c) Z (.w c)))))))
 
 (defn from-YXY*
   ""
   [c]
   (let [^Vec4 c (to-color c)]
     (from-YXY (Vec4. (m/norm (.x c) 0.0 255.0 0.0 100.0)
-                     (m/norm (.y c) 0.0 255.0 0.15001662234042548 0.640074499456775)
-                     (m/norm (.z c) 0.0 255.0 0.0600066489361702 0.6000000000000001)
+                     (m/norm (.y c) 0.0 255.0 0.0 0.640074499456775)
+                     (m/norm (.z c) 0.0 255.0 0.0 0.6000000000000001)
                      (.w c)))))
 
 ;; Hue based
@@ -1288,7 +1415,8 @@
   (let [^Vec4 c (to-color c)
         ^Vec4 hc (to-HC c)
         L (/ (* 0.5 (+ (.z hc) (.w hc))) 255.0)
-        S (if (== 1.0 L) 0.0
+        S (if (or (== 1.0 L)
+                  (zero? (.y hc))) 0.0
               (/ (.y hc) (- 1.0 (m/abs (dec (+ L L))))))]
     (Vec4. (.x hc) (/ S 255.0) L (.w c))))
 
@@ -1414,9 +1542,9 @@
 ;; Color Theory and Modeling for Computer Graphics, Visualization, and Multimedia Applications (The Springer International Series in Engineering and Computer Science) by Haim Levkowitz
 
 ;; Page 79, minimizer
-(def ^:const ^double weight-max 0.7)
-(def ^:const ^double weight-mid 0.1)
-(def ^:const ^double weight-min 0.2)
+(def ^:private ^:const ^double weight-max 0.7)
+(def ^:private ^:const ^double weight-mid 0.1)
+(def ^:private ^:const ^double weight-min 0.2)
 
 (defn to-GLHS
   "RGB -> GLHS
@@ -2463,7 +2591,6 @@
 (def desaturate (partial change-saturation -8.0))
 
 ;;
-
 (defn gradient
   "Create gradient function from palette (list of colors).
 
@@ -2496,13 +2623,18 @@
   "Create gradient between two sets of given colorspace values.
 
   easing defaults to linear."
-  ([colorspace-fn easing v1 v2]
-   (fn [^double t]
-     (colorspace-fn (v/interpolate v1 v2 (easing t)))))
-  ([colorspace-fn v1 v2]
-   (gradient-easing colorspace-fn e/linear v1 v2)))
+  ([cs easing v1 v2]
+   (let [[_ from] (colorspaces cs)
+         v1 (to-color v1)
+         v2 (to-color v2)]
+     (fn [^double t]
+       (from (v/interpolate v1 v2 (easing t))))))
+  ([cs v1 v2]
+   (gradient-easing cs e/linear v1 v2))
+  ([v1 v2]
+   (gradient-easing :RGB e/linear v1 v2)))
 
-(def cubehelix-gradient (partial gradient-easing from-Cubehelix))
+(def cubehelix-gradient (partial gradient-easing :Cubehelix))
 
 (defn resample
   ""
@@ -2514,7 +2646,10 @@
 (def ^:private ^:const vec3-05 (Vec3. 0.5 0.5 0.5))
 (def ^:private ^:const vec3-10 (Vec3. 1.0 1.0 1.0))
 
-(def gradient-presets
+(def ^{:doc "Ready to use gradients containing Inigo Quilez and Cubehelix sets.
+
+Map with name (keyword) as key and gradient function as value."}
+  gradient-presets
   {:iq-1 (iq-palette-gradient vec3-05 vec3-05 vec3-10
                               (Vec3. 0.0 0.33 0.67))
    :iq-2 (iq-palette-gradient vec3-05 vec3-05 vec3-10
@@ -2543,8 +2678,7 @@
                                                      (- 0.8 (* 0.9 ts))
                                                      255.0))))})
 
-(def gradient-presets-list (sort (keys gradient-presets)))
-
+(def ^{:doc "Gradient presets names."} gradient-presets-list (sort (keys gradient-presets)))
 
 (defn- d3->palette
   "Convert d3 string to palette"

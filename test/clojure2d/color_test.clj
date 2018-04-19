@@ -16,17 +16,7 @@
   (is (== 254.6 (clamp255 254.6)))
   (is (== 0.0 (clamp255 -1)))
   (is (== 22.49 (clamp255 22.49)))
-  (is (== 255.0 (clamp255 255.5)))
-
-  (is (== 255 (mod255 0xffff)))
-  (is (== 0 (mod255 0)))
-
-  (is (== 0.0 (clamp1 -2)))
-  (is (== 1.0 (clamp1 2)))
-  (is (== 0.34 (clamp1 0.34)))
-
-  (is (m/approx-eq 0.34 (mod1 1.34)))
-  (is (m/approx-eq 0.34 (mod1 -1.34))))
+  (is (== 255.0 (clamp255 255.5))))
 
 ;; color protocol
 
