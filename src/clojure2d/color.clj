@@ -17,7 +17,7 @@
   * fastmath `Vec4` - this is core type representing 3 color channels and alpha (RGBA). Values are `double` type from `[0-255]` range. [[color]], [[gray]] creators returns `Vec4` representation. To ensure `Vec4` use [[to-color]] function.
   * fastmath `Vec3` - 3 color channels, assuming `alpha` set to value of `255`.
   * `java.awt.Color` - Java AWT representation. Creators are [[awt-color]], [[awt-gray]]. Use [[to-awt-color]] to convert to this representations.
-  * `keyword` - one of the HTML CSS names (see [[html-colors-map]] for list)
+  * `keyword` - one of the HTML CSS names (see [[html-colors-list]])
   * `Integer` - packed ARGB value. Example: `0xffaa01`.
   * `String` - CSS (\"#ab1122\") or 6 chars string containg hexadecimal representation (\"ffaa01\")
   * any `seqable` - list, vector containing 2-4 elements. Conversion is done by applying content to [[color]] function.
@@ -318,7 +318,7 @@
 (declare html-awt-color)
 (declare html-color)
 
-(defn- strip-css
+(defn- strip-hash
   "Remove # from beginning of the string."
   [^String s]
   (if (= (first s) \#) (subs s 1) s))
@@ -398,14 +398,14 @@
   (to-awt-color [c] (to-awt-color (to-color c)))
   (luma [c] (luma (to-color c)))
   String
-  (alpha [^String c] (alpha (Long/parseLong (strip-css c) 16)))
-  (red [^String c] (red (Long/parseLong (strip-css c) 16)))
-  (green [^String c] (green (Long/parseLong (strip-css c) 16)))
-  (blue [^String c] (blue (Long/parseLong (strip-css c) 16)))
-  (ch0 [^String c] (ch0 (Long/parseLong (strip-css c) 16)))
-  (ch1 [^String c] (ch1 (Long/parseLong (strip-css c) 16)))
-  (ch2 [^String c] (ch2 (Long/parseLong (strip-css c) 16)))
-  (to-color [^String c] (to-color (Long/parseLong (strip-css c) 16)))
+  (alpha [^String c] (alpha (Long/parseLong (strip-hash c) 16)))
+  (red [^String c] (red (Long/parseLong (strip-hash c) 16)))
+  (green [^String c] (green (Long/parseLong (strip-hash c) 16)))
+  (blue [^String c] (blue (Long/parseLong (strip-hash c) 16)))
+  (ch0 [^String c] (ch0 (Long/parseLong (strip-hash c) 16)))
+  (ch1 [^String c] (ch1 (Long/parseLong (strip-hash c) 16)))
+  (ch2 [^String c] (ch2 (Long/parseLong (strip-hash c) 16)))
+  (to-color [^String c] (to-color (Long/parseLong (strip-hash c) 16)))
   (to-awt-color [c] (to-awt-color (to-color c)))
   (luma [c] (luma (to-color c)))
   Seqable
@@ -420,8 +420,8 @@
   (to-awt-color [c] (to-awt-color (to-color c)))
   (luma [c] (luma (to-color c))))
 
-(defn format-css
-  "Convert color to css string."
+(defn format-hex
+  "Convert color to hex string (css)."
   {:metadoc/categories #{:ops}}
   [c]
   (str "#" (format "%02x" (lclamp255 (red c))) (format "%02x" (lclamp255 (green c))) (format "%02x" (lclamp255 (blue c)))))
@@ -2450,6 +2450,23 @@ See [[blends-list]] for names."}
   ([xf c]
    (nearest-color euclidean xf c)))
 
+(defn average
+  "Average colors in given `colorspace` (default: `:RGB`)"
+  {:metadoc/categories #{:dist}}
+  ([colorspace xs]
+   (let [[to from] (colorspaces colorspace)]
+     (from (v/average-vectors (map to xs)))))
+  ([xs]
+   (v/average-vectors (map to-color xs))))
+
+(defn mix
+  "Mix colors in given optional `colorspace` (default: `:RGB`) and optional ratio (default: 0.5)."
+  ([colorspace x1 x2 t]
+   (let [[to from] (colorspaces colorspace)]
+     (from (lerp (to x1) (to x2) t))))
+  ([x1 x2 t] (lerp x1 x2 t))
+  ([x1 x2] (lerp x1 x2 0.5)))
+
 (defn make-reduce-color-filter
   "Define reduce color filter to use on `Pixels`.
 
@@ -2611,14 +2628,11 @@ See [[blends-list]] for names."}
                                 :yellow 0xffff00,
                                 :yellowgreen 0x9acd32})
 
-(def html-colors-list (sort (keys html-colors-map)))
+(def ^{:doc "List of html color names"
+       :metadoc/categories #{:pal}} html-colors-list (sort (keys html-colors-map)))
 
-(def ^:private ^{:doc "Returns AWT color object for given color keyword."
-                 :metadoc/categories #{:pal}}
-  html-awt-color (comp to-awt-color html-colors-map))
-(def ^:private ^{:doc "Returns color for given keyword."
-                 :metadoc/categories #{:pal}}
-  html-color (comp to-color html-colors-map))
+(def ^:private html-awt-color (comp to-awt-color html-colors-map))
+(def ^:private html-color (comp to-color html-colors-map))
 
 ;;
 
@@ -2631,25 +2645,28 @@ See [[blends-list]] for names."}
    (let [^Vec4 c (to-LAB col)]
      (from-LAB (Vec4. (m/constrain (+ (.x c) amt) 0.0 100.0) (.y c) (.z c) (.w c))))))
 
-(def ^{:doc "Make color darker. See [[lighten]]."
+(def ^{:doc "Make color darker. See [[brighten]]."
        :metadoc/categories #{:ops}}
   darken (partial change-lab-luma -10.0))
 
 (def ^{:doc "Make color brighter. See [[darken]]."
        :metadoc/categories #{:ops}}
-  lighten (partial change-lab-luma 10.0))
+  brighten  (partial change-lab-luma 10.0))
 
 (defn change-saturation
   "Change color saturation in LCH color space.
 
   Saturation value can't exceed `[0-134]` range."
+  {:metadoc/categories #{:ops}}
   ([^double amt col]
    (let [^Vec4 c (to-LCH col)
          ns (m/constrain (+ (.y c) amt) 0.0 134.0)]
      (from-LCH (Vec4. (.x c) ns (.z c) (.w c))))))
 
-(def saturate (partial change-saturation 10.0))
-(def desaturate (partial change-saturation -10.0))
+(def ^{:doc "Saturate color"
+       :metadoc/categories #{:ops}} saturate (partial change-saturation 10.0))
+(def ^{:doc "Desaturate color"
+       :metadoc/categories #{:ops}}desaturate (partial change-saturation -10.0))
 
 ;;
 (defn gradient
@@ -2657,7 +2674,10 @@ See [[blends-list]] for names."}
 
   Grandient function accepts value from 0 to 1 and returns interpolated color.
 
-  Optionally interpolate in given `colorspace` and `interpolator` name as keyword. See fastmath [interpolator names](https://generateme.github.io/fastmath/fastmath.interpolation.html#var-interpolators-list)."
+  Optionally interpolate in given `colorspace` and `interpolator` name as keyword. Possible interpolations: `:cubic-spline`, `:neville`, `:spline`, `:shepard`, `:akima`.
+
+  To make irregular spacings between colors, provide own `domain`."
+  {:metadoc/categories #{:grad}}
   ([palette] (gradient palette :RGB :linear nil))
   ([palette colorspace] (gradient palette colorspace :linear nil))
   ([palette colorspace interpolator] (gradient palette colorspace interpolator nil))
@@ -2681,9 +2701,12 @@ See [[blends-list]] for names."}
          (from (v/vec4 (i0 ct) (i1 ct) (i2 ct) (i3 ct))))))))
 
 (defn gradient-easing
-  "Create gradient between two sets of given colorspace values.
+  "Create gradient between two colors.
 
-  easing defaults to linear."
+  Input colors should be in expected color space (default: `RGB`).
+
+  You can use easing function to make interpolation non-linear (default: linear)."
+  {:metadoc/categories #{:grad}}
   ([cs easing v1 v2]
    (let [[_ from] (colorspaces cs)
          v1 (to-color v1)
@@ -2695,12 +2718,17 @@ See [[blends-list]] for names."}
   ([v1 v2]
    (gradient-easing :RGB e/linear v1 v2)))
 
-(def cubehelix-gradient (partial gradient-easing :Cubehelix))
+(def ^{:metadoc/categories #{:grad}
+       :doc "Cubehelix gradient generator."}
+  gradient-cubehelix (partial gradient-easing :Cubehelix))
 
 (defn resample
-  ""
-  [col-no palette & gradient-params]
-  (m/sample (apply gradient palette gradient-params) col-no))
+  "Resample palette.
+
+  Internally it's done by creating gradient and sampling back to colors. You can pass [[gradient]] parameters like colorspace, interpolator name and domain."
+  {:metadoc/categories #{:pal}}
+  [number-of-colors palette & gradient-params]
+  (m/sample (apply gradient palette gradient-params) number-of-colors))
 
 ;; http://iquilezles.org/www/articles/palettes/palettes.htm
 
@@ -2709,7 +2737,8 @@ See [[blends-list]] for names."}
 
 (def ^{:doc "Ready to use gradients containing Inigo Quilez and Cubehelix sets.
 
-Map with name (keyword) as key and gradient function as value."}
+Map with name (keyword) as key and gradient function as value."
+       :metadoc/categories #{:grad}}
   gradient-presets
   {:iq-1 (iq-palette-gradient vec3-05 vec3-05 vec3-10
                               (Vec3. 0.0 0.33 0.67))
@@ -2730,16 +2759,17 @@ Map with name (keyword) as key and gradient function as value."}
                               (Vec3. 0.2 0.4 0.2)
                               (Vec3. 2.0 1.0 1.0)
                               (Vec3. 0.0 0.25 0.25))
-   :cubehelix (cubehelix-gradient e/linear (Vec4. 300.0 0.5 0.0 255.0) (Vec4. -240 0.5 1.0 255.0))
-   :warm (cubehelix-gradient e/linear (Vec4. -100.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
-   :cool (cubehelix-gradient e/linear (Vec4. 260.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
+   :cubehelix (gradient-cubehelix e/linear (Vec4. 300.0 0.5 0.0 255.0) (Vec4. -240 0.5 1.0 255.0))
+   :warm (gradient-cubehelix e/linear (Vec4. -100.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
+   :cool (gradient-cubehelix e/linear (Vec4. 260.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
    :rainbow (fn [^double t] (let [ts (m/abs (- t 0.5))]
                               (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
                                                      (- 1.5 (* 1.5 ts))
                                                      (- 0.8 (* 0.9 ts))
                                                      255.0))))})
 
-(def ^{:doc "Gradient presets names."} gradient-presets-list (sort (keys gradient-presets)))
+(def ^{:doc "Gradient presets names."
+       :metadoc/categories #{:grad}} gradient-presets-list (sort (keys gradient-presets)))
 
 (defn- d3->palette
   "Convert d3 string to palette"
@@ -2753,7 +2783,8 @@ Map with name (keyword) as key and gradient function as value."}
         names (map #(keyword (str name "-" (count %))) pals)]
     (into {} (map vector names pals))))
 
-(def ^{:doc "Color palette presets."} palette-presets
+(def ^{:doc "Color palette presets."
+       :metadoc/categories #{:pal}} palette-presets
   (merge
    (d3->palettes "brbg" ["d8b365f5f5f55ab4ac",
                          "a6611adfc27d80cdc1018571",
@@ -3030,4 +3061,5 @@ Map with name (keyword) as key and gradient function as value."}
     :tableau-classic-medium [(color 114 158 206) (color 255 158 74) (color 103 191 92) (color 237 102 93) (color 173 139 201) (color 168 120 110) (color 237 151 202) (color 162 162 162) (color 205 204 93) (color 109 204 218)] 
     :tableau-classic-20 [(color 31 119 180) (color 174 199 232) (color 255 127 14) (color 255 187 120) (color 44 160 44) (color 152 223 138) (color 214 39 40) (color 255 152 150) (color 148 103 189) (color 197 176 213) (color 140 86 75) (color 196 156 148) (color 227 119 194) (color 247 182 210) (color 127 127 127) (color 199 199 199) (color 188 189 34) (color 219 219 141) (color 23 190 207) (color 158 218 229)]}))
 
-(def palette-presets-list (sort (keys palette-presets)))
+(def ^{:doc "Color palette presets list."
+       :metadoc/categories #{:pal}} palette-presets-list (sort (keys palette-presets)))

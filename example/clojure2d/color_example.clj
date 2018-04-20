@@ -5,7 +5,8 @@
             [clojure2d.core :refer :all]
             [clojure2d.pixels :as p]
             [fastmath.vector :as v]
-            [fastmath.core :as m]))
+            [fastmath.core :as m]
+            [fastmath.easings :as e]))
 
 (defmacro example-color [description ex]
   `(assoc (example ~description ~ex) :type :color))
@@ -19,20 +20,20 @@
 (defn color->html [c]
   (let [str-color (if (< (luma c) 128.0) "white" "black")
         o (/ (alpha c) 255.0)
-        n (format-css c)]
+        n (format-hex c)]
     (html [:span {:style (str "display:block;opacity:" o ";padding:5px;background-color:" n ";color:" str-color ";")} (str "[" n "] " c)])))
 
 (defn palette->html [c]
   (html (for [col c]
-          [:span {:style (str "border:1px solid;margin-right:1px;padding:6px;background-color:" (format-css col) ";border-radius:5px;")} "  "])))
+          [:span {:style (str "border:1px solid;margin-right:1px;padding:6px;background-color:" (format-hex col) ";border-radius:5px;")} "  "])))
 
-(defn gradient->html [f] 
+(defn gradient->html [f]
   (html (for [^double t (range 0.0 1.0 0.015)]
-          [:span {:style (str "background-color:" (format-css (f t)) ";width:1%;display:inline-block;height:20px;")}])))
+          [:span {:style (str "background-color:" (format-hex (f t)) ";width:1%;display:inline-block;height:20px;")}])))
 
 (defmethod format-html :color [r]
   (html [:div
-         [:blockquote (:doc r)] 
+         [:blockquote (:doc r)]
          [:pre [:code {:class "hljs clojure"} (:example r)]
           [:div {:style "z-index:-10;background-image:url(../bg.png);top:0;bottom:0;left:0;right:0"} (color->html (:result r))]]]))
 
@@ -41,7 +42,7 @@
 
 (defmethod format-html :palette [r]
   (html [:div
-         [:blockquote (:doc r)] 
+         [:blockquote (:doc r)]
          [:pre [:code {:class "hljs clojure"} (:example r)]
           (palette->html (:result r))]]))
 
@@ -50,7 +51,7 @@
 
 (defmethod format-html :gradient [r]
   (html [:div
-         [:blockquote (:doc r)] 
+         [:blockquote (:doc r)]
          [:pre [:code {:class "hljs clojure"} (:example r)]]
          [:div {:style "width:100%"} (gradient->html (:result r))]]))
 
@@ -118,8 +119,8 @@
 (add-examples lclamp
   (example "Usage" (lclamp (v/vec4 304 -123 3.4 22.9))))
 
-(add-examples format-css
-  (example-session "Usage" (format-css :maroon) (format-css (color 4 55 222))))
+(add-examples format-hex
+  (example-session "Usage" (format-hex :maroon) (format-hex (color 4 55 222))))
 
 ;; --
 
@@ -130,12 +131,12 @@
   (example "Gamma correction" (from-linear 0.5)))
 
 (add-examples colorspaces
-  (example "Example conversion" (let [[to from] (colorspaces :Cubehelix)]
-                                  (map m/approx (from (to [100 200 50]))))))
+  (example-color "Example conversion" (let [[to from] (colorspaces :Cubehelix)]
+                                        (map m/approx (from (to [100 200 50]))))))
 
 (add-examples colorspaces*
-  (example "Example conversion" (let [[to from] (colorspaces* :Cubehelix)]
-                                  (map m/approx (from (to [100 200 50]))))))
+  (example-color "Example conversion" (let [[to from] (colorspaces* :Cubehelix)]
+                                        (map m/approx (from (to [100 200 50]))))))
 
 ;;
 
@@ -165,7 +166,7 @@
 (defmacro add-blends-examples
   []
   `(do ~@(for [x blends-list]
-           (let [n (symbol (str "blend-" (name x)))]              
+           (let [n (symbol (str "blend-" (name x)))]
              `(add-examples ~n
                 (example-snippet "Composed images" blend-images :image ~x)
                 (example-session "Simple calls" (~n 0.43 0.68) (~n 0.22 0.44))
@@ -182,7 +183,7 @@
 (defmacro add-colorspace-examples
   []
   `(do ~@(for [n colorspaces-list]
-           (let [n-to (symbol (str "to-" (name n)))]              
+           (let [n-to (symbol (str "to-" (name n)))]
              `(do (add-examples ~n-to
                     (example-gradient "Gradient between four colors using given color space." (gradient [:maroon :white :black :lightcyan] ~n))
                     (example "Convert into colorspace value" (~n-to :peru))))))))
@@ -190,7 +191,7 @@
 (defmacro add-colorspace*-examples
   []
   `(do ~@(for [n colorspaces-list]
-           (let [n-to (symbol (str "to-" (name n) "*"))]              
+           (let [n-to (symbol (str "to-" (name n) "*"))]
              `(do (add-examples ~n-to
                     (example "Convert into colorspace value" (~n-to :peru))))))))
 
@@ -201,7 +202,7 @@
   []
   `(do ~@(for [n colorspaces-list]
            (let [n-from (symbol (str "from-" (name n) "*"))
-                 v (symbol "v")]              
+                 v (symbol "v")]
              `(do (add-examples ~n-from
                     (example-gradient "Gradient generated from given color space." (fn [~v] (~n-from (lerp [255 255 255] [0 0 0] ~v))))))))))
 
@@ -211,9 +212,9 @@
   []
   `(do ~@(for [n colorspaces-list]
            (let [n-from (symbol (str "from-" (name n)))
-                 n-to (symbol (str "to-" (name n)))]              
+                 n-to (symbol (str "to-" (name n)))]
              `(do (add-examples ~n-from
-                    (example "Converting to and from given colorspace should yield almost the same color." (map m/approx ((juxt red green blue) (~n-from (~n-to (color 122 3 254))))))))))))
+                    (example-color "Converting to and from given colorspace should yield almost the same color." (map m/approx ((juxt red green blue) (~n-from (~n-to (color 122 3 254))))))))))))
 
 (add-colorspace-from-examples)
 
@@ -229,8 +230,8 @@
   (example-session "You can maximum value for all channels."
     ((color-converter :HCL 1.0) [0.5 0.5 0.5 0.2])
     ((color-converter :HCL 100.0) [50 50 50 100]))
-  (example "You can set maximum value for each channel separately. Here makes conversion from HSL color space where hue is from range 0-360, saturation and lightness from 0-100. Alpha is from range 0-255."
-    ((color-converter :HCL 360.0 100.0 100.0) [240 50 50])))
+  (example-color "You can set maximum value for each channel separately. Here makes conversion from HSL color space where hue is from range 0-360, saturation and lightness from 0-100. Alpha is from range 0-255."
+                 ((color-converter :HCL 360.0 100.0 100.0) [240 50 50])))
 
 ;;
 
@@ -305,11 +306,6 @@
 
 ;; ----
 
-(comment add-examples html-awt-color
-         (example-color "Usage" (html-awt-color :khaki)))
-
-(comment add-examples html-color
-         (example-color "Usage" (html-color :khaki)))
 
 (add-examples change-lab-luma
   (example-color "Given color" :khaki)
@@ -319,9 +315,8 @@
 (add-examples darken
   (example-palette "Make palette" (take 10 (iterate darken :amber))))
 
-(add-examples lighten
-  (example-palette "Make palette" (take 10 (iterate lighten "03100f"))))
-
+(add-examples brighten
+  (example-palette "Make palette" (take 10 (iterate brighten "03100f"))))
 
 (add-examples change-saturation
   (example-color "Given color" :khaki)
@@ -334,7 +329,42 @@
 (add-examples desaturate
   (example-palette "Make palette" (take 10 (iterate desaturate (from-HSL (color 300 1.0 0.5))))))
 
+;; ----
 
+(add-examples average
+  (example-color "Average in RGB" (average [:yellow :red :teal "#dddddd"]))
+  (example-color "Average in LAB" (average :LAB [:yellow :red :teal "#dddddd"]))
+  (example-color "Average in HSL" (average :LCH [:yellow :red :teal "#dddddd"])))
+
+(add-examples mix
+  (example-color "Mix" (mix :red :blue))
+  (example-color "Mix, different ratio" (mix :red :blue 0.25))
+  (example-color "Mix in LAB" (mix :LAB :red :blue 0.5))
+  (example-color "Mix in HSI" (mix :HSI :red :blue 0.5)))
+
+;; ----
+
+(add-examples gradient
+  (example-gradient "Linear, RGB" (gradient (colourlovers-palettes 5)))
+  (example-gradient "Linear, HSL" (gradient (colourlovers-palettes 5) :HSL))
+  (example-gradient "Linear, Yxy" (gradient (colourlovers-palettes 5) :Yxy))
+  (example-gradient "Cubic, Yxy" (gradient (colourlovers-palettes 5) :Yxy :cubic-spline))
+  (example-gradient "Shepard, Yxy" (gradient (colourlovers-palettes 5) :Yxy :shepard))
+  (example-gradient "Shepard, Yxy, irregular spacing" (gradient (colourlovers-palettes 5) :Yxy :shepard [0 0.1 0.15 0.8 1.0]))
+  (example-palette "Easy way to create palette from gradient" (m/sample (gradient [:blue :green] :HSL :cubic-spline) 10)))
+
+(add-examples gradient-easing
+  (example-gradient "Linear, HCL" (gradient-easing :HCL [300 0.2 0.2] [200 0.8 0.9]))
+  (example-gradient "Bounce in-out, HCL" (gradient-easing :HCL e/bounce-in-out [300 0.2 0.2] [200 0.8 0.9])))
+
+(add-examples gradient-cubehelix
+  (example-gradient "Cubehelix gradient" (gradient-cubehelix [300 0.2 0.2] [200 0.8 0.9])))
+
+(add-examples resample
+  (example-palette "Input palette" (colourlovers-palettes 12))
+  (example-palette "Resample one of the colourlovers palette." (resample 16 (colourlovers-palettes 12)))
+  (example-palette "Resample one of the colourlovers palette. Different gradient settings."
+                   (resample 16 (colourlovers-palettes 12) :LUV :cubic-spline)))
 ;; ----
 
 (add-examples gradient-presets-list  (example "List of ready to use gradients" gradient-presets-list))
@@ -352,4 +382,21 @@
   (example-gradient "IQ 6" (:iq-6 gradient-presets))
   (example-gradient "IQ 7" (:iq-7 gradient-presets)))
 
+(add-examples palette-presets
+  (example-palette "`:prgn-10`" (palette-presets :prgn-10))
+  (example-palette "`:rdylbu-9`" (palette-presets :rdylbu-9))
+  (example-palette "`:spectral-11`" (palette-presets :spectral-11))
+  (example-palette "`:oranges-9`" (palette-presets :oranges-9))
+  (example-palette "`:accent`" (palette-presets :accent))
+  (example-palette "`:dark2`" (palette-presets :dark2))
+  (example-palette "`:set3`" (palette-presets :set3))
+  (example-palette "`:category-20c`" (palette-presets :category20c))
+  (example-palette "`:viridis`" (resample 16 (palette-presets :viridis)))
+  (example-palette "`:microsoft-3`" (resample 16 (palette-presets :microsoft-3)))
+  (example-palette "`:tableau-20-2`" (resample 16 (palette-presets :tableau-20-2))))
 
+(add-examples palette-presets-list
+  (example "List of palettes" palette-presets-list))
+
+(add-examples html-colors-list
+  (example "List of html color names" html-colors-list))
