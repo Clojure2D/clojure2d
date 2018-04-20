@@ -91,7 +91,7 @@
   [cs]
   (let [[to from] (colorspaces cs)
         [to* from*] (colorspaces* cs)
-        c (concat (keys html-colors-map)
+        c (concat html-colors-list
                   (repeatedly 20000 #(v/vec4 (v/generate-vec3 (fn [] (r/irand 256))) 255))
                   (repeatedly 20000 #(v/generate-vec3 (fn [] (r/irand 256))))
                   (repeatedly 20000 r/irand))]
@@ -121,7 +121,7 @@
   (is (colorspace-validity :LCH))
   (is (colorspace-validity :LUV))
   (is (colorspace-validity :XYZ))
-  (is (colorspace-validity :YXY))
+  (is (colorspace-validity :Yxy))
   (is (colorspace-validity :OHTA)))
 
 ;; test iq palette generator

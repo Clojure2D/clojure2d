@@ -4,7 +4,8 @@
             [clojure2d.color :refer :all]
             [clojure2d.core :refer :all]
             [clojure2d.pixels :as p]
-            [fastmath.vector :as v]))
+            [fastmath.vector :as v]
+            [fastmath.core :as m]))
 
 (defmacro example-color [description ex]
   `(assoc (example ~description ~ex) :type :color))
@@ -122,6 +123,29 @@
 
 ;; --
 
+(add-examples to-linear
+  (example "Gamma correction" (to-linear 0.5)))
+
+(add-examples from-linear
+  (example "Gamma correction" (from-linear 0.5)))
+
+(add-examples colorspaces
+  (example "Example conversion" (let [[to from] (colorspaces :Cubehelix)]
+                                  (map m/approx (from (to [100 200 50]))))))
+
+(add-examples colorspaces*
+  (example "Example conversion" (let [[to from] (colorspaces* :Cubehelix)]
+                                  (map m/approx (from (to [100 200 50]))))))
+
+;;
+
+(add-examples *blend-threshold*
+  (example-session "Usage"
+    (blend-opacity 0.23 0.88)
+    (binding [*blend-threshold* 0.9]
+      (blend-opacity 0.23 0.88))
+    (blend-opacity 0.23 0.88 0.9)))
+
 (add-examples blend-values
   (example-session "Usage" (blend-values blend-multiply 123 44) (blend-values blend-add 123 44)))
 
@@ -142,7 +166,10 @@
   []
   `(do ~@(for [x blends-list]
            (let [n (symbol (str "blend-" (name x)))]              
-             `(add-examples ~n (example-snippet "Composed images" blend-images :image ~x))))))
+             `(add-examples ~n
+                (example-snippet "Composed images" blend-images :image ~x)
+                (example-session "Simple calls" (~n 0.43 0.68) (~n 0.22 0.44))
+                (example-palette "Blend two colors" [:salmon :mediumturquoise (blend-colors ~n :salmon :mediumturquoise)]))))))
 
 (add-blends-examples)
 
@@ -157,7 +184,7 @@
   `(do ~@(for [n colorspaces-list]
            (let [n-to (symbol (str "to-" (name n)))]              
              `(do (add-examples ~n-to
-                    (example-gradient "Gradient between four colors using given colorspace." (gradient [:maroon :white :black :lightcyan] ~n))
+                    (example-gradient "Gradient between four colors using given color space." (gradient [:maroon :white :black :lightcyan] ~n))
                     (example "Convert into colorspace value" (~n-to :peru))))))))
 
 (defmacro add-colorspace*-examples
@@ -169,6 +196,143 @@
 
 (add-colorspace-examples)
 (add-colorspace*-examples)
+
+(defmacro add-colorspace*-from-examples
+  []
+  `(do ~@(for [n colorspaces-list]
+           (let [n-from (symbol (str "from-" (name n) "*"))
+                 v (symbol "v")]              
+             `(do (add-examples ~n-from
+                    (example-gradient "Gradient generated from given color space." (fn [~v] (~n-from (lerp [255 255 255] [0 0 0] ~v))))))))))
+
+(add-colorspace*-from-examples)
+
+(defmacro add-colorspace-from-examples
+  []
+  `(do ~@(for [n colorspaces-list]
+           (let [n-from (symbol (str "from-" (name n)))
+                 n-to (symbol (str "to-" (name n)))]              
+             `(do (add-examples ~n-from
+                    (example "Converting to and from given colorspace should yield almost the same color." (map m/approx ((juxt red green blue) (~n-from (~n-to (color 122 3 254))))))))))))
+
+(add-colorspace-from-examples)
+
+(add-examples colorspaces
+  (example "List of colorspaces" colorspaces-list))
+
+;;
+
+(add-examples color-converter
+  (example-session "When you pass only color space, returns normalized from-XXX* function."
+    (color-converter :YUV)
+    ((color-converter :YUV) [158 94 85]))
+  (example-session "You can maximum value for all channels."
+    ((color-converter :HCL 1.0) [0.5 0.5 0.5 0.2])
+    ((color-converter :HCL 100.0) [50 50 50 100]))
+  (example "You can set maximum value for each channel separately. Here makes conversion from HSL color space where hue is from range 0-360, saturation and lightness from 0-100. Alpha is from range 0-255."
+    ((color-converter :HCL 360.0 100.0 100.0) [240 50 50])))
+
+;;
+
+(add-examples colourlovers-palettes
+  (example "Number of palettes" (count colourlovers-palettes))
+  (example-palette "Palette 0" (colourlovers-palettes 0))
+  (example-palette "Palette 40" (colourlovers-palettes 40))
+  (example-palette "Palette 101" (colourlovers-palettes 101))
+  (example-palette "Palette 201" (colourlovers-palettes 201))
+  (example-palette "Palette 499" (colourlovers-palettes 499)))
+
+(add-examples iq-palette-gradient
+  (example-gradient "Create gradient"
+                    (iq-palette-gradient
+                     (v/vec3 0.5 0.5 0.5)
+                     (v/vec3 0.4 0.5 0.6)
+                     (v/vec3 0.2 0.2 1.0)
+                     (v/vec3 1.0 0.1 1.0))))
+
+(add-examples iq-palette-random-gradient
+  (example-gradient "Create gradient" (iq-palette-random-gradient))
+  (example-gradient "Create another gradient" (iq-palette-random-gradient)))
+
+;; ----
+
+(add-examples paletton-presets-list
+  (example "List of all paletton presets" paletton-presets-list))
+
+(add-examples paletton-rgb-to-hue
+  (example-session "Convert RGB to paletton hue."
+    (hue :amber)
+    (paletton-rgb-to-hue :amber)
+    (paletton-rgb-to-hue 22 33 123)))
+
+(add-examples paletton
+  (example-palette "Monochromatic dark-neon palette" (paletton :monochromatic 140 {:preset :dark-neon}))
+  (example-palette "Monochromatic full (default) palette" (paletton :monochromatic 140))
+  (example-palette "Monochromatic shiny palette with complementary color" (paletton :monochromatic 300 {:preset :shiny :compl true}))
+  (example-palette "Triad full palette, angle 30" (paletton :triad 120))
+  (example-palette "Triad palette, angle 10 with complementary" (paletton :triad 120 {:preset :pastels-dark :angle 10 :compl true}))
+  (example-palette "Triad palette, angle 10 with complementary, not adjacent version" (paletton :triad 120 {:adj false :preset :pastels-dark :angle 10 :compl true}))
+  (example-palette "Tetrad palette" (paletton :tetrad 20 {:preset :pastels-darkest}))
+  (example-palette "Tetrad palette, bigger angle " (paletton :tetrad 20 {:angle 100 :preset :pastels-darkest})))
+
+;; ----
+
+(add-examples delta-c
+  (example "Distance between colors" (delta-c :maroon :amber)))
+
+(add-examples delta-h
+  (example "Distance between colors" (delta-h :maroon :amber)))
+
+(add-examples delta-e-cie
+  (example "Distance between colors" (delta-e-cie :maroon :amber)))
+
+(add-examples delta-e-cmc
+  (example "Distance between colors" (delta-e-cmc :maroon :amber)))
+
+(add-examples euclidean
+  (example "Distance between colors" (euclidean :maroon :amber)))
+
+(def some-palette (paletton :triad 210 {:angle 40}))
+
+(add-examples nearest-color
+  (example-color "Find nearest color to given color from below palette." [120 0 80])
+  (example-palette "All below examples are using this palette" some-palette)
+  (example-color "With Delta C" (nearest-color delta-c some-palette [120 0 80]))
+  (example-color "With Delta H" (nearest-color delta-h some-palette [120 0 80]))
+  (example-color "With Delta E CIE" (nearest-color delta-e-cie some-palette [120 0 80]))
+  (example-color "With Delta E CMC" (nearest-color delta-e-cmc some-palette [120 0 80]))
+  (example-color "With euclidean" (nearest-color euclidean some-palette [120 0 80])))
+
+;; ----
+
+(comment add-examples html-awt-color
+         (example-color "Usage" (html-awt-color :khaki)))
+
+(comment add-examples html-color
+         (example-color "Usage" (html-color :khaki)))
+
+(add-examples change-lab-luma
+  (example-color "Given color" :khaki)
+  (example-color "Lighten by 30" (change-lab-luma 30 :khaki))
+  (example-color "Darken by 50" (change-lab-luma -50 :khaki)))
+
+(add-examples darken
+  (example-palette "Make palette" (take 10 (iterate darken :amber))))
+
+(add-examples lighten
+  (example-palette "Make palette" (take 10 (iterate lighten "03100f"))))
+
+
+(add-examples change-saturation
+  (example-color "Given color" :khaki)
+  (example-color "Saturate by 30" (change-saturation 30 :khaki))
+  (example-color "Desaturate by 30" (change-saturation -30 :khaki)))
+
+(add-examples saturate
+  (example-palette "Make palette" (take 10 (iterate saturate (from-HSL (color 300 0.0 0.5))))))
+
+(add-examples desaturate
+  (example-palette "Make palette" (take 10 (iterate desaturate (from-HSL (color 300 1.0 0.5))))))
 
 
 ;; ----

@@ -1238,7 +1238,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
                               (set-font "Arial")
                               (text "Trying to set Arial" 100 100 :center)
                               (set-font "Verdana")
-                              (text "Trying to set Helvetica" 100 150 :center))))]}
+                              (text "Trying to set Verdana" 100 150 :center))))]}
   [^Canvas canvas ^String fontname]
   (let [f (java.awt.Font/decode fontname)]
     (.setFont ^Graphics2D (.graphics canvas) f)

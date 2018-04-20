@@ -27,6 +27,9 @@ All notable changes to this project will be documented in this file. This change
 - `resize-image` and `resize-canvas` are now moved to ImageProto as `resize`
 - xor-mode, gradient-mode are reset with paint-mode
 - to-XXX/from-XXX in colorspaces are raw conversions now
+- YXY renamed to Yxy
+- make-color-converter -> color-converter
+- paletton-palette -> paletton
 
 Prefix `make-` is reserved when function is created.
 

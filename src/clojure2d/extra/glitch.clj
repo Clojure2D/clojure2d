@@ -369,7 +369,7 @@
                       :palette (m/sample (c/iq-palette-random-gradient) num)})
                0.5 {:type :colourlovers
                     :palette (rand-nth c/colourlovers-palettes)}
-               0.6 (let [preset (rand-nth (keys c/paletton-presets))
+               0.6 (let [preset (rand-nth c/paletton-presets-list)
                          p (rand-nth c/colourlovers-palettes)
                          h (map #(c/paletton-rgb-to-hue %) p)]
                      {:type :colourlovers-paletton
@@ -377,7 +377,7 @@
                              :preset preset
                              :type :monochromatic
                              :compl false}
-                      :palette (let [v (reduce #(concat %1 (c/make-monochromatic-palette %2 (preset c/paletton-presets))) p h)]
+                      :palette (let [v (reduce #(concat %1 (c/paletton %2 preset)) p h)]
                                  (vec v))})
                (let [h (r/drand 360.0)
                      t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
@@ -385,11 +385,11 @@
                            :angle (r/drand 10.0 90.0)
                            :adj (r/brand 0.5)
                            :hue h
-                           :preset (rand-nth (keys c/paletton-presets))
+                           :preset (rand-nth c/colourlovers-palettes)
                            :type t}]
                  {:type :paletton
                   :conf conf
-                  :palette (c/paletton-palette t h conf)}))
+                  :palette (c/paletton t h conf)}))
         pal (r/randval 0.2
                        (update bpal :palette conj (Vec4. 0.0 0.0 0.0 255.0) (Vec4. 255.0 255.0 255.0 255.0))
                        bpal)
