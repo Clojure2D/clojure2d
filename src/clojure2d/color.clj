@@ -2431,6 +2431,42 @@ See [[blends-list]] for names."}
          SH (* SC (inc (* F (dec T))))]
      (m/sqrt (+ (m/sq (/ dL (* l SL))) (m/sq (/ dC (* c SC))) (/ dH (m/sq SH)))))))
 
+(defn contrast-ratio
+  "WCAG contrast ratio.
+
+  Based on YUV luma."
+  {:metadoc/categories #{:dist}}
+  [c1 c2]
+  (let [^double l1 (luma c1)
+        ^double l2 (luma c2)]
+    (if (> l1 l2)
+      (/ (+ l1 0.05) (+ l2 0.05))
+      (/ (+ l2 0.05) (+ l1 0.05)))))
+
+(defn- nd-lab-interval
+  "Minimal difference values"
+  [^double s ^double p]
+  (v/mult (Vec3. (+ 10.16 (/ 1.5 s))
+                 (+ 10.68 (/ 3.08 s))
+                 (+ 10.70 (/ 5.74 s))) p))
+
+(defn noticable-different?
+  "Returns noticable difference (true/false) between colors.
+
+  Defined in: https://research.tableau.com/sites/default/files/2014CIC_48_Stone_v3.pdf
+
+  Implementation from: https://github.com/connorgr/d3-jnd/blob/master/src/jnd.js"
+  {:metadoc/categories #{:dist}}
+  ([c1 c2] (noticable-different? 0.1 0.5 c1 c2))
+  ([^double s ^double p c1 c2]
+   (let [c1 (to-LAB c1)
+         c2 (to-LAB c2)
+         ^Vec4 diff (v/abs (v/sub c1 c2))
+         ^Vec3 nd (nd-lab-interval s p)]
+     (bool-or (>= (.x diff) (.x nd))
+              (>= (.y diff) (.y nd))
+              (>= (.z diff) (.z nd))))))
+
 (defn nearest-color
   "Find nearest color from a set. Input: distance function (default euclidean), list of target colors and source color."
   {:metadoc/categories #{:dist}}
@@ -2674,14 +2710,14 @@ See [[blends-list]] for names."}
 
   Grandient function accepts value from 0 to 1 and returns interpolated color.
 
-  Optionally interpolate in given `colorspace` and `interpolator` name as keyword. Possible interpolations: `:cubic-spline`, `:neville`, `:spline`, `:shepard`, `:akima`.
+  Optionally interpolate in given `colorspace` and 1d `interpolator` as keyword or function.
 
   To make irregular spacings between colors, provide own `domain`."
   {:metadoc/categories #{:grad}}
-  ([palette] (gradient palette :RGB :linear nil))
-  ([palette colorspace] (gradient palette colorspace :linear nil))
-  ([palette colorspace interpolator] (gradient palette colorspace interpolator nil))
-  ([palette colorspace interpolator domain]
+  ([palette] (gradient :RGB :linear nil palette))
+  ([colorspace palette] (gradient colorspace :linear nil palette))
+  ([colorspace interpolator palette] (gradient colorspace interpolator nil palette))
+  ([colorspace interpolator domain palette]
    (let [[to from] (colorspaces colorspace)
          cpalette (->> palette
                        (map to-color)
@@ -2692,10 +2728,11 @@ See [[blends-list]] for names."}
          c1 (map ch1 cpalette)
          c2 (map ch2 cpalette)
          c3 (map alpha cpalette)
-         i0 ((i/interpolators-list interpolator) r c0)
-         i1 ((i/interpolators-list interpolator) r c1)
-         i2 ((i/interpolators-list interpolator) r c2)
-         i3 ((i/interpolators-list interpolator) r c3)] 
+         ifn (if (keyword? interpolator) (i/interpolators-1d-list interpolator) interpolator)
+         i0 (ifn r c0)
+         i1 (ifn r c1)
+         i2 (ifn r c2)
+         i3 (ifn r c3)] 
      (fn [^double t]
        (let [ct (m/constrain t 0.0 1.0)]
          (from (v/vec4 (i0 ct) (i1 ct) (i2 ct) (i3 ct))))))))
@@ -2707,16 +2744,16 @@ See [[blends-list]] for names."}
 
   You can use easing function to make interpolation non-linear (default: linear)."
   {:metadoc/categories #{:grad}}
-  ([cs easing v1 v2]
+  ([cs easing col1 col2]
    (let [[_ from] (colorspaces cs)
-         v1 (to-color v1)
-         v2 (to-color v2)]
+         col1 (to-color col1)
+         col2 (to-color col2)]
      (fn [^double t]
-       (from (v/interpolate v1 v2 (easing t))))))
-  ([cs v1 v2]
-   (gradient-easing cs e/linear v1 v2))
-  ([v1 v2]
-   (gradient-easing :RGB e/linear v1 v2)))
+       (from (v/interpolate col1 col2 (easing t))))))
+  ([cs col1 col2]
+   (gradient-easing cs e/linear col1 col2))
+  ([col1 col2]
+   (gradient-easing :RGB e/linear col1 col2)))
 
 (def ^{:metadoc/categories #{:grad}
        :doc "Cubehelix gradient generator."}
@@ -2728,7 +2765,7 @@ See [[blends-list]] for names."}
   Internally it's done by creating gradient and sampling back to colors. You can pass [[gradient]] parameters like colorspace, interpolator name and domain."
   {:metadoc/categories #{:pal}}
   [number-of-colors palette & gradient-params]
-  (m/sample (apply gradient palette gradient-params) number-of-colors))
+  (m/sample (apply gradient (conj (vec gradient-params) palette)) number-of-colors))
 
 ;; http://iquilezles.org/www/articles/palettes/palettes.htm
 

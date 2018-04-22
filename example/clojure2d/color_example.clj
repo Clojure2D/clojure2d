@@ -6,7 +6,9 @@
             [clojure2d.pixels :as p]
             [fastmath.vector :as v]
             [fastmath.core :as m]
-            [fastmath.easings :as e]))
+            [fastmath.easings :as e]
+            [fastmath.interpolation :as i]
+            [fastmath.rbf :as rbf]))
 
 (defmacro example-color [description ex]
   `(assoc (example ~description ~ex) :type :color))
@@ -185,7 +187,7 @@
   `(do ~@(for [n colorspaces-list]
            (let [n-to (symbol (str "to-" (name n)))]
              `(do (add-examples ~n-to
-                    (example-gradient "Gradient between four colors using given color space." (gradient [:maroon :white :black :lightcyan] ~n))
+                    (example-gradient "Gradient between four colors using given color space." (gradient ~n [:maroon :white :black :lightcyan]))
                     (example "Convert into colorspace value" (~n-to :peru))))))))
 
 (defmacro add-colorspace*-examples
@@ -293,6 +295,15 @@
 (add-examples euclidean
   (example "Distance between colors" (euclidean :maroon :amber)))
 
+(add-examples contrast-ratio
+  (example "Contrast ratio" (contrast-ratio :pink :hotpink))
+  (example "Contrast ratio" (contrast-ratio :pink :purple)))
+
+(add-examples noticable-different?
+  (example "Contrast ratio" (noticable-different? :pink :hotpink))
+  (example "Contrast ratio" (noticable-different? "00aabb" "00baba")))
+
+
 (def some-palette (paletton :triad 210 {:angle 40}))
 
 (add-examples nearest-color
@@ -346,12 +357,13 @@
 
 (add-examples gradient
   (example-gradient "Linear, RGB" (gradient (colourlovers-palettes 5)))
-  (example-gradient "Linear, HSL" (gradient (colourlovers-palettes 5) :HSL))
-  (example-gradient "Linear, Yxy" (gradient (colourlovers-palettes 5) :Yxy))
-  (example-gradient "Cubic, Yxy" (gradient (colourlovers-palettes 5) :Yxy :cubic-spline))
-  (example-gradient "Shepard, Yxy" (gradient (colourlovers-palettes 5) :Yxy :shepard))
-  (example-gradient "Shepard, Yxy, irregular spacing" (gradient (colourlovers-palettes 5) :Yxy :shepard [0 0.1 0.15 0.8 1.0]))
-  (example-palette "Easy way to create palette from gradient" (m/sample (gradient [:blue :green] :HSL :cubic-spline) 10)))
+  (example-gradient "Linear, HSL" (gradient :HSL (colourlovers-palettes 5)))
+  (example-gradient "Linear, Yxy" (gradient :Yxy (colourlovers-palettes 5)))
+  (example-gradient "Cubic, Yxy" (gradient :Yxy :cubic-spline (colourlovers-palettes 5)))
+  (example-gradient "Loess, Yxy" (gradient :Yxy :loess (colourlovers-palettes 5)))
+  (example-gradient "RBF, Yxy" (gradient :Yxy (partial i/rbf (rbf/rbf :thinplate)) (colourlovers-palettes 5)))
+  (example-gradient "Shepard, Yxy, irregular spacing" (gradient :Yxy :shepard [0 0.1 0.15 0.8 1.0] (colourlovers-palettes 5)))
+  (example-palette "Easy way to create palette from gradient" (m/sample (gradient :HSL :cubic-spline [:blue :green]) 10)))
 
 (add-examples gradient-easing
   (example-gradient "Linear, HCL" (gradient-easing :HCL [300 0.2 0.2] [200 0.8 0.9]))
@@ -400,3 +412,6 @@
 
 (add-examples html-colors-list
   (example "List of html color names" html-colors-list))
+
+
+;;

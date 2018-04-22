@@ -64,38 +64,38 @@
 <p>Font you set while creating canvas will be default font. You can set another font in the code with <a href="clojure2d.core.html#var-set-font">set-font</a> and <a href="clojure2d.core.html#var-set-font-attributes">set-font-attributes</a> functions. However these set font temporary.</p></div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Canvas is the record.</p></blockquote><pre><code class="hljs clojure">(canvas 20 30 :low)
 ;;=&gt; #clojure2d.core/Canvas
 ;;=&gt;  {:buffer
-;;=&gt;   #object[java.awt.image.BufferedImage 0x3691a4cc "BufferedImage@3691a4cc: type = 3 DirectColorModel: rmask=ff0000 gmask=ff00 bmask=ff amask=ff000000 IntegerInterleavedRaster: width = 20 height = 30 #Bands = 4 xOff = 0 yOff = 0 dataOffset[0] 0"],
+;;=&gt;   #object[java.awt.image.BufferedImage 0x61cd6f49 "BufferedImage@61cd6f49: type = 3 DirectColorModel: rmask=ff0000 gmask=ff00 bmask=ff amask=ff000000 IntegerInterleavedRaster: width = 20 height = 30 #Bands = 4 xOff = 0 yOff = 0 dataOffset[0] 0"],
 ;;=&gt;   :ellipse-obj
-;;=&gt;   #object[java.awt.geom.Ellipse2D$Double 0x48a9b72d "java.awt.geom.Ellipse2D$Double@0"],
+;;=&gt;   #object[java.awt.geom.Ellipse2D$Double 0x9ae1213 "java.awt.geom.Ellipse2D$Double@0"],
 ;;=&gt;   :font nil,
 ;;=&gt;   :graphics nil,
 ;;=&gt;   :h 30,
 ;;=&gt;   :hints
-;;=&gt;   [[#object[sun.awt.SunHints$Key 0x14aa145a "Global antialiasing enable key"]
-;;=&gt;     #object[sun.awt.SunHints$Value 0x296f4f62 "Nonantialiased rendering mode"]]
-;;=&gt;    [#object[sun.awt.SunHints$Key 0x6c8a97d6 "Image interpolation method key"]
-;;=&gt;     #object[sun.awt.SunHints$Value 0x1542447f "Nearest Neighbor image interpolation mode"]]
-;;=&gt;    [#object[sun.awt.SunHints$Key 0x2960dfb7 "Alpha blending interpolation method key"]
-;;=&gt;     #object[sun.awt.SunHints$Value 0x71f8971a "Fastest alpha blending methods"]]
-;;=&gt;    [#object[sun.awt.SunHints$Key 0x7c625a1d "Color rendering quality key"]
-;;=&gt;     #object[sun.awt.SunHints$Value 0x952a647 "Fastest color rendering mode"]]
-;;=&gt;    [#object[sun.awt.SunHints$Key 0x423873e8 "Global rendering quality key"]
-;;=&gt;     #object[sun.awt.SunHints$Value 0x5a15ec50 "Fastest rendering methods"]]
-;;=&gt;    [#object[sun.awt.SunHints$Key 0x3b2dcf41 "Fractional metrics enable key"]
-;;=&gt;     #object[sun.awt.SunHints$Value 0x5df33ad1 "Integer text metrics mode"]]
-;;=&gt;    [#object[sun.awt.SunHints$Key 0x6b2b46cf "Text-specific antialiasing enable key"]
-;;=&gt;     #object[sun.awt.SunHints$Value 0x60a08fd2 "Nonantialiased text mode"]]],
+;;=&gt;   [[#object[sun.awt.SunHints$Key 0x44f6b9c5 "Global antialiasing enable key"]
+;;=&gt;     #object[sun.awt.SunHints$Value 0x58bdc6dc "Nonantialiased rendering mode"]]
+;;=&gt;    [#object[sun.awt.SunHints$Key 0x128c36c0 "Image interpolation method key"]
+;;=&gt;     #object[sun.awt.SunHints$Value 0x2361f828 "Nearest Neighbor image interpolation mode"]]
+;;=&gt;    [#object[sun.awt.SunHints$Key 0x457aadb9 "Alpha blending interpolation method key"]
+;;=&gt;     #object[sun.awt.SunHints$Value 0x3ebaa33c "Fastest alpha blending methods"]]
+;;=&gt;    [#object[sun.awt.SunHints$Key 0x5b294fe7 "Color rendering quality key"]
+;;=&gt;     #object[sun.awt.SunHints$Value 0x4c01cb27 "Fastest color rendering mode"]]
+;;=&gt;    [#object[sun.awt.SunHints$Key 0x3e231755 "Global rendering quality key"]
+;;=&gt;     #object[sun.awt.SunHints$Value 0x7abc7f5d "Fastest rendering methods"]]
+;;=&gt;    [#object[sun.awt.SunHints$Key 0x26f71756 "Fractional metrics enable key"]
+;;=&gt;     #object[sun.awt.SunHints$Value 0x56b0789a "Integer text metrics mode"]]
+;;=&gt;    [#object[sun.awt.SunHints$Key 0x15c0918d "Text-specific antialiasing enable key"]
+;;=&gt;     #object[sun.awt.SunHints$Value 0x55c901f1 "Nonantialiased text mode"]]],
 ;;=&gt;   :line-obj
-;;=&gt;   #object[java.awt.geom.Line2D$Double 0x747ac5fb "java.awt.geom.Line2D$Double@747ac5fb"],
+;;=&gt;   #object[java.awt.geom.Line2D$Double 0x7fe23e48 "java.awt.geom.Line2D$Double@7fe23e48"],
 ;;=&gt;   :rect-obj
-;;=&gt;   #object[java.awt.geom.Rectangle2D$Double 0x45995714 "java.awt.geom.Rectangle2D$Double[x=0.0,y=0.0,w=0.0,h=0.0]"],
+;;=&gt;   #object[java.awt.geom.Rectangle2D$Double 0x331c309b "java.awt.geom.Rectangle2D$Double[x=0.0,y=0.0,w=0.0,h=0.0]"],
 ;;=&gt;   :transform-stack nil,
 ;;=&gt;   :w 20}</code></pre></div><div><blockquote><p>Check ImageProto on canvas.</p></blockquote><pre><code class="hljs clojure">(width (canvas 10 20))
 ;;=&gt; 10
 (height (canvas 10 20))
 ;;=&gt; 20
 (get-image (canvas 5 6))
-;;=&gt; BufferedImage@1cf74e23: type = 3 DirectColorModel: rmask=ff0000 gmask=ff00 bmask=ff amask=ff000000 IntegerInterleavedRaster: width = 5 height = 6 #Bands = 4 xOff = 0 yOff = 0 dataOffset[0] 0
+;;=&gt; BufferedImage@4a0cd5c1: type = 3 DirectColorModel: rmask=ff0000 gmask=ff00 bmask=ff amask=ff000000 IntegerInterleavedRaster: width = 5 height = 6 #Bands = 4 xOff = 0 yOff = 0 dataOffset[0] 0
 (width (resize (canvas 1 2) 15 15))
 ;;=&gt; 15
 (height (subimage (canvas 10 10) 5 5 2 2))
