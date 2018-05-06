@@ -759,6 +759,22 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   (.setTransform ^Graphics2D (.graphics canvas) (java.awt.geom.AffineTransform.))
   canvas)
 
+;; -- clip
+
+(defn clip
+  "Clip drawing to specified rectangle"
+  {:metadoc/categories #{:canvas}}
+  [^Canvas canvas x y w h] 
+  (.setClip ^Graphics2D (.graphics canvas) x y w h)
+  canvas)
+
+(defn reset-clip
+  "Clip drawing to specified rectangle"
+  {:metadoc/categories #{:canvas}}
+  [^Canvas canvas x y w h] 
+  (.setClip ^Graphics2D (.graphics canvas) 0 0 (width canvas) (height canvas))
+  canvas)
+
 ;; ### Drawing functions
 ;;
 ;; Here we have basic drawing functions. What you need to remember:
