@@ -1302,6 +1302,16 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   ^long [^Canvas canvas]
   (.getHeight (.getFontMetrics ^Graphics2D (.graphics canvas))))
 
+(defn font-ascent
+  "Returns font width from metrics. Should be called within context."
+  {:metadoc/categories #{:draw}
+   :metadoc/examples [(ex/example"Height of current font."
+                        (with-canvas-> (canvas 10 10)
+                          (font-ascent)))]}
+  ^long [^Canvas canvas]
+  (.getAscent (.getFontMetrics ^Graphics2D (.graphics canvas))))
+
+
 (defn text-width
   "Returns width of the provided string. Should be called within context."
   {:metadoc/categories #{:draw}

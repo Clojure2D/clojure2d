@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file. This change
 - color preset palettes (Brewer, Tableaus, Microsoft)
 - color gradients
 - color tweaking functions
+- font-ascent
 
 ### Changed
 
