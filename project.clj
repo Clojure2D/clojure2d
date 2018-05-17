@@ -16,7 +16,7 @@
         ::url "https://github.com/Clojure2D/clojure2d.git"}
   :repl-options {:timeout 120000}
   :target-path "target/%s"
-  :jvm-opts ["-Xmx4096M"
+  :jvm-opts ["-Xmx2048M"
              ;; "-Dcom.sun.management.jmxremote"
              ;; "-Dcom.sun.management.jmxremote.ssl=false"
              ;; "-Dcom.sun.management.jmxremote.authenticate=false"
