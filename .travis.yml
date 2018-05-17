@@ -3,7 +3,6 @@ lein: lein
 script: lein do clean, check, test
 jdk:
   - oraclejdk8
-  - oraclejdk7
 before_script:
   - "export DISPLAY=:99.0"
   - "sh -e /etc/init.d/xvfb start"
