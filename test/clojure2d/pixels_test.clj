@@ -6,58 +6,33 @@
             [clojure.test :refer :all])
   (:import [clojure2d.pixels Pixels]))
 
-(def ^Pixels pixels-planar (p/pixels 100 99 true))
-(def ^Pixels pixels-interleaved (p/pixels 100 99 false))
+(def ^Pixels pixels (p/pixels 100 99))
 
 (defn pixels-fixture
   [f]
-  (p/set-color pixels-planar 10 10 (c/color 100 200 10 22))
-  (p/set-color pixels-planar 222 (c/color 1 2 3 4))
-  (p/set-value pixels-planar 2 20 20 123)
-  (p/set-value pixels-planar 1 5555 30)
-  (p/set-color pixels-interleaved 10 10 (c/color 100 200 10 22))
-  (p/set-color pixels-interleaved 222 (c/color 1 2 3 4))
-  (p/set-value pixels-interleaved 2 20 20 123)
-  (p/set-value pixels-interleaved 1 5555 30)
+  (p/set-color pixels 10 10 (c/color 100 200 10 22))
+  (p/set-color pixels 222 (c/color 1 2 3 4))
+  (p/set-value pixels 2 20 20 123)
+  (p/set-value pixels 1 5555 30)
   (f))
 
 (use-fixtures :once pixels-fixture)
 
 ;; protocol
 (deftest get-colot-test
-  (is (= (c/color 100 200 10 22) (p/get-color pixels-planar 10 10)))
-  (is (= (c/color 1 2 3 4) (p/get-color pixels-planar 222)))
-  (is (= (c/color 0 0 0 0) (p/get-color pixels-planar 10 11)))
-  (is (= (c/color 100 200 10 22) (p/get-color pixels-interleaved 10 10)))
-  (is (= (c/color 1 2 3 4) (p/get-color pixels-interleaved 222)))
-  (is (= (c/color 0 0 0 0) (p/get-color pixels-interleaved 10 11))))
+  (is (= (c/color 100 200 10 22) (p/get-color pixels 10 10)))
+  (is (= (c/color 1 2 3 4) (p/get-color pixels 222)))
+  (is (= (c/color 0 0 0 0) (p/get-color pixels 10 11))))
 
 (deftest get-pixel-test
-  (is (= 200 (p/get-value pixels-planar 1 10 10)))
-  (is (= 123 (p/get-value pixels-planar 2 20 20)))
-  (is (= 0 (p/get-value pixels-planar 0 4444)))
-  (is (= 30 (p/get-value pixels-planar 1 5555)))
-  (is (= 200 (p/get-value pixels-interleaved 1 10 10)))
-  (is (= 123 (p/get-value pixels-interleaved 2 20 20)))
-  (is (= 0 (p/get-value pixels-interleaved 0 4444)))
-  (is (= 30 (p/get-value pixels-interleaved 1 5555))))
-
-(deftest idx->pos-test
-  (is (= (v/vec2 23 1) (p/idx->pos pixels-planar 123)))
-  (is (= (v/vec2 23 1) (p/idx->pos pixels-planar 123))))
-
-(deftest position-test
-  (is (= (+ 123 (* 100 99)) ((.pos pixels-planar) 1 123)))
-  (is (= (+ 1 (* 4 123)) ((.pos pixels-interleaved) 1 123))))
-
-(deftest planar-test
-  (is (.planar? pixels-planar))
-  (is (not (.planar? pixels-interleaved))))
+  (is (= 200 (p/get-value pixels 1 10 10)))
+  (is (= 123 (p/get-value pixels 2 20 20)))
+  (is (= 0 (p/get-value pixels 0 4444)))
+  (is (= 30 (p/get-value pixels 1 5555))))
 
 (deftest size-test
-  (is (= (.size pixels-planar) (* (.w pixels-planar) (.h pixels-planar))))
-  (is (= (.size pixels-interleaved) (* (width pixels-interleaved) (height pixels-interleaved))))
-  (is (= (* 4 (.size pixels-planar)) (alength (.p pixels-planar)))))
+  (is (= (.size pixels) (* (.w pixels) (.h pixels))))  
+  (is (= (* 4 (.size pixels)) (alength (.p pixels)))))
 
 ;; set/get channel
 

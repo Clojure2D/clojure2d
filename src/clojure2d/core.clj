@@ -1,14 +1,3 @@
-;; # Namespace scope
-;;
-;; This namespace provides functions which cover: diplaying windows, events, canvases, image files and session management.
-;; In brief:
-;;
-;; * Image file read and write, backed by Java ImageIO API. You can read and write BMP, JPG and PNG files. I didn't test WBMP and GIF. Image itself is Java `BufferedImage` in integer ARGB mode. Each pixel is represented as 32bit unsigned integer and 8 bits per channel. See `clojure2d.pixels` namespace for pixels operations.
-;; * Canvas with functions to draw on it, represented as Canvas type with Graphics2d, BufferedImage, quality settings, primitive classes and size
-;; * Display (JFrame) with events handlers (multimethods) + associated autorefreshing canvas, and optionally Processiing style `draw` function with context management
-;; * Session management: unique identifier generation, logging (different file per session) and unique, sequenced filename creation.
-;; * Some general helper functions
-
 (ns clojure2d.core
   "Main Clojure2d entry point for Canvas, Window and drawing generatively.
 
@@ -23,34 +12,158 @@
 
   * [[ImageProto]] - basic Image operations (Image, Canvas, Window and Pixels (see [[clojure2d.pixels]]) implement this protocol.
   * Various events protocols. Events and Window implement these:
-    * [[MouseXYProto]] - mouse position related to Window.
-    * [[MouseButtonProto]] - status of mouse buttons.
-    * [[KeyEventProto]] - keyboard status
-    * [[ModifiersProto]] - status of special keys (Ctrl, Meta, Alt, etc.)
+      * [[MouseXYProto]] - mouse position related to Window.
+      * [[MouseButtonProto]] - status of mouse buttons.
+      * [[KeyEventProto]] - keyboard status
+      * [[ModifiersProto]] - status of special keys (Ctrl, Meta, Alt, etc.)
   * Additionally Window implements [[PressedProto]] in case you want to check in draw loop if your mouse or key is pressed.
 
-  To draw on Canvas outside Window you have to create graphical context. Wrap your code into one of two functions:
-
-  * [[with-canvas]] - binding macro `(with-canvas [local-canvas canvas-object] ...)`
-  * [[with-canvas->]] - threading macro `(with-canvas-> canvas ...)`. Each function in this macro has to accept Canvas as first parameter and return Canvas.
-
-  Canvas bound to Window accessed via callback drawing function (a'ka Processing `draw()`) has graphical context created automatically.
-
-  ### Image
+  ## Image
 
   Image is `BufferedImage` java object. Image can be read from file using [[load-image]] function or saved to file with [[save]]. ImageProto provides [[get-image]] function to access to Image object directly (if you need)
   There is no function which creates Image directly (use Canvas instead).
-
-  ### Canvas
-
-  ### Events
-
-  ### Window
-
-  ### States
   
-  ### Utilities
-  "
+  ## Canvas
+
+  Canvas is an object which is used to draw on it. To create new one call [[canvas]] function. Provide width and height and optionally quality hint.
+
+  Quality hints are as follows:
+
+  * `:low` - no antialiasing, speed optimized rendering
+  * `:mid` - antialiasing, speed optimized rendering
+  * `:high` - antialiasing, quality optimized rendering (default)
+  * `:highest` - as `:high` plus `PURE_STROKE` hint, which can give strange results in some cases.
+
+  To draw on Canvas you have to create graphical context. Wrap your code into one of two functions:
+
+  * [[with-canvas]] - binding macro `(with-canvas [local-canvas canvas-object] ...)`
+  * [[with-canvas->]] - threading macro `(with-canvas-> canvas ...)`.
+
+  Each function in this macro has to accept Canvas as first parameter and return Canvas.
+
+  Canvas bound to Window and accessed via callback drawing function (a'ka Processing `draw()`) has graphical context created automatically.
+  
+  ## Events
+
+  Java2d keyboard and mouse event handlers can be defined as custom multimethods separately for each window.
+  There are following options:
+
+  * Handlers for particular key with dispatch as a vector of window name and key character (eg. `[\"name\" \\c]`)
+      * [[key-pressed]] - when key is pressed
+      * [[key-released]] - when key is released
+      * [[key-typed]] - when key is typed
+  * Handler for given key event with dispatch as a vector of window name and key event (eg. `[\"name\" :key-pressed]`)
+  * Handler for mouse event with dispatch as a vector of window name and mouse event (eg. `[\"name\" :mouse-dragged]`)
+
+  Every event handler accepts as parameters:
+
+  * Event object (java KeyEvent or MouseEvent) - access to the fields through defined protocols
+  * Global state - state attached to window
+
+  Event handler should return new global state.
+  
+  ## Window
+
+  Window object is responsible for displaying canvas content and processing events. You can also initialize states here.
+
+  To create window and display it call [[show-window]]. Function accepts several parameters which are described below.
+
+  Window itself simulates workflow which is available in Processing/Quil frameworks.
+  
+  ### Internals
+
+  When window is created following things are done:
+
+  1. Check parameters and create missing values for missed ones.
+  2. If `:setup` function is provided, call it and use returned value as `:draw-state`
+  3. Create JFrame, java.awt.Canvas, pack them, attach event handlers and display
+  4. Set global state
+  5. Run separated thread which refreshes display with given `:fps`, if `:draw-fn` is available it's called before refreshment.
+
+  Additional informations:
+
+  * Display refreshment is done by displaying canvas on JFrame. You can set separate quality hints (same as for canvas) for this process with `:hint` parameter.
+  * When you privide drawing function, it's called every refreshment. By default graphical context is created every call - which costs time but is safe in case you want to directly access pixels. The second variant which can be used is to create graphical context once at the moment of window creation. This variant can be forced by setting `:refresher` parameter to `:fast`.
+  * You can replace canvas attached to window with [[replace-canvas]] function.
+  * Window itself acts as event object (implements all event protocols)
+  * Canvas and window can have different sizes. Display refreshing functions will scale up/down in such case.
+  * Events and refreshment are not synchronized. Try to avoid drawing inside event multimethods.
+  * You can create as many windows as you want.
+  * You can check if window is visible or not with [[window-active?]] function.
+  * If you provide both `:draw-state` and `:setup`. Value returned by `:setup` has a precedence unless is `nil` or `false`.
+   
+  ### Parameters
+
+  Following parameters are used:
+
+  * `:canvas` - canvas which is displayed on window. Default is 200x200px
+  * `:window-name` - name of the window as a string. Used for event multimathods dispatch.
+  * `:w` - width of the window. Default width of the canvas
+  * `:h` - height of the window. Default height of the canvas
+  * `:fps` - frames per second, defaults to 60
+  * `:draw-fn` - drawing function, called before every display refreshment. Function should accept following four parameters:
+      * canvas within graphical context (you don't need to use [[with-canvas]] or [[with-canvas->]] wrappers.
+      * window object
+      * current frame number as a long value
+      * current state
+  * `:setup` - setup function which should accept two parameters and return initial draw state.
+      * canvas withing graphical context
+      * window object
+  * `:state` - initial global state
+  * `:draw-state` - initial local (drawing) state. If `setup` is provided, value returned by it will be used instead.
+  * `:hint` - display quality hint. Use it when window and canvas have different sizes
+  * `:refresher` - when create graphical context for draw: `:fast` for once or `:safe` for each call (default).
+
+  ## States
+
+  There are two states managed by library: global state connected to window and draw state connected to callback drawing function.
+
+  ### Global state
+
+  Each window has its own state kept in `atom`. The main idea is to have data which flow between event calls. Every event function accepts state and should return state data.
+  Initial state can be set with [[show-window]] `:state` parameter 
+  To access current state from outside the flow call [[get-state]]. You can also mutate the state with [[set-state!]].
+
+  ### Local state for drawing function
+
+  When drawing callback is used you can keep state between calls. What is returned by callback is passed as a parameter in next call. Drawing function is not synchronized with events that's why local state is introduced. You can still access and change global state.
+
+  You can init state from [[show-window]] with `:draw-state` or `:setup` parameters.
+
+  ## How to draw
+
+  There are plenty of functions which you can use to draw on canvas. They can be grouped to:
+
+  * Primitives like [[point]], [[rect]], etc.
+  * Tranformations like [[translate]], [[rotate]], etc.
+  * Text rendering like [[text]], [[set-font-attributes]], etc.
+  * Image manipulations like [[convolve]]
+  * Color and style like [[set-color]], [[gradient-mode]], [[set-background]], [[set-stroke]],  etc.
+
+  All operate on canvas and return canvas as a result. Obviously canvas is mutated.
+  
+  ## Session
+
+  Session is a datetime with its hash kept globally in vector. To access current session names call [[session-name]].
+
+  Following functions rely on session:
+
+  * [[next-filename]] - generate unique filename based on session
+  * [[log]] - save any information to the file under name based on session. See [[log-name]].
+
+  Session is created automatically when needed. Session management functions are:
+
+  * [[make-session]] - create new session
+  * [[ensure-session]] - create new session when there is no one
+  * [[close-session]] - close current session
+  * [[session-name]] - returns current session.
+  
+  ## Utilities
+
+  Additional utility functions
+  
+  * date and time functions
+  * [[to-hex]] formatter"
   {:metadoc/categories {:image "Image functions"
                         :canvas "Canvas functions"
                         :draw "Drawing functions"
@@ -59,6 +172,7 @@
                         :events "Events"
                         :dt "Date / time"
                         :session "Session"
+                        :write "Text / font"
                         :transform "Transform canvas"}}
   (:require [clojure.java.io :refer :all]
             [clojure2d.color :as c]
@@ -66,7 +180,6 @@
             [fastmath.core :as m]
             [clojure.reflect :as ref]
             [fastmath.random :as r]
-            [metadoc.examples :as ex]
             [clojure.string :as s])
   (:import [fastmath.vector Vec2]
            [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
@@ -92,12 +205,10 @@
 ;; ## Image
 
 (def ^{:doc "Default quality of saved jpg (values: 0.0 (lowest) - 1.0 (highest)"
-       :metadoc/categories #{:image}
-       :metadoc/examples [(ex/example "Value" *jpeg-image-quality*)]} ^:dynamic *jpeg-image-quality* 0.97)
+       :metadoc/categories #{:image}}
+  ^:dynamic *jpeg-image-quality* 0.97)
 
 ;; ### Load image
-
-;; To load image from the file, just call `(load-image "filename.jpg")`. Idea is taken from Processing code. Loading is done via `ImageIcon` class and later converted to BufferedImage in ARGB mode.
 
 (defn load-image 
   "Load Image from file.
@@ -137,11 +248,7 @@
 
   * Input: image filename
   * Returns extension (without dot)"
-  {:metadoc/categories #{:image}
-   :metadoc/examples [(ex/example-session "Usage"
-                        (file-extension "image.png")
-                        (file-extension "no_extension")
-                        (file-extension "with.path/file.doc"))]}
+  {:metadoc/categories #{:image}}
   [filename]
   (second (re-find #"\.(\w+)$" filename)))
 
@@ -187,14 +294,12 @@
 
 (def
   ^{:doc "Supported writable image formats. Machine/configuration dependant."
-    :metadoc/categories #{:image}
-    :metadoc/examples [(ex/example "Set of writable image formats" img-writer-formats)]}
+    :metadoc/categories #{:image}}
   img-writer-formats (formats->names (ImageIO/getWriterFormatNames)))
 
 (def
   ^{:doc "Supported readable image formats. Machine/configuration dependant."
-    :metadoc/categories #{:image}
-    :metadoc/examples [(ex/example "Set of readable image formats" img-reader-formats)]}
+    :metadoc/categories #{:image}}
   img-reader-formats (formats->names (ImageIO/getReaderFormatNames)))
 
 ;; Now we define multimethod which saves image. Multimethod is used here because some image types requires additional actions.
@@ -245,9 +350,7 @@
         (println "...done!"))
       (println (str "can't save an image: " filename)))))
 
-;; ### Additional functions
 ;;
-;; Just an image resizer with bicubic interpolation. Native `Graphics2D` method is called.
 
 (defprotocol ImageProto
   "Image Protocol"
@@ -257,26 +360,16 @@
   (^{:metadoc/categories #{:image :canvas :window}} save [i n] "Save image `i` to a file `n`.")
   (^{:metadoc/categories #{:image :canvas :window}} convolve [i t] "Convolve with Java ConvolveOp. See [[convolution-matrices]] for kernel names.")
   (^{:metadoc/categories #{:image :canvas :window}} subimage [i x y w h] "Return part of the image.")
-  (^{:metadoc/categories #{:image :canvas}} resize [i w h] "Resize image.")
-  (^{:metadoc/categories #{:image :canvas :window}} get-pixel [i x y] "Retrun color from given position."))
+  (^{:metadoc/categories #{:image :canvas}} resize [i w h] "Resize image."))
 
 (declare set-rendering-hints-by-key)
-
-(ex/defsnippet process-image-snippet
-  "Process image with function `f` and save."
-  (let [img (load-image "docs/cockatoo.jpg")
-        unique-name (str "images/core/" (first opts) ".jpg")]
-    (binding [*jpeg-image-quality* 0.7]
-      (save (f img) (str "docs/" unique-name)))
-    (str "../" unique-name)))
 
 (defn- resize-image
   "Resize Image.
 
   * Input: image and target width and height
   * Returns newly created resized image"
-  {:metadoc/categories #{:image}
-   :metadoc/examples []}
+  {:metadoc/categories #{:image}}
   [img width height]
   (let [^BufferedImage target (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)
         ^Graphics2D g (.createGraphics target)]
@@ -291,24 +384,6 @@
   [^BufferedImage source x y w h]
   (.getSubimage source x y w h))
 
-(ex/add-examples resize
-  (ex/example-snippet "Resize image to 300x40" process-image-snippet :image (fn [img] (resize img 300 40))))
-
-(ex/add-examples subimage
-  (ex/example-snippet "Get subimage and resize." process-image-snippet :image (fn [img] (-> img
-                                                                                            (subimage 100 100 12 12)
-                                                                                            (resize 150 150)))))
-
-(ex/add-examples get-pixel
-  (ex/example "Get pixel from an image." (let [img (load-image "docs/cockatoo.jpg")]
-                                           (get-pixel img 100 100))))
-
-(ex/add-examples width
-  (ex/example "Width of the image" (width (load-image "docs/cockatoo.jpg"))))
-
-(ex/add-examples height
-  (ex/example "Height of the image" (height (load-image "docs/cockatoo.jpg"))))
-
 ;; ## Screen info
 
 (defn- ^Dimension screen-size
@@ -317,21 +392,19 @@
 
 (defn screen-width
   "Returns width of the screen."
-  {:metadoc/categories #{:display}
-   :metadoc/examples [(ex/example "Example value" (screen-width))]}
+  {:metadoc/categories #{:display}}
   [] (.getWidth (screen-size)))
 
 (defn screen-height 
   "Returns height of the screen." 
-  {:metadoc/categories #{:display}
-   :metadoc/examples [(ex/example "Example value" (screen-height))]}
+  {:metadoc/categories #{:display}}
   [] (.getHeight (screen-size)))
 
 ;;
 
 (def ^{:doc "Java ConvolveOp kernels. See [[convolve]]."
        :metadoc/categories #{:image}
-       :metadoc/examples [(ex/example "List of kernels" (keys convolution-matrices))]}
+       :metadoc/examples []}
   convolution-matrices {:shadow          (Kernel. 3 3 (float-array [0 1 2 -1 0 1 -2 -1 0]))
                         :emboss          (Kernel. 3 3 (float-array [0 2 4 -2 1 2 -4 -2 0]))
                         :edges-1         (Kernel. 3 3 (float-array [1 2 1 2 -12 2 1 2 1]))
@@ -347,15 +420,6 @@
                         :gaussian-blur-3 (Kernel. 3 3 (float-array (map #(/ (int %) 16.0) [1 2 1 2 4 2 1 2 1])))
                         :gaussian-blur-5 (Kernel. 5 5 (float-array (map #(/ (int %) 256.0) [1 4 6 4 1 4 16 24 16 4 6 24 36 24 6 4 16 24 16 4 1 4 6 4 1])))
                         :unsharp         (Kernel. 5 5 (float-array (map #(/ (int %) -256.0) [1 4 6 4 1 4 16 24 16 4 6 24 -476 24 6 4 16 24 16 4 1 4 6 4 1])))})
-
-(defmacro ^:private make-conv-examples
-  []
-  `(ex/add-examples convolve
-     ~@(for [k (keys convolution-matrices)
-             :let [n (str "Convolve image with " (name k) " kernel.")]]
-         (list 'ex/example-snippet n 'process-image-snippet :image (list 'fn '[img] (list 'convolve 'img k))))))
-
-(make-conv-examples)
 
 ;; Add ImageProto functions to BufferedImae
 (extend BufferedImage
@@ -373,30 +437,12 @@
                                 (Kernel. s s (float-array t))))]
                  (.filter ^ConvolveOp (ConvolveOp. kernel) i nil)))
    :subimage get-subimage
-   :resize resize-image
-   :get-pixel (fn [^BufferedImage i ^long x ^long y]
-                (if (bool-or (< x 0)
-                             (< y 0)
-                             (>= x (.getWidth i))
-                             (>= y (.getHeight i)))
-                  (c/color 0 0 0)
-                  (let [b (int-array 1)
-                        ^java.awt.image.Raster raster (.getRaster i)]
-                    (.getDataElements raster x y b)
-                    (let [v (aget b 0)
-                          b (bit-and v 0xff)
-                          g (bit-and (>> v 8) 0xff)
-                          r (bit-and (>> v 16) 0xff)
-                          a (bit-and (>> v 24) 0xff)]
-                      (if (== (.getNumBands raster) 3)
-                        (c/color r g b)
-                        (c/color r g b a))))))})
+   :resize resize-image})
 
 ;;
 
 (declare resize-canvas)
 
-;; Canvas type. Use `get-image` to extract image (`BufferedImage`).
 (defrecord ^{:doc "Test"}
     Canvas [^Graphics2D graphics
             ^BufferedImage buffer
@@ -416,8 +462,7 @@
   (convolve [_ t]
     (convolve buffer t))
   (resize [c w h] (resize-canvas c w h))
-  (subimage [_ x y w h] (get-subimage buffer x y w h))
-  (get-pixel [_ x y] (get-pixel buffer x y)))
+  (subimage [_ x y w h] (get-subimage buffer x y w h)))
 
 (def ^{:doc "Rendering hints define quality of drawing or window rendering.
 
@@ -426,8 +471,7 @@ The differences are in interpolation, antialiasing, speed vs quality rendering e
 The `:highest` is `:high` with `VALUE_STROKE_PURE` added. Be aware that this option can give very soft lines.
 
 Default hint for Canvas is `:high`. You can set also hint for Window which means that when display is refreshed this hint is applied (java defaults are used otherwise)."
-       :metadoc/categories #{:canvas :window}
-       :metadoc/examples [(ex/example "List of possible hints." (keys rendering-hints))]}
+       :metadoc/categories #{:canvas :window}}
   rendering-hints {:low [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF]
                          [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR]
                          [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED]
@@ -535,7 +579,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
        (flush-graphics ~c)
        result#)))
 
-;; Next functions are canvas management functions: create, save, resize and set quality.
+;;
 
 (declare set-background)
 (declare set-stroke)
@@ -552,16 +596,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   Be aware that drawing on Canvas is single threaded.
 
   Font you set while creating canvas will be default font. You can set another font in the code with [[set-font]] and [[set-font-attributes]] functions. However these set font temporary."
-  {:metadoc/categories #{:canvas}
-   :metadoc/examples [(ex/example "Canvas is the record." (canvas 20 30 :low))
-                      (ex/example-session "Check ImageProto on canvas."
-                                          (width (canvas 10 20))
-                                          (height (canvas 10 20))
-                                          (get-image (canvas 5 6))
-                                          (width (resize (canvas 1 2) 15 15))
-                                          (height (subimage (canvas 10 10) 5 5 2 2)))
-                      
-                      ]}
+  {:metadoc/categories #{:canvas}}
   ([^long width ^long height hint ^String font]
    (let [^BufferedImage buffer (.. GraphicsEnvironment 
                                    (getLocalGraphicsEnvironment)
@@ -594,34 +629,9 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 ;;
 
-(ex/add-examples with-canvas->
-  (ex/example-snippet "Draw on canvas" process-image-snippet :image (fn [img]
-                                                                      (with-canvas-> (canvas 100 100)
-                                                                        (image img 50 50 50 50)))))
-
-(ex/add-examples with-canvas
-  (ex/example-snippet "Draw on canvas" process-image-snippet :image (fn [img]
-                                                                      (with-canvas [c (canvas 200 200)]
-                                                                        (dotimes [i 50]
-                                                                          (let [x (r/irand -50 100)
-                                                                                y (r/irand -50 100)
-                                                                                w (r/irand (- 200 x))
-                                                                                h (r/irand (- 200 y))]
-                                                                            (image c img x y w h)))
-                                                                        c))))
-
-;; ### Transformations
-;;
-;; You can transform your working area with couple of functions on canvas. They act exactly the same as in Processing. Transformation context is bound to canvas wrapped to `with-canvas->` macro. Each `with-canvas->` cleans all transformations.
-;; Transformations are concatenated.
-
 (defn scale
   "Scale canvas"
-  {:metadoc/categories #{:transform :canvas}
-   :metadoc/examples [(ex/example-snippet "Scale canvas" process-image-snippet :image (fn [img]
-                                                                                        (with-canvas-> (canvas 150 150)
-                                                                                          (scale 0.5)
-                                                                                          (image img 0 0))))]} 
+  {:metadoc/categories #{:transform :canvas}} 
   ([^Canvas canvas ^double scalex ^double scaley]
    (.scale ^Graphics2D (.graphics canvas) scalex scaley)
    canvas)
@@ -629,31 +639,19 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 (defn flip-x
   "Flip canvas over x axis"
-  {:metadoc/categories #{:transform :canvas}
-   :metadoc/examples [(ex/example-snippet "Scale canvas" process-image-snippet :image (fn [img]
-                                                                                        (with-canvas-> (canvas 150 150)
-                                                                                          (flip-x)
-                                                                                          (image img -150 0))))]}
+  {:metadoc/categories #{:transform :canvas}}
   [canvas]
   (scale canvas -1.0 1.0))
 
 (defn flip-y
   "Flip canvas over y axis"
-  {:metadoc/categories #{:transform :canvas}
-   :metadoc/examples [(ex/example-snippet "Scale canvas" process-image-snippet :image (fn [img]
-                                                                                        (with-canvas-> (canvas 150 150)
-                                                                                          (flip-y)
-                                                                                          (image img 0 -150))))]}
+  {:metadoc/categories #{:transform :canvas}}
   [canvas]
   (scale canvas 1.0 -1.0))
 
 (defn translate
   "Translate origin"
-  {:metadoc/categories #{:transform :canvas}
-   :metadoc/examples [(ex/example-snippet "Scale canvas" process-image-snippet :image (fn [img]
-                                                                                        (with-canvas-> (canvas 150 150)
-                                                                                          (translate 20 20)
-                                                                                          (image img 0 0))))]}
+  {:metadoc/categories #{:transform :canvas}}
   ([^Canvas canvas ^double tx ^double ty]
    (.translate ^Graphics2D (.graphics canvas) tx ty)
    canvas)
@@ -662,12 +660,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 (defn rotate
   "Rotate canvas"
-  {:metadoc/categories #{:transform :canvas}
-   :metadoc/examples [(ex/example-snippet "Scale canvas" process-image-snippet :image (fn [img]
-                                                                                        (with-canvas-> (canvas 150 150)
-                                                                                          (translate 75 75)
-                                                                                          (rotate m/QUARTER_PI)
-                                                                                          (image img -75 -75))))]}
+  {:metadoc/categories #{:transform :canvas}}
   [^Canvas canvas ^double angle]
   (.rotate ^Graphics2D (.graphics canvas) angle)
   canvas)
@@ -675,10 +668,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 (defn shear
   "Shear canvas"
   {:metadoc/categories #{:transform :canvas}
-   :metadoc/examples [(ex/example-snippet "Scale canvas" process-image-snippet :image (fn [img]
-                                                                                        (with-canvas-> (canvas 150 150)
-                                                                                          (shear 0.2 0.4)
-                                                                                          (image img 0 0))))]}
+   :metadoc/examples []}
   ([^Canvas canvas ^double sx ^double sy]
    (.shear ^Graphics2D (.graphics canvas) sx sy)
    canvas)
@@ -705,33 +695,9 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
       (.setTransform ^Graphics2D (.graphics canvas) v)))
   canvas)
 
-(def ^:private push-pop-matrix-example
-  (ex/example-snippet "Scale canvas" process-image-snippet :image
-    (fn [img]
-      (with-canvas [c (canvas 250 250)]
-        (translate c 125 125)
-        (doseq [a (range 0 m/TWO_PI 0.3)]
-          (let [x (* 80.0 (m/cos a))
-                y (* 80.0 (m/sin a))]
-            (-> c
-                (push-matrix)
-                (translate x y)
-                (rotate a)
-                (image img 0 0 20 20)
-                (pop-matrix))))
-        c))))
-
-(ex/add-examples push-matrix push-pop-matrix-example)
-(ex/add-examples pop-matrix push-pop-matrix-example)
-
 (defn transform
   "Transform given point or coordinates with current transformation. See [[inv-transform]]."
-  {:metadoc/categories #{:transform :canvas}
-   :metadoc/examples [(ex/example "Transform point."
-                        (with-canvas [c (canvas 100 100)]
-                          (translate c 50 50)
-                          (rotate c m/HALF_PI)
-                          (transform c 10 10)))]}
+  {:metadoc/categories #{:transform :canvas}}
   ([^Canvas canvas x y]
    (let [^Point2D p (.transform ^java.awt.geom.AffineTransform (.getTransform ^Graphics2D (.graphics canvas)) (Point2D$Double. x y) nil)]
      (Vec2. (.getX p) (.getY p))))
@@ -740,12 +706,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 (defn inv-transform
   "Inverse transform of given point or coordinates with current transformation. See [[transform]]."
-  {:metadoc/categories #{:transform :canvas}
-   :metadoc/examples [(ex/example "Invesre transform of point."
-                        (with-canvas [c (canvas 100 100)]
-                          (translate c 50 50)
-                          (rotate c m/HALF_PI)
-                          (inv-transform c 40 60)))]}
+  {:metadoc/categories #{:transform :canvas}}
   ([^Canvas canvas x y]
    (let [^Point2D p (.inverseTransform ^java.awt.geom.AffineTransform (.getTransform ^Graphics2D (.graphics canvas)) (Point2D$Double. x y) nil)]
      (Vec2. (.getX p) (.getY p))))
@@ -759,51 +720,31 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   (.setTransform ^Graphics2D (.graphics canvas) (java.awt.geom.AffineTransform.))
   canvas)
 
-;; -- clip
+;; clip
 
 (defn clip
-  "Clip drawing to specified rectangle"
+  "Clip drawing to specified rectangle.
+
+  See also [[reset-clip]]."
   {:metadoc/categories #{:canvas}}
   [^Canvas canvas x y w h] 
   (.setClip ^Graphics2D (.graphics canvas) x y w h)
   canvas)
 
 (defn reset-clip
-  "Clip drawing to specified rectangle"
+  "Resets current clipping.
+
+  See also [[clip]]."
   {:metadoc/categories #{:canvas}}
-  [^Canvas canvas x y w h] 
+  [^Canvas canvas] 
   (.setClip ^Graphics2D (.graphics canvas) 0 0 (width canvas) (height canvas))
   canvas)
 
-;; ### Drawing functions
-;;
-;; Here we have basic drawing functions. What you need to remember:
-;;
-;; * Color is set globally for all figures (exception: `set-background`)
-;; * Filled or stroke figures are determined by last parameter `stroke?`. When set to `true` draws figure outline, filled otherwise (default). Default is `false` (filled).
-;; * Always use with `with-canvas->` macro.
-;; 
-;; All functions return canvas object
-
-(ex/defsnippet drawing-snippet
-  "Draw something on canvas and save."
-  (let [canvas (canvas 200 200) 
-        unique-name (str "images/core/" (first opts) ".jpg")]
-    (with-canvas-> canvas
-      (set-background 0x30426a)
-      (set-color :white)
-      (f))
-    (binding [*jpeg-image-quality* 0.85]
-      (save canvas (str "docs/" unique-name)))
-    (str "../" unique-name)))
+;; Drawing functions
 
 (defn line
   "Draw line from point `(x1,y1)` to `(x2,y2)`"
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Draw some lines" drawing-snippet :image
-                        (fn [canvas] 
-                          (doseq [^long x (range 10 190 10)]
-                            (line canvas x 10 (- 190 x) 190))))]}
+  {:metadoc/categories #{:draw}}
   ([^Canvas canvas x1 y1 x2 y2]
    (let [^Line2D l (.line-obj canvas)]
      (.setLine l x1 y1 x2 y2)
@@ -813,21 +754,16 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    (line canvas (.x v1) (.y v1) (.x v2) (.y v2))))
 
 (def ^{:doc "Stroke join types"
-       :metadoc/categories #{:draw}
-       :metadoc/examples [(ex/example "List of stroke join types" (keys stroke-joins))]}
+       :metadoc/categories #{:draw}}
   stroke-joins {:bevel BasicStroke/JOIN_BEVEL
                 :miter BasicStroke/JOIN_MITER
                 :round BasicStroke/JOIN_ROUND})
 
 (def ^{:doc "Stroke cap types"
-       :metadoc/categories #{:draw}
-       :metadoc/examples [(ex/example "List of stroke cap types" (keys stroke-caps))]}
+       :metadoc/categories #{:draw}}
   stroke-caps {:round BasicStroke/CAP_ROUND
                :butt BasicStroke/CAP_BUTT
                :square BasicStroke/CAP_SQUARE})
-
-(declare rect)
-(declare triangle)
 
 (defn set-stroke
   "Set stroke (line) attributes like `cap`, `join`,  size and `miter-limit`.
@@ -837,31 +773,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   See [[stroke-joins]] and [[stroke-caps]] for names.
 
   See [[set-stroke-custom]]."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Various stroke settings." drawing-snippet :image
-                                          (fn [canvas]
-                                            (-> canvas
-                                                (set-stroke 10 :round)
-                                                (line 25 20 25 180)
-                                                (set-stroke 10 :butt)
-                                                (line 55 20 55 180)
-                                                (set-stroke 10 :square)
-                                                (line 85 20 85 180)
-                                                (set-stroke 10 :round :bevel)
-                                                (rect 120 20 60 40 true)
-                                                (set-stroke 10 :round :miter)
-                                                (rect 120 80 60 40 true)
-                                                (set-stroke 10 :round :round)
-                                                (rect 120 140 60 40 true))))
-                      (ex/example-snippet "Miter limit" drawing-snippet :image
-                                          (fn [canvas]
-                                            (-> canvas
-                                                (set-stroke 10 :square :miter)
-                                                (triangle 70 50 170 50 170 70 true)
-                                                (set-stroke 10 :square :miter 5.0)
-                                                (triangle 70 100 170 100 170 120 true)
-                                                (set-stroke 10 :square :miter 25.0)
-                                                (triangle 70 150 170 150 170 170 true))))]}
+  {:metadoc/categories #{:draw}}
   ([^Canvas canvas size cap join miter-limit]
    (.setStroke ^Graphics2D (.graphics canvas) (BasicStroke. size
                                                             (or (stroke-caps cap) BasicStroke/CAP_ROUND)
@@ -890,22 +802,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   * :dash-phase - offset to start pattern (default: 0.0)
 
   See also [[set-stroke]]."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Custom strokes" drawing-snippet :image
-                                          (fn [canvas]
-                                            (-> canvas
-                                                (set-stroke-custom {:size 2.0 :dash [4.0] :dash-phase 2.0})
-                                                (line 20 20 180 20)
-                                                (set-stroke-custom {:size 2.0 :dash [20.0] :dash-phase 10})
-                                                (line 20 50 180 50)
-                                                (set-stroke-custom {:size 2.0 :dash [10.0 2.0 2.0 2.0]})
-                                                (line 20 80 180 80)
-                                                (set-stroke-custom {:size 1.0 :dash [4.0] :dash-phase 2.0})
-                                                (rect 20 110 160 10 true)
-                                                (set-stroke-custom {:size 1.0 :dash [10.0 5.0] :join :miter})
-                                                (rect 20 140 160 10 :true)
-                                                (set-stroke-custom {:size 1.0 :dash [10.0 2.0 2.0 2.0]})
-                                                (rect 20 170 160 10 :true))))]}
+  {:metadoc/categories #{:draw}}
   [^Canvas canvas {:keys [size cap join miter-limit dash dash-phase]
                    :or {size 1.0 cap :butt join :round miter-limit 1.0 dash nil dash-phase 0.0}}]
   (if dash
@@ -923,20 +820,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   "Draw point at `x`,`y` or `^Vec2` position.
 
   It's implemented as a very short line. Consider using `(rect x y 1 1)` for speed when `x` and `y` are integers."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Sequence of points." drawing-snippet :image
-                                          (fn [canvas]
-                                            (doseq [^long x (range 10 190 10)]
-                                              (set-stroke canvas (/ x 20))
-                                              (point canvas x x))))
-                      (ex/example-snippet "Magnified point can look differently when different stroke settings are used."
-                                          drawing-snippet :image (fn [canvas]
-                                                                   (-> canvas
-                                                                       (scale 80.0)
-                                                                       (set-stroke 0.5)
-                                                                       (point 0.5 0.5)
-                                                                       (set-stroke 0.5 :square)
-                                                                       (point 1.5 1.5))))]}  
+  {:metadoc/categories #{:draw}}  
   ([canvas ^double x ^double y]
    (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
    canvas)
@@ -954,12 +838,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   "Draw rectangle with top-left corner at `(x,y)` position with width `w` and height `h`. Optionally you can set `stroke?` (default: `false`) to `true` if you don't want to fill rectangle and draw outline only.
 
   See also: [[crect]]."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Two squares, one filled and second as outline." drawing-snippet :image
-                        (fn [canvas]
-                          (-> canvas
-                              (rect 30 30 50 50) 
-                              (rect 80 80 90 90 true))))]}
+  {:metadoc/categories #{:draw}}
   ([^Canvas canvas x y w h stroke?]
    (let [^Rectangle2D r (.rect-obj canvas)] 
      (.setFrame r x y w h)
@@ -970,13 +849,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 (defn crect
   "Centered version of [[rect]]."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Two squares, regular and centered." drawing-snippet :image
-                        (fn [canvas]
-                          (-> canvas
-                              (set-color :white 160)
-                              (rect 50 50 100 100) 
-                              (crect 50 50 60 60))))]}
+  {:metadoc/categories #{:draw}}
   ([canvas x y w h stroke?]
    (let [w2 (* 0.5 ^double w)
          h2 (* 0.5 ^double h)]
@@ -987,16 +860,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 (defn ellipse
   "Draw ellipse with middle at `(x,y)` position with width `w` and height `h`."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "A couple of ellises." drawing-snippet :image
-                        (fn [canvas]
-                          (-> canvas
-                              (set-color :white 200)
-                              (ellipse 100 100 50 150)
-                              (ellipse 100 100 150 50 true)
-                              (ellipse 100 100 20 20)
-                              (set-color :black 200)
-                              (ellipse 100 100 20 20 true))))]}
+  {:metadoc/categories #{:draw}}
   ([^Canvas canvas x1 y1 w h stroke?]
    (let [^Ellipse2D e (.ellipse_obj canvas)]
      (.setFrame e (- ^double x1 (* ^double w 0.5)) (- ^double y1 (* ^double h 0.5)) w h)
@@ -1007,13 +871,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 (defn triangle
   "Draw triangle with corners at 3 positions."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Two triangles" drawing-snippet :image
-                        (fn [canvas]
-                          (-> canvas
-                              (triangle 30 30 170 100 30 170)
-                              (set-color :black)
-                              (triangle 170 30 170 170 30 100 true))))]}
+  {:metadoc/categories #{:draw}}
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 stroke?]
    (let [^Path2D p (Path2D$Double.)]
      (doto p
@@ -1032,15 +890,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   Input: list of vertices as Vec2 vectors.
 
   See also: [[triangle-fan]]."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Triangle strip" drawing-snippet :image
-                        (fn [canvas]
-                          (set-color canvas :white 190)
-                          (translate canvas 100 100)
-                          (let [s (for [a (range 0 65 3.0)]
-                                    (v/vec2 (* 90.0 (m/cos a))
-                                            (* 90.0 (m/sin a))))]
-                            (triangle-strip canvas s true))))]}
+  {:metadoc/categories #{:draw}}
   ([canvas vs stroke?]
    (when (> (count vs) 2)
      (loop [^Vec2 v1 (first vs)
@@ -1062,15 +912,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   Input: list of vertices as Vec2 vectors.
 
   See also: [[triangle-strip]]."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Triangle fan" drawing-snippet :image
-                        (fn [canvas]
-                          (set-color canvas :white 190)
-                          (translate canvas 100 100)
-                          (let [s (for [a (range 0 65 3.0)]
-                                    (v/vec2 (* 90.0 (m/cos a))
-                                            (* 90.0 (m/sin a))))]
-                            (triangle-fan canvas s true))))]}
+  {:metadoc/categories #{:draw}}
   ([canvas vs stroke?]
    (when (> (count vs) 2)
      (let [^Vec2 v1 (first vs)]
@@ -1090,15 +932,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).
 
   See also [[path-bezier]]."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Path" drawing-snippet :image
-                        (fn [canvas]
-                          (set-color canvas :white 190)
-                          (translate canvas 100 100)
-                          (let [s (for [^double a (range 0 65 1.3)]
-                                    (v/vec2 (* (+ a 25) (m/cos a))
-                                            (* (+ a 25) (m/sin a))))]
-                            (path canvas s))) )]}
+  {:metadoc/categories #{:draw}}
   ([^Canvas canvas vs close? stroke?]
    (when (seq vs)
      (let [^Path2D p (Path2D$Double.)
@@ -1143,15 +977,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).
 
   See also [[path]]."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Bezier path" drawing-snippet :image
-                        (fn [canvas]
-                          (set-color canvas :white 190)
-                          (translate canvas 100 100)
-                          (let [s (for [^double a (range 0 65 1.3)]
-                                    (v/vec2 (* (+ a 25) (m/cos a))
-                                            (* (+ a 25) (m/sin a))))]
-                            (path-bezier canvas s))))]}  
+  {:metadoc/categories #{:draw}}  
   ([^Canvas canvas vs close? stroke?]
    (when (> (count vs) 3)
      (let [cl? (or (not stroke?) close?)
@@ -1190,12 +1016,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 (defn bezier
   "Draw bezier curve with 4 sets of coordinates."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Bezier curve" drawing-snippet :image
-                        (fn [canvas]
-                          (bezier canvas 20 20 180 20 180 180 20 180 false)
-                          (set-color canvas :black)
-                          (bezier canvas 20 180 20 20 180 20 180 180)))]}  
+  {:metadoc/categories #{:draw}}  
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
    (let [^Path2D p (Path2D$Double.)]
      (doto p
@@ -1207,12 +1028,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 (defn curve
   "Draw quadratic curve with 3 sets of coordinates."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Quadratic curve" drawing-snippet :image
-                        (fn [canvas]
-                          (curve canvas 20 20 180 20 180 180 false)
-                          (set-color canvas :black)
-                          (curve canvas 20 180 20 20 180 20)))]}  
+  {:metadoc/categories #{:draw}}  
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 stroke?]
    (let [^Path2D p (Path2D$Double.)]
      (doto p
@@ -1224,10 +1040,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 (defn quad
   "Draw quad with corners at 4 positions."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Quad" drawing-snippet :image
-                        (fn [canvas]
-                          (quad canvas 20 20 180 50 50 180 70 70)))]}
+  {:metadoc/categories #{:draw}}
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
    (let [^Path2D p (Path2D$Double.)]
      (doto p
@@ -1241,20 +1054,12 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
    (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false)))
 
-(declare text)
+(def ^{:doc "List of all available font names."
+       :metadoc/categories #{:write}} fonts-list (into [] (.getAvailableFontFamilyNames (java.awt.GraphicsEnvironment/getLocalGraphicsEnvironment))))
 
 (defn set-font
   "Set font by name."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Various fonts" drawing-snippet :image
-                        (fn [canvas]
-                          (-> canvas
-                              (set-font "Courier New")
-                              (text "Trying to set Courier New" 100 50 :center)
-                              (set-font "Arial")
-                              (text "Trying to set Arial" 100 100 :center)
-                              (set-font "Verdana")
-                              (text "Trying to set Verdana" 100 150 :center))))]}
+  {:metadoc/categories #{:write}}
   [^Canvas canvas ^String fontname]
   (let [f (java.awt.Font/decode fontname)]
     (.setFont ^Graphics2D (.graphics canvas) f)
@@ -1264,16 +1069,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   "Set current font size and attributes.
 
   Attributes are: `:bold`, `:italic`, `:bold-italic`."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Font attributes" drawing-snippet :image
-                        (fn [canvas]
-                          (-> canvas
-                              (set-font-attributes 30)
-                              (text "Size 30" 100 50 :center)
-                              (set-font-attributes 15 :italic)
-                              (text "Size 15, italic" 100 100 :center)
-                              (set-font-attributes 20 :bold-italic)
-                              (text "Size 20, bold, italic" 100 150 :center))))]}
+  {:metadoc/categories #{:write}}
   ([^Canvas canvas ^double size style]
    (let [s (or (style {:bold 1 :italic 2 :bold-italic 3}) 0)
          f (.deriveFont ^java.awt.Font (.getFont ^Graphics2D (.graphics canvas)) (int s) (float size))]
@@ -1285,39 +1081,26 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
      canvas)))
 
 (defn char-width
-  "Returns font width from metrics. Should be called within context."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example "Width of some chars."
-                        (with-canvas [c (canvas 10 10)] [(char-width c \W)
-                                                         (char-width c \a)]))]}
+  "Returns font width from metrics. Should be called within graphical context."
+  {:metadoc/categories #{:write}}
   ^long [^Canvas canvas chr]
   (.charWidth (.getFontMetrics ^Graphics2D (.graphics canvas)) ^char chr))
 
 (defn font-height
   "Returns font width from metrics. Should be called within context."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example"Height of current font."
-                        (with-canvas-> (canvas 10 10)
-                          (font-height)))]}
+  {:metadoc/categories #{:write}}
   ^long [^Canvas canvas]
   (.getHeight (.getFontMetrics ^Graphics2D (.graphics canvas))))
 
 (defn font-ascent
   "Returns font width from metrics. Should be called within context."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example"Height of current font."
-                        (with-canvas-> (canvas 10 10)
-                          (font-ascent)))]}
+  {:metadoc/categories #{:write}}
   ^long [^Canvas canvas]
   (.getAscent (.getFontMetrics ^Graphics2D (.graphics canvas))))
 
-
 (defn text-width
   "Returns width of the provided string. Should be called within context."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example"Size of some string."
-                        (with-canvas-> (canvas 10 10)
-                          (text-width "Size of some string.")))]}
+  {:metadoc/categories #{:write}}
   ^long [^Canvas canvas ^String txt]
   (.stringWidth (.getFontMetrics ^Graphics2D (.graphics canvas)) txt))
 
@@ -1325,13 +1108,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   "Draw text for given position and alignment.
 
   Possible alignments are: `:right`, `:center`, `:left`."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Font attributes" drawing-snippet :image
-                        (fn [canvas]
-                          (-> canvas
-                              (text "Align left" 100 50 :left)
-                              (text "Align center" 100 100 :center)
-                              (text "Align right" 100 150 :right))))]}
+  {:metadoc/categories #{:write}}
   ([^Canvas canvas s x y align]
    (let [x (long x)
          y (long y)]
@@ -1365,12 +1142,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 (defn set-awt-color
   "Set color with valid java `Color` object. Use it when you're sure you pass `java.awt.Color` object."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Set color with `java.awt.Color`." drawing-snippet :image
-                        (fn [canvas]
-                          (-> canvas
-                              (set-awt-color java.awt.Color/RED)
-                              (rect 50 50 100 100))))]}
+  {:metadoc/categories #{:draw}}
   [^Canvas canvas ^java.awt.Color c]
   (.setColor ^Graphics2D (.graphics canvas) c)
   canvas)
@@ -1379,11 +1151,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 (defn set-awt-background
   "Set background color. Expects valid `java.awt.Color` object."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Set background with `java.awt.Color`." drawing-snippet :image
-                        (fn [canvas]
-                          (-> canvas
-                              (set-awt-background java.awt.Color/BLUE))))]}
+  {:metadoc/categories #{:draw}}
   [^Canvas canvas c]
   (let [^Graphics2D g (.graphics canvas)
         ^Color currc (.getColor g)
@@ -1403,13 +1171,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   "Set XOR graphics mode with `java.awt.Color`.
 
   To revert call [[paint-mode]]."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Set Xor Mode with `java.awt.Color`." drawing-snippet :image
-                        (fn [canvas]
-                          (-> canvas
-                              (awt-xor-mode java.awt.Color/BLACK)
-                              (rect 50 50 100 100)
-                              (rect 70 70 60 60))))]}
+  {:metadoc/categories #{:draw}}
   [^Canvas canvas c]
   (let [^Graphics2D g (.graphics canvas)]
     (.setXORMode g c))
@@ -1436,20 +1198,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 * r, g, b and optional alpha
 
 See [[clojure2d.color]] namespace for more color functions."
-       :metadoc/categories #{:draw}
-       :metadoc/examples [(ex/example-snippet "Set color various ways." drawing-snippet :image
-                            (fn [canvas]
-                              (-> canvas
-                                  (set-color 0xaabbcc)
-                                  (rect 10 10 40 40)
-                                  (set-color :maroon)
-                                  (rect 60 60 40 40)
-                                  (set-color java.awt.Color/GREEN)
-                                  (rect 110 110 40 40)
-                                  (set-color 0 111 200 100)
-                                  (rect 20 20 160 160)
-                                  (set-color (v/vec3 0 100 255))
-                                  (rect 160 160 25 25))))]} 
+       :metadoc/categories #{:draw}} 
   set-color (partial set-color-with-fn set-awt-color))
 
 ;; Set background color
@@ -1458,23 +1207,13 @@ See [[clojure2d.color]] namespace for more color functions."
 Background can be set with alpha.
 
 See [[set-color]]."
-       :metadoc/categories #{:draw}
-       :metadoc/examples [(ex/example-snippet "Set background with alpha set." drawing-snippet :image
-                            (fn [canvas]
-                              (-> canvas
-                                  (set-background :maroon 200))))]}
+       :metadoc/categories #{:draw}}
   set-background (partial set-color-with-fn set-awt-background))
 
 ;; Set XOR mode
 (def
   ^{:doc "Set XOR painting mode."
-    :metadoc/categories #{:draw}
-    :metadoc/examples [(ex/example-snippet "Set XOR Painting mode" drawing-snippet :image
-                         (fn [canvas]
-                           (-> canvas
-                               (xor-mode :gray)
-                               (rect 50 50 100 100)
-                               (rect 70 70 60 60))))]}
+    :metadoc/categories #{:draw}}
   xor-mode (partial set-color-with-fn awt-xor-mode))
 
 ;;;
@@ -1488,12 +1227,7 @@ See [[set-color]]."
   Provide two colors, one for fill (`color-filled`), second for stroke (`color-stroke`). `primitive-fn` is a primitive function and `attrs` are function parameters. Do not provide.
 
   One note: current color is replaced with `color-stroke`."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Draw two primitives" drawing-snippet :image
-                        (fn [canvas]
-                          (-> canvas
-                              (filled-with-stroke :maroon :black crect 100 100 180 180)
-                              (filled-with-stroke 0x3344ff :white ellipse 100 100 20 100))))]}
+  {:metadoc/categories #{:draw}}
   [canvas color-filled color-stroke primitive-fn & attrs]
   (set-color canvas color-filled)
   (apply primitive-fn canvas (concat attrs false-list))
@@ -1506,12 +1240,7 @@ See [[set-color]]."
   "Set paint mode to gradient.
 
   To revert call [[paint-mode]]"
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Set some gradient and fill" drawing-snippet :image
-                        (fn [canvas]
-                          (-> canvas
-                              (gradient-mode 20 20 :maroon 180 180 :black)
-                              (ellipse 100 100 190 190))))]}
+  {:metadoc/categories #{:draw}}
   ([^Canvas canvas x1 y1 color1 x2 y2 color2]
    (let [gp (java.awt.GradientPaint. x1 y1 (c/awt-color color1) x2 y2 (c/awt-color color2))
          ^Graphics2D g (.graphics canvas)]
@@ -1524,12 +1253,7 @@ See [[set-color]]."
   "Draw an image.
 
   You can specify position and size of the image. Default it's placed on whole canvas."
-  {:metadoc/categories #{:draw}
-   :metadoc/examples [(ex/example-snippet "Draw image at given position." drawing-snippet :image
-                        (fn [canvas]
-                          (let [img (load-image "docs/cockatoo.jpg")]
-                            (doseq [^int x (range 0 80 10)]
-                              (image canvas img x x (- 200 x x) (- 200 x x))))))]}
+  {:metadoc/categories #{:draw}}
   ([^Canvas canvas img x y w h]
    (.drawImage ^Graphics2D (.graphics canvas) (get-image img) x y w h nil)
    canvas)
@@ -1538,87 +1262,7 @@ See [[set-color]]."
   ([^Canvas canvas img x y]
    (image canvas img x y (width img) (height img))))
 
-;; ## Display window
-;;
-;; You can find here a couple of functions which help to display your canvas and build interaction with user.
-;; Display window is just a Swing `JFrame` with `java.awt.Canvas` as panel.
-;; What is important, window is not a canvas (like it is in Processing) so first you need to create canvas object and then create window displaying it.
-;; You can create as many windows as you want. Just name them differently. You can also create window with different size than canvas. Canvas will be rescaled.
-;; Windows is not resizable and can't be set to a fullscreen mode (yet)
-;; 
-;; To show window you call `show-window` function and provide following parameters:
-;;
-;; * canvas to display
-;; * window name (used to identify events)
-;; * width and height
-;; * canvas refresh rate as frames per second (ex. 25)
-;; * optionally callback function which is called just before repainting the canvas (like `draw` in Processing)
-;;
-;; `show-window` returns a `Window` object containing
-;;
-;; * `JFrame` object
-;; * `active?` atom (see below)
-;; *  buffer which is canvas packed into atom (to enable easy canvas replacement)
-;; *  `:panel` `java.awt.Canvas` object placed on JFrame (awt toolkit canvas)
-;; *  `:fps`
-;; *  `:width`
-;; *  `:height`
-;; *  `:window-name` window name
-;;
-;; `active?` atom is unique for each window and has value `true` when window is shown and set to `false` when window is closed with default close button.
-;; Use this information via `window-active?` function to control (and possibly stop) all activities which refers to related window. For example you may want to cancel all updating canvas processes when user closes window.
-;;
-;; ### Callback function (aka `draw`)
-;;
-;; You can define function with three parameters which is called just before repainting canvas. You can use it to simulate Processing `draw` behaviour. Function should accept following parameters:
-;;
-;; * canvas - canvas to draw on, canvas bound to window will be passed here.
-;; * window - window assiociated with function
-;; * frame count - current number of calls, starting 0
-;; * state - any state you want to pass between calls, `nil` initially
-;;
-;; Function should return current state, which will be passed to function when called next time.
-;;
-;; Note: calls to `draw` are wrapped in `with-canvas->` already.
-;;
-;; ### Events
-;;
-;; To control user activities you can use two event processing multimethods.
-;;
-;; * `key-pressed`
-;; * `key-released`
-;; * `key-typed`
-;; * `mouse-event`
-;;
-;; Each multimethod get awt Event object and global state. Each should return new state.
-;;
-;; #### Key event: `key-pressed` and other `key-` multimethods
-;;
-;; Your dispatch value is vector with window name and pressed key (as `char`) which you want to handle.
-;; This means you write different method for different key.
-;; As a function parameters you get `KeyEvent` object [java.awt.KeyEvent](https://docs.oracle.com/javase/7/docs/api/java/awt/event/KeyEvent.html) and global state attached to the Window.
-;;
-;; `KeyEvent` is enriched by `KeyEventProto` with functions:
-;;
-;; * `key-code` - key code mapped to keyword. Eg. `VK_UP` -> `:up` or `VK_CONTROL` -> `:control`
-;; * `key-raw` - raw key code value (integer)
-;; * `key-char` - char representation (for special keys char is equal `virtual-key` or `0xffff` value
-;;
-;; If you want to dispatch on special keys (like arrows), dispatch on `(char 0xffff)` or `virtual-key` and read `(key-code e)` to get key pressed.
-;;
-;; #### Mouse event
-;;
-;; As as dispatch you use a vector containing window name as a String and mouse event type as a keyword
-;; As a parameter you get `MouseEvent` object equipped with `MouseXYProto` protocol [java.awt.MouseEvent](https://docs.oracle.com/javase/7/docs/api/java/awt/event/MouseEvent.html) and global state attached to the Window.
-;;
-;; Currently implemented types are:
-;;
-;; * `:mouse-clicked`
-;; * `:mouse-dragged`
-;; * `:mouse-pressed`
-;; * `:mouse-released`
-;;
-;; To get mouse position call `(mouse-x e)` and `(mouse-y e)` where `e` is MouseEvent object.
+;; Display window
 
 ;; Extract all keycodes from `KeyEvent` object and pack it to the map
 (def ^:private keycodes-map (->> KeyEvent
@@ -1680,7 +1324,6 @@ See [[set-color]]."
   (save [w n] (save-image (get-image @buffer) n) w)
   (convolve [w n] (convolve @buffer n))
   (subimage [_ x y w h] (get-subimage @buffer x y w h))
-  (get-pixel [_ x y] (get-pixel @buffer x y))
   PressedProto
   (key-pressed? [_] (:key-pressed? @events))
   (mouse-pressed? [_] (:mouse-pressed? @events))
@@ -1738,18 +1381,9 @@ See [[set-color]]."
 
 ;; ### Window type helper functions
 
-(declare show-window)
-(declare close-window)
-
 (defn window-active?
   "Helper function, check if window is active."
-  {:metadoc/categories #{:window}
-   :metadoc/examples [(ex/example "Check if window is visible."
-                        (let [w (show-window)
-                              before-closing (window-active? w)]
-                          (close-window w)
-                          {:before-closing before-closing
-                           :after-closing (window-active? w)}))]}
+  {:metadoc/categories #{:window}}
   [^Window window]
   @(.active? window))
 
@@ -1768,6 +1402,7 @@ See [[set-color]]."
 
 (defn get-state
   "Get state from window"
+  {:metadoc/categories #{:window}}
   [^Window window]
   (@global-state (.window-name window)))
 
@@ -1784,6 +1419,7 @@ See [[set-color]]."
 
 (defn set-state!
   "Changle global state for Window."
+  {:metadoc/categories #{:window}}
   [^Window w state]
   (change-state! (.window-name w) state))
 
@@ -1794,50 +1430,121 @@ See [[set-color]]."
   [^ComponentEvent e]
   (.getName ^Component (.getComponent e)))
 
-(def ^:const virtual-key (char 0xffff))
+(def ^:const ^{:doc "Use as a dispatch in key events for keys like up/down/etc."} virtual-key (char 0xffff))
 
 ;; Multimethod used to process pressed key
-(defmulti key-pressed (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))
+(defmulti key-pressed
+  "Called when key is pressed.
+
+  * Dispatch: vector of window name and key char
+  * Params: key event and current state.
+
+  Should return state.
+
+  ```
+  (defmethod key-pressed [\"My window name\" \\c] [event state]
+    ;; do something when 'c' is pressed
+    (assoc state :some (calculate-something state)))
+  ```"
+  {:metadoc/categories #{:events}}
+  (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))
 ;; Do nothing on default
 (defmethod key-pressed :default [_ s]  s)
 
 ;; Multimethod used to process released key
-(defmulti key-released (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))
+(defmulti key-released
+  "Called when key is released.
+
+  * Dispatch: vector of window name and key char
+  * Params: key event and current state.
+
+  Should return state.
+
+  ```
+  (defmethod key-released [\"My window name\" \\c] [event state]
+    ;; do something after 'c' is released
+    (assoc state :some (calculate-something state)))
+  ```"
+  {:metadoc/categories #{:events}}
+  (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))
 ;; Do nothing on default
 (defmethod key-released :default [_ s]  s)
 
 ;; Multimethod used to process typed key
 (defmulti key-typed
-  ""
+  "Called when key is typed (pressed and released).
+
+  * Dispatch: vector of window name and key char
+  * Params: key event and current state.
+
+  Should return state.
+
+  ```
+  (defmethod key-typed [\"My window name\" \\c] [event state]
+    ;; do something when 'c' is typed
+    (assoc state :some (calculate-something state)))
+  ```"
+  {:metadoc/categories #{:events}}
   (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))
 ;; Do nothing on default
 (defmethod key-typed :default [_ s]  s)
 
 ;; Multimethod use to processed key events (any key event)
 
-(def key-event-map {KeyEvent/KEY_PRESSED  :key-pressed
-                    KeyEvent/KEY_RELEASED :key-released
-                    KeyEvent/KEY_TYPED    :key-typed})
+(def ^{:doc "Map of supported key events"
+       :metadoc/categories #{:events}} key-event-map {KeyEvent/KEY_PRESSED  :key-pressed
+                                                      KeyEvent/KEY_RELEASED :key-released
+                                                      KeyEvent/KEY_TYPED    :key-typed})
 
-(defmulti key-event (fn [^KeyEvent e state] [(event-window-name e) (key-event-map (.getID e))]))
+(defmulti key-event
+  "Called on key event
+
+  * Dispatch: vector of window name and key event. See [[key-event-map]].
+  * Params: key event and current state.
+
+  Should return state.
+
+  ```
+  (defmethod key-event [\"My window name\" :key-pressed] [event state]
+    ;; do something when 'up' is typed
+    (when (= :up (key-code event)) (do-something))
+    state)
+  ```"
+  {:metadoc/categories #{:events}}
+  (fn [^KeyEvent e state] [(event-window-name e) (key-event-map (.getID e))]))
 ;; Do nothing on default
 (defmethod key-event :default [_ s] s)
 
 ;; Map Java mouse event names onto keywords
-(def mouse-event-map {MouseEvent/MOUSE_CLICKED  :mouse-clicked
-                      MouseEvent/MOUSE_DRAGGED  :mouse-dragged
-                      MouseEvent/MOUSE_PRESSED  :mouse-pressed
-                      MouseEvent/MOUSE_RELEASED :mouse-released
-                      MouseEvent/MOUSE_MOVED    :mouse-moved})
+(def   ^{:doc "Map of supported mouse events"
+         :metadoc/categories #{:events}}
+  mouse-event-map {MouseEvent/MOUSE_CLICKED  :mouse-clicked
+                   MouseEvent/MOUSE_DRAGGED  :mouse-dragged
+                   MouseEvent/MOUSE_PRESSED  :mouse-pressed
+                   MouseEvent/MOUSE_RELEASED :mouse-released
+                   MouseEvent/MOUSE_MOVED    :mouse-moved})
 
 ;; Multimethod used to processed mouse events
-(defmulti mouse-event (fn [^MouseEvent e state] [(event-window-name e) (mouse-event-map (.getID e))]))
+(defmulti mouse-event
+  "Called on mouse event
+
+  * Dispatch: vector of window name and mouse event. See [[mouse-event-map]].
+  * Params: key event and current state.
+
+  Should return state.
+
+  ```
+  (defmethod mouse-event [\"My window name\" :mouse-pressed] [event state]
+    ;; do something when button is pressed
+    (do-something)
+    state)
+  ```"
+  {:metadoc/categories #{:events}}
+  (fn [^MouseEvent e state] [(event-window-name e) (mouse-event-map (.getID e))]))
 ;; Do nothing on default
 (defmethod mouse-event :default [_ s] s)
 
 ;; Event adapter objects.
-
-;; General function which manipulates state and calls proper event multimethod
 
 (defn- process-state-and-event 
   "For given event call provided multimethod passing state. Save new state."
@@ -1924,8 +1631,6 @@ See [[set-color]]."
       (.setPreferredSize d)
       (.setBackground Color/black))))
 
-;; Function used to close and dispose window. As a side effect `active?` atom is set to false and global state for window is cleared.
-
 (defn- close-window-fn
   "Close window frame"
   [^JFrame frame active? windowname]
@@ -1959,13 +1664,6 @@ See [[set-color]]."
     (doto panel
       (.requestFocus)
       (.createBufferStrategy 2))))
-
-;; Another internal function repaints panel with frames per seconds rate. If `draw` function is passed it is called before rapaint action. Function runs infinitely until window is closed. The cycle goes like this:
-;;
-;; * call `draw` function if available, pass canvas, current frame number and current state (`nil` at start)
-;; * repaint
-;; * wait
-;; * check if window is still displayed and recur incrementing frame number and pass state for another run.
 
 (defn- repaint
   "Draw buffer on panel using `BufferStrategy` object."
@@ -2045,15 +1743,14 @@ See [[set-color]]."
                      (System/nanoTime)
                      (if (pos? delay) (- (/ (- (System/nanoTime) at) 1.0e6) delay) 0.0)))))))))
 
-;; You may want to replace canvas to the other one. To make it pass result of `show-window` function and new canvas.
-;; Internally it just resets buffer atom for another canvas.
-;; See examples/ex01_events.clj to see how it works.
+;;
 
 (defn replace-canvas
   "Replace canvas in window.
 
   * Input: window and new canvas
   * Returns canvas"
+  {:metadoc/categories #{:canvas :window}}
   [^Window window canvas]
   (reset! (.buffer window) canvas))
 
@@ -2061,67 +1758,60 @@ See [[set-color]]."
 
 (defn get-canvas
   "Returns canvas bound to `window`."
+  {:metadoc/categories #{:canvas :window}}
   [^Window window]
   @(.buffer window))
 
-;; Finally function which creates and displays window. Function creates window's visibility status (`active?` atom), buffer as atomized canvas, creates frame, creates refreshing task (repainter) and shows window.
+;;
 
 (declare to-hex)
 
 (defn show-window
-  "Show window with width/height, name and required fps of refresh. Optionally pass callback function.
+  "Show window for given canvas
 
-  * Input: canvas, window name, width (defalut: canvas width), height (default: canvas height), frames per seconds (default: 60), (optional) `draw` function.
-  * Returns `Window` value
+  * Returns `Window` type value
 
   As parameters you can provide a map with folowing keys:
 
-  * :canvas
-  * :window-name
-  * :w
-  * :h
-  * :fps
-  * :draw-fn
-  * :state
-  * :draw-state
-  * :setup
+  * :canvas - canvas attached to window (default is canvas 200x200 px)
+  * :window-name - window name, used also for events dispatch and global state
+  * :w - width of the window (default as canvas width)
+  * :h - height of the window (default as canvas heiht)
+  * :fps - refresh rate
+  * :draw-fn - drawing callback
+  * :state - initial global state data
+  * :draw-state - initial drawing state
+  * :setup - inital callback function, returns drawing state
   * :hint - rendering hint for display
-  * :refresher - safe (default) or fast"
+  * :refresher - `:safe` (default) or `:fast`
+
+  There are several options for positional parameters."
   {:metadoc/categories #{:window}}
-  ([canvas wname width height fps draw-fun state draw-state setup hint refresher]
-   (let [active? (atom true)
-         buffer (atom canvas)
-         frame (JFrame.)
-         panel (create-panel buffer wname width height)
-         window (->Window frame
-                          active?
-                          buffer
-                          panel
-                          fps
-                          width
-                          height
-                          wname
-                          (atom {}))
-         setup-state (when setup (with-canvas-> canvas
-                                   (setup window))) 
-         refresh-screen-task (if (= refresher :fast)
-                               refresh-screen-task-speed
-                               refresh-screen-task-safety)]
-     (SwingUtilities/invokeAndWait #(build-frame frame panel active? wname width height))
-     (add-events-state-processors window)
-     (change-state! wname state)
-     (future (refresh-screen-task window draw-fun (or setup-state draw-state) (when hint (get-rendering-hints hint :mid))))
-     window))
-  ([canvas wname]
-   (show-window canvas wname nil))
-  ([canvas wname draw-fn]
-   (show-window canvas wname 60 draw-fn))
-  ([canvas wname fps draw-fn]
-   (show-window canvas wname (width canvas) (height canvas) fps draw-fn nil nil nil nil nil))
-  ([canvas wname w h fps]
-   (show-window canvas wname w h fps nil nil nil nil nil nil))
-  ([canvas wname w h fps draw-fun]
-   (show-window canvas wname w h fps draw-fun nil nil nil nil nil))
+  ([canvas window-name]
+   (show-window {:canvas canvas
+                 :window-name window-name}))
+  ([canvas window-name draw-fn]
+   (show-window {:canvas canvas
+                 :window-name window-name
+                 :draw-fn draw-fn}))
+  ([canvas window-name fps draw-fn]
+   (show-window {:canvas canvas
+                 :window-name window-name
+                 :fps fps
+                 :draw-fn draw-fn}))
+  ([canvas window-name w h fps]
+   (show-window {:canvas canvas
+                 :window-name window-name
+                 :fps fps
+                 :w w
+                 :h h}))
+  ([canvas window-name w h fps draw-fn]
+   (show-window {:canvas canvas
+                 :window-name window-name
+                 :fps fps
+                 :w w
+                 :h h
+                 :draw-fn draw-fn}))
   ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint refresher]
      :or {canvas (canvas 200 200)
           window-name (str "Clojure2D - " (to-hex (rand-int (Integer/MAX_VALUE)) 8))
@@ -2132,7 +1822,31 @@ See [[set-color]]."
           setup nil
           hint nil
           refresher nil}}]
-   (show-window canvas window-name (or w (width canvas)) (or h (height canvas)) fps draw-fn state draw-state setup hint refresher))
+   (let [w (or w (width canvas))
+         h (or h (height canvas))
+         active? (atom true)
+         buffer (atom canvas)
+         frame (JFrame.)
+         panel (create-panel buffer window-name w h)
+         window (->Window frame
+                          active?
+                          buffer
+                          panel
+                          fps
+                          w
+                          h
+                          window-name
+                          (atom {}))
+         setup-state (when setup (with-canvas-> canvas
+                                   (setup window))) 
+         refresh-screen-task (if (= refresher :fast)
+                               refresh-screen-task-speed
+                               refresh-screen-task-safety)]
+     (SwingUtilities/invokeAndWait #(build-frame frame panel active? window-name w h))
+     (add-events-state-processors window)
+     (change-state! window-name state)
+     (future (refresh-screen-task window draw-fn (or setup-state draw-state) (when hint (get-rendering-hints hint :mid))))
+     window))
   ([] (show-window {})))
 
 ;; ## Utility functions
@@ -2148,16 +1862,17 @@ See [[set-color]]."
 
 ;; ## Date/Time functions
 
-(defn ^{:metadoc/categories #{:dt}} year ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/YEAR))
-(defn ^{:metadoc/categories #{:dt}} month ^long [] (inc ^int (.get ^Calendar (Calendar/getInstance) Calendar/MONTH)))
-(defn ^{:metadoc/categories #{:dt}} day ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/DAY_OF_MONTH))
-(defn ^{:metadoc/categories #{:dt}} hour ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/HOUR_OF_DAY))
-(defn ^{:metadoc/categories #{:dt}} minute ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/MINUTE))
-(defn ^{:metadoc/categories #{:dt}} sec ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/SECOND))
-(defn ^{:metadoc/categories #{:dt}} millis ^long [] (System/currentTimeMillis))
-(defn ^{:metadoc/categories #{:dt}} nanos ^long [] (System/nanoTime))
-(defn ^{:metadoc/categories #{:dt}} datetime
+(defn year "Current year" {:metadoc/categories #{:dt}} ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/YEAR))
+(defn month "Current month" {:metadoc/categories #{:dt}} ^long [] (inc ^int (.get ^Calendar (Calendar/getInstance) Calendar/MONTH)))
+(defn day "Current day" {:metadoc/categories #{:dt}} ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/DAY_OF_MONTH))
+(defn hour "Current hour" {:metadoc/categories #{:dt}} ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/HOUR_OF_DAY))
+(defn minute "Current minute" {:metadoc/categories #{:dt}} ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/MINUTE))
+(defn sec "Current second" {:metadoc/categories #{:dt}} ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/SECOND))
+(defn millis "Milliseconds from epoch" {:metadoc/categories #{:dt}} ^long [] (System/currentTimeMillis))
+(defn nanos "JVM running time in nanoseconds" {:metadoc/categories #{:dt}} ^long [] (System/nanoTime))
+(defn datetime
   "Date time values in the array. Optional parameter :vector or :hashmap (default) to indicate what to return."
+  {:metadoc/categories #{:dt}}
   ([type-of-array]
    (let [y (year) m (month) d (day)
          h (hour) mi (minute) s (sec) mil (millis)
@@ -2198,24 +1913,6 @@ See [[set-color]]."
 (def ^:private ^java.text.SimpleDateFormat simple-date-format-full (java.text.SimpleDateFormat. "yyyy-MM-dd HH:mm:ss"))
 
 ;; Following block defines session related functions.
-;; Session is a type of:
-;;
-;; * logger - file writer
-;; * name - session identifiers as vector with formatted current date and hash of this date
-;; * counter - used to create sequence filenames for session
-;;
-;; Session is encapsulated in agent and is global for library
-;;
-;; Example:
-;;
-;; * `(get-session-name) => nil`
-;; * `(make-session) => ["20170123235332" "CD88D0C5"]`
-;; * `(get-session-name) => ["20170123235332" "CD88D0C5"]`
-;; * `(next-filename "folder/" ".txt") => "folder/CD88D0C5_000000.txt"`
-;; * `(next-filename "folder/" ".txt") => "folder/CD88D0C5_000001.txt"`
-;; * `(close-session) => nil`
-;; * `(get-session-name) => nil`
-;; * `(make-session) => ["20170123235625" "CD8B7204"]`
 
 ;; Session values are packed into the type
 (defrecord SessionType [logger
@@ -2226,7 +1923,8 @@ See [[set-color]]."
 (defonce ^:private session-agent (agent (map->SessionType {})))
 
 ;; Logging to file is turned off by default.
-(def ^:dynamic *log-to-file* false)
+(def ^:dynamic ^{:doc "Should [[log]] save to file under [[log-name]]. Print to terminal if `false` (default)."
+                 :metadoc/categories #{:session}} *log-to-file* false)
 
 (defn- close-session-fn
   "Close current session"
@@ -2237,20 +1935,28 @@ See [[set-color]]."
       (.close o)))
   (map->SessionType {}))
 
-(defn- make-logger-fn
-  "Create writer for logger"
-  [session-name]
-  (let [fname (str "log/" (first session-name) ".log")]
-    (make-parents fname) 
-    (let [^java.io.Writer no (writer fname :append true)]
-      (.write no (str "Session id: " (second session-name) (System/lineSeparator) (System/lineSeparator)))
-      no)))
-
 (defn- make-session-name
   "Create unique session name based on current time. Result is a vector with date and hash represented as hexadecimary number."
   []
   (let [date (java.util.Date.)]
     [(.format simple-date-format date) (to-hex (hash date) 8)]))
+
+(declare session-name)
+
+(defn log-name
+  "Returns log file name with path."
+  {:metadoc/categories #{:session}}
+  []
+  (str "log/" (first (session-name)) ".log"))
+
+(defn- make-logger-fn
+  "Create writer for logger"
+  [session-name]
+  (let [fname (log-name)]
+    (make-parents fname) 
+    (let [^java.io.Writer no (writer fname :append true)]
+      (.write no (str "Session id: " (second session-name) (System/lineSeparator) (System/lineSeparator)))
+      no)))
 
 (defn- make-session-fn 
   "Create session"
@@ -2276,7 +1982,7 @@ See [[set-color]]."
   (await-for 1000 session-agent))
 
 (defn ensure-session
-  "Ensure that session is active (create one if not"
+  "Ensure that session is active (create one if not)"
   []
   {:metadoc/categories #{:session}}
   (when (nil? (:name @session-agent))

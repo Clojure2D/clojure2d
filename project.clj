@@ -4,13 +4,14 @@
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.9.0"]
-                 [metadoc "0.2.0"]
+                 [metadoc "0.2.1"]
                  [generateme/fastmath "0.1.2-SNAPSHOT"]
                  ;; [org.bytedeco/javacv-platform "1.3.2"]
                  ]
   :resource-path "resources/"
   :java-source-paths ["src"]
-  :javac-options ["-target" "1.7" "-source" "1.7"]
+  :javac-options ["-target" "1.8" "-source" "1.8"]
+  :prep-tasks [["compile" "fastmath.vector"] "javac"]
   :scm {:name "git"
         ::url "https://github.com/Clojure2D/clojure2d.git"}
   :repl-options {:timeout 120000}
@@ -23,7 +24,7 @@
              ]
   :profiles {:uberjar {:aot :all}
              :dev {:plugins [[refactor-nrepl "2.4.0-SNAPSHOT"]
-                             [cider/cider-nrepl "0.17.0-SNAPSHOT"]
+                             [cider/cider-nrepl "0.17.0"]
                              [lein-ancient "0.6.15"]
                              [lein-kibit "0.1.6"]
                              [lein-bikeshed "0.5.0"]

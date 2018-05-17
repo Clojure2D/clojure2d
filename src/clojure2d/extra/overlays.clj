@@ -48,8 +48,8 @@
        (line canvas 0 y++ w y++))))
   canvas)
 
-(def tinter1 (partial p/filter-channels (p/make-tint-filter 245 130 16)))
-(def tinter2 (partial p/filter-channels (p/make-tint-filter 36 130 225)))
+(def tinter1 (partial p/filter-channels (p/tint (c/color 245 130 16))))
+(def tinter2 (partial p/filter-channels (p/tint (c/color 36 130 225))))
 
 (defn render-rgb-scanlines
   "Blurs and renders rgb stripes on the image, returns new image. Scale parameter (default 1.6) controls amount of blur. Resulting image is sligtly lighter and desaturated. Correct with normalize filter if necessary."
@@ -60,15 +60,15 @@
          rimg (-> p
                   (resize (unchecked-int (/ w scale)) (unchecked-int (/ h scale)))
                   (resize w h)
-                  (p/get-image-pixels))
+                  (p/to-pixels))
          l1 (tinter1 rimg)
          l2 (tinter2 rimg)
          cnvs (with-canvas-> (canvas w h)
-                (image (p/image-from-pixels l1))
+                (image (get-image l1))
                 (draw-lines w h))]
      
-     (let [l1 (p/get-canvas-pixels cnvs)]
-       (p/image-from-pixels (p/blend-channels (partial p/blend-channel-xy blend-shift-and-add-f) l1 l2)))))
+     (let [l1 (p/to-pixels cnvs)]
+       (get-image (p/blend-channels (partial p/blend-channel-xy blend-shift-and-add-f) l1 l2)))))
   ([p] (render-rgb-scanlines p {})))
 
 ;; ## CRT Scanlines
@@ -99,7 +99,7 @@
    (let [img (get-image img)
          ^int w (width img)
          ^int h (height img)
-         p (p/get-image-pixels img)]
+         p (p/to-pixels img)]
 
      (letfn [(dist [^double pos]
                (let [poss (/ pos resolution)]
@@ -145,7 +145,7 @@
                          (m/constrain 0.0 255.0))))]
          (->> blurred
               (p/filter-channels (partial p/filter-channel-xy tri) nil)
-              (p/image-from-pixels)))))))
+              (get-image)))))))
 
 ;; ## Noise
 ;;
@@ -160,7 +160,7 @@
          p (p/filter-channels (partial p/filter-channel fc) nil nil (partial p/filter-channel fa) (p/pixels w h))]
      (p/set-channel p 1 (p/get-channel p 0))
      (p/set-channel p 2 (p/get-channel p 0))
-     (p/image-from-pixels p)))
+     (get-image p)))
   ([w h] (make-noise w h {})))
 
 (defn render-noise
@@ -192,27 +192,27 @@
     (dorun (repeatedly (r/irand limita limitb)
                        #(let [i (r/irand 10 (- w 10))
                               j (r/irand 10 (- h 10))]
-                          (dorun (for [m (range i (+ i (r/irand 1 8)))
-                                       n (range (- j (r/irand 6)) (+ j (r/irand 1 6)))]
+                          (dorun (for [m (range i (+ i (r/irand 20)))
+                                       n (range (- j (r/irand 10)) (+ j (r/irand 2 10)))]
                                    (let [bc (-> (r/grand)
                                                 (* 40.0)
                                                 (+ intensity)
                                                 (int))
                                          a (-> (r/grand)
-                                               (* 30.0)
-                                               (+ 180.0)
-                                               (m/constrain 0.0 255.0)
+                                               (* 60.0)
+                                               (+ 180.0)                                               
                                                (* alphas)
+                                               (m/constrain 0.0 255.0)
                                                (int))]
                                      (aset pc (+ ^long m (* w ^long n)) bc)
                                      (aset pa (+ ^long m (* w ^long n)) a)))))))
     (let [p (p/pixels w h)]
       (p/set-channel p 0 pc)
       (p/set-channel p 3 pa)
-      (let [res (p/filter-channels p/dilate-filter nil nil p/dilate-filter p)]
+      (let [res (p/filter-channels p/dilate-cross nil nil p/dilate-cross p)]
         (p/set-channel res 1 (p/get-channel res 0))
         (p/set-channel res 2 (p/get-channel res 1))
-        (p/image-from-pixels res)))))
+        (get-image res)))))
 
 (defn make-spots
   "Create vector of spotted overlays. Input: spots transparency (default 80), list of intensities (int values from 0 to 255, default [60 120]) and size of overlay."
