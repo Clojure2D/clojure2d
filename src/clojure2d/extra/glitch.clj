@@ -21,7 +21,7 @@
             [fastmath.vector :as v]
             [clojure2d.extra.signal :as s]
             [clojure2d.color :as c]
-            [clojure2d.extra.variations :as var])
+            [fastmath.fields :as var])
   (:import [clojure2d.pixels Pixels]
            [fastmath.vector Vec2 Vec4]))
 

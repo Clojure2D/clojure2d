@@ -162,7 +162,8 @@
   * `:zero` - set `0` 
   * `:edge` - value from the edge of the image (left, right, top, bottom or corners) (default)
   * `:wrap` - wrap around image
-  * or channel value 0-255 - set specific value"}
+  * or channel value 0-255 - set specific value"
+       :metadoc/categories #{:pix}}
   ^:dynamic *pixels-edge* :edge)
 
 ;; ## Pixels type

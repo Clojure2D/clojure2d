@@ -3,7 +3,8 @@
             [clojure2d.color :as c]
             [clojure2d.core :as core]
             [clojure2d.pixels :refer :all]
-            [fastmath.core :as m]))
+            [fastmath.core :as m]
+            [fastmath.random :as r]))
 
 (defsnippet clojure2d.pixels saver "Save pixels to image."
   (let [n (str "images/pixels/" (first opts) ".jpg")]
@@ -345,4 +346,34 @@
   (example-snippet "Less contrast" saver :image
     (fn [] (filter-channels (brightness-contrast 1.0 0.5) cockatoo))))
 
-(comment saver #(filter-channels (brightness-contrast 1.0 0.5) cockatoo) [] "asdf")
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* :warn-on-boxed)
+(m/use-primitive-operators)
+
+(add-examples renderer
+  (example-snippet "Usage" saver :image
+    #(let [r (renderer 300 300)]
+       (dotimes [i 20000000]
+         (let [x (+ 150 (r/grand 30))
+               y (+ 150 (r/grand 30))
+               x (+ x (* 20.0 (- (r/noise (/ x 50.0) (/ y 50.0) 0.34) 0.5)))
+               y (+ y (* 20.0 (- (r/noise (/ y 50.0) (/ x 50.0) 2.23) 0.5)))]
+           (set-color r x y :white)))
+       (to-pixels r {:gamma-alpha 0.6 :gamma-color 0.8})))
+  (example-snippet "Compare to native Java2d rendering. You can observe oversaturation." saver :image
+    #(let [r (core/canvas 300 300)]
+       (core/with-canvas [c r]
+         (core/set-color c :white 5)
+         (dotimes [i 2000000]
+           (let [x (+ 150 (r/grand 30))
+                 y (+ 150 (r/grand 30))
+                 x (+ x (* 20.0 (- (r/noise (/ x 50.0) (/ y 50.0) 0.34) 0.5)))
+                 y (+ y (* 20.0 (- (r/noise (/ y 50.0) (/ x 50.0) 2.23) 0.5)))]
+             (core/point c x y))))
+       (to-pixels r))))
+
+
+
+(comment saver #(let [task (fn [] )]
+                  
+                  (to-pixels r)) [] "asdf")
