@@ -2,7 +2,8 @@
   (:require [clojure.test :refer :all]
             [fastmath.vector :as v]
             [clojure2d.core :refer :all]
-            [clojure2d.color :as c]))
+            [clojure2d.color :as c]
+            [clojure2d.pixels :as p]))
 
 ;; global variables
 (def ^:const window-name "Testing clojure.core")
@@ -86,8 +87,8 @@
   (is (= 100 (width (get-image @window)))))
 
 (deftest get-pixel-test
-  (is (= (c/to-color :maroon) (get-pixel canvas2 50 50)))
-  (is (= (c/to-color :black) (get-pixel canvas2 0 0))))
+  (is (= (c/to-color :maroon) (p/get-color canvas2 50 50)))
+  (is (= (c/to-color :black) (p/get-color canvas2 0 0))))
 
 ;; rendering hints available
 (deftest rendering-hints-test
