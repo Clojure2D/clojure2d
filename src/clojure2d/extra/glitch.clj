@@ -103,15 +103,15 @@
 (defn slitscan2-random-config
   ""
   []
-  (binding [var/*skip-random-variations* true]
-    {:variation (var/make-random-configuration)
+  (binding [var/*skip-random-fields* true]
+    {:variation (var/random-configuration)
      :r 2.0}))
 
 (defn make-slitscan2
   "f: variation configuration
    r: range value 1.0-3.0"
   ([{:keys [variation ^double r]}]
-   (let [f (var/make-combination variation)
+   (let [f (var/combine variation)
          r- (- r)]
      (fn [ch t ^Pixels p]
        (dotimes [y (.h p)]
@@ -135,7 +135,7 @@
   "f: variation configuration
    r: range value 1.0-3.0"
   ([{:keys [variation ^double r]}]
-   (let [f (var/make-combination variation)
+   (let [f (var/combine variation)
          r- (- r)]
      (fn [ch t ^Pixels p]
        (dotimes [y (.h p)]

@@ -1,22 +1,3 @@
-;; # Namespace scope
-;;
-;; Pixels represent raw color data take from image or canvas.
-;; `pixels` namespace consist of:
-;;
-;; * Pixels type definition with set of mutating functions
-;; * Parallel filter processors
-;; * Filters
-;; * BinPixels to support log-density (bin based) rendering process.
-;;
-;; Pixels are stored in `ints` array as separeted channels in one of two layouts: planar (default) and interleaved.
-;; To operate on pixels you have several methods:
-;;
-;; * whole channel, channel value or color getters and setters for specified position and/or channel
-;; * creators - rom and to: file, image, canvas
-;; * layout converters
-;; * parallel processors for filtering colors or channels; composition of `pixels`
-;; * filters: `dilate`, `erode`, `box-blur`, `gaussian-blur`, `posterize`, `threshold`, `quantile`, `tint`, `normalize`, `equalize`, `negate`.
-
 (ns clojure2d.pixels
   "Operations on pixel levels.
 
@@ -331,8 +312,7 @@
                     0 (c/ch0 c)
                     1 (c/ch1 c)
                     2 (c/ch2 c)
-                    3 (c/alpha c))))}
-  )
+                    3 (c/alpha c))))})
 
 (extend Canvas
   PixelsProto
@@ -345,7 +325,6 @@
   {:to-pixels (fn [^Window w] (get-canvas-pixels @(.buffer w)))
    :get-color (fn [^Window w x y] (get-color @(.buffer w) x y))
    :get-value (fn [^Window c ch x y] (get-value @(.buffer c) ch x y))})
-
 
 (defn filter-colors
   "Filter colors.
@@ -702,19 +681,6 @@
      (clojure2d.java.filter.ContrastBrightness/process (.p p) (.p target) ch brightness 1.0))))
 
 ;; ## Log-density rendering
-;;
-;; This is a helper type to support log-density rendering where each pixel is represented by "bin". Each bin counts number of hits which is later converted to valid colour. Each color channe (red, green and blue) has its own bin.
-;; Log-density rendering gives smooth output and was developed for fractal flames rendering. See: http://flam3.com/flame_draves.pdf
-;; After rendering `BinPixels` can be converted to `Pixels` using given configuration. You can treat it as RAW photo development.
-;; Configuration is a map of values:
-;;
-;; * alpha-gamma - gamma for transparency (default: 2.0)
-;; * color-gamma - gamma for color (default: 1.1)
-;; * intensity - color intensity (default: 0.8)
-;; * saturation - default: 1.0
-;; * brightness - default: 1.0
-;;
-;; You can pass also background color for your render. Default is fully transparent black.
 
 (defrecord LDRenderer [^clojure2d.java.LogDensity buff ^long w ^long h]
   PixelsProto
@@ -760,7 +726,7 @@
   (convolve [b t] (core/convolve (to-pixels b) t)))
 
 (defn- create-filter
-  ""
+  "Create antialiasing filter."
   [filter ^double filter-radius filter-params]
   (condp clojure.core/= filter
     :gaussian (clojure2d.java.reconstruction.Gaussian. filter-radius (or (first filter-params) 2.0))
@@ -775,7 +741,9 @@
     nil))
 
 (defn renderer
-  "Create"
+  "Create renderer.
+
+  Optionally you can pass antialiasing filter and its parameters. Default `:none`."
   {:metadoc/categories #{:ld}}
   ([w h filter filter-radius & filter-params]
    (LDRenderer. (clojure2d.java.LogDensity. w h (create-filter filter filter-radius filter-params))
@@ -784,7 +752,9 @@
   ([w h] (renderer w h :none 2.0 nil)))
 
 (defn merge-renderers
-  "Paralelly merge two binpixels. Be sure a and b are equal. Use this function to merge results created in separated threads"
+  "Paralelly merge two renderers. Be sure `a` and `b` are equal. Use this function to merge results created in separated threads.
+  
+  This is mutating function. Data from `b` are added to `a` which is returned."
   {:metadoc/categories #{:ld}}
   ^LDRenderer [^LDRenderer a ^LDRenderer b]
   (let [ch0 (future (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 0))

@@ -4,7 +4,7 @@
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.9.0"]
-                 [metadoc "0.2.1"]
+                 [metadoc "0.2.2"]
                  [generateme/fastmath "0.1.2-SNAPSHOT"]
                  ;; [org.bytedeco/javacv-platform "1.3.2"]
                  ]
@@ -24,7 +24,7 @@
              ]
   :profiles {:uberjar {:aot :all}
              :dev {:plugins [[refactor-nrepl "2.4.0-SNAPSHOT"]
-                             [cider/cider-nrepl "0.17.0"]
+                             [cider/cider-nrepl "0.18.0-SNAPSHOT"]
                              [lein-ancient "0.6.15"]
                              [lein-kibit "0.1.6"]
                              [lein-bikeshed "0.5.0"]
@@ -39,7 +39,6 @@
                            :output-path "docs/codox/"
                            :source-paths ["src"]
                            :source-uri "https://github.com/Clojure2D/clojure2d/blob/master/{filepath}#L{line}"
-                           :exclude-vars nil
                            :doc-paths ["docs/tutorials/"]
                            :writer metadoc.writers.codox/write-docs
                            :html {:transforms [[:head] [:append [:script {:type "text/javascript",
