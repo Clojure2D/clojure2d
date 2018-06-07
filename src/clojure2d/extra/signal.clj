@@ -1,13 +1,3 @@
-;; # Namespace scope
-;;
-;; Signal processing. You can find here 3 elements
-;;
-;; * Image pixels to/from raw (signal) converter
-;; * Signal processing + effects
-;; * Signal generators
-;;
-;; See examples 16 and 18
-
 (ns clojure2d.extra.signal
   "Signal processing and generation.
   
@@ -125,12 +115,12 @@
 (deftype EffectsList [effect-name ^double sample effect state next]
   Object
   (toString [_] (if next 
-                  (str next " -> " (name effect-name))
+                  (str next " -> " (name effect-name) ", result: " sample)
                   (name effect-name)))
   IFn
   (invoke [_] sample)
   (invoke [e n]
-    (.sample ^EffectsList (single-pass e n))))
+    (single-pass e n)))
 
 (defn- effect-node
   "Create `EffectsList` node from effect function and initial state"
@@ -140,20 +130,20 @@
 (defn compose-effects
   "Compose list of effects."
   [^EffectsList e & es]
-  (if (nil? es)
+  (if-not es
     e
     (EffectsList. (.effect-name e) (.sample e) (.effect e) (.state e) (apply compose-effects es))))
 
 (defn- reset-effects
   "Resets effects state to initial one."
   [^EffectsList e]
-  (EffectsList. (.effect-name e) 0.0 (.effect e) ((.effect e)) (when-not (nil? (.next e))
+  (EffectsList. (.effect-name e) 0.0 (.effect e) ((.effect e)) (when (.next e)
                                                                  (reset-effects (.next e)))))
 
 (defn- single-pass
   "Process on sample using effects, returns `EffectsList` with result and new effect states."
   [^EffectsList e ^double sample]
-  (if (nil? (.next e))
+  (if-not (.next e)
     (let [^SampleAndState r ((.effect e) sample (.state e))]
       (println (str "-> " (.effect-name e)))
       (EffectsList. (.effect-name e) (.sample r) (.effect e) (.state r) nil))
