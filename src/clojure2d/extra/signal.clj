@@ -79,7 +79,11 @@
   ([^Pixels p {:keys [planar? signed? little-endian? ^int bits channels coding]
                :or {planar? true little-endian? true bits 8 signed? false channels [0 1 2] coding :none}}]
    (let [channels (int-array (if (= :all channels) [0 1 2 3] channels))]
-     (Signal. (Converter/toSignal (.p p) channels (dec (>> bits 3)) little-endian? signed? planar? (coding-value coding)))))
+     (Signal. (Converter/toSignal
+               (.p p) channels
+               (dec (>> bits 3))
+               little-endian? signed? planar?
+               (coding-value coding)))))
   ([p]
    (pixels->signal p {})))
 
@@ -90,8 +94,13 @@
   ([^Pixels target ^Signal sig {:keys [planar? signed? little-endian? ^int bits channels coding]
                                 :or {planar? true little-endian? true bits 8 signed? false channels [0 1 2] coding :none}}]
    (let [channels (int-array (if (= :all channels) [0 1 2 3] channels))]
-     (Converter/fromSignal (.signal sig) (.p target) channels (dec (>> bits 3)) little-endian? signed? planar? (coding-value coding))
-
+     (Converter/fromSignal
+      (.signal sig)
+      (.p target)
+      channels
+      (dec (>> bits 3))
+      little-endian? signed? planar?
+      (coding-value coding))
      target))
   ([target sig]
    (signal->pixels target sig {})))
