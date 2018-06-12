@@ -492,7 +492,7 @@
   (fn [ch ^Pixels target ^Pixels p]
     (clojure2d.java.filter.Quantile/process (.p p) (.p target) ch (.w p) (.h p) no)))
 
-(def ^{:metadoc/categories #{:filt} :doc "Dilate filter. See: [[dilate-cross]]."} dilate (make-quantile 0))
+(def ^{:metadoc/categories #{:filt} :doc "Erode filter. See: [[erode-cross]]."} erode (make-quantile 0))
 (def ^{:metadoc/categories #{:filt} :doc "Quantile (2/9) filter"} quantile-1 (make-quantile 1))
 (def ^{:metadoc/categories #{:filt} :doc "Quantile (3/9) filter"} quantile-2 (make-quantile 2))
 (def ^{:metadoc/categories #{:filt} :doc "Quantile (4/9) filter"} quantile-3 (make-quantile 3))
@@ -500,7 +500,7 @@
 (def ^{:metadoc/categories #{:filt} :doc "Quantile (6/9) filter"} quantile-5 (make-quantile 5))
 (def ^{:metadoc/categories #{:filt} :doc "Quantile (7/9) filter"} quantile-6 (make-quantile 6))
 (def ^{:metadoc/categories #{:filt} :doc "Quantile (8/9) filter"} quantile-7 (make-quantile 7))
-(def ^{:metadoc/categories #{:filt} :doc "Erode filter. See: [[erode-cross]]."} erode (make-quantile 8))
+(def ^{:metadoc/categories #{:filt} :doc "Dilate filter. See: [[dilate-cross]]."} dilate (make-quantile 8))
 
 (defn- make-quantile-cross
   ""
@@ -508,8 +508,8 @@
   (fn [ch ^Pixels target ^Pixels p]
     (clojure2d.java.filter.Quantile/processCross (.p p) (.p target) ch (.w p) (.h p) no)))
 
-(def ^{:metadoc/categories #{:filt} :doc "Dilate using 5 pixels. See: [[dilate]]."} dilate-cross (make-quantile-cross 0))
-(def ^{:metadoc/categories #{:filt} :doc "Erode using 5 pixels. See: [[erode]]."} erode-cross (make-quantile-cross 4))
+(def ^{:metadoc/categories #{:filt} :doc "Erode using 5 pixels. See: [[erode]]."} erode-cross (make-quantile-cross 0))
+(def ^{:metadoc/categories #{:filt} :doc "Dilate using 5 pixels. See: [[dilate]]."} dilate-cross (make-quantile-cross 4))
 
 ;; ### Blurs
 

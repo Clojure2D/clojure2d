@@ -189,33 +189,34 @@
   [^double alpha ^double intensity ^long w ^long h]
   (let [size (* 4 w h)
         limita (int (max 1.0 (* 1.0e-5 w h)))
-        limitb (int (max 6.0 (* 6.0e-5 w h)))
+        limitb (int (max 6.0 (* 3.0e-5 w h)))
         ^ints pc (int-array size)
         ^ints pa (int-array size)
         alphas (/ alpha 255.0)]
     (dorun (repeatedly (r/irand limita limitb)
                        #(let [i (r/irand 10 (- w 10))
                               j (r/irand 10 (- h 10))]
-                          (dorun (for [m (range i (+ i (r/irand 20)))
-                                       n (range (- j (r/irand 10)) (+ j (r/irand 2 10)))]
+                          (dorun (for [m (range i (+ i (r/irand 1 8)))
+                                       n (range (- j (r/irand 6)) (+ j (r/irand 1 6)))]
                                    (let [bc (-> (r/grand)
                                                 (* 40.0)
                                                 (+ intensity)
                                                 (int))
                                          a (-> (r/grand)
-                                               (* 60.0)
+                                               (* 30.0)
                                                (+ 180.0)                                               
-                                               (* alphas)
                                                (m/constrain 0.0 255.0)
+                                               (* alphas)
                                                (int))]
                                      (aset pc (+ ^long m (* w ^long n)) bc)
                                      (aset pa (+ ^long m (* w ^long n)) a)))))))
     (let [p (p/pixels w h)]
       (p/set-channel p 0 pc)
       (p/set-channel p 3 pa)
-      (let [res (p/filter-channels p/dilate-cross nil nil p/dilate-cross p)]
+      (let [filt (r/randval p/dilate p/dilate-cross)
+            res (p/filter-channels filt nil nil filt p)]
         (p/set-channel res 1 (p/get-channel res 0))
-        (p/set-channel res 2 (p/get-channel res 1))
+        (p/set-channel res 2 (p/get-channel res 0))
         (get-image res)))))
 
 (defn spots-overlay

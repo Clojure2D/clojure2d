@@ -1,10 +1,7 @@
-;; ## Namespace scope
-;;
-;; Segment pixels into squares. Segmentation is based on similarity of channel values.
-;;
-;; See example 13
-
 (ns clojure2d.extra.segmentation
+  "Segment image into parts.
+
+  Currently contains only quadtree segmentation."
   (:require [clojure2d.core :as core]
             [fastmath.core :as m]
             [fastmath.random :as r]
@@ -34,27 +31,34 @@
            (m/sqrt (/ Q (dec limit)))))))))
 
 (defn segment-pixels
-  "Decompose channel into segments where mins is minimum size of segment, maxs is maximum size, thr is accuracy (minimum std dev of pixel values to make decision about subdivision."
-  [^Pixels p ch {:keys [^long min-size ^long max-size ^double threshold]
-                 :or {min-size 4 max-size 256 threshold 15.0}}]
-  (let [ww (<< 1 (m/high-2-exp (.w p)))
-        hh (<< 1 (m/high-2-exp (.h p)))
-        mins (max 2 min-size)
+  "Decompose channel `ch` from `Pixels` into square segments using quadtree decomposition.
 
-        segmf (fn local-segmentation
-                [^long x ^long y ^long size res]
-                (if (or (>= x (.w p)) (>= y (.h p)))
-                  res
-                  (lazy-seq
-                   (let [^double stdev (calc-stdev p ch x y size size)]
-                     (if (or (> size max-size)
-                             (and (> size mins)
-                                  (> stdev threshold)))
-                       (let [mid (>> size 1)]
-                         (->> res
-                              (local-segmentation (+ x mid) (+ y mid) mid)
-                              (local-segmentation x (+ y mid) mid)
-                              (local-segmentation (+ x mid) y mid)
-                              (local-segmentation x y mid)))
-                       (cons [x y size] res))))))]
-    (segmf 0 0 (max ww hh) nil)))
+  * `min-size` is minimum size of segment
+  * `max-size` is maximum size
+  * `threshold` is accuracy (minimum std dev of pixel values to make decision about subdivision.
+
+  Returns list of of vectors containing [x y size] where [x y] is segment position and `size` is a side length."
+  ([p ch] (segment-pixels p ch {}))
+  ([^Pixels p ch {:keys [^long min-size ^long max-size ^double threshold]
+                  :or {min-size 4 max-size 256 threshold 15.0}}]
+   (let [ww (<< 1 (m/high-2-exp (.w p)))
+         hh (<< 1 (m/high-2-exp (.h p)))
+         mins (max 2 min-size)
+
+         segmf (fn local-segmentation
+                 [^long x ^long y ^long size res]
+                 (if (or (>= x (.w p)) (>= y (.h p)))
+                   res
+                   (lazy-seq
+                    (let [^double stdev (calc-stdev p ch x y size size)]
+                      (if (or (> size max-size)
+                              (and (> size mins)
+                                   (> stdev threshold)))
+                        (let [mid (>> size 1)]
+                          (->> res
+                               (local-segmentation (+ x mid) (+ y mid) mid)
+                               (local-segmentation x (+ y mid) mid)
+                               (local-segmentation (+ x mid) y mid)
+                               (local-segmentation x y mid)))
+                        (cons [x y size] res))))))]
+     (segmf 0 0 (max ww hh) nil))))
