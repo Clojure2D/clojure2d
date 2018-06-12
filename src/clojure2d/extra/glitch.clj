@@ -59,7 +59,7 @@
 (defn- make-slitscan-waves
   "Create function from waves definision."
   [waves]
-  (s/make-sum-wave (map #(s/make-wave (:wave %) (:freq %) (:amp %) (:phase %)) waves)))
+  (s/sum-waves (map #(s/wave (:wave %) (:freq %) (:amp %) (:phase %)) waves)))
 
 (defn- slitscan
   "Shift pixels by amount returned by functions fx and fy."

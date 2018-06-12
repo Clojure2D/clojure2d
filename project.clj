@@ -4,9 +4,8 @@
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.9.0"]
-                 [metadoc "0.2.2"]
                  [generateme/fastmath "0.1.2-SNAPSHOT"]
-                 ;; [org.bytedeco/javacv-platform "1.3.2"]
+                 ;; [org.bytedeco/javacv-platform "1.4.1"]
                  ]
   :resource-path "resources/"
   :java-source-paths ["src"]
@@ -33,6 +32,7 @@
                    :source-paths ["example"]
                    :dependencies [[codox-theme-rdash "0.1.2"]
                                   [criterium "0.4.4"]
+                                  [metadoc "0.2.3-SNAPSHOT"]
                                   [hiccup "1.0.5"]]
                    :codox {:themes [:rdash]
                            :metadata {:doc/format :markdown}

@@ -403,8 +403,7 @@
 ;;
 
 (def ^{:doc "Java ConvolveOp kernels. See [[convolve]]."
-       :metadoc/categories #{:image}
-       :metadoc/examples []}
+       :metadoc/categories #{:image}}
   convolution-matrices {:shadow          (Kernel. 3 3 (float-array [0 1 2 -1 0 1 -2 -1 0]))
                         :emboss          (Kernel. 3 3 (float-array [0 2 4 -2 1 2 -4 -2 0]))
                         :edges-1         (Kernel. 3 3 (float-array [1 2 1 2 -12 2 1 2 1]))
@@ -667,8 +666,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 (defn shear
   "Shear canvas"
-  {:metadoc/categories #{:transform :canvas}
-   :metadoc/examples []}
+  {:metadoc/categories #{:transform :canvas}}
   ([^Canvas canvas ^double sx ^double sy]
    (.shear ^Graphics2D (.graphics canvas) sx sy)
    canvas)

@@ -31,6 +31,8 @@ All notable changes to this project will be documented in this file. This change
 - YXY renamed to Yxy
 - make-color-converter -> color-converter
 - paletton-palette -> paletton
+- signal processing refactored, api changed
+- overlays refactored
 
 Prefix `make-` is reserved when function is created.
 

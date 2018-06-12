@@ -49,7 +49,7 @@ public final class Converter {
         case CODING_ALAW: return alaw(v);
         case CODING_ALAW_REV: return alaw_rev(v);
         case CODING_ULAW: return ulaw(v);
-        case CODING_ULAW_REV: return alaw_rev(v);
+        case CODING_ULAW_REV: return ulaw_rev(v);
         default: return v;
         }
     }

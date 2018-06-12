@@ -24,7 +24,7 @@
 
 ;; ## RGB scanlines
 
-(def add-compose (:add c/blends))
+(def ^:private add-compose (:add c/blends))
 
 (defn- blend-shift-and-add-f
   "Slightly shift channels"
@@ -33,7 +33,7 @@
         c2 (p/get-value p2 ch (dec ^long x) y)]
     (c/blend-values add-compose c1 c2)))
 
-(defn draw-lines
+(defn- draw-lines
   "Draw rgb lines"
   [canvas ^long w ^long h]
   (dorun 
@@ -48,11 +48,15 @@
        (line canvas 0 y++ w y++))))
   canvas)
 
-(def tinter1 (partial p/filter-channels (p/tint (c/color 245 130 16))))
-(def tinter2 (partial p/filter-channels (p/tint (c/color 36 130 225))))
+(def ^:private tinter1 (partial p/filter-channels (p/tint (c/color 245 130 16))))
+(def ^:private tinter2 (partial p/filter-channels (p/tint (c/color 36 130 225))))
 
 (defn render-rgb-scanlines
-  "Blurs and renders rgb stripes on the image, returns new image. Scale parameter (default 1.6) controls amount of blur. Resulting image is sligtly lighter and desaturated. Correct with normalize filter if necessary."
+  "Blurs and renders rgb stripes on the image, returns new image.
+
+  Scale parameter (default 1.6) controls amount of blur. Resulting image is sligtly lighter and desaturated.
+
+  Correct with normalize filter if necessary."
   ([p {:keys [^double scale] :or {scale 1.6}}] 
    (let [p (get-image p)
          ^int w (width p)
@@ -72,12 +76,6 @@
   ([p] (render-rgb-scanlines p {})))
 
 ;; ## CRT Scanlines
-;;
-;; https://www.shadertoy.com/view/XsjSzR
-;;
-;; :TODO linear/non-linear tranformation on doubles or scaled ints
-;; clean duplicated blur fn
-;; add mask
 
 (defn- adjust-pos-value 
   "Adjust given position according to offset and resolution"
@@ -92,7 +90,9 @@
   * hardscan - scanline softness, -4.0 soft, -16.0 hard (default -12.0)
   * mask-dark - crt mask dark part multiplier 0.25-1.0 (default 1.0, none)
   * mask-light - crt mask color part multiplier 1.0-1.75 (default 1.0, none)
-  * mask-mult - crt mask pattern shift, 0.0+ (default 3.0, crt grid)"
+  * mask-mult - crt mask pattern shift, 0.0+ (default 3.0, crt grid)
+
+  Based on https://www.shadertoy.com/view/XsjSzR"
   ([img] (render-crt-scanlines img {}))
   ([img {:keys [^double resolution ^double hardpix ^double hardscan ^double mask-dark ^double mask-light ^int mask-mult]
          :or {resolution 6.0 hardpix -4.0 hardscan -12.0 mask-dark 1.0 mask-light 1.0 mask-mult 3.0}}]
@@ -151,8 +151,12 @@
 ;;
 ;; To apply noise overlay you have to perform two steps: first one is creating overlay with `make-noise` and then apply on image with `render-noise`. This way you can reuse overlay several times.
 
-(defn make-noise
-  "Create noise image with set alpha channel (first parameter)."
+(defn noise-overlay
+  "Create transparent image with noise (gaussian).
+
+  `:alpha` parameter describes transparency (default: 80).
+
+  Use with [[render-noise]]."
   ([w h {:keys [alpha] :or {alpha 80}}]
    (let [fc (fn [_] 
               (c/lclamp255 (+ 100.0 (* 20.0 (r/grand)))))
@@ -161,20 +165,20 @@
      (p/set-channel p 1 (p/get-channel p 0))
      (p/set-channel p 2 (p/get-channel p 0))
      (get-image p)))
-  ([w h] (make-noise w h {})))
+  ([w h] (noise-overlay w h {})))
 
 (defn render-noise
-  "Render noise on image"
-  ([img noise]
+  "Render noise on image."
+  ([img noise-ovrly]
    (let [img (get-image img)
          w (width img)
          h (height img)
          cnvs (with-canvas-> (canvas w h)
                 (image img)
-                (image noise))]
+                (image noise-ovrly))]
      (get-image cnvs)))
   ([img]
-   (render-noise img (make-noise (width img) (height img)))))
+   (render-noise img (noise-overlay (width img) (height img)))))
 
 ;; ## Spots
 ;;
@@ -184,8 +188,8 @@
   "Create transparent image with spots with set alpha and intensity"
   [^double alpha ^double intensity ^long w ^long h]
   (let [size (* 4 w h)
-        limita (int (min 5.0 (* 1.0e-5 (/ size 4.0))))
-        limitb (int (min 6.0 (* 6.0e-5 (/ size 4.0))))
+        limita (int (max 1.0 (* 1.0e-5 w h)))
+        limitb (int (max 6.0 (* 6.0e-5 w h)))
         ^ints pc (int-array size)
         ^ints pa (int-array size)
         alphas (/ alpha 255.0)]
@@ -214,11 +218,11 @@
         (p/set-channel res 2 (p/get-channel res 1))
         (get-image res)))))
 
-(defn make-spots
+(defn spots-overlay
   "Create vector of spotted overlays. Input: spots transparency (default 80), list of intensities (int values from 0 to 255, default [60 120]) and size of overlay."
   ([w h {:keys [alpha intensities] :or {alpha 80 intensities [60 120]}}]
    (mapv #(spots alpha % w h) intensities))
-  ([w h] (make-spots w h {})))
+  ([w h] (spots-overlay w h {})))
 
 (defn- apply-images
   "Add all spotted overlays to image."
@@ -237,5 +241,5 @@
          cnvs (with-canvas-> (canvas w h)
                 (apply-images img spots))]     
      (get-image cnvs)))
-  ([img] (render-spots img (make-spots (width img) (height img)))))
+  ([img] (render-spots img (spots-overlay (width img) (height img)))))
 

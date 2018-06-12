@@ -21,7 +21,17 @@
   
   ### Wave as Signal
 
+  You can create [[wave]] function from oscillator. You can also sum waves with [[sum-waves]].
+
+  To sample wave to signal, call [[wave->signal]] with following parameters:
+
+  * `f` - wave function
+  * `samplerate` - sample rate (samples per second)
+  * `seconds` - how many seconds generate
+  
   ### File operations
+
+  You can [[save-signal]] or [[load-signal]]. Representation is 16 bit signed, big endian. Use Audacity or SoX to convert to/from audio files.
 
   ## Signal processing
 
@@ -31,7 +41,140 @@
 
   Each effect has it's own parametrization which should be passed during creation.
   
-  List of all available effects is under [[effects-list]] value."
+  List of all available effects is under [[effects-list]] value.
+
+  ### Effects parametrization
+
+  Each effect has its own parametrization
+
+  #### :simple-lowpass, :simple-highpass
+
+  * `:rate` - sample rate (default 44100.0)
+  * `:cutoff` - cutoff frequency (default 2000.0)
+
+  #### :biquad-eq
+
+  Biquad equalizer
+  
+  * `:fc` - center frequency
+  * `:gain` - gain
+  * `:bw` - bandwidth (default: 1.0)
+  * `:fs` - sampling rate (defatult: 44100.0)
+
+  #### :biquad-hs, :biquad-ls
+
+  Biquad highpass and lowpass shelf filters
+  
+  * `:fc` - center frequency
+  * `:gain` - gain
+  * `:slope` - shelf slope (default 1.5)
+  * `:fs` - sampling rate (default 44100.0)
+
+  #### :biquad-lp, :biquad-hp, :biquad-bp
+
+  Biquad lowpass, highpass and bandpass filters
+  
+  * `:fc` - cutoff/center frequency
+  * `:bw` - bandwidth (default 1.0)
+  * `:fs` - sampling rate (default 44100.0)
+
+  #### :dj-eq
+
+  * `:high` - high frequency gain (10000Hz)
+  * `:mid` - mid frequency gain (1000Hz)
+  * `:low` - low frequency gain (100Hz)
+  * `:shelf-slope` - shelf slope for high frequency (default 1.5)
+  * `:peak-bw` - peak bandwidth for mid and low frequencies (default 1.0)
+  * `:rate` - sampling rate (default 44100.0)
+
+  #### :phaser-allpass
+
+  * `:delay` - delay factor (default: 0.5)
+
+  #### :divider
+
+  * `:denom` (long, default 2.0)
+
+  #### :fm
+
+  Modulate and demodulate signal using frequency
+
+   * `:quant` - quantization value (0.0 - if no quantization, default 10)
+   * `:omega` - carrier factor (default 0.014)
+   * `:phase` - deviation factor (default 0.00822)
+
+  #### :bandwidth-limit
+
+  https://searchcode.com/file/18573523/cmt/src/lofi.cpp#
+
+  * `:rate` - sample rate (default 44100.0)
+  * `:freq` - cutoff frequency (default 1000.0)
+
+  #### :distort
+
+  * `:factor` - distortion factor (default 1.0)
+
+  #### :foverdrive
+
+  Fast overdrive
+  
+  * `:drive` - drive (default 2.0)
+
+  #### :decimator
+
+  * `:bits` - bit depth (default 2)
+  * `:fs` - decimator sample rate (default 4410.0)
+  * `:rate` - input sample rate (default 44100.0)
+
+  #### :basstreble
+
+  * `:bass` - bass gain (default 1.0)
+  * `:treble` - treble gain (default 1.0)
+  * `:gain` - gain (default 0.0)
+  * `:rate` - sample rate (default 44100.0)
+  * `:slope` - slope for both (default 0.4)
+  * `:bass-freq` - bass freq (default 250.0)
+  * `:treble-freq` - treble freq (default 4000.0)
+
+  #### :echo
+
+  * `:delay` - delay time in seconds (default 0.5)
+  * `:decay` - decay (amount echo in signal, default 0.5)
+  * `:rate` - sample rate (default 44100.0)
+  
+  _Warning! Echo filter uses mutable array as a internal state, don't use the same filter in paraller processing._
+
+  #### :vcf303
+
+  * `:rate` - sample rate (default 44100.0)
+  * `:trigger` - boolean, trigger some action (default `false`), set true when you reset filter every line
+  * `:cutoff` - cutoff frequency (values 0-1, default 0.8)
+  * `:resonance` - resonance (values 0-1, default 0.8)
+  * `:env-mod` - envelope modulation (values 0-1, default 0.5)
+  * `:decay` - decay (values 0-1, default 1.0)
+  * `:gain` - gain output signal (default: 1.0)
+  
+  #### :slew-limit
+
+  http://git.drobilla.net/cgit.cgi/omins.lv2.git/tree/src/slew_limiter.c
+
+  * `:rate` - sample rate
+  * `:maxrise` - maximum change for rising signal (in terms of 1/rate steps, default 500)
+  * `:maxfall` - maximum change for falling singal (default 500)
+
+  #### :mda-thru-zero
+
+  * `:rate` - sample rate
+  * `:speed` - effect rate
+  * `:depth`
+  * `:mix`
+  * `:depth-mod`
+  * `:feedback`
+  
+  _Warning: like `:echo` internal state is kept in doubles array._"
+  {:metadoc/categories {:eff "Effects"
+                        :wave "Wave"
+                        :sig "Signal"}}
   (:require [fastmath.core :as m]
             [clojure2d.pixels :as p]
             [clojure2d.core :refer :all]
@@ -40,7 +183,7 @@
             [fastmath.random :as r])
   (:import [clojure2d.pixels Pixels]
            [fastmath.vector Vec2 Vec3]
-           [clojure.lang Counted IFn]
+           [clojure.lang Counted IFn Seqable Sequential]
            [clojure2d.java.signal Converter]))
 
 (set! *warn-on-reflection* true)
@@ -51,7 +194,16 @@
   Object
   (toString [_] (str "size=" (alength signal)))
   Counted
-  (count [_] (alength signal)))
+  (count [_] (alength signal))
+  Sequential
+  Seqable
+  (seq [_] (seq signal)) )
+
+(defn signal
+  "Signal creator"
+  {:metadoc/categories #{:sig}}
+  [xs]
+  (Signal. (double-array xs)))
 
 (defn- coding-value
   "Encode `coding` as Converter class value."
@@ -76,6 +228,7 @@
   * `coding` - encode signal with one of the encoders: `:alaw`, `:alaw-rev`, `:ulaw`, `:ulaw-rev` or `:none` (default).
 
   Pixels can be restored from Signal with [[signal->pixels]] function."
+  {:metadoc/categories #{:sig}}
   ([^Pixels p {:keys [planar? signed? little-endian? ^int bits channels coding]
                :or {planar? true little-endian? true bits 8 signed? false channels [0 1 2] coding :none}}]
    (let [channels (int-array (if (= :all channels) [0 1 2 3] channels))]
@@ -91,7 +244,8 @@
   "Convert `Signal` to `Pixels` storing result into `target` (mutating it!).
 
   Specification is the same as in [[pixels-signal]] functions."
-  ([^Pixels target ^Signal sig {:keys [planar? signed? little-endian? ^int bits channels coding]
+  {:metadoc/categories #{:sig}}
+  ([^Signal sig ^Pixels target {:keys [planar? signed? little-endian? ^int bits channels coding]
                                 :or {planar? true little-endian? true bits 8 signed? false channels [0 1 2] coding :none}}]
    (let [channels (int-array (if (= :all channels) [0 1 2 3] channels))]
      (Converter/fromSignal
@@ -102,17 +256,13 @@
       little-endian? signed? planar?
       (coding-value coding))
      target))
-  ([target sig]
-   (signal->pixels target sig {})))
+  ([sig target]
+   (signal->pixels sig target {})))
+
 
 ;; ## Signal processing
 ;;
-;; Signal processing machinery and effects definitions.
-;;
-;; Every effect is a function packed into `EffectsList` type. Function accepts `sample` as double and current `state` value. And returns type `SampleAndState` with resulting sample and new state. When called without parameters returns inital state.
-;; `EffectsList` type should be treated and one node of the list of effects. Effects can be composed this way.
-;;
-;; Type returned by effect function, consist of resulting sample and new effect state.
+;; Looks like a fastest implementation (reduce and vector types are 8-10 times slower).
 
 (declare single-pass)
 
@@ -123,25 +273,31 @@
 ;; Type representing list node consisting resulting sample, effect functions, state value and link to next node (or nil if last node)
 (deftype EffectsList [effect-name ^double sample effect state next]
   Object
-  (toString [_] (if next 
-                  (str next " -> " (name effect-name) ", result: " sample)
-                  (name effect-name)))
+  (toString [_] (str (if next 
+                       (str next " -> " (name effect-name))
+                       (name effect-name)) " (" sample ")"))
   IFn
   (invoke [_] sample)
   (invoke [e n]
     (single-pass e n)))
 
 (defn- effect-node
-  "Create `EffectsList` node from effect function and initial state"
+  "Create `EffectsList` node from effect function and initial state."
   [effect-name f]
   (EffectsList. effect-name 0.0 f (f) nil))
 
+(defn- compose-two-effects
+  "Join two effect lists."
+  [^EffectsList e1 ^EffectsList e2]
+  (EffectsList. (.effect-name e1) (.sample e1) (.effect e1) (.state e1) (if (.next e1)
+                                                                          (compose-two-effects (.next e1) e2)
+                                                                          e2)))
+
 (defn compose-effects
-  "Compose list of effects."
+  "Compose effects."
+  {:metadoc/categories #{:eff}}
   [^EffectsList e & es]
-  (if-not es
-    e
-    (EffectsList. (.effect-name e) (.sample e) (.effect e) (.state e) (apply compose-effects es))))
+  (reduce compose-two-effects e es))
 
 (defn- reset-effects
   "Resets effects state to initial one."
@@ -154,11 +310,9 @@
   [^EffectsList e ^double sample]
   (if-not (.next e)
     (let [^SampleAndState r ((.effect e) sample (.state e))]
-      (println (str "-> " (.effect-name e)))
       (EffectsList. (.effect-name e) (.sample r) (.effect e) (.state r) nil))
     (let [^EffectsList prev (single-pass (.next e) sample)]
       (let [^SampleAndState r ((.effect e) (.sample prev) (.state e))]
-        (println (str "-> " (.effect-name e)))
         (EffectsList. (.effect-name e) (.sample r) (.effect e) (.state r) prev)))))
 
 (defn apply-effects
@@ -167,7 +321,8 @@
   If `reset` is positive, reinit state each `reset` number of samples.
 
   Returns new signal."
-  ([effects ^Signal s ^long reset]
+  {:metadoc/categories #{:eff}}
+  ([^Signal s effects ^long reset]
    (let [len (count s)
          in (.signal s)
          out (double-array len)]
@@ -183,21 +338,22 @@
                     (reset-effects effects)
                     res)))))
      (Signal. out)))
-  ([effects s] (apply-effects effects s 0)))
+  ([sig effects] (apply-effects sig effects 0)))
 
 (defn- process-pixels
   "Process pixels as signal based on config for given pixels p. Store result in given target t."
   [p t effects config config-back reset]
-  (signal->pixels t (apply-effects effects (signal->pixels p config) reset) config-back))
+  (signal->pixels (apply-effects (pixels->signal p config) effects reset) t config-back))
 
 (defn effects-filter
-  "Creates filter to process `Pixels` as `Signal`.
+  "Creates filter to process `Pixels` as `Signal` using [[filter-channels]].
 
   Provide configurations to properly convert Pixels to Signal and back.
-
   Optionally set `reset` value (reinit effects' state after `reset` samples).
 
-  Filter operates on one channel at time and is defined to be used with [[filter-channels]]."
+  Filter operates on one channel at time and is defined to be used with [[filter-channels]].
+  If you want to operate on `Pixels` directly, use [[apply-effects-to-pixels]]."
+  {:metadoc/categories #{:eff}}
   ([effects config config-back reset]
    (fn [ch target p]
      (let [c {:channels [ch]}]
@@ -209,31 +365,49 @@
   ([effects config config-back]
    (effects-filter effects config config-back 0)))
 
+(defn apply-effects-to-pixels
+  "Apply effects directly to `Pixels`.
+
+  Provide configurations to properly convert Pixels to Signal and back.
+  Optionally set `reset` value (reinit effects' state after `reset` samples).
+    
+  If you prefer operating through [[filter-channels]] use [[effect-filter]]."
+  {:metadoc/categories #{:eff}}
+  ([effects config config-back reset pixels]
+   (process-pixels pixels (p/clone-pixels pixels) effects config config-back reset))
+  ([effects pixels]
+   (apply-effects-to-pixels effects {} {} 0 pixels))
+  ([effects reset pixels]
+   (apply-effects-to-pixels effects {} {} reset pixels))
+  ([effects config config-back pixels]
+   (apply-effects-to-pixels effects config config-back 0 pixels)))
+
 ;; ## Helper functions
 
 (defn db->linear
-  "DB to Linear (audacity)"
+  "DB to Linear"
   ^double [^double x]
   (m/pow 10.0 (/ x 20.0)))
 
 (defn linear->db
-  "Linear to DB (audacity)"
+  "Linear to DB"
   ^double [x]
   (* 20.0 (m/log10 x)))
 
 ;; ## Effects / Filters
 
-(defmulti effect (fn [m & conf] m))
+(defmulti effect
+  "Create effect for given name (as keyword) and optional parametrization.
+
+  List of all possible effects is under [[effects-list]].
+
+  Effect is a custom type which contains: name, sample (result of last call), effect function and current state.
+
+  Effect can be considered as function: call with sample to effect with next state or call without parameter to obtain latest result. Effects are also composable with [[compose-effects]]."
+  {:metadoc/categories #{:eff}}
+  (fn [m & conf] m))
 
 ;; ### Simple Low/High pass filters
-;;
-;; Names: `:simple-lowpass`, `:simple-highpass`
-;;
-;; Confguration:
-;;
-;; * `:rate` - sample rate (default 44100.0)
-;; * `:cutoff` - cutoff frequency (default 2000.0)
-
 (defn- calc-filter-alpha
   "Calculate alpha factor"
   ^double [^double rate ^double cutoff]
@@ -420,15 +594,7 @@
                    ([] (StateBiquad. 0.0 0.0 0.0 0.0)))))
 
 ;; ### Biquad equalizer
-;;
-;; Name: `:biquad-eq`
-;;
-;; Configuration:
-;;
-;; * `:fc` - center frequency
-;; * `:gain` - gain
-;; * `:bw` - bandwidth (default: 1.0)
-;; * `:fs` - sampling rate (defatult: 44100.0)
+
 (defmethod effect :biquad-eq
   ([m] (effect m {}))
   ([m {:keys [fc gain bw fs]
@@ -436,15 +602,7 @@
    (make-biquad-filter m (biquad-eq-params fc gain bw fs))))
 
 ;; ### Biquad high/low shelf
-;;
-;; Names: `:biquad-hs`, `:biquad-ls`
-;;
-;; Configuration:
-;;
-;; * `:fc` - center frequency
-;; * `:gain` - gain
-;; * `:slope` - shelf slope (default 1.5)
-;; * `:fs` - sampling rate (default 44100.0)
+
 (defmethod effect :biquad-hs
   ([m] (effect m {}))
   ([m {:keys [fc gain slope fs]
@@ -458,14 +616,6 @@
    (make-biquad-filter m (biquad-ls-params fc gain slope fs))))
 
 ;; ### Biquad lowpass/highpass/bandpass
-;;
-;; Names: `:biquad-lp`, `:biquad-hp`, `:biquad-bp`
-;;
-;; Configuration:
-;;
-;; * `:fc` - cutoff/center frequency
-;; * `:bw` - bandwidth (default 1.0)
-;; * `:fs` - sampling rate (default 44100.0)
 
 (defn- lhb-params
   "Create parameters for lp hp and bp biquad filters."
@@ -478,25 +628,15 @@
 (defmethod effect :biquad-bp ([m] (effect m {})) ([m conf] (make-biquad-filter m (lhb-params biquad-bp-params conf))))
 
 ;; ### DJ Equalizer
-;;
-;; Name: `:dj-eq`
-;;
-;; Configuration:
-;;
-;; * `:high` - high frequency gain (10000Hz)
-;; * `:mid` - mid frequency gain (1000Hz)
-;; * `:low` - low frequency gain (100Hz)
-;; * `:shelf-slope` - shelf slope for high frequency (default 1.5)
-;; * `:peak-bw` - peak bandwidth for mid and low frequencies (default 1.0)
-;; * `:rate` - sampling rate (default 44100.0)
+
 (defmethod effect :dj-eq
   ([m] (effect m {}))
-  ([m {:keys [hi mid low shelf-slope peak-bw rate]
+  ([m {:keys [hi mid low shelf-slope peak-bw ^double rate]
        :or {hi 0.0 mid 0.0 low 0.0 shelf-slope 1.5 peak-bw 1.0 rate 44100.0}}]
    (let [b (compose-effects
-            (effect :biquad-hs {:fc 10000.0 :gain hi :slope shelf-slope :fs rate})
-            (effect :biquad-eq {:fc 1000.0 :gain mid :bw peak-bw :fs rate})
-            (effect :biquad-eq {:fc 100.0 :gain low :bw peak-bw :fs rate}))]
+            (effect :biquad-hs {:fc (* rate (/ 10000.0 44100.0)) :gain hi :slope shelf-slope :fs rate})
+            (effect :biquad-eq {:fc (* rate (/ 1000.0 44100.0)) :gain mid :bw peak-bw :fs rate})
+            (effect :biquad-eq {:fc (* rate (/ 100.0 44100.0)) :gain low :bw peak-bw :fs rate}))]
      (effect-node m (fn
                       ([sample state]
                        (let [^EffectsList res (single-pass state sample)]
@@ -504,10 +644,7 @@
                       ([] b))))))
 
 ;; ### Phaser
-;;
-;; Name: `:phaser-allpass`
-;;
-;; Configuration: `:delay` - delay factor (default: 0.5)
+
 (defmethod effect :phaser-allpass
   ([m] (effect m {}))
   ([m {:keys [^double delay]
@@ -521,10 +658,7 @@
                       ([] 0.0))))))
 
 ;; ### Divider
-;;
-;; Name: `:divider`
-;;
-;; Configuration: `:denom` (long, default 2.0)
+
 (deftype StateDivider [^double out ^double amp ^double count ^double lamp ^double last ^int zeroxs])
 
 (defmethod effect :divider
@@ -550,16 +684,7 @@
                   ([] (StateDivider. 1.0 0.0 0.0 0.0 0.0 0.0))))))
 
 ;; ### FM filter
-;;
-;; Filter modulates and demodulates signal
-;;
-;; Name `:fm`
-;;
-;; Configuration:
-;;
-;; * `:quant` - quantization value (0.0 - if no quantization, default 10)
-;; * `:omega` - carrier factor (default 0.014)
-;; * `:phase` - deviation factor (default 0.00822)
+
 (deftype StateFm [^double pre ^double integral ^double t lp])
 
 (defmethod effect :fm
@@ -586,15 +711,7 @@
 
 
 ;; ### Bandwidth limit
-;;
-;; https://searchcode.com/file/18573523/cmt/src/lofi.cpp#
-;;
-;; Name: `:bandwidth-limit`
-;;
-;; Confguration:
-;;
-;; * `:rate` - sample rate (default 44100.0)
-;; * `:freq` - cutoff frequency (default 1000.0)
+
 (defmethod effect :bandwidth-limit
   ([m] (effect m {}))
   ([m {:keys [^double freq ^double rate]
@@ -609,12 +726,7 @@
                       ([] 0.0))))))
 
 ;; ### Distortion
-;;
-;; Name: `:distort`
-;;
-;; Confguration:
-;;
-;; * `:factor` - distortion factor (default 1.0)
+
 (defmethod effect :distort
   ([m] (effect m {}))
   ([m {:keys [^double factor]
@@ -628,12 +740,7 @@
                       ([]))))))
 
 ;; ### Fast overdrive
-;;
-;; Name: `:foverdrive`
-;;
-;; Confguration:
-;;
-;; * `:drive` - drive (default 2.0)
+
 (defmethod effect :foverdrive
   ([m] (effect m {}))
   ([m {:keys [^double drive]
@@ -647,14 +754,7 @@
                       ([]))))))
 
 ;; ### Decimator
-;;
-;; Name: `:decimator`
-;;
-;; Confguration:
-;;
-;; * `:bits` - bit depth (default 2)
-;; * `:fs` - decimator sample rate (default 4410.0)
-;; * `:rate` - input sample rate (default 44100.0)
+
 (deftype StateDecimator [^double count ^double last])
 
 (defmethod effect :decimator
@@ -679,18 +779,7 @@
                       ([] (StateDecimator. 0.0 0.0)))))))
 
 ;; ### BassTreble
-;;
-;; Name: `:basstreble`
-;;
-;; Configuration:
-;;
-;; * `:bass` - bass gain (default 1.0)
-;; * `:treble` - treble gain (default 1.0)
-;; * `:gain` - gain (default 0.0)
-;; * `:rate` - sample rate (default 44100.0)
-;; * `:slope` - slope for both (default 0.4)
-;; * `:bass-freq` - bass freq (default 250.0)
-;; * `:treble-freq` - treble freq (default 4000.0)
+
 (deftype StateBassTreble [^double xn1Bass ^double xn2Bass ^double yn1Bass ^double yn2Bass
                           ^double xn1Treble ^double xn2Treble ^double yn1Treble ^double yn2Treble])
 
@@ -746,17 +835,7 @@
                                             0.0 0.0 0.0 0.0)))))))
 
 ;; ### Echo (audacity)
-;;
-;; Name: `:echo`
-;;
-;; Configuration:
-;;
-;; * `:delay` - delay time in seconds (default 0.5)
-;; * `:decay` - decay (amount echo in signal, default 0.5)
-;; * `:rate` - sample rate (default 44100.0)
-;;
-;; Warning! Echo filter uses mutable array as state, don't use the same filter in paraller processing
-;; See example 16
+
 (deftype StateEcho [^doubles buffer ^int position])
 
 (defmethod effect :echo
@@ -774,24 +853,12 @@
 
 ;; ### Vcf303
 ;;
-;; Name: `:vcf303`
-;;
-;; Configuration:
-;;
-;; * `:rate` - sample rate (default 44100.0)
-;; * `:trigger` - boolean, trigger some action (default `false`), set true when you reset filter every line
-;; * `:cutoff` - cutoff frequency (values 0-1, default 0.8)
-;; * `:resonance` - resonance (values 0-1, default 0.8)
-;; * `:env-mod` - envelope modulation (values 0-1, default 0.5)
-;; * `:decay` - decay (values 0-1, default 1.0)
-;;
-;; Warning: filter requires normalization
 (deftype StateVcf303 [^double d1 ^double d2 ^double c0 ^int env-pos ^Vec3 abc])
 
 (defmethod effect :vcf303
   ([m] (effect m {}))
-  ([m {:keys [^double rate trigger ^double cutoff ^double resonance ^double env-mod ^double decay]
-       :or {rate 44100.0 trigger false cutoff 0.8 resonance 0.8 env-mod 0.5 decay 1.0}}]
+  ([m {:keys [^double rate trigger ^double cutoff ^double resonance ^double env-mod ^double decay ^double gain]
+       :or {rate 44100.0 trigger false cutoff 0.8 resonance 0.8 env-mod 0.5 decay 1.0 gain 1.0}}]
    (let [scale (/ m/PI rate)
          e0 (* scale
                (m/exp (-> (- 5.613 (* 0.8 env-mod))
@@ -828,21 +895,13 @@
                              env-pos (inc (.env-pos state))]
                          (if (>= env-pos 64)
                            (let [c0 (* d (.c0 state))]
-                             (SampleAndState. result
+                             (SampleAndState. (* gain result)
                                               (StateVcf303. d1 d2 c0 0 (recalc-abc c0))))
-                           (SampleAndState. result
+                           (SampleAndState. (* gain result)
                                             (StateVcf303. d1 d2 (.c0 state) env-pos abc)))))
                       ([] (StateVcf303. 0.0 0.0 init-c0 0 (recalc-abc init-c0))))))))
 
-;; ### Slew limiter (http://git.drobilla.net/cgit.cgi/omins.lv2.git/tree/src/slew_limiter.c)
-;;
-;; Name: `:slew-limit`
-;;
-;; Configuration:
-;;
-;; * `:rate` - sample rate
-;; * `:maxrise` - maximum change for rising signal (in terms of 1/rate steps, default 500)
-;; * `:maxfall` - maximum change for falling singal (default 500)
+;; ### Slew limiter
 
 (defmethod effect :slew-limit
   ([m] (effect m {}))
@@ -857,20 +916,8 @@
                          (SampleAndState. nsample nsample)))
                       ([] 0.0))))))
 
-;; ### mdaThruZero
-;;
-;; Name: `:mda-thru-zero`
-;;
-;; Configuration:
-;;
-;; * `:rate` - sample rate
-;; * `:speed` - effect rate
-;; * `:depth`
-;; * `:mix`
-;; * `:depth-mod`
-;; * `:feedback`
-;;
-;; Warning: like `:echo` internal state is kept in doubles array.
+
+;; 
 (deftype StateMdaThruZero [^doubles buffer ^double ph ^long bp ^double f])
 
 (defmethod effect :mda-thru-zero
@@ -901,16 +948,18 @@
                            (SampleAndState. result (StateMdaThruZero. (.buffer state) ph bp f)))))
                       ([] (StateMdaThruZero. (double-array 2048) 0.0 0 0.0)))))))
 
-(def effects-list (sort (keys (methods effect))))
-
+(def ^{:metadoc/categories #{:eff}
+       :doc "List of effects."}
+  effects-list (sort (keys (methods effect))))
 
 ;; ## File operations
 
-;; Load and save signal from and to file.
-;; Representation is: 16 bit signed, big endian file
-;; You can use Audacity/SOX utilities to convert files to audio.
 (defn save-signal
-  "Save signal to file"
+  "Save signal to file.
+
+  Representation is: 16 bit signed, big endian file
+  You can use Audacity/SOX utilities to convert files to audio."
+  {:metadoc/categories #{:sig}}
   [^Signal s filename]
   (make-parents filename)
   (let [^java.io.DataOutputStream out (java.io.DataOutputStream. (output-stream filename))]
@@ -922,7 +971,10 @@
     s))
 
 (defn load-signal
-  "Read signal from file"
+  "Read signal from file
+
+  Expected representation is 16 bit signed, big endian file."
+  {:metadoc/categories #{:sig}}
   [filename]
   (let [^java.io.File f (file filename)
         len (/ (.length f) 2)
@@ -947,60 +999,77 @@
 ;;
 ;; Multimethod creates oscillator function accepting `double` (time) and resulting `double` from [-1.0 1.0] range.
 
-(defmulti make-wave (fn [f _ _ _] f))
+(defmulti wave
+  "Create waves from various oscilators
 
-(defmethod make-wave :sin [_ ^double f ^double a ^double p]
+  Parameters are:
+
+  * oscilator name (see `oscillators` variable)
+  * frequency
+  * amplitude
+  * phase (0-1)
+  
+  Multimethod creates oscillator function accepting `double` (time) and resulting `double` from [-1.0 1.0] range.
+
+  To convert `wave` to Signal, call [[signal-from-wave]].
+
+  To add waves, call [[sum-waves]]."
+  {:metadoc/categories #{:wave}}
+  (fn [f _ _ _] f))
+
+(defmethod wave :sin [_ ^double f ^double a ^double p]
   (fn ^double [^double x]
     (* a
        (m/sin (+ (* p m/TWO_PI) (* x m/TWO_PI f))))))
 
-(def snoise (r/fbm-noise {:octaves 2}))
+(def ^:private snoise (r/fbm-noise {:octaves 2}))
 
-(defmethod make-wave :noise [_ ^double f ^double a ^double p]
-  (let [shift-noise (r/drand -5.0 5.0)]
-    (fn ^double [^double x]
-      (* a 2.0
-         (- ^double (snoise (* (+ p x) f) shift-noise) 0.5)))))
+(defmethod wave :noise [_ ^double f ^double a ^double p]
+  (fn ^double [^double x]
+    (* a 2.0
+       (- ^double (snoise (* (+ p x) f) 1.23456789) 0.5))))
 
-(defmethod make-wave :saw [_ ^double f ^double a ^double p] 
+(defmethod wave :saw [_ ^double f ^double a ^double p] 
   (fn ^double [^double x]
     (let [rp (* 2.0 a)
           p2 (* f ^double (mod (+ (* a p) a x) 1.0))]
       (* rp (- p2 (m/floor p2) 0.5)))))
 
-(defmethod make-wave :square [_ ^double f ^double a ^double p]
+(defmethod wave :square [_ ^double f ^double a ^double p]
   (fn ^double [^double x]
     (if (< ^double (mod (+ p (* x f)) 1.0) 0.5)
       a
       (- a))))
 
-(defmethod make-wave :triangle [_ ^double f ^double a ^double p]
-  (let [saw (make-wave :saw f a p)]
+(defmethod wave :triangle [_ ^double f ^double a ^double p]
+  (let [saw (wave :saw f a p)]
     (fn ^double [^double x]
       (- (* 2.0 (m/abs (saw x))) a))))
 
-(defmethod make-wave :cut-triangle [_ ^double f ^double a ^double p]
-  (let [tri (make-wave :triangle f a p)]
+(defmethod wave :cut-triangle [_ ^double f ^double a ^double p]
+  (let [tri (wave :triangle f a p)]
     (fn ^double [^double x]
       (let [namp (* 0.5 a)]
         (* 2.0 (m/constrain ^double (tri x) (- namp) namp))))))
 
-(defmethod make-wave :constant [_ _ ^double a _] (constantly a))
+(defmethod wave :constant [_ _ ^double a _] (constantly a))
 
-;; List of all oscillators
-(def oscillators [:sin :noise :saw :square :triangle :cut-triangle :constant])
+(def ^{:doc "List of oscillator names used with [[wave]]"
+       :metadoc/categories #{:wave}}
+  oscillators (sort (keys (methods wave))))
 
-(defn make-sum-wave
-  "Create function which is sum of all waves."
-  [fs]
+(defn sum-waves
+  "Create wave which is sum of all waves."
+  {:metadoc/categories #{:wave}}
+  [& fs]
   (reduce #(fn [^double x] (+ ^double (%1 x) ^double (%2 x))) fs))
 
-(defn signal-from-wave
-  "Create Signal from oscillator. Parameters are: f - oscillator, samplerate and number of seconds."
+(defn wave->signal
+  "Create Signal from wave. Parameters are: f - oscillator, samplerate and number of seconds."
+  {:metadoc/categories #{:wave}}
   [f ^double samplerate ^double seconds]
   (let [len (* samplerate seconds)
-        ^doubles buffer (double-array len)
-        limit (dec seconds)]
+        ^doubles buffer (double-array len)]
     (dotimes [i len]
-      (aset ^doubles buffer i ^double (f (m/norm i 0 len 0 limit))))
+      (aset ^doubles buffer i (m/constrain ^double (f (m/norm i 0 len 0 seconds)) -1.0 1.0)))
     (Signal. buffer)))
