@@ -189,7 +189,7 @@
   [^double alpha ^double intensity ^long w ^long h]
   (let [size (* 4 w h)
         limita (int (max 1.0 (* 1.0e-5 w h)))
-        limitb (int (max 6.0 (* 3.0e-5 w h)))
+        limitb (int (max 5.0 (* 2.0e-5 w h)))
         ^ints pc (int-array size)
         ^ints pa (int-array size)
         alphas (/ alpha 255.0)]

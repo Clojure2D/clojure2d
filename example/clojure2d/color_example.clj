@@ -77,7 +77,8 @@
     (to-color (v/vec4 11 22 33 44))
     (to-color [3 4 5])
     (to-color (range 4))
-    (to-color 0xaafffeeb)))
+    (to-color 0xaafffeeb)
+    (to-color (to-thing-rgba :khaki))))
 
 (add-examples to-awt-color
   (example-session "Various conversions"
@@ -123,6 +124,13 @@
 
 (add-examples format-hex
   (example-session "Usage" (format-hex :maroon) (format-hex (color 4 55 222))))
+
+;; -- thing
+
+(add-examples to-thing-rgba
+  (example-session "Usage"
+    (to-thing-rgba :lightblue)
+    (to-thing-rgba (color 128 16 16))))
 
 ;; --
 
@@ -245,17 +253,17 @@
   (example-palette "Palette 201" (colourlovers-palettes 201))
   (example-palette "Palette 499" (colourlovers-palettes 499)))
 
-(add-examples iq-palette-gradient
+(add-examples iq-gradient
   (example-gradient "Create gradient"
-                    (iq-palette-gradient
+                    (iq-gradient
                      (v/vec3 0.5 0.5 0.5)
                      (v/vec3 0.4 0.5 0.6)
                      (v/vec3 0.2 0.2 1.0)
                      (v/vec3 1.0 0.1 1.0))))
 
-(add-examples iq-palette-random-gradient
-  (example-gradient "Create gradient" (iq-palette-random-gradient))
-  (example-gradient "Create another gradient" (iq-palette-random-gradient)))
+(add-examples iq-random-gradient
+  (example-gradient "Create gradient" (iq-random-gradient))
+  (example-gradient "Create another gradient" (iq-random-gradient)))
 
 ;; ----
 
@@ -415,3 +423,14 @@
 
 
 ;;
+
+(add-examples random-gradient
+  (example-gradient "Randomly generated gradient" (random-gradient))
+  (example-gradient "Randomly generated gradient" (random-gradient))
+  (example-gradient "Randomly generated gradient" (random-gradient)))
+
+(add-examples random-palette
+  (example-palette "Randomly generated palette" (random-palette))
+  (example-palette "Randomly generated palette" (random-palette))
+  (example-palette "Randomly generated palette" (random-palette)))
+

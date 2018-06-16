@@ -17,7 +17,7 @@
   * fastmath `Vec4` - this is core type representing 3 color channels and alpha (RGBA). Values are `double` type from `[0-255]` range. [[color]], [[gray]] creators returns `Vec4` representation. To ensure `Vec4` use [[to-color]] function.
   * fastmath `Vec3` - 3 color channels, assuming `alpha` set to value of `255`.
   * `java.awt.Color` - Java AWT representation. Creators are [[awt-color]], [[awt-gray]]. Use [[to-awt-color]] to convert to this representations.
-  * `keyword` - one of the HTML CSS names (see [[html-colors-list]])
+  * `keyword` - one of the HTML CSS names (see [[html-colors-list]]) or thi.ng.color.presets/colors names
   * `Integer` - packed ARGB value. Example: `0xffaa01`.
   * `String` - CSS (\"#ab1122\") or 6 chars string containg hexadecimal representation (\"ffaa01\")
   * any `seqable` - list, vector containing 2-4 elements. Conversion is done by applying content to [[color]] function.
@@ -76,7 +76,7 @@
 
   ### Gradient
 
-  Gradient is continuous functions which accepts value from `[0-1]` range and returns color. Call [[gradient]], [[gradient-easing]] or [[iq-palette-gradient]] to create one.
+  Gradient is continuous functions which accepts value from `[0-1]` range and returns color. Call [[gradient]], [[gradient-easing]] or [[iq-gradient]] to create one.
 
   Predefined gradients are collected in [[gradient-presets]] map. You can find them `cubehelix` based and generated from [Inigo Quilez](http://iquilezles.org/www/articles/palettes/palettes.htm) settings.
 
@@ -94,7 +94,11 @@
   
   ## Distances
 
-  Several functions to calculate distance between colors (`euclidean`, `delta-xxx` etc.)."
+  Several functions to calculate distance between colors (`euclidean`, `delta-xxx` etc.).
+
+  ## Thi.ng interoperability
+
+  Thi.ng `RGBA` type implements [[ColorProto]]. To convert any color to `RGBA` use [[to-thing-rgba]]."
   {:metadoc/categories {:ops "Color/channel operations"
                         :conv "Color conversions"
                         :bl "Color blendings"
@@ -109,10 +113,14 @@
             [fastmath.stats :as stat]
             [fastmath.interpolation :as i]
             [fastmath.easings :as e]
-            [clojure.java.io :refer :all])
+            [clojure.java.io :refer :all]
+            [thi.ng.color.presets :as tpres]
+            [thi.ng.color.gradients :as tgrad]
+            [thi.ng.color.core :as tcol])
   (:import [fastmath.vector Vec3 Vec4]           
            [java.awt Color]
-           [clojure.lang Seqable]))
+           [clojure.lang Seqable]
+           [thi.ng.color.core RGBA]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -418,7 +426,31 @@
   (ch1 [c] (ch1 (to-color c)))
   (ch2 [c] (ch2 (to-color c)))
   (to-awt-color [c] (to-awt-color (to-color c)))
-  (luma [c] (luma (to-color c))))
+  (luma [c] (luma (to-color c)))
+  RGBA
+  (to-color [c] (v/mult (color (tcol/red c) (tcol/green c) (tcol/blue c) (tcol/alpha c)) 255.0))
+  (alpha [c] (* 255.0 ^double (tcol/alpha c)))
+  (red [c] (* 255.0 ^double (tcol/red c)))
+  (green [c] (* 255.0 ^double (tcol/green c)))
+  (blue [c] (* 255.0 ^double (tcol/blue c)))
+  (ch0 [c] (* 255.0 ^double (tcol/red c)))
+  (ch1 [c] (* 255.0 ^double (tcol/green c)))
+  (ch2 [c] (* 255.0 ^double (tcol/blue c)))
+  (to-awt-color [c] (to-awt-color (to-color c)))
+  (luma [c] (* 255.0 ^double (tcol/luminance c))))
+
+(extend-type Vec4
+  tcol/IRGBConvert
+  (as-rgba [c] (let [^Vec4 col (-> c
+                                   (to-color)
+                                   (v/div 255.0))]
+                 (tcol/rgba (.x col) (.y col) (.z col) (.w col)))))
+
+(defn to-thing-rgba
+  "Convert Clojure2d color to thi.ng RGBA."
+  {:metadoc/categories #{:ops}}
+  [c]
+  (tcol/as-rgba (to-color c)))
 
 (defn format-hex
   "Convert color to hex string (css)."
@@ -2100,14 +2132,14 @@ See [[blends-list]] for names."}
                  (map xml/parse)                 
                  (map f)
                  (apply concat))]
-    (mapv (fn [x] (map to-color x)) all)))
+    (mapv (fn [x] (mapv to-color x)) all)))
 
 ;; ### Inigo Quilez
 
 ;; http://iquilezles.org/www/articles/palettes/palettes.htm
 
-(defn iq-palette-gradient
-  "Create palette generator function with given parametrization. See http://iquilezles.org/www/articles/palettes/palettes.htm.
+(defn iq-gradient
+  "Create gradient generator function with given parametrization. See http://iquilezles.org/www/articles/palettes/palettes.htm.
 
   Parameters should be `Vec3` type."
   {:metadoc/categories #{:gr}}
@@ -2124,7 +2156,7 @@ See [[blends-list]] for names."}
           (v/mult 255.0)
           (v/applyf clamp255)))))
 
-(defn iq-palette-random-gradient
+(defn iq-random-gradient
   "Create random iq gradient."
   {:metadoc/categories #{:gr}}
   []
@@ -2132,7 +2164,7 @@ See [[blends-list]] for names."}
         b (v/generate-vec3 (partial r/drand 0.2 0.8))
         c (v/generate-vec3 (partial r/drand 2))
         d (v/generate-vec3 r/drand)]
-    (iq-palette-gradient a b c d)))
+    (iq-gradient a b c d)))
 
 ;; --------------
 
@@ -2471,14 +2503,13 @@ See [[blends-list]] for names."}
   "Find nearest color from a set. Input: distance function (default euclidean), list of target colors and source color."
   {:metadoc/categories #{:dist}}
   ([f xf c]
-   (let [s (count xf)
-         xf (mapv to-color xf)]
+   (let [s (count xf)]
      (loop [i (int 0)
             currc c
             currdist Double/MAX_VALUE]
        (if (< i s)
-         (let [c1 (xf i)
-               dist (double (f c c1))]
+         (let [c1 (nth xf i)
+               dist (m/abs (double (f c c1)))]
            (recur (unchecked-inc i)
                   (if (< dist currdist) c1 currc)
                   (if (< dist currdist) dist currdist)))
@@ -2488,7 +2519,6 @@ See [[blends-list]] for names."}
 
 (defn average
   "Average colors in given `colorspace` (default: `:RGB`)"
-  {:metadoc/categories #{:dist}}
   ([colorspace xs]
    (let [[to from] (colorspaces colorspace)]
      (from (v/average-vectors (map to xs)))))
@@ -2503,166 +2533,160 @@ See [[blends-list]] for names."}
   ([x1 x2 t] (lerp x1 x2 t))
   ([x1 x2] (lerp x1 x2 0.5)))
 
-(defn make-reduce-color-filter
-  "Define reduce color filter to use on `Pixels`.
-
-  Will be removed from this namespace!"
-  ([pal]
-   (partial nearest-color pal))
-  ([f pal]
-   (partial nearest-color f pal)))
-
 ;; colors
 
-(def ^:private html-colors-map {:aliceblue 0xf0f8ff,
-                                :antiquewhite 0xfaebd7,
-                                :amber (color 178 140 0)
-                                :aqua 0x00ffff,
-                                :aquamarine 0x7fffd4,
-                                :azure 0xf0ffff,
-                                :beige 0xf5f5dc,
-                                :bisque 0xffe4c4,
-                                :black 0x000000,
-                                :blanchedalmond 0xffebcd,
-                                :blue 0x0000ff,
-                                :blueviolet 0x8a2be2,
-                                :brown 0xa52a2a,
-                                :burlywood 0xdeb887,
-                                :cadetblue 0x5f9ea0,
-                                :chartreuse 0x7fff00,
-                                :chocolate 0xd2691e,
-                                :coral 0xff7f50,
-                                :cornflowerblue 0x6495ed,
-                                :cornsilk 0xfff8dc,
-                                :crimson 0xdc143c,
-                                :cyan 0x00ffff,
-                                :darkblue 0x00008b,
-                                :darkcyan 0x008b8b,
-                                :darkgoldenrod 0xb8860b,
-                                :darkgray 0xa9a9a9,
-                                :darkgreen 0x006400,
-                                :darkgrey 0xa9a9a9,
-                                :darkkhaki 0xbdb76b,
-                                :darkmagenta 0x8b008b,
-                                :darkolivegreen 0x556b2f,
-                                :darkorange 0xff8c00,
-                                :darkorchid 0x9932cc,
-                                :darkred 0x8b0000,
-                                :darksalmon 0xe9967a,
-                                :darkseagreen 0x8fbc8f,
-                                :darkslateblue 0x483d8b,
-                                :darkslategray 0x2f4f4f,
-                                :darkslategrey 0x2f4f4f,
-                                :darkturquoise 0x00ced1,
-                                :darkviolet 0x9400d3,
-                                :deeppink 0xff1493,
-                                :deepskyblue 0x00bfff,
-                                :dimgray 0x696969,
-                                :dimgrey 0x696969,
-                                :dodgerblue 0x1e90ff,
-                                :firebrick 0xb22222,
-                                :floralwhite 0xfffaf0,
-                                :forestgreen 0x228b22,
-                                :fuchsia 0xff00ff,
-                                :gainsboro 0xdcdcdc,
-                                :ghostwhite 0xf8f8ff,
-                                :gold 0xffd700,
-                                :goldenrod 0xdaa520,
-                                :gray 0x808080,
-                                :green 0x008000,
-                                :greenyellow 0xadff2f,
-                                :grey 0x808080,
-                                :honeydew 0xf0fff0,
-                                :hotpink 0xff69b4,
-                                :indianred 0xcd5c5c,
-                                :indigo 0x4b0082,
-                                :ivory 0xfffff0,
-                                :khaki 0xf0e68c,
-                                :lavender 0xe6e6fa,
-                                :lavenderblush 0xfff0f5,
-                                :lawngreen 0x7cfc00,
-                                :lemonchiffon 0xfffacd,
-                                :lightblue 0xadd8e6,
-                                :lightcoral 0xf08080,
-                                :lightcyan 0xe0ffff,
-                                :lightgoldenrodyellow 0xfafad2,
-                                :lightgray 0xd3d3d3,
-                                :lightgreen 0x90ee90,
-                                :lightgrey 0xd3d3d3,
-                                :lightpink 0xffb6c1,
-                                :lightsalmon 0xffa07a,
-                                :lightseagreen 0x20b2aa,
-                                :lightskyblue 0x87cefa,
-                                :lightslategray 0x778899,
-                                :lightslategrey 0x778899,
-                                :lightsteelblue 0xb0c4de,
-                                :lightyellow 0xffffe0,
-                                :lime 0x00ff00,
-                                :limegreen 0x32cd32,
-                                :linen 0xfaf0e6,
-                                :magenta 0xff00ff,
-                                :maroon 0x800000,
-                                :mediumaquamarine 0x66cdaa,
-                                :mediumblue 0x0000cd,
-                                :mediumorchid 0xba55d3,
-                                :mediumpurple 0x9370db,
-                                :mediumseagreen 0x3cb371,
-                                :mediumslateblue 0x7b68ee,
-                                :mediumspringgreen 0x00fa9a,
-                                :mediumturquoise 0x48d1cc,
-                                :mediumvioletred 0xc71585,
-                                :midnightblue 0x191970,
-                                :mintcream 0xf5fffa,
-                                :mistyrose 0xffe4e1,
-                                :moccasin 0xffe4b5,
-                                :navajowhite 0xffdead,
-                                :navy 0x000080,
-                                :oldlace 0xfdf5e6,
-                                :olive 0x808000,
-                                :olivedrab 0x6b8e23,
-                                :orange 0xffa500,
-                                :orangered 0xff4500,
-                                :orchid 0xda70d6,
-                                :palegoldenrod 0xeee8aa,
-                                :palegreen 0x98fb98,
-                                :paleturquoise 0xafeeee,
-                                :palevioletred 0xdb7093,
-                                :papayawhip 0xffefd5,
-                                :peachpuff 0xffdab9,
-                                :peru 0xcd853f,
-                                :pink 0xffc0cb,
-                                :plum 0xdda0dd,
-                                :powderblue 0xb0e0e6,
-                                :purple 0x800080,
-                                :rebeccapurple 0x663399,
-                                :red 0xff0000,
-                                :rosybrown 0xbc8f8f,
-                                :royalblue 0x4169e1,
-                                :saddlebrown 0x8b4513,
-                                :salmon 0xfa8072,
-                                :sandybrown 0xf4a460,
-                                :seagreen 0x2e8b57,
-                                :seashell 0xfff5ee,
-                                :sienna 0xa0522d,
-                                :silver 0xc0c0c0,
-                                :skyblue 0x87ceeb,
-                                :slateblue 0x6a5acd,
-                                :slategray 0x708090,
-                                :slategrey 0x708090,
-                                :snow 0xfffafa,
-                                :springgreen 0x00ff7f,
-                                :steelblue 0x4682b4,
-                                :tan 0xd2b48c,
-                                :teal 0x008080,
-                                :thistle 0xd8bfd8,
-                                :tomato 0xff6347,
-                                :turquoise 0x40e0d0,
-                                :violet 0xee82ee,
-                                :wheat 0xf5deb3,
-                                :white 0xffffff,
-                                :whitesmoke 0xf5f5f5,
-                                :yellow 0xffff00,
-                                :yellowgreen 0x9acd32})
+(def ^:private html-colors-map
+  (merge
+   tpres/colors
+   {:aliceblue 0xf0f8ff,
+    :antiquewhite 0xfaebd7,
+    :amber (color 178 140 0)
+    :aqua 0x00ffff,
+    :aquamarine 0x7fffd4,
+    :azure 0xf0ffff,
+    :beige 0xf5f5dc,
+    :bisque 0xffe4c4,
+    :black 0x000000,
+    :blanchedalmond 0xffebcd,
+    :blue 0x0000ff,
+    :blueviolet 0x8a2be2,
+    :brown 0xa52a2a,
+    :burlywood 0xdeb887,
+    :cadetblue 0x5f9ea0,
+    :chartreuse 0x7fff00,
+    :chocolate 0xd2691e,
+    :coral 0xff7f50,
+    :cornflowerblue 0x6495ed,
+    :cornsilk 0xfff8dc,
+    :crimson 0xdc143c,
+    :cyan 0x00ffff,
+    :darkblue 0x00008b,
+    :darkcyan 0x008b8b,
+    :darkgoldenrod 0xb8860b,
+    :darkgray 0xa9a9a9,
+    :darkgreen 0x006400,
+    :darkgrey 0xa9a9a9,
+    :darkkhaki 0xbdb76b,
+    :darkmagenta 0x8b008b,
+    :darkolivegreen 0x556b2f,
+    :darkorange 0xff8c00,
+    :darkorchid 0x9932cc,
+    :darkred 0x8b0000,
+    :darksalmon 0xe9967a,
+    :darkseagreen 0x8fbc8f,
+    :darkslateblue 0x483d8b,
+    :darkslategray 0x2f4f4f,
+    :darkslategrey 0x2f4f4f,
+    :darkturquoise 0x00ced1,
+    :darkviolet 0x9400d3,
+    :deeppink 0xff1493,
+    :deepskyblue 0x00bfff,
+    :dimgray 0x696969,
+    :dimgrey 0x696969,
+    :dodgerblue 0x1e90ff,
+    :firebrick 0xb22222,
+    :floralwhite 0xfffaf0,
+    :forestgreen 0x228b22,
+    :fuchsia 0xff00ff,
+    :gainsboro 0xdcdcdc,
+    :ghostwhite 0xf8f8ff,
+    :gold 0xffd700,
+    :goldenrod 0xdaa520,
+    :gray 0x808080,
+    :green 0x008000,
+    :greenyellow 0xadff2f,
+    :grey 0x808080,
+    :honeydew 0xf0fff0,
+    :hotpink 0xff69b4,
+    :indianred 0xcd5c5c,
+    :indigo 0x4b0082,
+    :ivory 0xfffff0,
+    :khaki 0xf0e68c,
+    :lavender 0xe6e6fa,
+    :lavenderblush 0xfff0f5,
+    :lawngreen 0x7cfc00,
+    :lemonchiffon 0xfffacd,
+    :lightblue 0xadd8e6,
+    :lightcoral 0xf08080,
+    :lightcyan 0xe0ffff,
+    :lightgoldenrodyellow 0xfafad2,
+    :lightgray 0xd3d3d3,
+    :lightgreen 0x90ee90,
+    :lightgrey 0xd3d3d3,
+    :lightpink 0xffb6c1,
+    :lightsalmon 0xffa07a,
+    :lightseagreen 0x20b2aa,
+    :lightskyblue 0x87cefa,
+    :lightslategray 0x778899,
+    :lightslategrey 0x778899,
+    :lightsteelblue 0xb0c4de,
+    :lightyellow 0xffffe0,
+    :lime 0x00ff00,
+    :limegreen 0x32cd32,
+    :linen 0xfaf0e6,
+    :magenta 0xff00ff,
+    :maroon 0x800000,
+    :mediumaquamarine 0x66cdaa,
+    :mediumblue 0x0000cd,
+    :mediumorchid 0xba55d3,
+    :mediumpurple 0x9370db,
+    :mediumseagreen 0x3cb371,
+    :mediumslateblue 0x7b68ee,
+    :mediumspringgreen 0x00fa9a,
+    :mediumturquoise 0x48d1cc,
+    :mediumvioletred 0xc71585,
+    :midnightblue 0x191970,
+    :mintcream 0xf5fffa,
+    :mistyrose 0xffe4e1,
+    :moccasin 0xffe4b5,
+    :navajowhite 0xffdead,
+    :navy 0x000080,
+    :oldlace 0xfdf5e6,
+    :olive 0x808000,
+    :olivedrab 0x6b8e23,
+    :orange 0xffa500,
+    :orangered 0xff4500,
+    :orchid 0xda70d6,
+    :palegoldenrod 0xeee8aa,
+    :palegreen 0x98fb98,
+    :paleturquoise 0xafeeee,
+    :palevioletred 0xdb7093,
+    :papayawhip 0xffefd5,
+    :peachpuff 0xffdab9,
+    :peru 0xcd853f,
+    :pink 0xffc0cb,
+    :plum 0xdda0dd,
+    :powderblue 0xb0e0e6,
+    :purple 0x800080,
+    :rebeccapurple 0x663399,
+    :red 0xff0000,
+    :rosybrown 0xbc8f8f,
+    :royalblue 0x4169e1,
+    :saddlebrown 0x8b4513,
+    :salmon 0xfa8072,
+    :sandybrown 0xf4a460,
+    :seagreen 0x2e8b57,
+    :seashell 0xfff5ee,
+    :sienna 0xa0522d,
+    :silver 0xc0c0c0,
+    :skyblue 0x87ceeb,
+    :slateblue 0x6a5acd,
+    :slategray 0x708090,
+    :slategrey 0x708090,
+    :snow 0xfffafa,
+    :springgreen 0x00ff7f,
+    :steelblue 0x4682b4,
+    :tan 0xd2b48c,
+    :teal 0x008080,
+    :thistle 0xd8bfd8,
+    :tomato 0xff6347,
+    :turquoise 0x40e0d0,
+    :violet 0xee82ee,
+    :wheat 0xf5deb3,
+    :white 0xffffff,
+    :whitesmoke 0xf5f5f5,
+    :yellow 0xffff00,
+    :yellowgreen 0x9acd32}))
 
 (def ^{:doc "List of html color names"
        :metadoc/categories #{:pal}} html-colors-list (sort (keys html-colors-map)))
@@ -2777,33 +2801,36 @@ See [[blends-list]] for names."}
 Map with name (keyword) as key and gradient function as value."
        :metadoc/categories #{:grad}}
   gradient-presets
-  {:iq-1 (iq-palette-gradient vec3-05 vec3-05 vec3-10
-                              (Vec3. 0.0 0.33 0.67))
-   :iq-2 (iq-palette-gradient vec3-05 vec3-05 vec3-10
-                              (Vec3. 0.0 0.1 0.2))
-   :iq-3 (iq-palette-gradient vec3-05 vec3-05 vec3-10 
-                              (Vec3. 0.3 0.2 0.2))
-   :iq-4 (iq-palette-gradient vec3-05 vec3-05
-                              (Vec3. 1.0 1.0 0.5)
-                              (Vec3. 0.8 0.9 0.3))
-   :iq-5 (iq-palette-gradient vec3-05 vec3-05
-                              (Vec3. 1.0 0.7 0.4)
-                              (Vec3. 0.0 0.15 0.2))
-   :iq-6 (iq-palette-gradient vec3-05 vec3-05
-                              (Vec3. 2.0 1.0 0.0)
-                              (Vec3. 0.5 0.2 0.25))
-   :iq-7 (iq-palette-gradient (Vec3. 0.8 0.5 0.4)
-                              (Vec3. 0.2 0.4 0.2)
-                              (Vec3. 2.0 1.0 1.0)
-                              (Vec3. 0.0 0.25 0.25))
-   :cubehelix (gradient-cubehelix e/linear (Vec4. 300.0 0.5 0.0 255.0) (Vec4. -240 0.5 1.0 255.0))
-   :warm (gradient-cubehelix e/linear (Vec4. -100.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
-   :cool (gradient-cubehelix e/linear (Vec4. 260.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
-   :rainbow (fn [^double t] (let [ts (m/abs (- t 0.5))]
-                              (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
-                                                     (- 1.5 (* 1.5 ts))
-                                                     (- 0.8 (* 0.9 ts))
-                                                     255.0))))})
+  (merge
+   (into {} (for [[k v] tgrad/cosine-schemes]
+              [k (apply iq-gradient (map #(apply v/vec3 %) v))])) ;; thi.ng presets
+   {:iq-1 (iq-gradient vec3-05 vec3-05 vec3-10
+                       (Vec3. 0.0 0.33 0.67))
+    :iq-2 (iq-gradient vec3-05 vec3-05 vec3-10
+                       (Vec3. 0.0 0.1 0.2))
+    :iq-3 (iq-gradient vec3-05 vec3-05 vec3-10 
+                       (Vec3. 0.3 0.2 0.2))
+    :iq-4 (iq-gradient vec3-05 vec3-05
+                       (Vec3. 1.0 1.0 0.5)
+                       (Vec3. 0.8 0.9 0.3))
+    :iq-5 (iq-gradient vec3-05 vec3-05
+                       (Vec3. 1.0 0.7 0.4)
+                       (Vec3. 0.0 0.15 0.2))
+    :iq-6 (iq-gradient vec3-05 vec3-05
+                       (Vec3. 2.0 1.0 0.0)
+                       (Vec3. 0.5 0.2 0.25))
+    :iq-7 (iq-gradient (Vec3. 0.8 0.5 0.4)
+                       (Vec3. 0.2 0.4 0.2)
+                       (Vec3. 2.0 1.0 1.0)
+                       (Vec3. 0.0 0.25 0.25))
+    :cubehelix (gradient-cubehelix e/linear (Vec4. 300.0 0.5 0.0 255.0) (Vec4. -240 0.5 1.0 255.0))
+    :warm (gradient-cubehelix e/linear (Vec4. -100.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
+    :cool (gradient-cubehelix e/linear (Vec4. 260.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
+    :rainbow (fn [^double t] (let [ts (m/abs (- t 0.5))]
+                               (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
+                                                      (- 1.5 (* 1.5 ts))
+                                                      (- 0.8 (* 0.9 ts))
+                                                      255.0))))}))
 
 (def ^{:doc "Gradient presets names."
        :metadoc/categories #{:grad}} gradient-presets-list (sort (keys gradient-presets)))
@@ -3100,3 +3127,36 @@ Map with name (keyword) as key and gradient function as value."
 
 (def ^{:doc "Color palette presets list."
        :metadoc/categories #{:pal}} palette-presets-list (sort (keys palette-presets)))
+
+;;;;
+
+(defn random-palette
+  "Generate random palette from all collections defined in clojure2d.color namespace."
+  {:metadoc/categories #{:pal}}
+  []
+  (condp clojure.core/> (r/drand)
+    0.1 (m/sample (iq-random-gradient) (r/irand 3 10))
+    0.5 (let [p (rand-nth (concat colourlovers-palettes
+                                  (vals palette-presets)))]
+          (if (> (count p) 15)
+            (resample 15 p) p))
+    0.6 (m/sample (rand-nth (vals gradient-presets)) (r/irand 3 10))
+    (let [h (r/drand 360)
+          t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
+          conf {:compl (r/brand 0.6)
+                :angle (r/drand 10.0 90.0)
+                :adj (r/brand)
+                :preset (rand-nth paletton-presets-list)}]
+      (paletton t h conf))))
+
+(defn random-gradient
+  "Generate random gradient function."
+  {:metadoc/categories #{:pal}}
+  []
+  (let [pal (rand-nth (concat colourlovers-palettes
+                              (vals palette-presets)))
+        pal->grad (gradient (r/randval :RGB (rand-nth colorspaces-list))
+                            (r/randval :spline (rand-nth [:cubic-spline :linear :shepard :neville :loess]))
+                            pal)]
+    (r/randval 0.75 pal->grad (rand-nth (vals gradient-presets)))))
+

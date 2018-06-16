@@ -15,22 +15,15 @@ Clojure2D is a library supporting generative coding or glitching. It's based on 
 
 ## WARNING
 
-Refactoring in progress -> towards 0.1.0, check Changelog.
+Version `1.0.0` is after big refactoring and contains plenty of breaking changes.
 
 ## Documentation
 
-[Codox - In progress!](https://clojure2d.github.io/clojure2d/docs/codox/)
+[Documentation with examples](https://clojure2d.github.io/clojure2d/docs/codox/)
 
 ## Motivation
 
 This project is the answer to personal needs to optimize my own workflow for generative or glitch creations. I've been producing a lot of Processing code and started to suffer from limitations of working in 'write sketch and run' mode. Too much copy&paste between sketches, zillions of folders, zillions of processed images. And one day I fell in love with FP. This code is the answer.
-
-### What's wrong with Processing?
-
-* not reusable code - you have to copy your common parts between sketches
-* display and canvas coupling
-* weak or no support for parallelism
-* more minor...
 
 ### Is it replacement for...
 
@@ -44,30 +37,31 @@ No, rather no. The closest is quil, which is really great library (both Clojure 
 In points:
 
 * Almost decoupled display and canvas (decoupled drawing and refreshing) - you can have as many windows as you want, you can have as many canvases as you want. Display repaints selected canvas automaticaly in separate thread. This way you can operate on canvas in your pace.
-* Processing way is still possible (you can attach draw() function to your Display). However main benefit here: draw function keeps context between invocations, this way you can avoid global state (atoms etc.) and write more functional way. The same is for events, each Window has assigned state which is passed through event calls.
+* Processing way is still possible (you can attach draw() function to your Display). However main benefit here: draw function keeps state between invocations, this way you can avoid global state (atoms etc.) and write more functional way. The same is for events, each Window has assigned state which is passed through event calls.
 * Easy live coding possible (Emacs/Cider/REPL)
 * FastMath as main math library
-* Main focus on higher level generative/glitch concepts (like sonification support, vector field functions, colorspace operations, things like pixelsorting, slitscan etc. See my Processing sketches, link below)
-
-Check out examples and results folders
+* Main focus on higher level generative/glitch concepts (like sonification support, vector field functions, colorspace operations, things like slitscan etc. See my Processing sketches, link below)
 
 ### What's odd?
 
 It's kind of personal library which supports my (probably not optimal, not convenient for others) way of creating stuff.
 There are still plenty of bugs and not idiomatic code. It may be slower than Processing. Eats a lot of memory (Pixels code is generally immutable). Still not stable API and architecture.
-No tests (yet)
 
 ## Installation
 
 Add following line as a dependency to your `project.clj`
 
+Development version (release soon):
+
 ```clojure
-[clojure2d "0.0.7-SNAPSHOT"]
+[clojure2d "1.0.0-RC1"]
 ```
+
+_Release will be done after review of all [examples](https://github.com/Clojure2D/clojure2d-examples)_
 
 ## Usage
 
-Since still no tutorials are available, check out prepared examples. All namespaces are described below.
+Since still no tutorials are available, see [documentation](https://clojure2d.github.io/clojure2d/docs/codox/). All namespaces are described below:
 
 ### clojure2d.core [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.core.html)
 
@@ -76,7 +70,6 @@ This is main namespace with functions in three groups:
 * image file oparations (load/save); jpg, png and bmp
 * canvas operations (wrapper for Java2D BufferedImage and Graphics2D)
 * window and event operations (JFrame wrapper)
-* global state (one per window)
 * session handling (logger + unique, sequential filename generator)
 
 ### clojure2d.pixels [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.pixels.html)
@@ -87,24 +80,24 @@ Defines also:
 * pixel filters (blur, erode, dilate, median, threshold, posterize, tint)
 * composing Pixels
 * higher order functions which operate on Pixels parallelly (filter-channels, blend-channels)
-* accumulation bins (smooth rendering canvas)
+* log density renderer
 
 ### clojure2d.color [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.color.html)
 
-* colorspace converters
+* color space converters
 * collection of blending basic functions (like add, subtract, divide, difference, etc.)
-* palette generation / color reducing filter
+* huge collection of palettes and gradients
 
 ### clojure2d.extra
 
 This is namespace for common generative/glitch specific libraries:
 
-* signal - signal processing, wave generators, effects and filters (sonification enabler) [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.extra.signal.html)
-* overlays - 3 overlays (noise, spots and rgb scanlines) to finish your images [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.extra.overlays.html)
-* segmentation - segment Pixels into rectangles [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.extra.segmentation.html)
-* variations - vector field functions / variations taken from fractal flames world [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.extra.variations.html)
-* glitch - glitching filters
-* raymarching - simple ray marching 3d scene renderer
+* signal - signal processing, wave generators, effects and filters (for sonification process) [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.extra.signal.html)
+* overlays - postprocessing filters (like rgb/crt scanlines, etc.) [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.extra.overlays.html)
+* segmentation - image segmentation [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.extra.segmentation.html)
+* glitch - glitching filters [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.extra.glitch.html)
+* utils - visualize objects: palette, gradient, image, vector/scalar field... [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.extra.glitch.html)
+* raymarching - simple ray marching 3d scene renderer (abandoned)
 
 ### generateme/fastmath
 
@@ -115,33 +108,6 @@ All math functions are in [fastmath](https://github.com/generateme/fastmath) rep
 200+ examples are in separate repository
 
 [EXAMPLES](https://github.com/Clojure2D/clojure2d-examples)
-
-## TODO
-
-### High priority
-
-* ~~Marginalia docs + github.io page - in progress~~
-* Cleaning, optimizations - still in progress (more profiling, boxed math removal)
-* ~~Parallel color operations on Pixels~~
-* ~~Color namespace cleaning~~
-* ~~Colorspace converters~~
-* More in extra ns:
-  - SDF objects
-  - variations
-  - glitch filters in extra namespace (moved from Processing)
-  - analog filters (for sonification part)
-* More canvas drawing functions (PShape implementation - partially done)
-* ~~Session handling (saving results in session, logging actions) - done, not tested~~
-* Sanity tests
-* Tutorials
-
-### Low priority or ideas
-
-* Cheat sheet
-* ~~More window events~~
-* Deeper joise bindings
-* Wavelets bindings
-* Tests... (in progress)
 
 ## Community
 

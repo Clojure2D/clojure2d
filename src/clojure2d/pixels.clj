@@ -657,6 +657,8 @@
          2 (clojure2d.java.filter.Tint/process3 (.p p) (.p target) 2 (.z col-low) (.z col-mid) (.z col-high))
          3 (clojure2d.java.filter.Tint/process3 (.p p) (.p target) 3 (.w col-low) (.w col-mid) (.w col-high)))))))
 
+;;
+
 (defn modulate
   "Create modulate channel values filter.
 

@@ -75,3 +75,11 @@
               v (f (v/vec2 x y))]
           (point c (norm-out (v 0)) (norm-out (v 1))))))
     (show-window {:canvas c})))
+
+(defn show-image
+  "Show image"
+  [img]
+  (let [c (canvas (width img) (height img))]
+    (with-canvas-> c
+      (image (get-image img)))
+    (show-window {:canvas c})))

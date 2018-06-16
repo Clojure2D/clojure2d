@@ -1,7 +1,9 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
-## 0.1.0-SNAPSHOT
+## 1.0.0-RC1 (0.1.0-SNAPSHOT)
+
+Please note - breaking changes!
 
 ### Added
 
@@ -15,6 +17,7 @@ All notable changes to this project will be documented in this file. This change
 - color gradients
 - color tweaking functions
 - font-ascent
+- thi.ng rgba interoperability
 
 ### Changed
 
@@ -33,6 +36,7 @@ All notable changes to this project will be documented in this file. This change
 - paletton-palette -> paletton
 - signal processing refactored, api changed
 - overlays refactored
+- glitch scripts refectored, api changed
 
 Prefix `make-` is reserved when function is created.
 

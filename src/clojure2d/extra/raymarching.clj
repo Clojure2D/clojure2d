@@ -1,8 +1,8 @@
-;; http://www.iquilezles.org/www/index.htm
-;; http://mercury.sexy/hg_sdf/
-;; cheap&dirty ray marching helper library
-
 (ns clojure2d.extra.raymarching
+  "(ABANDONED) Raymarching helper.
+  
+  * http://www.iquilezles.org/www/index.htm
+  * http://mercury.sexy/hg_sdf/"
   (:require [fastmath.core :as m]
             [fastmath.vector :as v])
   (:import [fastmath.vector Vec2 Vec3]))

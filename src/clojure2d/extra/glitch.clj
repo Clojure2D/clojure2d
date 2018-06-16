@@ -1,19 +1,24 @@
-;; # Namespace scope
-;;
-;; Various glitching pixel filters or functions
-;;
-;; * Slitscan
-;; * Mirror
-;; * Slitscan2
-;; * Fold
-;; * Blend two Pixels (compose)
-;; * Reduce colors
-;;
-;; All filters are equiped with random configuration generator. This way you can easily search vast space of options.
-;;
-;; More info soon. Some API is subject to change (make it more consistent).
-
 (ns clojure2d.extra.glitch
+  "Various glitching pixel filters or functions
+
+  ### Filter
+
+  Use following filters with [[filter-channels]] function.
+  
+  * Slitscan - x/y slitscan simulation based on wave functions
+  * Shift-channels - just shift channels
+  * Mirror - mirror image along different axes
+  * Slitscan2 - slitscan simulation based on vector fields
+  * Fold - apply vector field on the image
+  * Pix2line - convert pixel into horizontal line
+
+  ### Machines
+
+  Short sketches operating on images/pixels.
+  
+  * Blend - compose two images in glitchy way
+
+  All filters are equiped with random configuration generator."
   (:require [fastmath.core :as m]
             [fastmath.random :as r]
             [clojure2d.pixels :as p]
@@ -36,8 +41,8 @@
 ;; Pixels are shifted by value returned by wave function. You have to provide separate wave functions for x and y axises.
 ;; Random setup is based on sum of oscillators defined in `signal` namespace.
 
-(def freqs (mapv #(<< 1 ^long %) (range 8)))
-(def amps (mapv #(/ ^long %) freqs))
+(def ^:private freqs (mapv #(<< 1 ^long %) (range 8)))
+(def ^:private amps (mapv #(/ ^long %) freqs))
 
 (defn- make-random-wave 
   "Create random wave definition."
@@ -49,10 +54,12 @@
      :phase (r/drand)}))
 
 (defn slitscan-random-config
-  "Create list of random waves for each axis separately"
+  "Create list of random waves for each axis separately.
+
+  Optionally you can pass number of waves to create for each axis."
   ([nx ny]
-   {:waves-x (repeatedly nx make-random-wave)
-    :waves-y (repeatedly ny make-random-wave)})
+   {:x (repeatedly nx make-random-wave)
+    :y (repeatedly ny make-random-wave)})
   ([]
    (slitscan-random-config (r/irand 2 6) (r/irand 2 6))))
 
@@ -61,7 +68,7 @@
   [waves]
   (apply s/sum-waves (map #(s/wave (:wave %) (:freq %) (:amp %) (:phase %)) waves)))
 
-(defn- slitscan
+(defn- do-slitscan
   "Shift pixels by amount returned by functions fx and fy."
   [fx fy ch ^Pixels p x y]
   (let [wp (.w p)
@@ -74,44 +81,73 @@
         yy (m/wrap 0.0 hp (+ ^int y shifty))]
     (p/get-value p ch xx yy)))
 
-(defn make-slitscan
-  "Create slitscan filter funtion."
+(defn slitscan
+  "Create slitscan filter funtion.
+
+  Config is a map each axis has it's own list of maps defining waves. Each map contains:
+
+  * `:wave` - oscillator name (see [[oscillators]].
+  * `:freq` - wave frequency
+  * `:amp` - wave amplitude
+  * `:phase` - wave phase (0-1)."
   ([]
-   (make-slitscan (slitscan-random-config)))
-  ([{:keys [waves-x waves-y]
-     :or {waves-x [(make-random-wave)] waves-y [(make-random-wave)]}}]
-   (partial p/filter-channel-xy (partial slitscan (make-slitscan-waves waves-x) (make-slitscan-waves waves-y)))))
+   (slitscan (slitscan-random-config)))
+  ([{:keys [x y]
+     :or {x [(make-random-wave)] y [(make-random-wave)]}}]
+   (partial p/filter-channel-xy (partial do-slitscan (make-slitscan-waves x) (make-slitscan-waves y)))))
 
 ;; channel shifts
 
 (defn shift-channels-random-config
-  "Random shift values."
-  []
-  {:horizontal-shift (r/randval 0.3 0.0 (r/drand -0.1 0.1))
-   :vertical-shift (r/randval 0.3 0.0 (r/drand -0.1 0.1))})
+  "Random shift values along x and y axes.
 
-(defn make-shift-channels
-  "Shift channels by given amount."
-  ([] (make-shift-channels (shift-channels-random-config)))
-  ([{:keys [horizontal-shift vertical-shift]
-     :or {horizontal-shift 0.05 vertical-shift -0.05}}]
-   (make-slitscan {:waves-x [{:wave :constant :amp horizontal-shift}]
-                   :waves-y [{:wave :constant :amp vertical-shift}]})))
+  Optionally provide `spread` parameter to define maximum shift value."
+  ([] (shift-channels-random-config 0.1))
+  ([^double spread]
+   (let [shift-x (r/randval 0.2 0.0 (r/drand (- spread) spread))
+         shift-y (if (zero? shift-x)
+                   (r/drand (- spread) spread)
+                   (r/randval 0.2 0.0 (r/drand (- spread) spread)))]
+     {:x-shift shift-x
+      :y-shift shift-y})))
+
+(defn shift-channels
+  "Shift channels by given amount.
+
+  Parameters:
+
+  * `:x-shift` - shift amount along x axis
+  * `:y-shift` - shift amount along y axis"
+  ([] (shift-channels (shift-channels-random-config)))
+  ([{:keys [^double x-shift ^double y-shift]
+     :or {x-shift 0.05 y-shift -0.05}}]
+   (slitscan {:x [{:wave :constant :amp (- x-shift)}]
+              :y [{:wave :constant :amp (- y-shift)}]})))
 
 ;; Slitscan2
 
 (defn slitscan2-random-config
-  ""
-  []
-  (binding [var/*skip-random-fields* true]
-    {:variation (var/random-configuration)
-     :r 2.0}))
+  "Generate random configuration for vector fields slitscan.
 
-(defn make-slitscan2
-  "f: variation configuration
-   r: range value 1.0-3.0"
-  ([{:keys [variation ^double r]}]
-   (let [f (var/combine variation)
+  * `r` - field range (default 2.0)
+  * `d` - fields configuration depth (default up to 3)"
+  ([] (slitscan2-random-config 2.0 3))
+  ([r] (slitscan2-random-config r 3.0))
+  ([r d]
+   (binding [var/*skip-random-fields* true]
+     {:fields (var/random-configuration d)
+      :r r})))
+
+(defn slitscan2
+  "Slitscan filter based on vector fields.
+
+  Parameters:
+  
+  * `:fields` - vector fields configuration [[combine]]
+  * `:r` -  range value 1.0-3.0"
+  ([{:keys [fields ^double r]
+     :or {r 2.0 fields (var/random-configuration 0)}}]
+   (let [f (var/combine fields)
          r- (- r)]
      (fn [ch t ^Pixels p]
        (dotimes [y (.h p)]
@@ -125,17 +161,25 @@
                    yy (unchecked-int (m/norm (.y vv) r- r 0.0 (.h p)))]
                (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
   ([]
-   (make-slitscan2 (slitscan2-random-config))))
+   (slitscan2 (slitscan2-random-config))))
 
 ;;
 
-(def fold-random-config slitscan2-random-config)
+(def ^{:doc   "Generate random configuration for vector fields slitscan.
 
-(defn make-fold
-  "f: variation configuration
-   r: range value 1.0-3.0"
-  ([{:keys [variation ^double r]}]
-   (let [f (var/combine variation)
+  * `r` - field range (default 2.0)
+  * `d` - fields configuration depth (default up to 3)"}
+  fold-random-config slitscan2-random-config)
+
+(defn fold
+  "Folding filter based on vector fields.
+
+  Parameters:
+  
+  * `:fields` - vector fields configuration [[combine]]
+  * `:r` -  range value 1.0-3.0"
+  ([{:keys [fields ^double r]}]
+   (let [f (var/combine fields)
          r- (- r)]
      (fn [ch t ^Pixels p]
        (dotimes [y (.h p)]
@@ -147,7 +191,7 @@
                    yy (unchecked-int (m/norm (.y vv) r- r 0.0 (.h p)))]
                (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
   ([]
-   (make-fold (fold-random-config))))
+   (fold (fold-random-config))))
 
 ;; mirrorimage
 
@@ -221,38 +265,39 @@
           (mi-draw-point ch target source (- (.w source) x 1) (- (.h source) y 1) x y)
           (mi-draw-point ch target source x y (- (.w source) x 1) (- (.h source) y 1)))))))
 
-(def mirror-types {:U    (partial mi-do-horizontal true)
-                   :D    (partial mi-do-horizontal false)
-                   :L    (partial mi-do-vertical true)
-                   :R    (partial mi-do-vertical false)
-                   :DL   (partial mi-do-diag-ul 0 false)
-                   :UR   (partial mi-do-diag-ul 1 false)
-                   :DL2  (partial mi-do-diag-ul 2 false)
-                   :UR2  (partial mi-do-diag-ul 3 false)
-                   :SDL  (partial mi-do-diag-ul 0 true)
-                   :SUR  (partial mi-do-diag-ul 1 true)
-                   :SDL2 (partial mi-do-diag-ul 2 true)
-                   :SUR2 (partial mi-do-diag-ul 3 true)
-                   :DR   (partial mi-do-diag-ur 0 false)
-                   :UL   (partial mi-do-diag-ur 1 false)
-                   :DR2  (partial mi-do-diag-ur 2 false)
-                   :UL2  (partial mi-do-diag-ur 3 false)
-                   :SDR  (partial mi-do-diag-ur 0 true)
-                   :SUL  (partial mi-do-diag-ur 1 true)
-                   :SDR2 (partial mi-do-diag-ur 2 true)
-                   :SUL2 (partial mi-do-diag-ur 3 true)
-                   :RUR  (partial mi-do-diag-rect true true)
-                   :RDR  (partial mi-do-diag-rect false true)
-                   :RDL  (partial mi-do-diag-rect true false)
-                   :RUL  (partial mi-do-diag-rect false false)})
+(def ^{:doc "Map of names and mirroring functions"}
+  mirror-types {:U    (partial mi-do-horizontal true)
+                :D    (partial mi-do-horizontal false)
+                :L    (partial mi-do-vertical true)
+                :R    (partial mi-do-vertical false)
+                :DL   (partial mi-do-diag-ul 0 false)
+                :UR   (partial mi-do-diag-ul 1 false)
+                :DL2  (partial mi-do-diag-ul 2 false)
+                :UR2  (partial mi-do-diag-ul 3 false)
+                :SDL  (partial mi-do-diag-ul 0 true)
+                :SUR  (partial mi-do-diag-ul 1 true)
+                :SDL2 (partial mi-do-diag-ul 2 true)
+                :SUR2 (partial mi-do-diag-ul 3 true)
+                :DR   (partial mi-do-diag-ur 0 false)
+                :UL   (partial mi-do-diag-ur 1 false)
+                :DR2  (partial mi-do-diag-ur 2 false)
+                :UL2  (partial mi-do-diag-ur 3 false)
+                :SDR  (partial mi-do-diag-ur 0 true)
+                :SUL  (partial mi-do-diag-ur 1 true)
+                :SDR2 (partial mi-do-diag-ur 2 true)
+                :SUL2 (partial mi-do-diag-ur 3 true)
+                :RUR  (partial mi-do-diag-rect true true)
+                :RDR  (partial mi-do-diag-rect false true)
+                :RDL  (partial mi-do-diag-rect true false)
+                :RUL  (partial mi-do-diag-rect false false)})
 
 (defn mirror-random-config
-  ""
+  "Generate random mirroring functions."
   []
   (rand-nth (keys mirror-types)))
 
-(defn make-mirror
-  ""
+(defn mirror
+  "Mirror image for given (or random) mirroring functions."
   ([t] (mirror-types t))
   ([] (mirror-types (mirror-random-config))))
 
@@ -284,7 +329,7 @@
     bget))
 
 (defn pix2line-random-config
-  "Make random config for pix2line"
+  "Make random config for pix2line."
   []
   {:nx (inc (r/irand 100))
    :ny (inc (r/irand 100))
@@ -295,10 +340,19 @@
    :shiftx (r/drand)
    :shifty (r/drand)})
 
-(defn make-pix2line
-  ""
+(defn pix2line
+  "Pix2line effect. Convert pixels to lines.
+
+  Parametrization:
+
+  * `:nx`, `:ny` - grid size
+  * `:scale` - grid scaling factor
+  * `:tolerance` - factor which regulates when start new line
+  * `:nseed` - noise seed
+  * `:whole` - skip lines or not
+  * `:shiftx`, `:shifty` - noise shift"
   ([]
-   (make-pix2line (pix2line-random-config)))
+   (pix2line (pix2line-random-config)))
   ([{:keys [^long tolerance whole] :as config}] 
    (fn [ch target ^Pixels source]
      (let [grid (pix2line-grid (width source) (height source) config)]
@@ -323,7 +377,7 @@
 ;; blend machine
 
 (defn blend-machine-random-config
-  ""
+  "Random configuration for blend machine."
   []
   (let [cs1 (r/randval 0.9 (rand-nth c/colorspaces-list) nil) ; let's convert to some colorspace (or leave rgb)
         cs2 (r/randval 0.2 (r/randval 0.9 (rand-nth c/colorspaces-list) nil) cs1) ; maybe different cs on second image?
@@ -331,98 +385,79 @@
         bl1 (r/randval 0.85 (rand-nth c/blends-list) nil)    ; ch1 blend
         bl2 (r/randval 0.85 (rand-nth c/blends-list) nil) ; ch2 blend
         bl3 (r/randval 0.85 (rand-nth c/blends-list) nil)] ; ch3 blend
-    {:switch (r/brand 0.5)
-     :in-cs1 cs1
-     :in-cs2 cs2
+    {:switch? (r/brand 0.5)
+     :in1-cs cs1
+     :in2-cs cs2
      :out-cs outcs
-     :cs1-to (r/brand 0.5)
-     :cs2-to (r/brand 0.5)
-     :cs-to (r/brand 0.5)
+     :in1-to? (r/brand 0.5)
+     :in2-to? (r/brand 0.5)
+     :out-to? (r/brand 0.5)
      :blend-ch1 bl1
      :blend-ch2 bl2
      :blend-ch3 bl3}))
 
 (defn blend-machine
-  "Do random blend of two pixels, use random colorspace"  
+  "Blend two `Pixels` based on configuration.
+
+  The idea is to compose channels separately in different color spaces.
+
+  Full flow does following steps:
+
+  * convert inputs to (or from) selected color spaces
+  * compose each channel separately using different method
+  * convert output to (or from) selected color space
+  
+  Parametrization:
+
+  * `:switch?` -  reverse input order
+  * `:in1-cs` - color space for first image
+  * `:in2-cs` - color space for second image
+  * `:out-cs` - color space for output
+  * `:in1-to?`, `:in2-to?`, `:cs-to?` - which conversion to select: to color space or from color space
+  * `:blend-ch1`, `:blend-ch2`, `:blend-ch3` - blend methods for each channel"  
   ([p1 p2]
    (blend-machine (blend-machine-random-config) p1 p2))
-  ([{:keys [switch in-cs1 in-cs2 out-cs cs1-to cs2-to cs-to blend-ch1 blend-ch2 blend-ch3]} p1 p2]
-   (let [[p1 p2] (if switch [p2 p1] [p1 p2]) ; switch images
-         cs1-sel (if cs1-to first second)
-         cs2-sel (if cs2-to first second)
-         cs-sel (if cs-to first second)
+  ([{:keys [switch? in1-cs in2-cs out-cs in1-to? in2-to? out-to? blend-ch1 blend-ch2 blend-ch3]} p1 p2]
+   (let [[p1 p2] (if switch? [p2 p1] [p1 p2]) ; switch images
+         in1-sel (if in1-to? first second)
+         in2-sel (if in2-to? first second)
+         out-sel (if out-to? first second)
          result (p/compose-channels blend-ch1 blend-ch2 blend-ch3 nil
-                                    (if in-cs1 (p/filter-colors (cs1-sel (in-cs1 c/colorspaces*)) p1) p1)
-                                    (if in-cs2 (p/filter-colors (cs2-sel (in-cs2 c/colorspaces*)) p2) p2))]
+                                    (if in1-cs (p/filter-colors (in1-sel (in1-cs c/colorspaces*)) p1) p1)
+                                    (if in2-cs (p/filter-colors (in2-sel (in2-cs c/colorspaces*)) p2) p2))]
      (if out-cs
-       (p/filter-colors (cs-sel (out-cs c/colorspaces*)) result)
+       (p/filter-colors (out-sel (out-cs c/colorspaces*)) result)
        result))))
-
-;; color reducer machine
-
-(defn color-reducer-machine-random-config
-  ""
-  []
-  (let [bpal (condp #(> ^double %1 ^double %2) (r/drand 1.0)
-               0.1 (let [num (r/irand 5 20)]
-                     {:type :iq
-                      :palette (m/sample (c/iq-palette-random-gradient) num)})
-               0.5 {:type :colourlovers
-                    :palette (rand-nth c/colourlovers-palettes)}
-               0.6 {:type :gradient
-                    :palette (m/sample (rand-nth (vals c/gradient-presets)) 7)}
-               (let [h (r/drand 360.0)
-                     t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
-                     conf {:compl (r/brand 0.6)
-                           :angle (r/drand 10.0 90.0)
-                           :adj (r/brand 0.5)
-                           :hue h
-                           :preset (rand-nth c/paletton-presets-list)
-                           :type t}]
-                 {:type :paletton
-                  :conf conf
-                  :palette (c/paletton t h conf)}))
-        pal (r/randval 0.2
-                       (update bpal :palette conj (Vec4. 0.0 0.0 0.0 255.0) (Vec4. 255.0 255.0 255.0 255.0))
-                       bpal)
-        pal (assoc pal :distf (rand-nth [v/dist v/dist-abs v/dist-cheb v/dist-sq v/dist-cos v/dist-discrete]))]
-    pal))
-
-(defn color-reducer-machine
-  "Randomize color reducing filter, random method, random colors" 
-  ([conf p]
-   (p/filter-colors (c/make-reduce-color-filter (:distf conf) (:palette conf)) p))
-  ([p]
-   (color-reducer-machine p (color-reducer-machine-random-config))))
 
 ;; find best matching pixels
 
-(defn blend-images-filter
-  ""
-  [{:keys [names pixels mode distance cs]
-    :or {names [] pixels [] distance :euclid-sq mode :color cs :RGB}} ^Pixels p]
-  (let [images (concat pixels (map (comp (partial p/filter-colors (first (c/colorspaces cs))) p/to-pixels load-image) names))
-        ^int w (width p)
-        ^int h (height p)
-        df (v/distances distance)]
-    (if (= mode :color)
-      (p/filter-colors-xy (fn [p ^long x ^long y]
-                            (let [c (p/get-color p x y)]
-                              (first (reduce (fn [curr img]
-                                               (let [nx (unchecked-int (m/norm x 0 w 0 (width img)))
-                                                     ny (unchecked-int (m/norm y 0 h 0 (height img)))
-                                                     [currc ^double currd] curr
-                                                     nc (p/get-color img nx ny) 
-                                                     ^double nd (df c nc)] 
-                                                 (if (< nd currd) [nc nd] curr)))
-                                             [c Double/MAX_VALUE] images)))) p)
-      (p/filter-channels (partial p/filter-channel-xy (fn [ch p ^long x ^long y]
-                                                        (let [^int c (p/get-value p ch x y)]
-                                                          (first (reduce (fn [curr img]
-                                                                           (let [nx (unchecked-int (m/norm x 0 w 0 (width img)))
-                                                                                 ny (unchecked-int (m/norm y 0 h 0 (height img)))
-                                                                                 [currc ^double currd] curr
-                                                                                 ^int nc (p/get-value img ch nx ny) 
-                                                                                 nd (m/abs (- c nc))]
-                                                                             (if (< nd currd) [nc nd] curr)))
-                                                                         [c Double/MAX_VALUE] images))))) p))))
+(comment defn blend-images-filter
+         ""
+         [{:keys [names pixels mode distance cs]
+           :or {names [] pixels [] distance :euclid-sq mode :color cs :RGB}} ^Pixels p]
+         (let [images (concat pixels (map (comp (partial p/filter-colors (first (c/colorspaces* cs))) p/load-pixels) names))
+               ^int w (width p)
+               ^int h (height p)
+               df (v/distances distance)]
+           (if (= mode :color)
+             (p/filter-colors-xy (fn [p ^long x ^long y]
+                                   (let [c (p/get-color p x y)]
+                                     (first (reduce (fn [curr img]
+                                                      (let [nx (unchecked-int (m/norm x 0 w 0 (width img)))
+                                                            ny (unchecked-int (m/norm y 0 h 0 (height img)))
+                                                            [currc ^double currd] curr
+                                                            nc (p/get-color img nx ny) 
+                                                            ^double nd (df c nc)] 
+                                                        (if (< nd currd) [nc nd] curr)))
+                                                    [c Double/MAX_VALUE] images)))) p)
+             (p/filter-channels (partial p/filter-channel-xy (fn [ch p ^long x ^long y]
+                                                               (let [^int c (p/get-value p ch x y)]
+                                                                 (first (reduce (fn [curr img]
+                                                                                  (let [nx (unchecked-int (m/norm x 0 w 0 (width img)))
+                                                                                        ny (unchecked-int (m/norm y 0 h 0 (height img)))
+                                                                                        [currc ^double currd] curr
+                                                                                        ^int nc (p/get-value img ch nx ny) 
+                                                                                        nd (m/abs (- c nc))]
+                                                                                    (if (< nd currd) [nc nd] curr)))
+                                                                                [c Double/MAX_VALUE] images))))) p))))
+

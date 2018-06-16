@@ -1,10 +1,11 @@
-(defproject clojure2d "0.1.0-SNAPSHOT"
+(defproject clojure2d "1.0.0-RC1"
   :description "Creative coding / glitch library backed by Java2D"
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.9.0"]
-                 [generateme/fastmath "0.1.2-SNAPSHOT"]
+                 [generateme/fastmath "1.0.0"]
+                 [thi.ng/color "1.2.0"] ;; iq gradients
                  ;; [org.bytedeco/javacv-platform "1.4.1"]
                  ]
   :resource-path "resources/"
@@ -32,7 +33,7 @@
                    :source-paths ["example"]
                    :dependencies [[codox-theme-rdash "0.1.2"]
                                   [criterium "0.4.4"]
-                                  [metadoc "0.2.3-SNAPSHOT"]
+                                  [metadoc "0.2.3"]
                                   [hiccup "1.0.5"]]
                    :codox {:themes [:rdash]
                            :metadata {:doc/format :markdown}
