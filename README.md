@@ -54,7 +54,7 @@ Add following line as a dependency to your `project.clj`
 Development version (release soon):
 
 ```clojure
-[clojure2d "1.0.0-RC1"]
+[clojure2d "1.0.0-RC2"]
 ```
 
 _Release will be done after review of all [examples](https://github.com/Clojure2D/clojure2d-examples)_
