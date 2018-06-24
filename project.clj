@@ -1,10 +1,10 @@
-(defproject clojure2d "1.0.0-RC1"
+(defproject clojure2d "1.0.0-RC2"
   :description "Creative coding / glitch library backed by Java2D"
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.9.0"]
-                 [generateme/fastmath "1.0.0"]
+                 [generateme/fastmath "1.0.1"]
                  [thi.ng/color "1.2.0"] ;; iq gradients
                  ;; [org.bytedeco/javacv-platform "1.4.1"]
                  ]

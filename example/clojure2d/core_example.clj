@@ -3,7 +3,8 @@
             [metadoc.examples :refer :all]
             [fastmath.random :as r]
             [fastmath.core :as m]
-            [fastmath.vector :as v]))
+            [fastmath.vector :as v]
+            [clojure2d.color :as c]))
 
 (add-examples *jpeg-image-quality*
   (example "Value" *jpeg-image-quality*))
@@ -269,7 +270,7 @@
           (crect 50 50 60 60)))))
 
 (add-examples ellipse
-  (example-snippet "A couple of ellises." drawing-snippet :image
+  (example-snippet "A couple of ellipses." drawing-snippet :image
     (fn [canvas]
       (-> canvas
           (set-color :white 200)
@@ -278,6 +279,32 @@
           (ellipse 100 100 20 20)
           (set-color :black 200)
           (ellipse 100 100 20 20 true)))))
+
+(add-examples arc
+  (example-snippet "Arcs" drawing-snippet :image
+    (fn [canvas]
+      (-> canvas
+          (set-color :white)
+          (arc 60 60 90 90 m/PI m/HALF_PI)
+          (arc 70 70 90 90 m/PI m/HALF_PI :chord)
+          (arc 90 90 90 90 m/PI m/HALF_PI :pie)
+          (set-color :gray)
+          (arc 130 130 90 90 m/PI m/HALF_PI :open false)
+          (arc 150 150 90 90 m/PI m/HALF_PI :chord false)
+          (arc 170 170 90 90 m/PI m/HALF_PI :pie false)))))
+
+(add-examples rarc
+  (example-snippet "Arcs by radius" drawing-snippet :image
+    (fn [canvas]
+      (-> canvas
+          (set-color :white)
+          (rarc 60 60 45 3.5 m/HALF_PI)
+          (rarc 70 70 45 3.5 m/HALF_PI :chord)
+          (rarc 90 90 45 3.5 m/HALF_PI :pie)
+          (set-color :gray)
+          (rarc 130 130 45 m/PI 2 :open false)
+          (rarc 150 150 45 m/PI 2 :chord false)
+          (rarc 170 170 45 m/PI 2 :pie false)))))
 
 (add-examples triangle
   (example-snippet "Two triangles" drawing-snippet :image

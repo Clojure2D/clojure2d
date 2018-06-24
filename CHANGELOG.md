@@ -1,6 +1,16 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 1.0.0-RC2
+
+### Added
+
+- arc and rarc (radius arc) functions
+
+### Changed
+
+- spots overlay - number of spots heuristic changed
+
 ## 1.0.0-RC1 (0.1.0-SNAPSHOT)
 
 Please note - breaking changes!

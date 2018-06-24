@@ -184,7 +184,7 @@
   (:import [fastmath.vector Vec2]
            [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
            [java.awt.event InputEvent ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
-           [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double]
+           [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double Arc2D Arc2D$Double]
            [java.awt.image BufferedImage BufferStrategy Kernel ConvolveOp]
            [java.util Iterator Calendar]
            [javax.imageio IIOImage ImageIO ImageWriteParam ImageWriter]
@@ -393,12 +393,12 @@
 (defn screen-width
   "Returns width of the screen."
   {:metadoc/categories #{:display}}
-  [] (.getWidth (screen-size)))
+  ^long [] (long (.getWidth (screen-size))))
 
 (defn screen-height 
   "Returns height of the screen." 
   {:metadoc/categories #{:display}}
-  [] (.getHeight (screen-size)))
+  ^long [] (long (.getHeight (screen-size))))
 
 ;;
 
@@ -448,6 +448,7 @@
             ^Line2D line-obj
             ^Rectangle2D rect-obj
             ^Ellipse2D ellipse-obj
+            ^Arc2D arc-obj
             hints
             ^long w
             ^long h
@@ -545,6 +546,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
              (.line-obj canvas)
              (.rect-obj canvas)
              (.ellipse-obj canvas)
+             (.arc-obj canvas)
              (.hints canvas)
              (.w canvas)
              (.h canvas)
@@ -607,6 +609,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
                          (Line2D$Double.)
                          (Rectangle2D$Double.)
                          (Ellipse2D$Double.)
+                         (Arc2D$Double.)
                          (get-rendering-hints hint)
                          width height
                          nil
@@ -860,12 +863,64 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   "Draw ellipse with middle at `(x,y)` position with width `w` and height `h`."
   {:metadoc/categories #{:draw}}
   ([^Canvas canvas x1 y1 w h stroke?]
-   (let [^Ellipse2D e (.ellipse_obj canvas)]
+   (let [^Ellipse2D e (.ellipse-obj canvas)]
      (.setFrame e (- ^double x1 (* ^double w 0.5)) (- ^double y1 (* ^double h 0.5)) w h)
      (draw-fill-or-stroke (.graphics canvas) e stroke?))
    canvas)
   ([canvas x1 y1 w h]
    (ellipse canvas x1 y1 w h false)))
+
+(defn arc
+  "Draw arc with middle at `(x,y)` position with width `w` and height `h`.
+
+  Starting angle `start` and `extent` are in radians. Direction is clockwise.
+
+  Type is one of the:
+
+  * `:open`
+  * `:pie`
+  * `:chord`"
+  {:metadoc/categories #{:draw}}
+  ([^Canvas canvas x1 y1 w h start extent type stroke?]
+   (let [^Arc2D e (.arc-obj canvas)]
+     (.setArc e (- ^double x1 (* ^double w 0.5)) (- ^double y1 (* ^double h 0.5)) w h
+              (m/degrees start) (- (m/degrees extent))
+              (case type
+                :chord Arc2D/CHORD
+                :pie Arc2D/PIE
+                Arc2D/OPEN))
+     (draw-fill-or-stroke (.graphics canvas) e stroke?))
+   canvas)
+  ([canvas x1 y1 w h start extent type]
+   (arc canvas x1 y1 w h start extent type true))
+  ([canvas x1 y1 w h start extent]
+   (arc canvas x1 y1 w h start extent :open true)))
+
+(defn rarc
+  "Draw arc with middle at `(x,y)` with radius `r`.
+
+  Starting angle `start` and `extent` are in radians. Direction is clockwise.
+
+  Type is one of the:
+
+  * `:open`
+  * `:pie`
+  * `:chord`"
+  {:metadoc/categories #{:draw}}
+  ([^Canvas canvas x1 y1 r start extent type stroke?]
+   (let [^Arc2D e (.arc-obj canvas)]
+     (.setArcByCenter e x1 y1 r
+                      (m/degrees start) (- (m/degrees extent))
+                      (case type
+                        :chord Arc2D/CHORD
+                        :pie Arc2D/PIE
+                        Arc2D/OPEN))
+     (draw-fill-or-stroke (.graphics canvas) e stroke?))
+   canvas)
+  ([canvas x1 y1 r start extent type]
+   (rarc canvas x1 y1 r start extent type true))
+  ([canvas x1 y1 r start extent]
+   (rarc canvas x1 y1 r start extent :open true)))
 
 (defn triangle
   "Draw triangle with corners at 3 positions."
@@ -1771,19 +1826,17 @@ See [[set-color]]."
 
   As parameters you can provide a map with folowing keys:
 
-  * :canvas - canvas attached to window (default is canvas 200x200 px)
-  * :window-name - window name, used also for events dispatch and global state
-  * :w - width of the window (default as canvas width)
-  * :h - height of the window (default as canvas heiht)
-  * :fps - refresh rate
-  * :draw-fn - drawing callback
-  * :state - initial global state data
-  * :draw-state - initial drawing state
-  * :setup - inital callback function, returns drawing state
-  * :hint - rendering hint for display
-  * :refresher - `:safe` (default) or `:fast`
-
-  There are several options for positional parameters."
+  * `:canvas` - canvas attached to window (default is canvas 200x200 px)
+  * `:window-name` - window name, used also for events dispatch and global state
+  * `:w` - width of the window (default as canvas width)
+  * `:h` - height of the window (default as canvas heiht)
+  * `:fps` - refresh rate
+  * `:draw-fn` - drawing callback (fn [canvas window frame loop-state] ... new-loop-state)
+  * `:state` - initial global state data
+  * `:draw-state` - initial drawing state
+  * `:setup` - inital callback function, returns drawing state (fn [canvas window] ... initial-loop-state)
+  * `:hint` - rendering hint for display: `:low`, `:mid`, `:high` or `:highest`
+  * `:refresher` - `:safe` (default) or `:fast`"
   {:metadoc/categories #{:window}}
   ([canvas window-name]
    (show-window {:canvas canvas

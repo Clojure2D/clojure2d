@@ -37,3 +37,4 @@
 
 (add-examples render-spots
   (example-snippet "Render spots overlay" save-result :image render-spots (spots-overlay 600 800  {:alpha 128 :intensities [10 50 100 150 200 250]})))
+
