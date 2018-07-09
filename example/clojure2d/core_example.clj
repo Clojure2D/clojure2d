@@ -330,8 +330,8 @@
       (set-color canvas :white 190)
       (translate canvas 100 100)
       (let [s (for [a (range 0 65 3.0)]
-                (v/vec2 (* 90.0 (m/cos a))
-                        (* 90.0 (m/sin a))))]
+                [(* 90.0 (m/cos a))
+                 (* 90.0 (m/sin a))])]
         (triangle-fan canvas s true)))))
 
 (add-examples path
@@ -350,8 +350,8 @@
       (set-color canvas :white 190)
       (translate canvas 100 100)
       (let [s (for [^double a (range 0 65 1.3)]
-                (v/vec2 (* (+ a 25) (m/cos a))
-                        (* (+ a 25) (m/sin a))))]
+                [(* (+ a 25) (m/cos a))
+                 (* (+ a 25) (m/sin a))])]
         (path-bezier canvas s)))))
 
 (add-examples bezier
@@ -496,6 +496,17 @@
       (let [img (load-image "docs/cockatoo.jpg")]
         (doseq [^int x (range 0 80 10)]
           (image canvas img x x (- 200 x x) (- 200 x x)))))))
+
+(add-examples load-svg
+  (example "Load SVG into Batik object" (load-svg "docs/takkun.svg")))
+
+(add-examples transcode-svg
+  (example-snippet "Draw SVG onto canvas." drawing-snippet :image
+    (fn [canvas]
+      (let [svg (load-svg "docs/takkun.svg")]
+        (-> canvas
+            (image (transcode-svg svg 200 200))
+            (image (transcode-svg svg 30 30) 170 170))))))
 
 ;;
 

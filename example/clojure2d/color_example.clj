@@ -254,12 +254,14 @@
   (example-palette "Palette 499" (colourlovers-palettes 499)))
 
 (add-examples iq-gradient
-  (example-gradient "Create gradient"
+  (example-gradient "Create gradient from 4 coeffs"
                     (iq-gradient
                      (v/vec3 0.5 0.5 0.5)
                      (v/vec3 0.4 0.5 0.6)
                      (v/vec3 0.2 0.2 1.0)
-                     (v/vec3 1.0 0.1 1.0))))
+                     (v/vec3 1.0 0.1 1.0)))
+  (example-gradient "Create gradient from two colors"
+                    (iq-gradient :red :blue)))
 
 (add-examples iq-random-gradient
   (example-gradient "Create gradient" (iq-random-gradient))

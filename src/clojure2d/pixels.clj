@@ -753,7 +753,7 @@
   ([w h filter] (renderer w h filter 2.0 nil))
   ([w h] (renderer w h :none 2.0 nil)))
 
-(defn merge-renderers
+(defn- merge-two-renderers
   "Paralelly merge two renderers. Be sure `a` and `b` are equal. Use this function to merge results created in separated threads.
   
   This is mutating function. Data from `b` are added to `a` which is returned."
@@ -766,5 +766,13 @@
     (run! deref [ch0 ch1 ch2])
     a))
 
+(defn merge-renderers
+  "Paralelly merge renderers and store result to the target.
 
+  Use this function to merge separate rendereing results (ex. from separeted threads).
+  
+  This is mutating function. Data from list of renderers is added to the target."
+  {:metadoc/categories #{:ld}}
+  ^LDRenderer [^LDRenderer target & renderers]
+  (reduce merge-two-renderers target renderers))
 

@@ -2139,32 +2139,42 @@ See [[blends-list]] for names."}
 ;; http://iquilezles.org/www/articles/palettes/palettes.htm
 
 (defn iq-gradient
-  "Create gradient generator function with given parametrization. See http://iquilezles.org/www/articles/palettes/palettes.htm.
+  "Create gradient generator function with given parametrization or two colors.
+
+  See http://iquilezles.org/www/articles/palettes/palettes.htm and https://github.com/thi-ng/color/blob/master/src/gradients.org#gradient-coefficient-calculation
 
   Parameters should be `Vec3` type."
   {:metadoc/categories #{:gr}}
-  [a b c d]
-  (fn [t]
-    (let [^Vec3 cc (-> (->> t
-                            (v/mult c)
-                            (v/add d))
-                       (v/mult m/TWO_PI)
-                       (v/applyf #(m/cos %))
-                       (v/emult b)
-                       (v/add a))]
-      (-> (Vec4. (.x cc) (.y cc) (.z cc) 1.0)
-          (v/mult 255.0)
-          (v/applyf clamp255)))))
+  ([c1 c2]
+   (apply iq-gradient (->> (tgrad/cosine-coefficients (to-color c1) (to-color c2))
+                           (map #(apply v/vec3 %)))))
+  ([a b c d]
+   (fn [t]
+     (let [^Vec3 cc (-> (->> t
+                             (v/mult c)
+                             (v/add d))
+                        (v/mult m/TWO_PI)
+                        (v/applyf #(m/cos %))
+                        (v/emult b)
+                        (v/add a))]
+       (-> (Vec4. (.x cc) (.y cc) (.z cc) 1.0)
+           (v/mult 255.0)
+           (v/applyf clamp255))))))
+
+(declare paletton)
 
 (defn iq-random-gradient
   "Create random iq gradient."
   {:metadoc/categories #{:gr}}
   []
-  (let [a (v/generate-vec3 (partial r/drand 0.2 0.8))
-        b (v/generate-vec3 (partial r/drand 0.2 0.8))
-        c (v/generate-vec3 (partial r/drand 2))
-        d (v/generate-vec3 r/drand)]
-    (iq-gradient a b c d)))
+  (r/randval
+   (let [a (v/generate-vec3 (partial r/drand 0.2 0.8))
+         b (v/generate-vec3 (partial r/drand 0.2 0.8))
+         c (v/generate-vec3 (partial r/drand 2))
+         d (v/generate-vec3 r/drand)]
+     (iq-gradient a b c d))
+   (let [pal (paletton :monochromatic (r/irand 360) {:compl true :preset (rand-nth [:pastels :pastels-med :full :shiny :dark :pastels-mid-dark :dark-neon :darker])})]
+     (iq-gradient (first pal) (first (drop 5 pal))))))
 
 ;; --------------
 
@@ -3153,10 +3163,11 @@ Map with name (keyword) as key and gradient function as value."
   "Generate random gradient function."
   {:metadoc/categories #{:pal}}
   []
-  (let [pal (rand-nth (concat colourlovers-palettes
-                              (vals palette-presets)))
-        pal->grad (gradient (r/randval :RGB (rand-nth colorspaces-list))
-                            (r/randval :spline (rand-nth [:cubic-spline :linear :shepard :neville :loess]))
-                            pal)]
-    (r/randval 0.75 pal->grad (rand-nth (vals gradient-presets)))))
-
+  (condp clojure.core/> (r/drand)
+    0.2 (iq-random-gradient)
+    0.8 (let [pal (rand-nth (concat colourlovers-palettes
+                                    (vals palette-presets)))]
+          (gradient (r/randval :RGB (rand-nth colorspaces-list))
+                    (r/randval :linear :cubic-spline)
+                    pal))
+    (rand-nth (vals gradient-presets))))

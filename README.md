@@ -54,10 +54,8 @@ Add following line as a dependency to your `project.clj`
 Development version (release soon):
 
 ```clojure
-[clojure2d "1.0.0-RC2"]
+[clojure2d "1.0.0"]
 ```
-
-_Release will be done after review of all [examples](https://github.com/Clojure2D/clojure2d-examples)_
 
 ## Usage
 
@@ -119,7 +117,6 @@ Yes! You can help with this project:
 
 * Beginners:
   - create more variations
-  - ~~create colorspace converters~~
   - create pixel filters
   - create analog (audio) filters
 * Advanced:

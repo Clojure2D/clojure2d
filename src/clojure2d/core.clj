@@ -22,6 +22,10 @@
 
   Image is `BufferedImage` java object. Image can be read from file using [[load-image]] function or saved to file with [[save]]. ImageProto provides [[get-image]] function to access to Image object directly (if you need)
   There is no function which creates Image directly (use Canvas instead).
+
+  ### SVG
+
+  To load SVG use `load-svg` which creates internal Batik object. Object can be rendered to Image with `transcode-svg`.
   
   ## Canvas
 
@@ -181,14 +185,19 @@
             [clojure.reflect :as ref]
             [fastmath.random :as r]
             [clojure.string :as s])
-  (:import [fastmath.vector Vec2]
-           [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
+  (:import [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
            [java.awt.event InputEvent ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
            [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double Arc2D Arc2D$Double]
            [java.awt.image BufferedImage BufferStrategy Kernel ConvolveOp]
            [java.util Iterator Calendar]
            [javax.imageio IIOImage ImageIO ImageWriteParam ImageWriter]
-           [javax.swing ImageIcon JFrame SwingUtilities]))
+           [javax.swing ImageIcon JFrame SwingUtilities]
+           [org.apache.batik.transcoder.image ImageTranscoder]
+           [org.apache.batik.transcoder TranscoderInput]
+           [org.w3c.dom Document]
+           [org.apache.batik.util SVGConstants XMLResourceDescriptor ]
+           [org.apache.batik.dom.util SAXDocumentFactory]
+           [org.apache.batik.anim.dom SVGDOMImplementation]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -657,8 +666,8 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   ([^Canvas canvas ^double tx ^double ty]
    (.translate ^Graphics2D (.graphics canvas) tx ty)
    canvas)
-  ([canvas ^Vec2 v]
-   (translate canvas (.x v) (.y v))))
+  ([canvas [x y]]
+   (translate canvas x y)))
 
 (defn rotate
   "Rotate canvas"
@@ -701,18 +710,18 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   {:metadoc/categories #{:transform :canvas}}
   ([^Canvas canvas x y]
    (let [^Point2D p (.transform ^java.awt.geom.AffineTransform (.getTransform ^Graphics2D (.graphics canvas)) (Point2D$Double. x y) nil)]
-     (Vec2. (.getX p) (.getY p))))
-  ([canvas ^Vec2 v]
-   (transform canvas (.x v) (.y v))))
+     [(.getX p) (.getY p)]))
+  ([canvas [x y]]
+   (transform canvas x y)))
 
 (defn inv-transform
   "Inverse transform of given point or coordinates with current transformation. See [[transform]]."
   {:metadoc/categories #{:transform :canvas}}
   ([^Canvas canvas x y]
    (let [^Point2D p (.inverseTransform ^java.awt.geom.AffineTransform (.getTransform ^Graphics2D (.graphics canvas)) (Point2D$Double. x y) nil)]
-     (Vec2. (.getX p) (.getY p))))
-  ([canvas ^Vec2 v]
-   (inv-transform canvas (.x v) (.y v))))
+     [(.getX p) (.getY p)]))
+  ([canvas [x y]]
+   (inv-transform canvas x y)))
 
 (defn reset-matrix
   "Reset transformations."
@@ -751,8 +760,8 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
      (.setLine l x1 y1 x2 y2)
      (.draw ^Graphics2D (.graphics canvas) l))
    canvas)
-  ([canvas ^Vec2 v1 ^Vec2 v2]
-   (line canvas (.x v1) (.y v1) (.x v2) (.y v2))))
+  ([canvas vect1 vect2]
+   (line canvas (vect1 0) (vect1 1) (vect2 0) (vect2 1))))
 
 (def ^{:doc "Stroke join types"
        :metadoc/categories #{:draw}}
@@ -818,15 +827,15 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
     (set-stroke canvas size cap join miter-limit)))
 
 (defn point
-  "Draw point at `x`,`y` or `^Vec2` position.
+  "Draw point at `x`,`y` or at vector position.
 
   It's implemented as a very short line. Consider using `(rect x y 1 1)` for speed when `x` and `y` are integers."
   {:metadoc/categories #{:draw}}  
   ([canvas ^double x ^double y]
    (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
    canvas)
-  ([canvas ^Vec2 vec]
-   (point canvas (.x vec) (.y vec))))
+  ([canvas vect]
+   (point canvas (vect 0) (vect 1))))
 
 (defn- draw-fill-or-stroke
   "Draw filled or outlined shape."
@@ -940,18 +949,18 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 (defn triangle-strip
   "Draw triangle strip. Implementation of `Processing` `STRIP` shape.
 
-  Input: list of vertices as Vec2 vectors.
+  Input: list of vertices as vectors.
 
   See also: [[triangle-fan]]."
   {:metadoc/categories #{:draw}}
   ([canvas vs stroke?]
    (when (> (count vs) 2)
-     (loop [^Vec2 v1 (first vs)
-            ^Vec2 v2 (second vs)
+     (loop [v1 (first vs)
+            v2 (second vs)
             vss (nnext vs)]
        (when vss
-         (let [^Vec2 v3 (first vss)]
-           (triangle canvas (.x v2) (.y v2) (.x v3) (.y v3) (.x v1) (.y v1) stroke?)
+         (let [v3 (first vss)]
+           (triangle canvas (v2 0) (v2 1) (v3 0) (v3 1) (v1 0) (v1 1) stroke?)
            (recur v2 v3 (next vss))))))
    canvas)
   ([canvas vs]
@@ -962,18 +971,18 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
   First point is common vertex of all triangles.
   
-  Input: list of vertices as Vec2 vectors.
+  Input: list of vertices as vectors.
 
   See also: [[triangle-strip]]."
   {:metadoc/categories #{:draw}}
   ([canvas vs stroke?]
    (when (> (count vs) 2)
-     (let [^Vec2 v1 (first vs)]
-       (loop [^Vec2 v2 (second vs)
+     (let [v1 (first vs)]
+       (loop [v2 (second vs)
               vss (nnext vs)]
          (when vss
-           (let [^Vec2 v3 (first vss)]
-             (triangle canvas (.x v1) (.y v1) (.x v2) (.y v2) (.x v3) (.y v3) stroke?)
+           (let [v3 (first vss)]
+             (triangle canvas (v1 0) (v1 1) (v2 0) (v2 1) (v3 0) (v3 1) stroke?)
              (recur v3 (next vss)))))))
    canvas)
   ([canvas vs]
@@ -982,17 +991,17 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 (defn path
   "Draw path from lines.
 
-  Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).
+  Input: list of points as vectors, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).
 
   See also [[path-bezier]]."
   {:metadoc/categories #{:draw}}
   ([^Canvas canvas vs close? stroke?]
    (when (seq vs)
      (let [^Path2D p (Path2D$Double.)
-           ^Vec2 m (first vs)]
-       (.moveTo p (.x m) (.y m))
-       (doseq [^Vec2 v (next vs)]
-         (.lineTo p (.x v) (.y v)))
+           m (first vs)]
+       (.moveTo p (m 0) (m 1))
+       (doseq [v (next vs)]
+         (.lineTo p (v 0) (v 1)))
        (when (or (not stroke?) close?) (.closePath p))
        (draw-fill-or-stroke (.graphics canvas) p stroke?)))
    canvas)
@@ -1027,7 +1036,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 (defn path-bezier
   "Draw path from quad curves.
 
-  Input: list of Vec2 points, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).
+  Input: list of points as vectors, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).
 
   See also [[path]]."
   {:metadoc/categories #{:draw}}  
@@ -1035,33 +1044,33 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    (when (> (count vs) 3)
      (let [cl? (or (not stroke?) close?)
            ^Path2D p (Path2D$Double.)
-           ^Vec2 m0 (first vs)
-           ^Vec2 m1 (second vs)
+           m0 (first vs)
+           m1 (second vs)
            m2 (nth vs 2) 
            f0 (if cl? m0 m0)
-           ^Vec2 f1 (if cl? m1 m0)
+           f1 (if cl? m1 m0)
            f2 (if cl? m2 m1)
            f3 (if cl? (nth vs 3) m2)
            vs (if cl? (next vs) vs)]
-       (.moveTo p (.x f1) (.y f1))
+       (.moveTo p (f1 0) (f1 1))
        (loop [v0 f0
               v1 f1
-              ^Vec2 v2 f2
-              ^Vec2 v3 f3
+              v2 f2
+              v3 f3
               nvs (drop 3 vs)]
-         (let [[^Vec2 cp1 ^Vec2 cp2] (calculate-bezier-control-points v0 v1 v2 v3)]
-           (.curveTo p (.x cp1) (.y cp1) (.x cp2) (.y cp2) (.x v2) (.y v2))
+         (let [[cp1 cp2] (calculate-bezier-control-points v0 v1 v2 v3)]
+           (.curveTo p (cp1 0) (cp1 1) (cp2 0) (cp2 1) (v2 0) (v2 1))
            (if-not (empty? nvs)
              (recur v1 v2 v3 (first nvs) (next nvs))
              (if cl?
-               (let [[^Vec2 cp1 ^Vec2 cp2] (calculate-bezier-control-points v1 v2 v3 m0)
-                     [^Vec2 cp3 ^Vec2 cp4] (calculate-bezier-control-points v2 v3 m0 m1)
-                     [^Vec2 cp5 ^Vec2 cp6] (calculate-bezier-control-points v3 m0 m1 m2)]
-                 (.curveTo p (.x cp1) (.y cp1) (.x cp2) (.y cp2) (.x v3) (.y v3))
-                 (.curveTo p (.x cp3) (.y cp3) (.x cp4) (.y cp4) (.x m0) (.y m0))
-                 (.curveTo p (.x cp5) (.y cp5) (.x cp6) (.y cp6) (.x m1) (.y m1)))
-               (let [[^Vec2 cp1 ^Vec2 cp2] (calculate-bezier-control-points v1 v2 v3 v3)]
-                 (.curveTo p (.x cp1) (.y cp1) (.x cp2) (.y cp2) (.x v3) (.y v3)))))))
+               (let [[cp1 cp2] (calculate-bezier-control-points v1 v2 v3 m0)
+                     [cp3 cp4] (calculate-bezier-control-points v2 v3 m0 m1)
+                     [cp5 cp6] (calculate-bezier-control-points v3 m0 m1 m2)]
+                 (.curveTo p (cp1 0) (cp1 1) (cp2 0) (cp2 1) (v3 0) (v3 1))
+                 (.curveTo p (cp3 0) (cp3 1) (cp4 0) (cp4 1) (m0 0) (m0 1))
+                 (.curveTo p (cp5 0) (cp5 1) (cp6 0) (cp6 1) (m1 0) (m1 1)))
+               (let [[cp1 cp2] (calculate-bezier-control-points v1 v2 v3 v3)]
+                 (.curveTo p (cp1 0) (cp1 1) (cp2 0) (cp2 1) (v3 0) (v3 1)))))))
        (draw-fill-or-stroke (.graphics canvas) p stroke?)))
    canvas)
   ([canvas vs close?] (path-bezier canvas vs close? true))
@@ -1271,10 +1280,7 @@ See [[set-color]]."
 
 ;;;
 
-(def ^:private ^:const false-list '(false))
-(def ^:private ^:const true-list '(true))
-
-(defn filled-with-stroke
+(defmacro filled-with-stroke
   "Draw primitive filled and with stroke.
 
   Provide two colors, one for fill (`color-filled`), second for stroke (`color-stroke`). `primitive-fn` is a primitive function and `attrs` are function parameters. Do not provide.
@@ -1282,10 +1288,11 @@ See [[set-color]]."
   One note: current color is replaced with `color-stroke`."
   {:metadoc/categories #{:draw}}
   [canvas color-filled color-stroke primitive-fn & attrs]
-  (set-color canvas color-filled)
-  (apply primitive-fn canvas (concat attrs false-list))
-  (set-color canvas color-stroke)
-  (apply primitive-fn canvas (concat attrs true-list)))
+  `(-> ~canvas
+       (set-color ~color-filled)
+       (~primitive-fn ~@attrs false)
+       (set-color ~color-stroke)
+       (~primitive-fn ~@attrs true)))
 
 ;; ### Gradient
 
@@ -1314,6 +1321,33 @@ See [[set-color]]."
    (image canvas img 0 0 (.w canvas) (.h canvas)))
   ([^Canvas canvas img x y]
    (image canvas img x y (width img) (height img))))
+
+;; SVG
+
+(defn load-svg
+  "Load image into Batik Document. See [[transcode-svg]]."
+  {:metadoc/categories #{:image}}
+  ^TranscoderInput  [svg-filename]
+  (TranscoderInput. ^Document (.createDocument (SAXDocumentFactory.
+                                                (SVGDOMImplementation/getDOMImplementation)
+                                                (XMLResourceDescriptor/getXMLParserClassName))
+                                               SVGConstants/SVG_NAMESPACE_URI
+                                               SVGConstants/SVG_SVG_TAG
+                                               (str "file:///" svg-filename)
+                                               (input-stream (file svg-filename)))))
+
+(defn transcode-svg
+  "Convert transcoder input into BufferedImage. See [[load-svg]]."
+  {:metadoc/categories #{:draw}}
+  [^TranscoderInput input ^long w ^long h]
+  (let [img (atom nil)
+        transcoder (proxy [ImageTranscoder] []
+                     (createImage [w h] (BufferedImage. w h BufferedImage/TYPE_INT_ARGB))
+                     (writeImage [image output] (reset! img image)))]
+    (.addTranscodingHint transcoder ImageTranscoder/KEY_WIDTH (float w))
+    (.addTranscodingHint transcoder ImageTranscoder/KEY_HEIGHT (float h))
+    (.transcode transcoder input nil)
+    @img))
 
 ;; Display window
 
@@ -1396,8 +1430,8 @@ See [[set-color]]."
   (mouse-pos [_]
     (let [^java.awt.Point p (.getMousePosition panel)]
       (if (nil? p)
-        (Vec2. -1.0 -1.0)
-        (Vec2. (.x p) (.y p)))))
+        (v/vec2 -1.0 -1.0)
+        (v/vec2 (.x p) (.y p)))))
   (mouse-x [_]
     (let [^java.awt.Point p (.getMousePosition panel)]
       (if (nil? p) -1 (.x p))))
@@ -1416,7 +1450,7 @@ See [[set-color]]."
   MouseXYProto
   {:mouse-x #(.getX ^MouseEvent %)
    :mouse-y #(.getY ^MouseEvent %)
-   :mouse-pos #(Vec2. (mouse-x %) (mouse-y %))})
+   :mouse-pos #(v/vec2 (mouse-x %) (mouse-y %))})
 
 (extend KeyEvent
   KeyEventProto
@@ -1659,7 +1693,7 @@ See [[set-color]]."
       (.addKeyListener key-events))))
 
 (defn close-window
-  "Close window programatically"
+  "Close window programmatically"
   {:metadoc/categories #{:window}}
   [window]
   (.dispatchEvent ^JFrame (:frame window) (java.awt.event.WindowEvent. (:frame window) java.awt.event.WindowEvent/WINDOW_CLOSING)))
@@ -2034,8 +2068,8 @@ See [[set-color]]."
 
 (defn ensure-session
   "Ensure that session is active (create one if not)"
-  []
   {:metadoc/categories #{:session}}
+  []
   (when (nil? (:name @session-agent))
     (make-session)))
 
