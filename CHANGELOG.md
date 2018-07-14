@@ -1,6 +1,13 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 1.0.1
+
+### Added
+
+* `Pixels` can be treated as sequence now (sequence of colors)
+* `reduce-colors` using x-means clustering algorithm
+
 ## 1.0.0
 
 ### Added

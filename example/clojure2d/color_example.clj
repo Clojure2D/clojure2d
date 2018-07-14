@@ -325,8 +325,13 @@
   (example-color "With Delta E CMC" (nearest-color delta-e-cmc some-palette [120 0 80]))
   (example-color "With euclidean" (nearest-color euclidean some-palette [120 0 80])))
 
-;; ----
-
+(add-examples reduce-colors
+  (example-palette "Reduce cockatoo image palette (2 colors)" (reduce-colors i1 2))
+  (example-palette "Reduce cockatoo image palette in LAB (2 colors)" (reduce-colors :LAB i1 2))
+  (example-palette "Reduce cockatoo image palette (6 colors)" (reduce-colors i1 6))
+  (example-palette "Reduce cockatoo image palette in LAB (6 colors)" (reduce-colors :LAB i1 6))
+  (example-palette "Reduce cockatoo image palette (15 colors)" (reduce-colors i1 15))
+  (example-palette "Reduce cockatoo image palette in LAB (15 colors)" (reduce-colors :LAB i1 15)))
 
 (add-examples change-lab-luma
   (example-color "Given color" :khaki)

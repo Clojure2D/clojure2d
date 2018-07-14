@@ -15,7 +15,7 @@ Clojure2D is a library supporting generative coding or glitching. It's based on 
 
 ## WARNING
 
-Version `1.0.0` is after big refactoring and contains plenty of breaking changes.
+Version `1.x.x` is after big refactoring and contains plenty of breaking changes.
 
 ## Documentation
 
@@ -54,7 +54,7 @@ Add following line as a dependency to your `project.clj`
 Development version (release soon):
 
 ```clojure
-[clojure2d "1.0.0"]
+[clojure2d "1.0.1"]
 ```
 
 ## Usage

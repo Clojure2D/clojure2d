@@ -130,7 +130,7 @@
   (:import [clojure2d.core Canvas Window]
            [fastmath.vector Vec2 Vec4]
            [java.awt.image BufferedImage]
-           [clojure.lang Counted]))
+           [clojure.lang Counted Seqable Sequential]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -177,6 +177,11 @@
   
   Counted
   (count [_] size)
+
+  Seqable
+  (seq [_] (for [idx (range size)]
+             (clojure2d.java.Pixels/getColor p idx)))
+  Sequential
   
   PixelsProto
   (get-channel [_ ch] (clojure2d.java.Pixels/getChannel p ch))

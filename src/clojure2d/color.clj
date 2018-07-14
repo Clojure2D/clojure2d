@@ -112,6 +112,7 @@
             [fastmath.vector :as v]
             [fastmath.stats :as stat]
             [fastmath.interpolation :as i]
+            [fastmath.clustering :as cl]
             [fastmath.easings :as e]
             [clojure.java.io :refer :all]
             [thi.ng.color.presets :as tpres]
@@ -2542,6 +2543,20 @@ See [[blends-list]] for names."}
      (from (lerp (to x1) (to x2) t))))
   ([x1 x2 t] (lerp x1 x2 t))
   ([x1 x2] (lerp x1 x2 0.5)))
+
+;; color reduction using x-means
+
+(defn reduce-colors
+  "Reduce colors using x-means clustering in given `colorspace` (default `:RGB`).
+
+  Use for long sequences."
+  ([xs number-of-colors]
+   (sort-by luma (for [{:keys [representative]} (cl/regroup (cl/x-means xs number-of-colors))]
+                   representative)))
+  ([colorspace xs number-of-colors]
+   (let [[to from] (colorspaces* colorspace)]     
+     (sort-by luma (for [{:keys [representative]} (cl/regroup (cl/x-means (map (comp to to-color) xs) number-of-colors))]
+                     (from representative))))))
 
 ;; colors
 
