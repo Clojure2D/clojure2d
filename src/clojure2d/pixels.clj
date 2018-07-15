@@ -174,6 +174,7 @@
     px)
   (convolve [_ t]
     (core/convolve (clojure2d.java.Pixels/imageFromPixels p w h) t))
+  (resize [_ wi he] (to-pixels (core/resize (clojure2d.java.Pixels/imageFromPixels p w h) wi he)))
   
   Counted
   (count [_] size)

@@ -125,6 +125,14 @@
 (add-examples format-hex
   (example-session "Usage" (format-hex :maroon) (format-hex (color 4 55 222))))
 
+(add-examples pack
+  (example-session "Pack colors into 32 bit int"
+    (pack :green)
+    (pack 1233456)
+    (pack 0x1122ff)
+    (pack (to-color 0x1122ff))
+    (pack (color 12 33 255))))
+
 ;; -- thing
 
 (add-examples to-thing-rgba

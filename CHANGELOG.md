@@ -1,6 +1,17 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 1.0.2
+
+### Added
+
+* `pack` color into 32 bit integer
+* `resize` Pixels
+
+### Changed
+
+* `reduce-colors` - selects color from cluster using `mode` rather than centroid
+
 ## 1.0.1
 
 ### Added

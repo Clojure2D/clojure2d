@@ -459,6 +459,14 @@
   [c]
   (str "#" (format "%02x" (lclamp255 (red c))) (format "%02x" (lclamp255 (green c))) (format "%02x" (lclamp255 (blue c)))))
 
+(defn pack
+  "Pack color to ARGB 32bit integer."
+  [c]
+  (unchecked-int (bit-or (<< (lclamp255 (alpha c)) 24)
+                         (<< (lclamp255 (red c)) 16)
+                         (<< (lclamp255 (green c)) 8)
+                         (lclamp255 (blue c)))))
+
 ;; ---------- blending
 
 (def ^:dynamic ^{:metadoc/categories #{:bl} :doc "Some blend functions can be parametrized with `threshold` value. Default `0.5`."} ^double *blend-threshold* 0.5)
@@ -2549,14 +2557,19 @@ See [[blends-list]] for names."}
 (defn reduce-colors
   "Reduce colors using x-means clustering in given `colorspace` (default `:RGB`).
 
-  Use for long sequences."
-  ([xs number-of-colors]
-   (sort-by luma (for [{:keys [representative]} (cl/regroup (cl/x-means xs number-of-colors))]
-                   representative)))
+  Use for long sequences (for example to generate palette from image)."
+  ([xs number-of-colors] (reduce-colors :RGB xs number-of-colors))
   ([colorspace xs number-of-colors]
    (let [[to from] (colorspaces* colorspace)]     
-     (sort-by luma (for [{:keys [representative]} (cl/regroup (cl/x-means (map (comp to to-color) xs) number-of-colors))]
-                     (from representative))))))
+     (sort-by luma ;; sort by brightness
+              (for [{:keys [data]} (-> (map to xs) ;; convert to given colorspace
+                                       (cl/x-means number-of-colors) ;; clustering
+                                       (cl/regroup))] ;; reshape
+                (->> (map pack data) ;; pack colors into integers
+                     (stat/modes) ;; find colors which appears most often
+                     (map (comp to-color unchecked-long)) ;; convert back to colors
+                     (v/average-vectors) ;; average vectors if necessary
+                     (from))))))) ;; convert back to RGB
 
 ;; colors
 
@@ -2759,7 +2772,7 @@ See [[blends-list]] for names."}
 
   Grandient function accepts value from 0 to 1 and returns interpolated color.
 
-  Optionally interpolate in given `colorspace` and 1d `interpolator` as keyword or function.
+  Optionally interpolate in given `colorspace` and 1d [interpolator](https://generateme.github.io/fastmath/fastmath.interpolation.html#var-interpolators-1d-list) as keyword or function.
 
   To make irregular spacings between colors, provide own `domain`."
   {:metadoc/categories #{:grad}}
