@@ -1,4 +1,4 @@
-# clojure2d [![Build Status](https://travis-ci.org/Clojure2D/clojure2d.svg?branch=master)](https://travis-ci.org/Clojure2D/clojure2d)
+# clojure2d [![Build Status](https://travis-ci.org/Clojure2D/clojure2d.svg?branch=master)](https://travis-ci.org/Clojure2D/clojure2d) [![Clojars Project](https://img.shields.io/clojars/v/clojure2d.svg)](https://clojars.org/clojure2d)
 
 Clojure2D is a library supporting generative coding or glitching. It's based on Java2D directly. It's Clojure only, no ClojureScript version.
 
@@ -51,11 +51,7 @@ There are still plenty of bugs and not idiomatic code. It may be slower than Pro
 
 Add following line as a dependency to your `project.clj`
 
-Development version (release soon):
-
-```clojure
-[clojure2d "1.0.1"]
-```
+![](https://clojars.org/clojure2d/latest-version.svg)
 
 ## Usage
 

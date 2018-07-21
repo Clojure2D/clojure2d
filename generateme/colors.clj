@@ -27,12 +27,24 @@
 
 (def img (p/load-pixels "docs/samurai.jpg"))
 
-(u/show-palette (c/reduce-colors :LUV (resize (p/load-pixels "bbb1.jpg") 600 600) 5) )  
+(let [img (p/load-pixels "aaa1.jpg")
+      ratio (/ 1.0 (max (width img) (height img)))
+      ns 600.0
+      cls 6
+      nw (* ratio ns (width img))
+      nh (* ratio ns (height img))
+      pal (c/reduce-colors :LUV (->> (resize img nw nh)
+                                     ;; (p/filter-channels p/median)
+                                     ) cls)]
+  (println nw nh)
+  (u/show-palette pal)
+  (u/show-gradient (c/gradient :LAB :cubic-spline pal))
+  )
 
 ;;
 
 (save (:buffer (u/show-gradient (c/gradient :LAB :cubic-spline (c/reduce-colors :LAB (resize (p/load-pixels "b5.jpg") 600 600) 5)))) "b5grad.jpg")
 
-(u/show-gradient (c/gradient :LAB :cubic-spline (c/reduce-colors :LUV (resize (p/load-pixels "bbb1.jpg") 600 600) 4)))
+(u/show-gradient (c/gradient :LAB :cubic-spline (c/reduce-colors :LAB (p/filter-channels p/median (resize img 600 600)) 4)))
 
 ;;
