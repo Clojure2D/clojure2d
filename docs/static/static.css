@@ -1,0 +1,20 @@
+pre.color {padding: 0px;}
+pre.pal {padding: 5px;}
+pre.grad {padding: 0px;}
+
+span.color {display:block;
+           padding:8px;}
+
+span.pal {border:1px solid;
+          margin-right:1px;
+          padding:6px;
+          border-radius:5px;}
+
+span.grad {width:1%;
+           display:inline-block;
+           height:20px;}
+
+span.name {width: 15%;
+           display: inline-block;
+           padding-right: 10px;
+           text-align: right;}

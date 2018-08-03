@@ -4,7 +4,7 @@
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.9.0"]
-                 [generateme/fastmath "1.1.0"]
+                 [generateme/fastmath "1.1.3"]
                  [thi.ng/color "1.3.0"] ;; iq gradients
                  [org.apache.xmlgraphics/batik-transcoder "1.10"] ;; SVG
                  ;; [org.bytedeco/javacv-platform "1.4.1"]
@@ -41,7 +41,7 @@
                            :output-path "docs/codox/"
                            :source-paths ["src"]
                            :source-uri "https://github.com/Clojure2D/clojure2d/blob/master/{filepath}#L{line}"
-                           :doc-paths ["docs/tutorials/"]
+                           :doc-paths ["docs/tutorials"]
                            :writer metadoc.writers.codox/write-docs
                            :html {:transforms [[:head] [:append [:script {:type "text/javascript",
                                                                           :async ""

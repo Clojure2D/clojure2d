@@ -7,10 +7,15 @@ All notable changes to this project will be documented in this file. This change
 
 * `pack` color into 32 bit integer
 * `resize` Pixels
+* 4 new color spaces: IPT, LMS, JAB, JCH
+* new palettes and gradient
+* new color distance based on JAB
+* list of all predefined colors, palettes and gradients have separate docs
 
 ### Changed
 
 * `reduce-colors` - selects color from cluster using `mode` rather than centroid
+* html-color* -> named-color*
 
 ## 1.0.1
 
