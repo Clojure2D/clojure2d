@@ -4,18 +4,25 @@ import net.jafama.FastMath;
 
 public class Gaussian extends AFilter {
     double alpha;
-    double expx, expy;
+    double exp;
 
     public Gaussian(double radius, double alpha) {
         super(radius);
         this.alpha = alpha;
 
-        expx = FastMath.exp(-alpha*radius*radius);
-        expy = FastMath.exp(-alpha*radius*radius);
+        exp = FastMath.exp(-alpha*radius*radius);
         init();
     }
 
+    public Gaussian() {
+        this(2.0, 2.0);
+    }
+    
     public double evaluate(double x, double y) {
-        return Math.max(0, FastMath.exp(-alpha*x*x)-expx) * Math.max(0, FastMath.exp(-alpha*y*y)-expy);
+        return Math.max(0, FastMath.exp(-alpha*x*x)-exp) * Math.max(0, FastMath.exp(-alpha*y*y)-exp);
+    }
+
+    public String getName() {
+        return "Gaussian";
     }
 }

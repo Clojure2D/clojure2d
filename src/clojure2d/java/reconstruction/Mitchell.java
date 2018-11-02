@@ -3,16 +3,25 @@ package clojure2d.java.reconstruction;
 import net.jafama.FastMath;
 
 public class Mitchell extends AFilter {
-    double B, C;
+    private double B, C, spread;
 
-    public Mitchell(double radius, double B, double C) {
+    public Mitchell(double radius, double spread, double B, double C) {
         super(radius);
         this.B = B;
         this.C = C;
-
+        this.spread = 1.0/spread;
+        
         init();
     }
 
+    public Mitchell(double B, double C) {
+        this(2.0,2.25,B,C);
+    }
+
+    public Mitchell() {
+        this(1.0/3.0, 1.0/3.0);
+    }
+    
     private double Mitchell1d(double x) {
         x = FastMath.abs(x + x);
         if (x > 1)
@@ -24,6 +33,10 @@ public class Mitchell extends AFilter {
     }
 
     public double evaluate(double x, double y) {
-        return Mitchell1d(x*iradius) * Mitchell1d(y*iradius);
+        return Mitchell1d(x*spread) * Mitchell1d(y*spread);
+    }
+
+    public String getName() {
+        return "Mitchell (B=" + B + ", C=" + C + ")";
     }
 }

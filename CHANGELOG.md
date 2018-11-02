@@ -1,6 +1,19 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 1.0.3
+
+### Added
+* reconstruction filters spread parameter
+* Hann reconstruction filter
+
+### Changed
+* reconstruction filters default values
+* refactored renderer, breaking change: intensity is now vibrancy and acts opposite way
+
+### Fixed
+* reconstruction filters errors
+
 ## 1.0.2
 
 ### Added

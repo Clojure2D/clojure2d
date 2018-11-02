@@ -1,10 +1,10 @@
-(defproject clojure2d "1.0.2"
+(defproject clojure2d "1.0.3"
   :description "Creative coding / glitch library backed by Java2D"
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.9.0"]
-                 [generateme/fastmath "1.1.3"]
+                 [generateme/fastmath "1.1.4"]
                  [thi.ng/color "1.3.0"] ;; iq gradients
                  [org.apache.xmlgraphics/batik-transcoder "1.10"] ;; SVG
                  ;; [org.bytedeco/javacv-platform "1.4.1"]
@@ -24,13 +24,11 @@
              ;; "-Dcom.sun.management.jmxremote.port=43210"
              ]
   :profiles {:uberjar {:aot :all}
-             :dev {:plugins [[refactor-nrepl "2.4.0-SNAPSHOT"]
-                             [cider/cider-nrepl "0.18.0-SNAPSHOT"]
+             :dev {:plugins [[refactor-nrepl "2.4.0"]
+                             [cider/cider-nrepl "0.19.0-SNAPSHOT"]
                              [lein-ancient "0.6.15"]
-                             [lein-kibit "0.1.6"]
-                             [lein-bikeshed "0.5.0"]
-                             [com.jakemccrary/lein-test-refresh "0.22.0"]
-                             [lein-codox "0.10.3"]]
+                             [com.jakemccrary/lein-test-refresh "0.23.0"]
+                             [lein-codox "0.10.5"]]
                    :source-paths ["example"]
                    :dependencies [[codox-theme-rdash "0.1.2"]
                                   [criterium "0.4.4"]

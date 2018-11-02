@@ -11,13 +11,21 @@ public class CosineBell extends AFilter {
         init();
     }
 
+    public CosineBell() {
+        this(2.0,1.2);
+    }
+    
     private double cosinebell(double x) {
         double xx = FastMath.abs(x);
         if (xx>xm) return 0;
-        return 1.0+FastMath.cos(FastMath.PI*xx/xm);
+        return 0.5*(1.0+FastMath.cos(FastMath.PI*xx/xm));
     }
 
     public double evaluate(double x, double y) {
-        return cosinebell(FastMath.sqrt(FastMath.pow2(x*iradius)+FastMath.pow2(y*iradius)));
+        return cosinebell(FastMath.sqrt(x*x+y*y));
+    }
+
+    public String getName() {
+        return "Cosine Bell";
     }
 }

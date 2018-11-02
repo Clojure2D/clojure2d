@@ -8,11 +8,18 @@ public class BlackmanHarris extends AFilter {
     private final static double A2 =  0.14128;
     private final static double A3 = -0.01168;
 
-    public BlackmanHarris(double radius) {
+    private double spread;
+    
+    public BlackmanHarris(double radius, double spread) {
         super(radius);
+        this.spread = 1.0/spread;
         init();
     }
 
+    public BlackmanHarris() {
+        this(2.0,1.5);
+    }
+    
     private double BlackmanHarris1d(double x) {
         if (x < -1.0 || x > 1.0)
             return 0.0;
@@ -23,6 +30,10 @@ public class BlackmanHarris extends AFilter {
     }
 
     public double evaluate(double x, double y) {
-        return BlackmanHarris1d(x*iradius) * BlackmanHarris1d(y*iradius);
+        return BlackmanHarris1d(x*spread) * BlackmanHarris1d(y*spread);
+    }
+
+    public String getName() {
+        return "Blackmann-Harris";
     }
 }

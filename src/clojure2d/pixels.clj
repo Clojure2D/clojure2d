@@ -87,17 +87,19 @@
   
   #### Antialiasing filters
 
-  Below you have list of all available antialiasing filters:
+  Below you have list of all available antialiasing filters. Each filter has radius and spread parameter.
   
-  * :gaussian - two parameters, radius and alpha (default: 2.0)
-  * :box - one parameter, radius (use 0.5)
-  * :sinc - Lanczos filter, two parameters, radius and tau (default: 1.0)
-  * :mitchell - Mitchell-Netravali filter, three parameters, radius, B and C (default: 1/3)
-  * :cubic - one parameter, radius
-  * :catmull - one parameter, radius
-  * :triangle - one parameter, radius
-  * :cosinebell - two parameters, radius and xm (default: 0.5)
-  * :blackmann-harris - one parameter, radius
+  * :gaussian
+  * :box - only radius
+  * :sinc - Windowed sinc filter
+  * :mitchell - Mitchell-Netravali filter, additional parameters: B and C (default: 1/3)
+  * :cubic
+  * :catmull
+  * :triangle
+  * :cosinebell
+  * :blackmann-harris
+  * :hann
+  * :none or `nil` - no filter
 
   ### Converting
 
@@ -106,11 +108,11 @@
   Configuration is a map with following fields:
 
   * :background - color of the background (default: :black)
-  * :gamma-alpha - gamma correction for alpha, to adjust blending strength.
-  * :gamma-color - gamma correction for color, to adjust intensity
-  * :intensity:
-      1.0 - use calculated color
-      0.0 - use gamma corrected color
+  * :gamma-alpha - gamma correction for alpha
+  * :gamma-color - gamma correction for color, to adjust vibrancy
+  * :vibrancy:
+      0.0 - use calculated color
+      1.0 - use gamma corrected color
       (0.0-1.0) - mix between above
   * :saturation - adjust saturation (0-2)
   * :brightness - adjust brightness (0-2)
@@ -332,6 +334,14 @@
    :get-color (fn [^Window w x y] (get-color @(.buffer w) x y))
    :get-value (fn [^Window c ch x y] (get-value @(.buffer c) ch x y))})
 
+(defn- segment-range
+  "Segment range into parts based on cores"
+  ([^long size ^long mn]
+   (let [step (max mn (+ core/available-cores (/ size core/available-cores)))]
+     (map #(vector % (min size (+ ^long % step))) (range 0 size step))))
+  ([size]
+   (segment-range size 0)))
+
 (defn filter-colors
   "Filter colors.
 
@@ -339,13 +349,11 @@
   {:metadoc/categories #{:filt}}
   [f ^Pixels p]
   (let [target (clone-pixels p)
-        pre-step (max 40000 (/ (.size p) core/available-tasks))
-        step (unchecked-int (m/ceil pre-step))
-        parts (range 0 (.size p) step)
+        parts (segment-range (.size p) 10000)
         ftrs (doall
               (map
-               #(future (let [end (min (+ ^long % step) (.size p))]
-                          (loop [idx (unchecked-int %)]
+               #(future (let [[^long start ^long end] %]
+                          (loop [idx start]
                             (when (< idx end)
                               (set-color target idx (f (get-color p idx)))
                               (recur (unchecked-inc idx))))))
@@ -360,13 +368,11 @@
   {:metadoc/categories #{:filt}}
   [f ^Pixels p]
   (let [target (clone-pixels p)
-        pre-step (max 10 (/ (.w p) core/available-tasks))
-        step (unchecked-int (m/ceil pre-step))
-        parts (range 0 (.w p) step)
+        parts (segment-range (.w p) 10)
         ftrs (doall
               (map
-               #(future (let [end (min (+ ^long % step) (.w p))]
-                          (loop [x (unchecked-int %)]
+               #(future (let [[^long start ^long end] %]
+                          (loop [x start]
                             (when (< x end)
                               (dotimes [y (.h p)]
                                 (set-color target x y (f p x y)))
@@ -704,28 +710,23 @@
              (/ (fastmath.java.Array/get2d (.b buff) w x y) a)
              255.0)))
   (to-pixels [r] (to-pixels r {}))
-  (to-pixels [r {:keys [background ^double gamma-alpha ^double gamma-color ^double intensity
+  (to-pixels [r {:keys [background ^double gamma-alpha ^double gamma-color ^double vibrancy
                         ^double saturation ^double brightness ^double contrast]
                  :or {background :black
                       gamma-alpha 1.0
                       gamma-color 1.0
-                      intensity 1.0
+                      vibrancy 0.5
                       saturation 1.0
                       brightness 1.0
                       contrast 1.0}}]
-    (let [res (pixels (.toPixels buff ^Vec4 (c/to-color background)
-                                 gamma-alpha gamma-color intensity) w h)
-          res (if-not (bool-and (== 1.0 contrast)
-                                (== 1.0 brightness))
-                (filter-channels (brightness-contrast brightness contrast) res)
-                res)
-          res (if-not (== 1.0 saturation)
-                (->> res
-                     (filter-colors c/to-HSL*)
-                     (filter-channels nil (modulate saturation) nil nil)
-                     (filter-colors c/from-HSL*))
-                res)]
-      res))
+    (let [size (* w h)
+          arr (int-array (* 4 size))
+          conf (clojure2d.java.LogDensity$Config. buff gamma-alpha gamma-color vibrancy brightness contrast saturation)
+          parts (segment-range size)
+          tasks (doall (map #(future (let [[start end] %]
+                                       (.toPixels buff arr start end conf (c/to-color background)))) parts))]
+      (run! deref tasks)
+      (pixels arr w h)))
   core/ImageProto
   (get-image [b] (core/get-image (to-pixels b)))
   (width [_] w)
@@ -735,18 +736,32 @@
 
 (defn- create-filter
   "Create antialiasing filter."
-  [filter ^double filter-radius filter-params]
-  (condp clojure.core/= filter
-    :gaussian (clojure2d.java.reconstruction.Gaussian. filter-radius (or (first filter-params) 2.0))
-    :box (clojure2d.java.reconstruction.Box. filter-radius)
-    :sinc (clojure2d.java.reconstruction.Sinc. filter-radius (or (first filter-params) 1.0))
-    :mitchell (clojure2d.java.reconstruction.Mitchell. filter-radius (or (first filter-params) m/THIRD) (or (second filter-params) m/THIRD))
-    :cubic (clojure2d.java.reconstruction.Mitchell. filter-radius 1.0 0.0)
-    :catmull-rom (clojure2d.java.reconstruction.Mitchell. filter-radius 0.0 0.5)
-    :triangle (clojure2d.java.reconstruction.Triangle. filter-radius)
-    :cosinebell (clojure2d.java.reconstruction.CosineBell. filter-radius (or (first filter-params) 0.5))
-    :blackmann-harris (clojure2d.java.reconstruction.BlackmanHarris. filter-radius)
-    nil))
+  [filter filter-radius [spread B C]]
+  (if filter-radius
+    (condp clojure.core/= filter
+      :gaussian (clojure2d.java.reconstruction.Gaussian. filter-radius (or spread 2.0))
+      :box (clojure2d.java.reconstruction.Box. filter-radius)
+      :sinc (clojure2d.java.reconstruction.Sinc. filter-radius (or spread 1.5))
+      :mitchell (clojure2d.java.reconstruction.Mitchell. filter-radius (or spread 2.25) (or B m/THIRD) (or C m/THIRD))
+      :cubic (clojure2d.java.reconstruction.Mitchell. filter-radius (or spread 2.25) 1.0 0.0)
+      :catmull-rom (clojure2d.java.reconstruction.Mitchell. filter-radius (or spread 2.25) 0.0 0.5)
+      :triangle (clojure2d.java.reconstruction.Triangle. filter-radius (or spread 1.2))
+      :cosinebell (clojure2d.java.reconstruction.CosineBell. filter-radius (or spread 1.2))
+      :blackmann-harris (clojure2d.java.reconstruction.BlackmanHarris. filter-radius (or spread 1.5))
+      :hann (clojure2d.java.reconstruction.Hann. filter-radius (or spread 1.2))
+      nil)
+    (condp clojure.core/= filter
+      :gaussian (clojure2d.java.reconstruction.Gaussian.)
+      :box (clojure2d.java.reconstruction.Box.)
+      :sinc (clojure2d.java.reconstruction.Sinc.)
+      :mitchell (clojure2d.java.reconstruction.Mitchell.)
+      :cubic (clojure2d.java.reconstruction.Mitchell. 1.0 0.0)
+      :catmull-rom (clojure2d.java.reconstruction.Mitchell. 0.0 0.5)
+      :triangle (clojure2d.java.reconstruction.Triangle.)
+      :cosinebell (clojure2d.java.reconstruction.CosineBell.)
+      :blackmann-harris (clojure2d.java.reconstruction.BlackmanHarris.)
+      :hann (clojure2d.java.reconstruction.Hann.)
+      nil)))
 
 (defn renderer
   "Create renderer.
@@ -756,8 +771,8 @@
   ([w h filter filter-radius & filter-params]
    (LDRenderer. (clojure2d.java.LogDensity. w h (create-filter filter filter-radius filter-params))
                 w h))
-  ([w h filter] (renderer w h filter 2.0 nil))
-  ([w h] (renderer w h :none 2.0 nil)))
+  ([w h filter] (renderer w h filter nil nil))
+  ([w h] (renderer w h (clojure2d.java.LogDensity. w h nil))))
 
 (defn- merge-two-renderers
   "Paralelly merge two renderers. Be sure `a` and `b` are equal. Use this function to merge results created in separated threads.

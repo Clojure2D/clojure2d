@@ -2,17 +2,17 @@ package clojure2d.java.reconstruction;
 
 import net.jafama.FastMath;
 
-public class Sinc extends AFilter {
-    private double tau;
+public class Hann extends AFilter {
+    private double spread;
 
-    public Sinc(double radius, double tau) {
+    public Hann(double radius, double spread) {
         super(radius);
-        this.tau = FastMath.abs(tau);
+        this.spread = 1.0/spread;
         init();
     }
 
-    public Sinc() {
-        this(1.5,1.5);
+    public Hann() {
+        this(2.0,1.2);
     }
     
     private double sinc(double v) {
@@ -21,17 +21,17 @@ public class Sinc extends AFilter {
         return FastMath.sin(pv)/pv;
     }
 
-    private double windowedSinc(double v) {
+    private double hannSinc(double v) {
         double vv = FastMath.abs(v);
         if (vv>radius) return 0.0;
-        return sinc(vv)*sinc(vv/tau);
+        return sinc(vv)*(0.5+0.5*FastMath.cos(FastMath.PI*vv/radius));
     }
 
     public double evaluate(double x, double y) {
-        return windowedSinc(x)*windowedSinc(y);
+        return hannSinc(x*spread)*hannSinc(y*spread);
     }
 
     public String getName() {
-        return "Windowed Sinc (Lanchos)";
+        return "Hann";
     }
 }

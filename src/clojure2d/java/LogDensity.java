@@ -2,6 +2,8 @@ package clojure2d.java;
 
 import fastmath.vector.Vec4;
 import net.jafama.FastMath;
+import fastmath.java.PrimitiveMath;
+import java.awt.Color;
 
 import clojure2d.java.reconstruction.AFilter;
 
@@ -29,6 +31,10 @@ public class LogDensity {
         a = new double[size];
     }
 
+    public LogDensity(int w, int h) {
+        this(w, h, null);
+    }
+    
     public void addPixel(double px, double py, Vec4 c) {
         if(f==null) {
             set(px,py,c);
@@ -41,40 +47,26 @@ public class LogDensity {
     public void setFiltered(double fx, double fy, Vec4 c) {
         int p0x = Math.max((int)FastMath.ceil(fx-0.5-f.radius), 0);
         int p0y = Math.max((int)FastMath.ceil(fy-0.5-f.radius), 0);
-        int p1x = Math.min((int)FastMath.floor(fx-0.5+f.radius)+1,  wdec);
+        int p1x = Math.min((int)FastMath.floor(fx-0.5+f.radius)+1, wdec);
         int p1y = Math.min((int)FastMath.floor(fy-0.5+f.radius)+1, hdec);
 
         int diffx = p1x-p0x;
         int diffy = p1y-p0y;
 
         if (diffx>0 && diffy>0) {
-
-            int[] ifx = new int[diffx];
-            int[] ify = new int[diffy];
-
-            for (int x=p0x; x<p1x; x++) {
-                double v = FastMath.abs( (x-fx)*f.iradius*16.0);
-                ifx[x-p0x] = Math.min((int)FastMath.floor(v), 15);
-            }
-
             for (int y=p0y; y<p1y; y++) {
-                double v = FastMath.abs( (y-fy)*f.iradius*16.0);
-                ify[y-p0y] = Math.min((int)FastMath.floor(v), 15);
-            }
-
-
-            for (int x=p0x; x<p1x; x++) {
-                for (int y=p0y; y<p1y; y++) {
-                    int off = (ify[y-p0y]<<4)+ifx[x-p0x];
-                    set(x, y, c, f.filterTable[off]);
+                int yy = Math.min((int)FastMath.floor(FastMath.abs((y-fy)*f.iradius16)), 15) << 4;
+                for (int x=p0x; x<p1x; x++) {
+                    int xx = Math.min((int)FastMath.floor(FastMath.abs((x-fx)*f.iradius16)), 15);
+                    set(x, y, c, f.filterTable[yy+xx]);
                 }
             }
         }
     }
 
     public void set(double x, double y, Vec4 c) {
-        int xx = (int)x;
-        int yy = (int)y;
+        int xx = (int)(x+0.5);
+        int yy = (int)(y+0.5);
         if(xx>=0 && xx<w && yy>=0 && yy<h) {
             int off = yy*w+xx;
             r[off] += c.x;
@@ -92,65 +84,90 @@ public class LogDensity {
         a[off] += weight;
     }
 
-    public int[] toPixels(Vec4 bg, double gamma_alpha, double gamma_color, double intensity) {
-        double agamma = 1.0 / gamma_alpha;
-        double cgamma = 1.0 / gamma_color;
-        double rintensity = 1.0 - intensity;
 
-        double mx = Double.MIN_VALUE;
+    public class Config {
+        public double agamma, cgamma, vibrancy, saturation;
+        public double mx, lmx;
+        public boolean do_saturation, do_bc, do_vibrancy, do_gamma;
+        public int[] bc_lut;
 
-        for (int i=0; i<size; i++) {
-            double n=a[i];
-            mx = n > mx ? n : mx;
+        public Config(double gamma_alpha, double gamma_color, double vibrancy, double brightness, double contrast, double saturation) {
+            agamma = 1.0 / gamma_alpha;
+            cgamma = 1.0 / gamma_color;
+            this.vibrancy = vibrancy<0.0 ? 0.0 : (vibrancy > 1.0 ? 1.0 : vibrancy);
+            this.saturation = saturation;
+
+            do_saturation = saturation != 1.0;
+            do_bc = (brightness != 1.0) || (contrast != 1.0);
+            do_vibrancy = (this.vibrancy > 0.0) && (gamma_color != 1.0);
+            do_gamma = gamma_alpha != 1.0;
+
+            calcBrightnessContrastLut(brightness, contrast);
+
+            mx = Double.MIN_VALUE;
+            
+            for (int i=0; i<size; i++) {
+                if (a[i]>mx) mx=a[i];
+            }
+            
+            lmx = 1.0 / FastMath.log1p(mx);
         }
+        
+        private void calcBrightnessContrastLut(double brightness, double contrast) {
+            bc_lut = new int[256];
+            
+            for (int i=0; i<256; i++) {
+                bc_lut[i] = Pixels.constrain((int)(0.5 + 255.0 * (((i / 255.0) * brightness - 0.5) * contrast + 0.5)), 0, 255);
+            }
+        }        
+    }
 
-        double mxlog = 1.0 / FastMath.log(mx+1);
-
-        int[] res = new int[size*4];
-
-        for (int i=0; i<size; i++) {
+    public void toPixels(int[] res, int start, int end, Config conf, Vec4 bg) {
+        
+        for (int i=start; i<end; i++) {
+            int rr,gg,bb;
             double hit = a[i];
-
+            
             if (hit > 0.0) {
                 double rhit = 1.0/hit;
-                double loghit = FastMath.log(hit+1) * mxlog;
 
-                double alpha = FastMath.pow(loghit, agamma);
-                double ralpha = 1.0-alpha;
+                double alpha = conf.do_gamma ? FastMath.pow(FastMath.log(hit+1.0) * conf.lmx, conf.agamma) : FastMath.log(hit+1.0) * conf.lmx;
 
-                double abr = ralpha * bg.x;
-                double abg = ralpha * bg.y;
-                double abb = ralpha * bg.z;
+                double fr = Math.min(Math.max(r[i]*rhit,0.0),255.0);
+                double fg = Math.min(Math.max(g[i]*rhit,0.0),255.0);
+                double fb = Math.min(Math.max(b[i]*rhit,0.0),255.0);
 
-                double rr = rhit * r[i];
-                double gg = rhit * g[i];
-                double bb = rhit * b[i];
-        
-                if (intensity == 0.0) {
-                    rr = 255.0 * FastMath.pow(Math.max(0,rr)/255.0, cgamma);
-                    gg = 255.0 * FastMath.pow(Math.max(0,gg)/255.0, cgamma);
-                    bb = 255.0 * FastMath.pow(Math.max(0,bb)/255.0, cgamma);
-                } else 
-                    if (intensity < 1.0) {
-                        rr = rr*intensity + (255.0 * FastMath.pow(Math.max(0,rr)/255.0, cgamma) * rintensity);
-                        gg = gg*intensity + (255.0 * FastMath.pow(Math.max(0,gg)/255.0, cgamma) * rintensity);
-                        bb = bb*intensity + (255.0 * FastMath.pow(Math.max(0,bb)/255.0, cgamma) * rintensity);
-                    }
-
-                if (alpha < 1.0) {
-                    rr = rr * alpha + abr;
-                    gg = gg * alpha + abg;
-                    bb = bb * alpha + abb;
+                if(conf.do_vibrancy) {
+                    fr = PrimitiveMath.lerp(fr, 255.0*Math.pow(fr/255.0, conf.cgamma), conf.vibrancy);
+                    fg = PrimitiveMath.lerp(fg, 255.0*Math.pow(fg/255.0, conf.cgamma), conf.vibrancy);
+                    fb = PrimitiveMath.lerp(fb, 255.0*Math.pow(fb/255.0, conf.cgamma), conf.vibrancy);
                 }
-
-                Pixels.setColor(res,i,new Vec4(rr,gg,bb,255.0));
                 
+                rr = (int)PrimitiveMath.lerp(bg.x, fr, alpha);
+                gg = (int)PrimitiveMath.lerp(bg.y, fg, alpha);
+                bb = (int)PrimitiveMath.lerp(bg.z, fb, alpha);
+
             } else {
-                Pixels.setColor(res,i,bg);
+                rr = (int)bg.x;
+                gg = (int)bg.y;
+                bb = (int)bg.z;
+            }
+
+            if(conf.do_bc) {
+                rr = conf.bc_lut[rr];
+                gg = conf.bc_lut[gg];
+                bb = conf.bc_lut[bb];
+            }
+
+            if (conf.do_saturation) {
+                float[] hsb = Color.RGBtoHSB(rr, gg, bb, null);
+                hsb[1] = (float)Math.min(Math.max(hsb[1]*conf.saturation, 0.0), 1.0);
+                int s = Color.HSBtoRGB(hsb[0], hsb[1], hsb[2]);
+                Pixels.setColor(res, i, new Vec4((s>>16)&0xff, (s>>8)&0xff, s&0xff, 255.0));
+            } else {      
+                Pixels.setColor(res, i, new Vec4(rr,gg,bb,255.0));
             }
         }
-
-        return res;
     }
 
     private void mergeChannel(double[] a, double[] b) {
