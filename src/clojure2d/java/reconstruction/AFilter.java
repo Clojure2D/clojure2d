@@ -1,7 +1,9 @@
 package clojure2d.java.reconstruction;
 
+import net.jafama.FastMath;
+
 public abstract class AFilter {
-    public double radius, iradius;
+    public double radius, iradius, iradius16;
     public double[] filterTable = new double[16*16];
 
     protected void init() {
@@ -20,9 +22,11 @@ public abstract class AFilter {
     }
 
     public AFilter(double radius) {
-        this.radius = radius;
+        this.radius = FastMath.abs(radius);
         iradius = 1.0 / radius;
+        iradius16 = iradius * 16.0;
     }
 
     public abstract double evaluate(double x, double y);
+    public abstract String getName();
 }

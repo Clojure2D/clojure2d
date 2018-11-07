@@ -1,16 +1,34 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 1.0.3
+
+### Added
+* reconstruction filters spread parameter
+* Hann reconstruction filter
+
+### Changed
+* reconstruction filters default values
+* refactored renderer, breaking change: intensity is now vibrancy and acts opposite way
+
+### Fixed
+* reconstruction filters errors
+
 ## 1.0.2
 
 ### Added
 
 * `pack` color into 32 bit integer
 * `resize` Pixels
+* 4 new color spaces: IPT, LMS, JAB, JCH
+* new palettes and gradient
+* new color distance based on JAB
+* list of all predefined colors, palettes and gradients have separate docs
 
 ### Changed
 
 * `reduce-colors` - selects color from cluster using `mode` rather than centroid
+* html-color* -> named-color*
 
 ## 1.0.1
 

@@ -6,6 +6,8 @@
             [fastmath.vector :as v]
             [clojure2d.color :as c]))
 
+(r/set-seed! r/default-rng 42)
+
 (add-examples *jpeg-image-quality*
   (example "Value" *jpeg-image-quality*))
 

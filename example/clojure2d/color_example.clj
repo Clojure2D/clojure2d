@@ -307,6 +307,9 @@
 (add-examples delta-e-cie
   (example "Distance between colors" (delta-e-cie :maroon :amber)))
 
+(add-examples delta-e-jab
+  (example "Distance between colors" (delta-e-jab :maroon :amber)))
+
 (add-examples delta-e-cmc
   (example "Distance between colors" (delta-e-cmc :maroon :amber)))
 
@@ -433,8 +436,8 @@
 (add-examples palette-presets-list
   (example "List of palettes" palette-presets-list))
 
-(add-examples html-colors-list
-  (example "List of html color names" html-colors-list))
+(add-examples named-colors-list
+  (example "List of color names" named-colors-list))
 
 
 ;;

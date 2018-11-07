@@ -17,7 +17,7 @@
   * fastmath `Vec4` - this is core type representing 3 color channels and alpha (RGBA). Values are `double` type from `[0-255]` range. [[color]], [[gray]] creators returns `Vec4` representation. To ensure `Vec4` use [[to-color]] function.
   * fastmath `Vec3` - 3 color channels, assuming `alpha` set to value of `255`.
   * `java.awt.Color` - Java AWT representation. Creators are [[awt-color]], [[awt-gray]]. Use [[to-awt-color]] to convert to this representations.
-  * `keyword` - one of the HTML CSS names (see [[html-colors-list]]) or thi.ng.color.presets/colors names
+  * `keyword` - one of the defined names (see [[named-colors-list]])
   * `Integer` - packed ARGB value. Example: `0xffaa01`.
   * `String` - CSS (\"#ab1122\") or 6 chars string containg hexadecimal representation (\"ffaa01\")
   * any `seqable` - list, vector containing 2-4 elements. Conversion is done by applying content to [[color]] function.
@@ -26,6 +26,8 @@
   To create color from individual channel values use [[color]] function. To create gray for given intensity call [[gray]].
 
   By default color is treated as `RGB` with values from ranges `[0.0-255.0]` inclusive.
+
+  [Coloured list of all names](../static/colors.html)
   
   ## Color/ channel manipulations
 
@@ -64,6 +66,14 @@
   
   ## Palettes / gradients
 
+  ### Links
+
+  List of all defined colors and palettes:
+  
+  * [Named palettes](../static/palettes.html)
+  * [Colourlovers palettes](../static/colourlovers.html)
+  * [Gradients](../static/gradients.html)
+  
   ### Palette
 
   Palette is just sequence of colors.
@@ -324,8 +334,8 @@
   ([v] (awt-color v v v))
   ([v a] (awt-color v v v a)))
 
-(declare html-awt-color)
-(declare html-color)
+(declare named-awt-color)
+(declare named-color)
 
 (defn- strip-hash
   "Remove # from beginning of the string."
@@ -367,16 +377,16 @@
   (alpha [^Vec4 c] (.w c))
   (hue [^Vec4 c] )
   clojure.lang.Keyword
-  (to-color [n] (html-color n))
-  (to-awt-color [n] (html-awt-color n))
-  (luma [n] (luma (html-color n)))
-  (red [n] (red (html-color n)))
-  (green [n] (green (html-color n)))
-  (blue [n] (blue (html-color n)))
-  (ch0 [n] (red (html-color n)))
-  (ch1 [n] (green (html-color n)))
-  (ch2 [n] (blue (html-color n)))
-  (alpha [n] (alpha (html-color n)))
+  (to-color [n] (named-color n))
+  (to-awt-color [n] (named-awt-color n))
+  (luma [n] (luma (named-color n)))
+  (red [n] (red (named-color n)))
+  (green [n] (green (named-color n)))
+  (blue [n] (blue (named-color n)))
+  (ch0 [n] (red (named-color n)))
+  (ch1 [n] (green (named-color n)))
+  (ch2 [n] (blue (named-color n)))
+  (alpha [n] (alpha (named-color n)))
   Color
   (to-color [^Color c]
     (Vec4. (.getRed c)
@@ -1348,6 +1358,248 @@ See [[blends-list]] for names."}
                      (m/norm (.z c) 0.0 255.0 0.0 0.6000000000000001)
                      (.w c)))))
 
+;; ### LMS - normalized D65
+(defn to-LMS
+  "RGB -> LMS, D65"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 c (to-XYZ c)]
+    (Vec4. (+ (* 0.40024 (.x c)) (* 0.7076 (.y c)) (* -0.08081 (.z c)))
+           (+ (* -0.2263 (.x c)) (* 1.16532 (.y c)) (* 0.0457 (.z c)))
+           (* 0.91822 (.z c))
+           (.w c))))
+
+(defn to-LMS*
+  "RGB -> LMS, normalized"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 cc (to-LMS c)]
+    (Vec4. (m/norm (.x cc) 0.0 100.00260300000001 0.0 255.0)
+           (m/norm (.y cc) 0.0 99.998915 0.0 255.0)
+           (m/norm (.z cc) 0.0 99.994158 0.0 255.0)
+           (.w cc))))
+
+(defn from-LMS
+  "LMS -> RGB, D65"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (from-XYZ (Vec4. (+ (* 1.8599363874558397 (.x c)) (* -1.1293816185800916 (.y c)) (* 0.2198974095961933 (.z c)))
+                     (+ (* 0.3611914362417676 (.x c)) (* 0.6388124632850422 (.y c)) (* -0.0000063705968386499 (.z c)))
+                     (* 1.0890636230968613 (.z c))
+                     (.w c)))))
+
+(defn from-LMS*
+  "LMS -> RGB, normalized"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (from-LMS (Vec4. (m/norm (.x c) 0.0 255.0 0.0 100.00260300000001)
+                     (m/norm (.y c) 0.0 255.0 0.0 99.998915)
+                     (m/norm (.z c) 0.0 255.0 0.0 99.994158)
+                     (.w c)))))
+
+;; IPT
+
+(defn- spow 
+  "Symmetric pow"
+  ^double [^double v ^double e]
+  (if (neg? v)
+    (- (m/pow (- v) e))
+    (m/pow v e)))
+
+(defn- spow-043
+  ""
+  ^double [^double v]
+  (spow v 0.43))
+
+(defn- spow-r043
+  ""
+  ^double [^double v]
+  (spow v 2.3255813953488373))
+
+(defn to-IPT
+  "RGB -> IPT"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 c (to-XYZ c)
+        ^Vec3 LMS (-> (Vec3. (+ (* 0.4002 (.x c)) (* 0.7075 (.y c)) (* -0.0807 (.z c)))
+                             (+ (* -0.228 (.x c)) (* 1.15 (.y c)) (* 0.0612 (.z c)))
+                             (* 0.9184 (.z c)))
+                      (v/applyf spow-043))]
+    (Vec4. (+ (* 0.4 (.x LMS)) (* 0.4 (.y LMS)) (* 0.2 (.z LMS)))
+           (+ (* 4.455 (.x LMS)) (* -4.851 (.y LMS)) (* 0.396 (.z LMS)))
+           (+ (* 0.8056 (.x LMS)) (* 0.3572 (.y LMS)) (* -1.1628 (.z LMS)))
+           (.w c))))
+
+(defn to-IPT*
+  "RGB -> IPT, normalized"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 cc (to-IPT c)]
+    (Vec4. (m/norm (.x cc) 0.0 7.2443713084435615 0.0 255.0)
+           (m/norm (.y cc) -3.2846335885160194 4.799977261009928 0.0 255.0)
+           (m/norm (.z cc) -5.422400706730331 4.719620894528216 0.0 255.0)
+           (.w cc))))
+
+(defn from-IPT
+  "IPT -> RGB"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 c (to-color c)
+        ^Vec3 LMS' (-> (Vec3. (+ (* 1.0000000000000002 (.x c)) (* 0.0975689305146139 (.y c)) (* 0.2052264331645916 (.z c)))
+                              (+ (* 0.9999999999999999 (.x c)) (* -0.1138764854731471 (.y c)) (* 0.13321715836999806 (.z c)))
+                              (+ (* 0.9999999999999999 (.x c)) (* 0.0326151099170664 (.y c)) (* -0.6768871830691793 (.z c))))
+                       (v/applyf spow-r043))]
+    (from-XYZ (Vec4. (+ (* 1.8502429449432056 (.x LMS')) (* -1.1383016378672328 (.y LMS')) (* 0.23843495850870136 (.z LMS')))
+                     (+ (* 0.3668307751713486 (.x LMS')) (* 0.6438845448402355 (.y LMS')) (* -0.010673443584379992 (.z LMS')))
+                     (* 1.088850174216028 (.z LMS'))
+                     (.w c)))))
+
+(defn from-IPT*
+  "LMS -> RGB, normalized"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (from-IPT (Vec4. (m/norm (.x c) 0.0 255.0 0.0 7.2443713084435615)
+                     (m/norm (.y c) 0.0 255.0 -3.2846335885160194 4.799977261009928)
+                     (m/norm (.z c) 0.0 255.0 -5.422400706730331 4.719620894528216)
+                     (.w c)))))
+
+;; Jab https://www.osapublishing.org/oe/abstract.cfm?uri=oe-25-13-15131
+
+(def ^:private ^:const ^double jab-b 1.15)
+(def ^:private ^:const ^double jab-g 0.66)
+(def ^:private ^:const ^double jab-rb (/ jab-b))
+(def ^:private ^:const ^double jab-rg (/ jab-g))
+(def ^:private ^:const ^double jab-b- (dec jab-b))
+(def ^:private ^:const ^double jab-g- (dec jab-g))
+(def ^:private ^:const ^double jab-c1 (/ 3424.0 (m/fpow 2.0 12)))
+(def ^:private ^:const ^double jab-c2 (/ 2413.0 (m/fpow 2.0 7)))
+(def ^:private ^:const ^double jab-c3 (/ 2392.0 (m/fpow 2.0 7)))
+(def ^:private ^:const ^double jab-n (/ 2610.0 (m/fpow 2.0 14)))
+(def ^:private ^:const ^double jab-p (* 1.7 (/ 2523.0 (m/fpow 2.0 5))))
+(def ^:private ^:const ^double jab-rn (/ jab-n))
+(def ^:private ^:const ^double jab-rp (/ jab-p))
+(def ^:private ^:const ^double jab-d -0.56)
+(def ^:private ^:const ^double jab-d+ (inc jab-d))
+(def ^:private ^:const ^double jab-d0 1.6295499532821566e-11)
+
+(defn- jab-lms->lms' 
+  ""
+  ^double [^double v]
+  (let [v (m/pow (/ v 10000.0) jab-n)]
+    (m/pow (/ (+ jab-c1 (* jab-c2 v))
+              (inc (* jab-c3 v))) jab-p)))
+
+(defn to-JAB
+  "RGB -> JAB"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 c (to-XYZ c)
+        X' (- (* jab-b (.x c)) (* jab-b- (.z c)))
+        Y' (- (* jab-g (.y c)) (* jab-g- (.x c)))
+        ^Vec3 LMS' (-> (Vec3. (+ (* 0.41478972 X') (* 0.579999 Y') (* 0.0146480 (.z c)))
+                              (+ (* -0.2015100 X') (* 1.120649 Y') (* 0.0531008 (.z c)))
+                              (+ (* -0.0166008 X') (* 0.264800 Y') (* 0.6684799 (.z c))))
+                       (v/applyf jab-lms->lms'))
+        ^Vec3 Iab (Vec3. (+ (* 0.5 (.x LMS')) (* 0.5 (.y LMS')))
+                         (+ (* 3.524000 (.x LMS')) (* -4.066708 (.y LMS')) (* 0.542708 (.z LMS')))
+                         (+ (* 0.199076 (.x LMS')) (* 1.096799 (.y LMS')) (* -1.295875 (.z LMS'))))]
+    (Vec4. (- (/ (* jab-d+ (.x Iab))
+                 (inc (* jab-d (.x Iab)))) jab-d0) (.y Iab) (.z Iab) (.w c))))
+
+(defn to-JAB*
+  "RGB -> JAB, normalized"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 cc (to-JAB c)]
+    (Vec4. (m/norm (.x cc) -3.2311742677852644E-26 0.16717463103478347 0.0 255.0)
+           (m/norm (.y cc) -0.09286319310837648 0.1090265140291988 0.0 255.0)
+           (m/norm (.z cc) -0.15632173559361429 0.11523306877502998 0.0 255.0)
+           (.w cc))))
+
+(defn- jab-lms'->lms 
+  ""
+  ^double [^double v]
+  (let [v (m/pow v jab-rp)]
+    (* 10000.0 (m/pow (/ (- jab-c1 v)
+                         (- (* jab-c3 v) jab-c2)) jab-rn))))
+
+(defn from-JAB
+  "JAB -> RGB"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 c (to-color c)
+        J+ (+ jab-d0 (.x c))
+        I (/ J+ (- jab-d+ (* jab-d J+)))
+        ^Vec3 LMS (-> (Vec3. (+ (* 1.0000000000000002 I) (* 0.1386050432715393 (.y c)) (* 0.05804731615611886 (.z c)))
+                             (+ (* 0.9999999999999999 I) (* -0.1386050432715393 (.y c)) (* -0.05804731615611886 (.z c)))
+                             (+ (* 0.9999999999999998 I) (* -0.09601924202631895 (.y c)) (* -0.8118918960560388 (.z c))))
+                      (v/applyf jab-lms'->lms))
+        ^Vec3 XYZ' (Vec3. (+ (* 1.9242264357876069 (.x LMS)) (* -1.0047923125953657 (.y LMS)) (* 0.037651404030617994 (.z LMS)))
+                          (+ (* 0.350316762094999 (.x LMS)) (* 0.7264811939316552 (.y LMS)) (* -0.06538442294808501 (.z LMS)))
+                          (+ (* -0.09098281098284752 (.x LMS)) (* -0.3127282905230739 (.y LMS)) (* 1.5227665613052603 (.z LMS))))
+        X (* jab-rb (+ (.x XYZ') (* jab-b- (.z XYZ'))))]
+    (from-XYZ (Vec4. X
+                     (* jab-rg (+ (.y XYZ') (* jab-g- X)))
+                     (.z XYZ') (.w c)))))
+
+(defn from-JAB*
+  "JAB -> RGB, normalized"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (from-JAB (Vec4. (m/norm (.x c) 0.0 255.0 -3.2311742677852644E-26 0.16717463103478347)
+                     (m/norm (.y c) 0.0 255.0 -0.09286319310837648 0.1090265140291988)
+                     (m/norm (.z c) 0.0 255.0 -0.15632173559361429 0.11523306877502998)
+                     (.w c)))))
+
+;;
+
+(defn to-JCH
+  "RGB -> JCH"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 cc (to-JAB c)
+        H (m/atan2 (.z cc) (.y cc))
+        Hd (if (pos? H)
+             (m/degrees H)
+             (- 360.0 (m/degrees (m/abs H))))
+        C (m/hypot-sqrt (.y cc) (.z cc))]
+    (Vec4. (.x cc) C Hd (.w cc))))
+
+(defn to-JCH*
+  "RGB -> JCH, normalized"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 cc (to-JCH c)]
+    (Vec4. (m/norm (.x cc) -3.2311742677852644E-26, 0.16717463103478347 0.0 255.0)
+           (m/norm (.y cc) 1.2924697071141057E-26, 0.15934590856406236 0.0 255.0)
+           (m/norm (.z cc) 1.0921476445810189E-5, 359.99995671898046 0.0 255.0)
+           (.w cc))))
+
+(defn from-JCH
+  "JCH -> RGB"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 c (to-color c)
+        h (m/radians (.z c))
+        a (* (.y c) (m/cos h))
+        b (* (.y c) (m/sin h))]
+    (from-JAB (Vec4. (.x c) a b (.w c)))))
+
+(defn from-JCH*
+  "JCH -> RGB, normalized"
+  {:metadoc/categories #{:conv}}
+  [c]
+  (let [^Vec4 c (to-color c)]
+    (from-JCH (Vec4. (m/norm (.x c) 0.0 255.0 -3.2311742677852644E-26, 0.16717463103478347)
+                     (m/norm (.y c) 0.0 255.0 1.2924697071141057E-26, 0.15934590856406236)
+                     (m/norm (.z c) 0.0 255.0 1.0921476445810189E-5, 359.99995671898046)
+                     (.w c)))))
+
+
 ;; Hue based
 
 (defn- to-HC
@@ -2043,10 +2295,14 @@ See [[blends-list]] for names."}
                :OHTA  [to-OHTA from-OHTA]
                :XYZ   [to-XYZ from-XYZ]
                :Yxy   [to-Yxy from-Yxy]
+               :LMS   [to-LMS from-LMS]
+               :IPT   [to-IPT from-IPT]
                :LUV   [to-LUV from-LUV]
                :LAB   [to-LAB from-LAB]
+               :JAB   [to-JAB from-JAB]
                :HunterLAB  [to-HunterLAB from-HunterLAB]
                :LCH   [to-LCH from-LCH]
+               :JCH   [to-JCH from-JCH]
                :HCL   [to-HCL from-HCL]
                :HSB   [to-HSB from-HSB]
                :HSI   [to-HSI from-HSI]
@@ -2073,10 +2329,14 @@ See [[blends-list]] for names."}
                 :OHTA  [to-OHTA* from-OHTA*]
                 :XYZ   [to-XYZ* from-XYZ*]
                 :Yxy   [to-Yxy* from-Yxy*]
+                :LMS   [to-LMS* from-LMS*]
+                :IPT   [to-IPT* from-IPT*]
                 :LUV   [to-LUV* from-LUV*]
                 :LAB   [to-LAB* from-LAB*]
+                :JAB   [to-JAB* from-JAB*]
                 :HunterLAB  [to-HunterLAB* from-HunterLAB*]
                 :LCH   [to-LCH* from-LCH*]
+                :JCH   [to-JCH* from-JCH*]
                 :HCL   [to-HCL* from-HCL*]
                 :HSB   [to-HSB* from-HSB*]
                 :HSI   [to-HSI* from-HSI*]
@@ -2129,18 +2389,20 @@ See [[blends-list]] for names."}
 
 ;; Read and parse 500 best palettes taken from http://www.colourlovers.com/ (stored locally)
 (def ^{:metadoc/categories #{:pal}
-       :doc "Vector 500 best palettes taken from http://www.colourlovers.com/"}
+       :doc "Vector 500 best palettes taken from http://www.colourlovers.com/
+
+[See all](../static/colourlovers.html)"}
   colourlovers-palettes
-  (let [f (fn [xml-in] (map (fn [x] (map #((:content %) 0) (:content (first (filter #(= (:tag %) :colors) (:content ((:content xml-in) x))))))) (range 100)))
-        all (->> (range 5)
-                 (map clojure.core/inc)
-                 (map #(str "cl" % ".xml.gz"))
-                 (map resource)
-                 (map input-stream)
-                 (map #(java.util.zip.GZIPInputStream. %))
-                 (map xml/parse)                 
-                 (map f)
-                 (apply concat))]
+  (let [f (fn [xml-in] (map (fn [x] (map #((:content %) 0) (:content (first (filter #(= (:tag %) :colors) (:content ((:content xml-in) x))))))) (range 100))) ;; parser
+        all (->> (range 5) ;; five files
+                 (map clojure.core/inc) ;; index 1-5
+                 (map #(str "cl" % ".xml.gz")) ;; filename
+                 (map resource) ;; as resource
+                 (map input-stream) ;; as input stream
+                 (map #(java.util.zip.GZIPInputStream. %)) ;; unzip
+                 (map xml/parse) ;; parse
+                 (map f) ;; extract palettes
+                 (apply concat))] ;; join them
     (mapv (fn [x] (mapv to-color x)) all)))
 
 ;; ### Inigo Quilez
@@ -2482,6 +2744,26 @@ See [[blends-list]] for names."}
          SH (* SC (inc (* F (dec T))))]
      (m/sqrt (+ (m/sq (/ dL (* l SL))) (m/sq (/ dC (* c SC))) (/ dH (m/sq SH)))))))
 
+(defn delta-e-jab
+  "Delta e calculated in JAB color space."
+  {:metadoc/categories #{:dist}}
+  [c1 c2]
+  (let [^Vec4 c1 (to-JAB c1)
+        ^Vec4 c2 (to-JAB c2)
+        J1 (.x c1)
+        J2 (.x c2)
+        a1 (.y c1)
+        a2 (.y c2)
+        b1 (.z c1)
+        b2 (.z c2)
+        C1 (m/hypot-sqrt a1 b1)
+        C2 (m/hypot-sqrt a2 b2)
+        h1 (m/atan (/ b1 a1))
+        h2 (m/atan (/ b2 a2))]
+    (m/hypot-sqrt (- J2 J1)
+                  (- C2 C1)
+                  (* 2.0 (m/sqrt (* C1 C2)) (m/sin (* 0.5 (- h2 h1)))))))
+
 (defn contrast-ratio
   "WCAG contrast ratio.
 
@@ -2573,7 +2855,7 @@ See [[blends-list]] for names."}
 
 ;; colors
 
-(def ^:private html-colors-map
+(def ^:private named-colors-map
   (merge
    tpres/colors
    {:aliceblue 0xf0f8ff,
@@ -2726,11 +3008,13 @@ See [[blends-list]] for names."}
     :yellow 0xffff00,
     :yellowgreen 0x9acd32}))
 
-(def ^{:doc "List of html color names"
-       :metadoc/categories #{:pal}} html-colors-list (sort (keys html-colors-map)))
+(def ^{:doc "List of html color names
 
-(def ^:private html-awt-color (comp to-awt-color html-colors-map))
-(def ^:private html-color (comp to-color html-colors-map))
+  [Coloured list](../static/colors.html)"
+       :metadoc/categories #{:pal}} named-colors-list (sort (keys named-colors-map)))
+
+(def ^:private named-awt-color (comp to-awt-color named-colors-map))
+(def ^:private named-color (comp to-color named-colors-map))
 
 ;;
 
@@ -2762,9 +3046,11 @@ See [[blends-list]] for names."}
      (from-LCH (Vec4. (.x c) ns (.z c) (.w c))))))
 
 (def ^{:doc "Saturate color"
-       :metadoc/categories #{:ops}} saturate (partial change-saturation 10.0))
+       :metadoc/categories #{:ops}}
+  saturate (partial change-saturation 10.0))
 (def ^{:doc "Desaturate color"
-       :metadoc/categories #{:ops}}desaturate (partial change-saturation -10.0))
+       :metadoc/categories #{:ops}}
+  desaturate (partial change-saturation -10.0))
 
 ;;
 (defn gradient
@@ -2829,49 +3115,27 @@ See [[blends-list]] for names."}
   [number-of-colors palette & gradient-params]
   (m/sample (apply gradient (conj (vec gradient-params) palette)) number-of-colors))
 
-;; http://iquilezles.org/www/articles/palettes/palettes.htm
-
-(def ^:private ^:const vec3-05 (Vec3. 0.5 0.5 0.5))
-(def ^:private ^:const vec3-10 (Vec3. 1.0 1.0 1.0))
-
-(def ^{:doc "Ready to use gradients containing Inigo Quilez and Cubehelix sets.
-
-Map with name (keyword) as key and gradient function as value."
-       :metadoc/categories #{:grad}}
-  gradient-presets
-  (merge
-   (into {} (for [[k v] tgrad/cosine-schemes]
-              [k (apply iq-gradient (map #(apply v/vec3 %) v))])) ;; thi.ng presets
-   {:iq-1 (iq-gradient vec3-05 vec3-05 vec3-10
-                       (Vec3. 0.0 0.33 0.67))
-    :iq-2 (iq-gradient vec3-05 vec3-05 vec3-10
-                       (Vec3. 0.0 0.1 0.2))
-    :iq-3 (iq-gradient vec3-05 vec3-05 vec3-10 
-                       (Vec3. 0.3 0.2 0.2))
-    :iq-4 (iq-gradient vec3-05 vec3-05
-                       (Vec3. 1.0 1.0 0.5)
-                       (Vec3. 0.8 0.9 0.3))
-    :iq-5 (iq-gradient vec3-05 vec3-05
-                       (Vec3. 1.0 0.7 0.4)
-                       (Vec3. 0.0 0.15 0.2))
-    :iq-6 (iq-gradient vec3-05 vec3-05
-                       (Vec3. 2.0 1.0 0.0)
-                       (Vec3. 0.5 0.2 0.25))
-    :iq-7 (iq-gradient (Vec3. 0.8 0.5 0.4)
-                       (Vec3. 0.2 0.4 0.2)
-                       (Vec3. 2.0 1.0 1.0)
-                       (Vec3. 0.0 0.25 0.25))
-    :cubehelix (gradient-cubehelix e/linear (Vec4. 300.0 0.5 0.0 255.0) (Vec4. -240 0.5 1.0 255.0))
-    :warm (gradient-cubehelix e/linear (Vec4. -100.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
-    :cool (gradient-cubehelix e/linear (Vec4. 260.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
-    :rainbow (fn [^double t] (let [ts (m/abs (- t 0.5))]
-                               (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
-                                                      (- 1.5 (* 1.5 ts))
-                                                      (- 0.8 (* 0.9 ts))
-                                                      255.0))))}))
-
-(def ^{:doc "Gradient presets names."
-       :metadoc/categories #{:grad}} gradient-presets-list (sort (keys gradient-presets)))
+(def ^:private image-palettes
+  {:k2 [(color 0.4113482181302168, 0.7654335528693236, 10.992247503581464, 255.0) (color 0.22061087801919138, 62.95308516147251, 143.36625434970534, 255.0) (color 14.456361206680231, 83.01644652628998, 160.63248513207887, 255.0) (color 56.2006580334195, 132.6336074038975, 200.55892997048295, 255.0) (color 127.369257346748, 191.58760556287123, 236.15585077189115, 255.0) (color 254.81532816694084, 255.0744678455372, 254.87237723195426, 255.0)]
+   :k2b [(color 10.3881796935232, 32.06677355252445, 75.39140006088721, 255.0) (color 19.351729266643563, 57.72422893906951, 128.30134963880397, 255.0) (color 148.2897398287252, 183.3436537239422, 211.82830156200507, 255.0) (color 222.90167413854766, 232.7120359623188, 241.72338629444977, 255.0)]
+   :road-dubai [(color 32.6393594293625, 46.281295964576934, 59.57356199376628, 255.0) (color 233.17102229055934, 184.68752890208228, 144.55829790294206, 255.0) (color 244.68546295625484, 195.45608515013302, 154.92438050553642, 255.0) (color 245.09929596284874, 218.08638324946338, 208.74921795045734, 255.0)]
+   :ethiopia-beckwith-fischer [(color -0.2326252787934594, 0.08300046208669531, -0.1372086711319381, 255.0) (color 82.0349924521415, 63.67276673909004, 54.2884030520438, 255.0) (color 177.58808103089592, 145.46078318309068, 104.53234975128821, 255.0) (color 254.81532816694084, 255.0744678455372, 254.87237723195426, 255.0)]
+   :maurizummo [(color 1.197695163065406, 1.5134262010185038, 1.2928715418442345, 255.0) (color 44.053640173903325, 59.62054293719374, 49.803238000268045, 255.0) (color 162.12581921688079, 159.665319364655, 141.91024664871063, 255.0) (color 204.17644476822295, 200.55289091972827, 188.6054303629103, 255.0)]
+   :guerreiro [(color 1.525729560410939, 26.307761616217558, 23.17239250610738, 255.0) (color 26.012307143990885, 54.29461429416537, 57.775770217858785, 255.0) (color 72.67097238099743, 83.09823488052274, 84.68135625834721, 255.0) (color 140.12944307732434, 117.50297794501442, 111.82266257754186, 255.0) (color 252.9463761712598, 188.54432903171156, 176.55547310302512, 255.0)]
+   :two-heads-filonov [(color 24.460842016758622, 13.319186466937532, 11.371481719746425, 255.0) (color 70.2970618115852, 66.59811478304647, 150.88220402996322, 255.0) (color 231.81934795563782, 51.60425154939317, 18.892200403824166, 255.0) (color 250.29485056314277, 246.26718534934852, 228.9649823035563, 255.0)]
+   :glitterboy [(color 0.0, 0.0, 0.0, 255.0) (color 34.832094967759296, 51.53258449525617, 76.08897751627643, 255.0) (color 254.89515125022243, 255.08416964439067, 254.54087895755788, 255.0)]
+   :tornyai [(color 16.536913197539874, 35.148996010035155, 49.6490190574263, 255.0) (color 37.17313937364111, 65.29626990699421, 50.67791316590424, 255.0) (color 98.18761762111131, 126.67221289112751, 78.30493337962938, 255.0) (color 202.4438850642266, 191.59799331682444, 75.6924308608252, 255.0) (color 205.87604983243077, 194.82332684615847, 78.83846935997073, 255.0)]
+   :dune-poster [(color 107.33995301254643, 27.055313332762026, 38.47925048531382, 255.0) (color 155.82118800551515, 38.90429583899509, 62.35925340548446, 255.0) (color 183.99945094294546, 88.39591455068566, 64.51297949567373, 255.0) (color 220.73204002416284, 186.4585849666728, 118.40324019304026, 255.0)]
+   :prl-1 [(color 13.29994985403398, 15.48845781002485, 14.86363184532867, 255.0) (color 101.68034192140362, 62.02739941274223, 23.02079614459207, 255.0) (color 138.35299872312532, 129.75667686894934, 65.2034600779777, 255.0) (color 169.15454856033406, 174.1653374012969, 151.24750522305126, 255.0)]
+   :prl-2 [(color 43.046985452697314, -0.06827493811636616, 20.218644689729913, 255.0) (color 128.34049233695694, 25.699038961985888, 46.91568830236381, 255.0) (color 241.44626439671217, 178.95881985218566, 162.09534893102426, 255.0) (color 244.8006213590985, 246.45045233296074, 227.7677303310493, 255.0)]
+   :prl-3 [(color 61.50262728122596, 53.74828658523728, 60.753673742911616, 255.0) (color 77.47529157962626, 100.23834982625017, 89.61922557794098, 255.0) (color 218.46051667336093, 130.57560168018827, 110.3073956175709, 255.0)]
+   :prl-4 [(color 123.65261300859397, 41.43986331898571, 35.50064040876995, 255.0) (color 247.60423576785973, 47.56327524725518, 35.503509169735274, 255.0) (color 253.33093752285706, 128.56444420734425, 43.89944079224073, 255.0) (color 247.00764385965468, 219.3958440987627, 140.67803434636033, 255.0)]
+   :prl-5 [(color 3.8290482977573905, 1.8652223272246056, 23.782273486179594, 255.0) (color 38.16453828311066, 38.07842354169119, 40.562483109713455, 255.0) (color 124.47917250188553, 46.8860488213824, 37.03042402622115, 255.0) (color 116.68340394316182, 116.70254121948781, 117.82259593093804, 255.0) (color 204.82688535629052, 210.41253869113314, 210.261336369497, 255.0) (color 254.89515125022243, 255.08416964439067, 254.54087895755788, 255.0)]
+   :prl-6 [(color 91.0234341283588, 41.60222426927309, 31.986846129453752, 255.0) (color 229.16318463676487, 29.700013017335557, 5.841793052086214, 255.0) (color 156.12238464594444, 179.56558564011212, 64.2687167627744, 255.0) (color 226.2084134692385, 196.56580362093143, 168.7561397523294, 255.0)]
+   :prl-7 [(color 30.0, 29.0, 35.0, 255.0) (color 3.0, 169.0, 217.0, 255.0) (color 247.0, 239.0, 236.0, 255.0)]
+   :prl-8 [(color 11.111707340820754, 4.113829164875057, 5.680316944823451, 255.0) (color 104.83604065530469, 28.109059377246094, 5.376818940241242, 255.0) (color 93.13973348869847, 91.10953112041967, 112.51452179401566, 255.0) (color 140.13914847036114, 149.60592631159392, 96.29184203770888, 255.0) (color 211.89437893767288, 150.11487580629205, 63.409156284547926, 255.0)]
+   :prl-9 [(color 227.196156740449, 55.071940035989655, 73.74431951629776, 255.0) (color 102.03660534286227, 110.87026617840641, 175.79287733452057, 255.0) (color 94.83619506822001, 117.84420336680716, 141.88748246791656, 255.0) (color 254.7254945449911, 249.18544480490488, 250.4106982164419, 255.0)]
+   :prl-10 [(color 32.94738281709724, 34.1274380898261, 38.50895242119614, 255.0) (color 200.74884857843253, 30.4865255859429, 43.73963717008773, 255.0) (color 62.41560521711818, 143.56878761416803, 154.89709282983696, 255.0)]})
 
 (defn- d3->palette
   "Convert d3 string to palette"
@@ -2885,9 +3149,12 @@ Map with name (keyword) as key and gradient function as value."
         names (map #(keyword (str name "-" (count %))) pals)]
     (into {} (map vector names pals))))
 
-(def ^{:doc "Color palette presets."
+(def ^{:doc "Color palette presets.
+
+[See all](../static/palettes.html)"
        :metadoc/categories #{:pal}} palette-presets
   (merge
+   image-palettes
    (d3->palettes "brbg" ["d8b365f5f5f55ab4ac",
                          "a6611adfc27d80cdc1018571",
                          "a6611adfc27df5f5f580cdc1018571",
@@ -3161,12 +3428,80 @@ Map with name (keyword) as key and gradient function as value."
     :traffic-light-2 [(color 182 10 28) (color 227 152 2) (color 48 145 67) (color 224 53 49) (color 240 189 39) (color 81 179 100) (color 255 104 76) (color 255 218 102) (color 138 206 126)] 
     :color-blind [(color 17 112 170) (color 252 125 11) (color 163 172 185) (color 87 96 108) (color 95 162 206) (color 200 82 0) (color 123 132 143) (color 163 204 233) (color 255 188 121) (color 200 208 217)] 
     :tableau-classic-medium [(color 114 158 206) (color 255 158 74) (color 103 191 92) (color 237 102 93) (color 173 139 201) (color 168 120 110) (color 237 151 202) (color 162 162 162) (color 205 204 93) (color 109 204 218)] 
-    :tableau-classic-20 [(color 31 119 180) (color 174 199 232) (color 255 127 14) (color 255 187 120) (color 44 160 44) (color 152 223 138) (color 214 39 40) (color 255 152 150) (color 148 103 189) (color 197 176 213) (color 140 86 75) (color 196 156 148) (color 227 119 194) (color 247 182 210) (color 127 127 127) (color 199 199 199) (color 188 189 34) (color 219 219 141) (color 23 190 207) (color 158 218 229)]}))
+    :tableau-classic-20 [(color 31 119 180) (color 174 199 232) (color 255 127 14) (color 255 187 120) (color 44 160 44) (color 152 223 138) (color 214 39 40) (color 255 152 150) (color 148 103 189) (color 197 176 213) (color 140 86 75) (color 196 156 148) (color 227 119 194) (color 247 182 210) (color 127 127 127) (color 199 199 199) (color 188 189 34) (color 219 219 141) (color 23 190 207) (color 158 218 229)]
+    
+    ;; https://github.com/karthik/wesanderson/blob/master/R/colors.R
+
+    :bottle-rocket-1 (mapv to-color '(0xA42820 0x5F5647 0x9B110E 0x3F5151 0x4E2A1E 0x550307 0x0C1707))
+    :bottle-rocket-2 (mapv to-color '(0xFAD510 0xCB2314 0x273046 0x354823 0x1E1E1E))
+    :rushmore-1 (mapv to-color '(0xE1BD6D 0xEABE94 0x0B775E 0x35274A 0xF2300F))
+    :rushmore (mapv to-color '(0xE1BD6D 0xEABE94 0x0B775E 0x35274A 0xF2300F))
+    :royal-1 (mapv to-color '(0x899DA4 0xC93312 0xFAEFD1 0xDC863B))
+    :royal-2 (mapv to-color '(0x9A8822 0xF5CDB4 0xF8AFA8 0xFDDDA0 0x74A089))
+    :zissou-1 (mapv to-color '(0x3B9AB2 0x78B7C5 0xEBCC2A 0xE1AF00 0xF21A00))
+    :darjeeling-1 (mapv to-color '(0xFF0000 0x00A08A 0xF2AD00 0xF98400 0x5BBCD6))
+    :darjeeling-2 (mapv to-color '(0xECCBAE 0x046C9A 0xD69C4E 0xABDDDE 0x000000))
+    :chevalier-1 (mapv to-color '(0x446455 0xFDD262 0xD3DDDC 0xC7B19C))
+    :fantastic-fox-1 (mapv to-color '(0xDD8D29 0xE2D200 0x46ACC8 0xE58601 0xB40F20))
+    :moonrise-1 (mapv to-color '(0xF3DF6C 0xCEAB07 0xD5D5D3 0x24281A))
+    :moonrise-2 (mapv to-color '(0x798E87 0xC27D38 0xCCC591 0x29211F))
+    :moonrise-3 (mapv to-color '(0x85D4E3 0xF4B5BD 0x9C964A 0xCDC08C 0xFAD77B))
+    :cavalcanti-1 (mapv to-color '(0xD8B70A 0x02401B 0xA2A475 0x81A88D 0x972D15))
+    :grand-budapest-1 (mapv to-color '(0xF1BB7B 0xFD6467 0x5B1A18 0xD67236))
+    :grand-budapest-2 (mapv to-color '(0xE6A0C4 0xC6CDF7 0xD8A499 0x7294D4))
+    :isle-of-dogs-1 (mapv to-color '(0x9986A5 0x79402E 0xCCBA72 0x0F0D0E 0xD9D0D3 0x8D8680))
+    :isle-of-dogs-2 (mapv to-color '(0xEAD3BF 0xAA9486 0xB6854D 0x39312F 0x1C1718))}))
 
 (def ^{:doc "Color palette presets list."
        :metadoc/categories #{:pal}} palette-presets-list (sort (keys palette-presets)))
 
-;;;;
+(def ^:private ^:const vec3-05 (Vec3. 0.5 0.5 0.5))
+(def ^:private ^:const vec3-10 (Vec3. 1.0 1.0 1.0))
+
+(def ^{:doc "Ready to use gradients containing Inigo Quilez, Cubehelix sets and other.
+
+Map with name (keyword) as key and gradient function as value.
+
+[See all](../static/gradients.html)"
+       :metadoc/categories #{:grad}}
+  gradient-presets
+  (merge
+   (into {} (for [[k v] image-palettes]
+              [k (gradient :LAB :cubic-spline v)]))
+   (into {} (for [[k v] tgrad/cosine-schemes]
+              [k (apply iq-gradient (map #(apply v/vec3 %) v))])) ;; thi.ng presets
+   {:iq-1 (iq-gradient vec3-05 vec3-05 vec3-10
+                       (Vec3. 0.0 0.33 0.67))
+    :iq-2 (iq-gradient vec3-05 vec3-05 vec3-10
+                       (Vec3. 0.0 0.1 0.2))
+    :iq-3 (iq-gradient vec3-05 vec3-05 vec3-10 
+                       (Vec3. 0.3 0.2 0.2))
+    :iq-4 (iq-gradient vec3-05 vec3-05
+                       (Vec3. 1.0 1.0 0.5)
+                       (Vec3. 0.8 0.9 0.3))
+    :iq-5 (iq-gradient vec3-05 vec3-05
+                       (Vec3. 1.0 0.7 0.4)
+                       (Vec3. 0.0 0.15 0.2))
+    :iq-6 (iq-gradient vec3-05 vec3-05
+                       (Vec3. 2.0 1.0 0.0)
+                       (Vec3. 0.5 0.2 0.25))
+    :iq-7 (iq-gradient (Vec3. 0.8 0.5 0.4)
+                       (Vec3. 0.2 0.4 0.2)
+                       (Vec3. 2.0 1.0 1.0)
+                       (Vec3. 0.0 0.25 0.25))
+    :cubehelix (gradient-cubehelix e/linear (Vec4. 300.0 0.5 0.0 255.0) (Vec4. -240 0.5 1.0 255.0))
+    :warm (gradient-cubehelix e/linear (Vec4. -100.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
+    :cool (gradient-cubehelix e/linear (Vec4. 260.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
+    :rainbow (fn [^double t] (let [ts (m/abs (- t 0.5))]
+                               (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
+                                                      (- 1.5 (* 1.5 ts))
+                                                      (- 0.8 (* 0.9 ts))
+                                                      255.0))))}))
+
+(def ^{:doc "Gradient presets names."
+       :metadoc/categories #{:grad}} gradient-presets-list (sort (keys gradient-presets)))
+
+;;;
 
 (defn random-palette
   "Generate random palette from all collections defined in clojure2d.color namespace."
@@ -3174,11 +3509,11 @@ Map with name (keyword) as key and gradient function as value."
   []
   (condp clojure.core/> (r/drand)
     0.1 (m/sample (iq-random-gradient) (r/irand 3 10))
-    0.5 (let [p (rand-nth (concat colourlovers-palettes
+    0.6 (let [p (rand-nth (concat colourlovers-palettes
                                   (vals palette-presets)))]
           (if (> (count p) 15)
             (resample 15 p) p))
-    0.6 (m/sample (rand-nth (vals gradient-presets)) (r/irand 3 10))
+    0.7 (m/sample (rand-nth (vals gradient-presets)) (r/irand 3 10))
     (let [h (r/drand 360)
           t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
           conf {:compl (r/brand 0.6)
@@ -3193,7 +3528,7 @@ Map with name (keyword) as key and gradient function as value."
   []
   (condp clojure.core/> (r/drand)
     0.2 (iq-random-gradient)
-    0.8 (let [pal (rand-nth (concat colourlovers-palettes
+    0.7 (let [pal (rand-nth (concat colourlovers-palettes
                                     (vals palette-presets)))]
           (gradient (r/randval :RGB (rand-nth colorspaces-list))
                     (r/randval :linear :cubic-spline)

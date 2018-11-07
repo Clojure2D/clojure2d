@@ -116,13 +116,7 @@ public final class Pixels {
     // some basic utilities
     
     public static int constrain(int v, int mn, int mx) {
-        if(v<mn) {
-            return mn;
-        } else if (v>mx) {
-            return mx;
-        } else {
-            return v;
-        }
+        return v < mn ? mn : (v > mx ? mx : v);
     }
 
     public static double smoothStep(double a, double b, double x) {
@@ -130,8 +124,8 @@ public final class Pixels {
             return 0;
         if (x >= b)
             return 1;
-        x = (x - a) / (b - a);
-        return x*x * (3 - 2*x);
+        double xx = (x - a) / (b - a);
+        return xx*xx * (3.0 - (xx+xx));
     }
     
     public static int mod(int x, int y) {

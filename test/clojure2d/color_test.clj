@@ -91,10 +91,10 @@
   [cs]
   (let [[to from] (colorspaces cs)
         [to* from*] (colorspaces* cs)
-        c (concat html-colors-list
-                  (repeatedly 20000 #(v/vec4 (v/generate-vec3 (fn [] (r/irand 256))) 255))
-                  (repeatedly 20000 #(v/generate-vec3 (fn [] (r/irand 256))))
-                  (repeatedly 20000 r/irand))]
+        c (concat named-colors-list
+                  (repeatedly 30000 #(v/vec4 (v/generate-vec3 (fn [] (r/irand 256))) 255))
+                  (repeatedly 30000 #(v/generate-vec3 (fn [] (r/irand 256))))
+                  (repeatedly 30000 r/irand))]
     (empty? (concat (filter false? (map = (map to-color c) (map (comp (fn [v] (v/applyf v #(m/round %))) from to) c)))
                     (filter false? (map = (map to-color c) (map (comp (fn [v] (v/applyf v #(m/round %))) from* to*) c)))))))
 
@@ -117,11 +117,15 @@
   (is (colorspace-validity :HWB))
   (is (colorspace-validity :CMY))
   (is (colorspace-validity :LAB))
+  (is (colorspace-validity :JAB))
   (is (colorspace-validity :HunterLAB))
   (is (colorspace-validity :LCH))
+  (is (colorspace-validity :JCH))
   (is (colorspace-validity :LUV))
   (is (colorspace-validity :XYZ))
   (is (colorspace-validity :Yxy))
+  (is (colorspace-validity :LMS))
+  (is (colorspace-validity :IPT))
   (is (colorspace-validity :OHTA)))
 
 ;; test iq palette generator

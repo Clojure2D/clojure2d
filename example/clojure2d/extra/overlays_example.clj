@@ -2,7 +2,10 @@
   (:require [clojure2d.core :refer :all]
             [clojure2d.extra.overlays :refer :all]
             [metadoc.examples :refer :all]
+            [fastmath.random :as r]
             [clojure2d.color :as c]))
+
+(r/set-seed! r/default-rng 42)
 
 (defsnippet clojure2d.extra.overlays save-result "Save overlays"
   (let [n (str "images/overlays/" (first opts) ".jpg")

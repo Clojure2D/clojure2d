@@ -6,6 +6,8 @@
             [fastmath.core :as m]
             [fastmath.random :as r]))
 
+(r/set-seed! r/default-rng 42)
+
 (defsnippet clojure2d.pixels saver "Save pixels to image."
   (let [n (str "images/pixels/" (first opts) ".jpg")]
     (core/save (f) (str "docs/" n))
@@ -350,14 +352,16 @@
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
 
+(def local-noise (r/fbm-noise {:seed 42}))
+
 (add-examples renderer
   (example-snippet "Usage" saver :image
     #(let [r (renderer 300 300)]
        (dotimes [i 20000000]
          (let [x (+ 150 (r/grand 30))
                y (+ 150 (r/grand 30))
-               x (+ x (* 20.0 (- (r/noise (/ x 50.0) (/ y 50.0) 0.34) 0.5)))
-               y (+ y (* 20.0 (- (r/noise (/ y 50.0) (/ x 50.0) 2.23) 0.5)))]
+               x (+ x (* 20.0 (- ^double (local-noise (/ x 50.0) (/ y 50.0) 0.34) 0.5)))
+               y (+ y (* 20.0 (- ^double (local-noise (/ y 50.0) (/ x 50.0) 2.23) 0.5)))]
            (set-color r x y :white)))
        (to-pixels r {:gamma-alpha 0.6 :gamma-color 0.8})))
   (example-snippet "Compare to native Java2d rendering. You can observe oversaturation." saver :image
@@ -367,13 +371,8 @@
          (dotimes [i 2000000]
            (let [x (+ 150 (r/grand 30))
                  y (+ 150 (r/grand 30))
-                 x (+ x (* 20.0 (- (r/noise (/ x 50.0) (/ y 50.0) 0.34) 0.5)))
-                 y (+ y (* 20.0 (- (r/noise (/ y 50.0) (/ x 50.0) 2.23) 0.5)))]
+                 x (+ x (* 20.0 (- ^double (local-noise (/ x 50.0) (/ y 50.0) 0.34) 0.5)))
+                 y (+ y (* 20.0 (- ^double (local-noise (/ y 50.0) (/ x 50.0) 2.23) 0.5)))]
              (core/point c x y))))
        (to-pixels r))))
 
-
-
-(comment saver #(let [task (fn [] )]
-                  
-                  (to-pixels r)) [] "asdf")

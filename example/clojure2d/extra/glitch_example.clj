@@ -3,7 +3,10 @@
             [metadoc.examples :refer :all]
             [clojure2d.pixels :as p]
             [clojure2d.core :refer :all]
-            [clojure2d.color :as c]))
+            [clojure2d.color :as c]
+            [fastmath.random :as r]))
+
+(r/set-seed! r/default-rng 42)
 
 (def samurai (p/load-pixels "docs/samurai.jpg"))
 

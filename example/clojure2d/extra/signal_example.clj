@@ -5,8 +5,11 @@
             [clojure2d.pixels :as p]
             [clojure2d.color :as c]
             [fastmath.vector :as v]
-            [fastmath.core :as m])
+            [fastmath.core :as m]
+            [fastmath.random :as r])
   (:import [clojure2d.extra.signal Signal]))
+
+(r/set-seed! r/default-rng 42)
 
 (add-examples signal
   (example "Create signal from sequence" (signal (repeatedly 1000 rand))))
