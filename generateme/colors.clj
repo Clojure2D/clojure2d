@@ -33,6 +33,6 @@
 
 (save (:buffer (u/show-gradient (c/gradient :LAB :cubic-spline (c/reduce-colors :LAB (resize (p/load-pixels "b5.jpg") 600 600) 5)))) "b5grad.jpg")
 
-(u/show-gradient (c/gradient :LAB :cubic-spline (c/reduce-colors :LUV (resize (p/load-pixels "bbb1.jpg") 600 600) 4)))
+(u/show-gradient (c/gradient :LAB :cubic-spline (c/reduce-colors :LAB (resize (p/load-pixels "cc.jpg") 600 600) 5)))
 
 ;;
