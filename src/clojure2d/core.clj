@@ -184,7 +184,8 @@
             [fastmath.core :as m]
             [clojure.reflect :as ref]
             [fastmath.random :as r]
-            [clojure.string :as s])
+            [clojure.string :as s]
+            [fastmath.grid :as grid])
   (:import [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
            [java.awt.event InputEvent ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
            [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double Arc2D Arc2D$Double]
@@ -1115,6 +1116,38 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
    (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false)))
+
+;; hex
+
+(defn pointy-hex
+  "Draw pointy topped hex."
+  {:metadoc/categories #{:draw}}
+  ([canvas x y size stroke?]
+   (path canvas (grid/pointy-hex-corners size x y) true stroke?))
+  ([canvas x y size]
+   (pointy-hex canvas x y size false)))
+
+(defn flat-hex
+  "Draw flat topped hex."
+  {:metadoc/categories #{:draw}}
+  ([canvas x y size stroke?]
+   (path canvas (grid/flat-hex-corners size x y) true stroke?))
+  ([canvas x y size]
+   (flat-hex canvas x y size false)))
+
+;; grid
+
+(defn grid-cell
+  "Draw grid cell for given grid."
+  {:metadoc/categories #{:draw}}
+  ([canvas grid x y stroke?]
+   (path canvas (grid/corners grid [x y]) true stroke?))
+  ([canvas grid x y]
+   (grid-cell canvas grid x y false))
+  ([canvas grid x y scale stroke?]
+   (path canvas (grid/corners grid [x y] scale) true stroke?)))
+
+;;
 
 (def ^{:doc "List of all available font names."
        :metadoc/categories #{:write}} fonts-list (into [] (.getAvailableFontFamilyNames (java.awt.GraphicsEnvironment/getLocalGraphicsEnvironment))))
