@@ -1,6 +1,16 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 1.1.0
+
+### Added
+* grid cells
+* hex primitive
+
+### Changed
+
+* quadtree segmentation now uses low-discrepancy sequence generator
+
 ## 1.0.3
 
 ### Added

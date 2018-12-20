@@ -3,6 +3,7 @@
             [metadoc.examples :refer :all]
             [fastmath.random :as r]
             [fastmath.core :as m]
+            [fastmath.grid :as grid]
             [fastmath.vector :as v]
             [clojure2d.color :as c]))
 
@@ -375,6 +376,18 @@
     (fn [canvas]
       (quad canvas 20 20 180 50 50 180 70 70))))
 
+(add-examples pointy-hex
+  (example-snippet "Pointy topped hexagon" drawing-snippet :image
+    (fn [canvas]
+      (pointy-hex canvas 100 100 20)
+      (pointy-hex canvas 100 100 90 true))))
+
+(add-examples flat-hex
+  (example-snippet "Flat topped hexagon" drawing-snippet :image
+    (fn [canvas]
+      (flat-hex canvas 100 100 20)
+      (flat-hex canvas 100 100 90 true))))
+
 (add-examples fonts-list
   (example "First five availabe fonts" (take 5 fonts-list)))
 
@@ -484,6 +497,58 @@
       (-> canvas
           (filled-with-stroke :maroon :black crect 100 100 180 180)
           (filled-with-stroke 0x3344ff :white ellipse 100 100 20 100)))))
+
+(add-examples grid-cell
+  (example-snippet "Draw on square grid" drawing-snippet :image
+    (fn [canvas]
+      (let [g (grid/grid :square 15)]
+        (dotimes [_ 100]
+          (let [x (r/drand 200)
+                y (r/drand 200)]
+            (filled-with-stroke canvas (c/color :white 100) :maroon grid-cell g x y))))))
+  (example-snippet "Draw on shifted-square grid" drawing-snippet :image
+    (fn [canvas]
+      (let [g (grid/grid :shifted-square 15)]
+        (dotimes [_ 100]
+          (let [x (r/drand 200)
+                y (r/drand 200)]
+            (filled-with-stroke canvas (c/color :white 100) :maroon grid-cell g x y))))))
+  (example-snippet "Draw on rhomboidal grid" drawing-snippet :image
+    (fn [canvas]
+      (let [g (grid/grid :rhombus 15)]
+        (dotimes [_ 100]
+          (let [x (r/drand 200)
+                y (r/drand 200)]
+            (filled-with-stroke canvas (c/color :white 100) :maroon grid-cell g x y))))))
+  (example-snippet "Draw on triangular grid" drawing-snippet :image
+    (fn [canvas]
+      (let [g (grid/grid :triangle 15)]
+        (dotimes [_ 100]
+          (let [x (r/drand 200)
+                y (r/drand 200)]
+            (filled-with-stroke canvas (c/color :white 100) :maroon grid-cell g x y))))))
+  (example-snippet "Draw on flat topped hexagonal grid" drawing-snippet :image
+    (fn [canvas]
+      (let [g (grid/grid :flat-hex 15)]
+        (dotimes [_ 100]
+          (let [x (r/drand 200)
+                y (r/drand 200)]
+            (filled-with-stroke canvas (c/color :white 100) :maroon grid-cell g x y))))))
+  (example-snippet "Draw on pointy topped hexagonal grid" drawing-snippet :image
+    (fn [canvas]
+      (let [g (grid/grid :pointy-hex 15)]
+        (dotimes [_ 100]
+          (let [x (r/drand 200)
+                y (r/drand 200)]
+            (filled-with-stroke canvas (c/color :white 100) :maroon grid-cell g x y))))))
+  (example-snippet "Draw on hexagonal grid with random size" drawing-snippet :image
+    (fn [canvas]
+      (let [g (grid/grid :flat-hex 15)]
+        (dotimes [_ 100]
+          (let [x (r/drand 200)
+                y (r/drand 200)
+                s (r/drand 0.1 1.0)]
+            (filled-with-stroke canvas (c/color :white 100) :maroon grid-cell g x y s)))))))
 
 (add-examples gradient-mode
   (example-snippet "Set some gradient and fill" drawing-snippet :image
