@@ -388,10 +388,11 @@
 
   Function parameter is channel value and should return new value."
   {:metadoc/categories #{:filt}}
-  [f ch ^Pixels target p]
-  (dotimes [idx (.size target)]
-    (set-value target ch idx (f (get-value p ch idx))))
-  true)
+  ([f ch ^Pixels target p]
+   (dotimes [idx (.size target)]
+     (set-value target ch idx (f (get-value p ch idx))))
+   true)
+  ([f] (partial filter-channel f)))
 
 (defn filter-channel-xy
   "Filter one channel, write result into target.
@@ -402,11 +403,12 @@
 
   Note: channel is first parameter."
   {:metadoc/categories #{:filt}}
-  [f ch ^Pixels target p]
-  (dotimes [y (.h target)]
-    (dotimes [x (.w target)]
-      (set-value target ch x y (f ch p x y))))
-  true)
+  ([f ch ^Pixels target p]
+   (dotimes [y (.h target)]
+     (dotimes [x (.w target)]
+       (set-value target ch x y (f ch p x y))))
+   true)
+  ([f] (partial filter-channel-xy f)))
 
 (defn filter-channels
   "Filter channels parallelly with filtering function. Build filtering function using `filter-channel` or `filter-channel-xy` helpers as with filter aplied partially. Filtering function parameters are: channel, target and source pixels.
@@ -435,21 +437,23 @@
 
   This should be considered as helper function for [[blend-channels]]."
   {:metadoc/categories #{:filt}}
-  [f ch ^Pixels target p1 p2]
-  (dotimes [i (.size target)]
-    (set-value target ch i (f (get-value p1 ch i) (get-value p2 ch i))))
-  true)
+  ([f ch ^Pixels target p1 p2]
+   (dotimes [i (.size target)]
+     (set-value target ch i (f (get-value p1 ch i) (get-value p2 ch i))))
+   true)
+  ([f] (partial blend-channel f)))
 
 (defn blend-channel-xy
   "Blend one channel, write result into target.
   
   Blending function should accept channel, two `Pixels` and position x,y."
   {:metadoc/categories #{:filt}}
-  [f ch ^Pixels target p1 p2]
-  (dotimes [x (.w target)]
-    (dotimes [y (.h target)]
-      (set-value target ch x y (f ch p1 p2 x y))))
-  true)
+  ([f ch ^Pixels target p1 p2]
+   (dotimes [x (.w target)]
+     (dotimes [y (.h target)]
+       (set-value target ch x y (f ch p1 p2 x y))))
+   true)
+  ([f] (partial blend-channel-xy f)))
 
 (defn blend-channels
   "Blend channels parallelly.
