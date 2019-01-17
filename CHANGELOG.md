@@ -1,6 +1,16 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 1.2.0
+
+### Added
+
+* `:always-on-top?` parameter to set window to be on top
+
+### Changed
+
+* [breaking] `filter-channel`, `filter-channel-xy`, `blend-channel` and `blend-channel-xy` accepts only function as a parameter.
+
 ## 1.1.0
 
 ### Added

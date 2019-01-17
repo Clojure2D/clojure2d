@@ -1763,7 +1763,7 @@ See [[set-color]]."
 
 (defn- build-frame
   "Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event."
-  [^JFrame frame ^java.awt.Canvas panel active? windowname width height]
+  [^JFrame frame ^java.awt.Canvas panel active? on-top? windowname width height]
   (let [closer (proxy [WindowAdapter] []
                  (windowClosing [^WindowEvent e] (close-window-fn frame active? windowname)))]
     (doto frame
@@ -1780,7 +1780,8 @@ See [[set-color]]."
       (.setTitle windowname)
       (.setBackground Color/white)
       (.setLocationRelativeTo nil)
-      (.setVisible true))
+      (.setVisible true)
+      (.setAlwaysOnTop on-top?))
     (doto panel
       (.requestFocus)
       (.createBufferStrategy 2))))
@@ -1930,7 +1931,7 @@ See [[set-color]]."
                  :w w
                  :h h
                  :draw-fn draw-fn}))
-  ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint refresher]
+  ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint refresher always-on-top?]
      :or {canvas (canvas 200 200)
           window-name (str "Clojure2D - " (to-hex (rand-int (Integer/MAX_VALUE)) 8))
           fps 60
@@ -1939,7 +1940,8 @@ See [[set-color]]."
           draw-state nil
           setup nil
           hint nil
-          refresher nil}}]
+          refresher nil
+          always-on-top? false}}]
    (let [w (or w (width canvas))
          h (or h (height canvas))
          active? (atom true)
@@ -1960,7 +1962,7 @@ See [[set-color]]."
          refresh-screen-task (if (= refresher :fast)
                                refresh-screen-task-speed
                                refresh-screen-task-safety)]
-     (SwingUtilities/invokeAndWait #(build-frame frame panel active? window-name w h))
+     (SwingUtilities/invokeAndWait #(build-frame frame panel active? always-on-top? window-name w h))
      (add-events-state-processors window)
      (change-state! window-name state)
      (future (refresh-screen-task window draw-fn (or setup-state draw-state) (when hint (get-rendering-hints hint :mid))))

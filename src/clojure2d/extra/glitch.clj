@@ -28,7 +28,7 @@
             [clojure2d.color :as c]
             [fastmath.fields :as var])
   (:import [clojure2d.pixels Pixels]
-           [fastmath.vector Vec2 Vec4]))
+           [fastmath.vector Vec2]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)

@@ -130,7 +130,7 @@
                                                                    target))))
 
 (add-examples filter-channel-xy
-  (example-snippet "Create filter and process image."
+  (example-snippet "Create filter and process channel."
     saver :image (fn [] (let [target (pixels 150 150)
                               filter (fn [ch p x y] (let [v1 (get-value p ch (dec x) y)
                                                           v2 (get-value p ch (inc x) y)
@@ -139,6 +139,18 @@
                                                           avg (/ (+ v1 v2 v3 v4) 4)]
                                                       (if (< avg 128) 0 255)))]
                           (filter-channel-xy filter 0 target cockatoo)
+                          (let [c0 (get-channel target 0)]
+                            (set-channel target 1 c0)
+                            (set-channel target 2 c0))
+                          target)))
+  (example-snippet "Create filter and process channel. Using [[filter-channels]]."
+    saver :image (fn [] (let [filter (filter-channel-xy (fn [ch p x y] (let [v1 (get-value p ch (dec x) y)
+                                                                             v2 (get-value p ch (inc x) y)
+                                                                             v3 (get-value p ch x (dec y))
+                                                                             v4 (get-value p ch x (inc y))
+                                                                             avg (/ (+ v1 v2 v3 v4) 4)]
+                                                                         (if (< avg 128) 0 255))))
+                              target (filter-channels filter nil nil nil cockatoo)]
                           (let [c0 (get-channel target 0)]
                             (set-channel target 1 c0)
                             (set-channel target 2 c0))
