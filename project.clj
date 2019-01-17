@@ -17,12 +17,6 @@
         ::url "https://github.com/Clojure2D/clojure2d.git"}
   :repl-options {:timeout 120000}
   :target-path "target/%s"
-  :jvm-opts ["-Xmx2048M"
-             ;; "-Dcom.sun.management.jmxremote"
-             ;; "-Dcom.sun.management.jmxremote.ssl=false"
-             ;; "-Dcom.sun.management.jmxremote.authenticate=false"
-             ;; "-Dcom.sun.management.jmxremote.port=43210"
-             ]
   :profiles {:uberjar {:aot :all}
              :dev {:plugins [[refactor-nrepl "2.4.0"]
                              [cider/cider-nrepl "0.19.0-SNAPSHOT"]
@@ -34,6 +28,12 @@
                                   [criterium "0.4.4"]
                                   [metadoc "0.2.3"]
                                   [hiccup "1.0.5"]]
+                   :jvm-opts ["-Xmx4096M"
+                              ;; "-Dcom.sun.management.jmxremote"
+                              ;; "-Dcom.sun.management.jmxremote.ssl=false"
+                              ;; "-Dcom.sun.management.jmxremote.authenticate=false"
+                              ;; "-Dcom.sun.management.jmxremote.port=43210"
+                              ]
                    :codox {:themes [:rdash]
                            :metadata {:doc/format :markdown}
                            :output-path "docs/codox/"
