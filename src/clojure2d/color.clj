@@ -2803,20 +2803,20 @@ See [[blends-list]] for names."}
 (defn nearest-color
   "Find nearest color from a set. Input: distance function (default euclidean), list of target colors and source color."
   {:metadoc/categories #{:dist}}
-  ([f xf c]
-   (let [s (count xf)]
+  ([f pal c]
+   (let [s (count pal)]
      (loop [i (int 0)
             currc c
             currdist Double/MAX_VALUE]
        (if (< i s)
-         (let [c1 (nth xf i)
+         (let [c1 (nth pal i)
                dist (m/abs (double (f c c1)))]
            (recur (unchecked-inc i)
                   (if (< dist currdist) c1 currc)
                   (if (< dist currdist) dist currdist)))
          currc))))
-  ([xf c]
-   (nearest-color euclidean xf c)))
+  ([pal c] (nearest-color euclidean pal c))
+  ([pal] (partial nearest-color pal)))
 
 (defn average
   "Average colors in given `colorspace` (default: `:RGB`)"
