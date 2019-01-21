@@ -164,6 +164,43 @@
       (rotate c m/HALF_PI)
       (inv-transform c 40 60))))
 
+;; orientation
+
+(defsnippet clojure2d.core draw-on-oriented-canvas
+  "Draw axes on reoriented canvas"
+  (let [canvas (canvas 400 200) 
+        unique-name (str "images/core/" (first opts) ".jpg")]
+    (with-oriented-canvas-> f canvas
+      (set-background 0x30426a)
+      (set-color :white)
+      (line 5 5 150 5)
+      (line 5 5 5 100)
+      (line 150 5 145 10)
+      (line 5 100 10 95)
+      (line 150 5 145 0)
+      (line 5 100 0 95)
+      (text "X" 150 20)
+      (text "Y" 15 100)
+      (text "warning: text is reoriented" 20 40))
+    (binding [*jpeg-image-quality* 0.85]
+      (save canvas (str "docs/" unique-name)))
+    (str "../" unique-name)))
+
+(add-examples orient-canvas
+  (example-snippet "top-left-, default" draw-on-oriented-canvas :image :top-left-)
+  (example-snippet "top-left+" draw-on-oriented-canvas :image :top-left+)
+  (example-snippet "top-right-" draw-on-oriented-canvas :image :top-right-)
+  (example-snippet "top-right+" draw-on-oriented-canvas :image :top-right+)
+  (example-snippet "bottom-left-" draw-on-oriented-canvas :image :bottom-left-)
+  (example-snippet "bottom-left+" draw-on-oriented-canvas :image :bottom-left+)
+  (example-snippet "bottom-right-" draw-on-oriented-canvas :image :bottom-right-)
+  (example-snippet "bottom-right+" draw-on-oriented-canvas :image :bottom-right+))
+
+(add-examples orientations-list
+  (example "List of orientations" orientations-list))
+
+;;
+
 (add-examples clip
   (example-snippet "Set clip region." process-image-snippet :image
     (fn [img]
@@ -184,6 +221,21 @@
     (binding [*jpeg-image-quality* 0.85]
       (save canvas (str "docs/" unique-name)))
     (str "../" unique-name)))
+
+(add-examples with-oriented-canvas->
+  (example-snippet "Orient and draw." drawing-snippet :image
+    (fn [canvas]
+      (with-oriented-canvas-> :bottom-left+ canvas
+        (line 0 0 100 50)
+        (line 100 0 200 50)))))
+
+(add-examples with-oriented-canvas
+  (example-snippet "Orient and draw." drawing-snippet :image
+    (fn [canvas]
+      (with-oriented-canvas :bottom-left+ [c canvas]
+        (doseq [p (range 0 100 4)]
+          (set-color c (* p 2) 200 200)
+          (line c p 0 (+ p 100) 50))))))
 
 (add-examples line
   (example-snippet "Draw some lines" drawing-snippet :image

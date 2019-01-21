@@ -731,6 +731,75 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   (.setTransform ^Graphics2D (.graphics canvas) (java.awt.geom.AffineTransform.))
   canvas)
 
+;; canvas orientation
+
+(defmulti orient-canvas
+  "Place origin into one of four window corners and reorient axes.
+
+  * `-` as suffix - means default orientation (y-axis reversed)
+  * `+` as suffix - means usual (mathematical) orientation (y-axis not reversed)."
+  {:metadoc/categories #{:transform :canvas}}
+  (fn [orientation c] orientation))
+
+(defmethod orient-canvas :default [_ c] c)
+(defmethod orient-canvas :top-left- [_ c] c)
+
+(defmethod orient-canvas :top-left+ [_ c]
+  (-> c
+      (flip-y)
+      (rotate m/-HALF_PI)))
+
+(defmethod orient-canvas :top-right- [_ ^Canvas c]
+  (-> c
+      (translate (dec (.w c)) 0)
+      (rotate m/HALF_PI)))
+
+(defmethod orient-canvas :top-right+ [_ ^Canvas c]
+  (-> c
+      (translate (dec (.w c)) 0)
+      (flip-x)))
+
+(defmethod orient-canvas :bottom-left+ [_ ^Canvas c]
+  (-> c
+      (translate 0 (dec (.h c)))
+      (flip-y)))
+
+(defmethod orient-canvas :bottom-left- [_ ^Canvas c]
+  (-> c
+      (translate 0 (dec (.h c)))
+      (rotate m/-HALF_PI)))
+
+(defmethod orient-canvas :bottom-right+ [_ ^Canvas c]
+  (-> c
+      (translate (dec (.w c)) (dec (.h c)))
+      (rotate m/HALF_PI)
+      (flip-x)))
+
+(defmethod orient-canvas :bottom-right- [_ ^Canvas c]
+  (-> c
+      (translate (dec (.w c)) (dec (.h c)))
+      (flip-x)
+      (flip-y)))
+
+(def ^{:doc "List of orientations" :metadoc/categories #{:transform :canvas}}
+  orientations-list (remove #(= :default %) (sort (keys (methods orient-canvas)))))
+
+(defmacro with-oriented-canvas 
+  "Same as [[with-canvas]] but with initial orientation."
+  {:metadoc/categories #{:transform :canvas}}
+  [orientation [c canv] & body]
+  `(with-canvas [~c ~canv]
+     (orient-canvas ~orientation ~c)
+     ~@body))
+
+(defmacro with-oriented-canvas->
+  "Same as [[with-canvas->]] but with initial orientation."
+  {:metadoc/categories #{:transform :canvas}}
+  [orientation canv & body]
+  `(with-canvas [c# ~canv]
+     (orient-canvas ~orientation c#)
+     (-> c# ~@body)))
+
 ;; clip
 
 (defn clip

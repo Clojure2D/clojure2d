@@ -6,10 +6,8 @@ All notable changes to this project will be documented in this file. This change
 ### Added
 
 * `:always-on-top?` parameter to set window to be on top
-
-### Changed
-
-* [breaking] `filter-channel`, `filter-channel-xy`, `blend-channel` and `blend-channel-xy` accepts only function as a parameter.
+* `orient-canvas` - axis orientation functions
+* `filter-channel`, `filter-channel-xy`, `blend-channel` and `blend-channel-xy` can accept function as a parameter single parameter (acts a partial)..
 
 ## 1.1.0
 
