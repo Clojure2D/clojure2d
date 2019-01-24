@@ -603,7 +603,9 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   Default hint is `:high`. Default font is system one.
 
   Canvas is an object which keeps everything needed to draw Java2d primitives on it. As a drawing buffer `BufferedImage` is used. To draw on Canvas directly wrap your functions with [[with-canvas]] or [[with-canvas->]] macros to create graphical context.
-
+  
+  Canvas is transparent by default. See also [[black-canvas]].
+  
   Be aware that drawing on Canvas is single threaded.
 
   Font you set while creating canvas will be default font. You can set another font in the code with [[set-font]] and [[set-font-attributes]] functions. However these set font temporary."
@@ -624,13 +626,20 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
                          width height
                          nil
                          (when font (java.awt.Font/decode font)))]
-     (with-canvas-> result
-       (set-background Color/black))
+     (with-canvas [c result]
+       (.setComposite ^Graphics2D (.graphics ^Canvas c) java.awt.AlphaComposite/Src)
+       (set-background c Color/black 0))
      result))
   ([width height]
    (canvas width height :high nil))
   ([width height hint]
    (canvas width height hint nil)))
+
+(defn black-canvas
+  "Create [[canvas]] with black, opaque background."
+  {:metadoc/categories #{:canvas}}
+  [& r] (with-canvas-> (apply canvas r)
+          (set-background :black)))
 
 (defn- resize-canvas
   "Resize canvas to new dimensions. Creates and returns new canvas."
@@ -1311,25 +1320,20 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   (.setColor ^Graphics2D (.graphics canvas) c)
   canvas)
 
-(def ^:private alpha-composite-src ^java.awt.Composite (java.awt.AlphaComposite/getInstance java.awt.AlphaComposite/SRC))
-
 (defn set-awt-background
   "Set background color. Expects valid `java.awt.Color` object."
   {:metadoc/categories #{:draw}}
-  [^Canvas canvas c]
-  (let [^Graphics2D g (.graphics canvas)
-        ^Color currc (.getColor g)
-        curr-composite (.getComposite g)]
-    (push-matrix canvas)
-    (reset-matrix canvas)
-    (.setComposite g (java.awt.AlphaComposite/getInstance java.awt.AlphaComposite/SRC))
-    (set-color-with-fn set-awt-color canvas c)
-    (doto g
-      (.fillRect 0 0 (.w canvas) (.h canvas))
-      (.setColor currc))
-    (pop-matrix canvas)
-    (.setComposite g curr-composite))
-  canvas)
+  ([^Canvas canvas c]
+   (let [^Graphics2D g (.graphics canvas)
+         ^Color currc (.getColor g)]
+     (push-matrix canvas)
+     (reset-matrix canvas)
+     (set-color-with-fn set-awt-color canvas c)
+     (doto g
+       (.fillRect 0 0 (.w canvas) (.h canvas))
+       (.setColor currc))
+     (pop-matrix canvas))
+   canvas))
 
 (defn awt-xor-mode
   "Set XOR graphics mode with `java.awt.Color`.
@@ -1351,6 +1355,20 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   [^Canvas canvas]
   (.setPaintMode ^Graphics2D (.graphics canvas))
   canvas)
+
+(defn set-composite
+  "Set composite method for blending during draw.
+
+  See [[composite]] to create one defined by [[clojure2d.color]] blending modes.
+
+  You can also use ones defined in `java.awt.AlphaComposite` class.
+
+  Call witout parameters to revert to default: `java.awt.AlphaComposite/SrcOver`."
+  {:metadoc/categories #{:draw}}
+  ([^Canvas canvas composite]
+   (.setComposite ^Graphics2D (.graphics canvas) composite)
+   canvas)
+  ([^Canvas canvas] (set-composite canvas java.awt.AlphaComposite/SrcOver)))
 
 ;; Set color for primitive
 (def ^{:doc "Sets current color. Color can be:
@@ -1505,7 +1523,8 @@ See [[set-color]]."
                    ^long w
                    ^long h
                    window-name
-                   events]
+                   events
+                   background]
   ImageProto
   (get-image [_] (get-image @buffer))
   (width [_] w)
@@ -1818,7 +1837,7 @@ See [[set-color]]."
       (.setFocusTraversalKeysEnabled false)
       (.setIgnoreRepaint true)
       (.setPreferredSize d)
-      (.setBackground Color/black))))
+      (.setBackground Color/white))))
 
 (defn- close-window-fn
   "Close window frame"
@@ -1857,13 +1876,14 @@ See [[set-color]]."
 
 (defn- repaint
   "Draw buffer on panel using `BufferStrategy` object."
-  [^java.awt.Canvas panel ^Canvas canvas hints]
+  [^java.awt.Canvas panel ^Canvas canvas ^BufferedImage background hints]
   (let [^BufferStrategy strategy (.getBufferStrategy panel)
         ^BufferedImage b (.buffer canvas)]
     (when strategy
       (loop []
         (loop []
           (let [^Graphics2D graphics-context (.getDrawGraphics strategy)]
+            (.drawImage graphics-context background 0 0 (.getWidth panel) (.getHeight panel) nil)
             (when hints (set-rendering-hints graphics-context hints))
             (.drawImage graphics-context b 0 0 (.getWidth panel) (.getHeight panel) nil) ;; sizes of panel???
             (.dispose graphics-context))
@@ -1896,7 +1916,7 @@ See [[set-color]]."
               delay (- stime diff overt)]
           (when (pos? delay)
             (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay)))))
-          (repaint (.panel window) @(.buffer window) hints)
+          (repaint (.panel window) @(.buffer window) (.background window) hints)
           (when (bool-and @(.active? window) (not (.exception? new-result)))
             (recur (inc cnt)
                    (.value new-result)
@@ -1926,7 +1946,7 @@ See [[set-color]]."
                 delay (- stime diff overt)]
             (when (pos? delay)
               (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay)))))
-            (repaint (.panel window) @(.buffer window) hints)
+            (repaint (.panel window) @(.buffer window) (.background window) hints)
             (when (bool-and @(.active? window) (not (.exception? new-result)))
               (recur (inc cnt)
                      (.value new-result)
@@ -1973,7 +1993,8 @@ See [[set-color]]."
   * `:draw-state` - initial drawing state
   * `:setup` - inital callback function, returns drawing state (fn [canvas window] ... initial-loop-state)
   * `:hint` - rendering hint for display: `:low`, `:mid`, `:high` or `:highest`
-  * `:refresher` - `:safe` (default) or `:fast`"
+  * `:refresher` - `:safe` (default) or `:fast`
+  * `:background` - background color for window panel, default white."
   {:metadoc/categories #{:window}}
   ([canvas window-name]
    (show-window {:canvas canvas
@@ -2000,7 +2021,7 @@ See [[set-color]]."
                  :w w
                  :h h
                  :draw-fn draw-fn}))
-  ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint refresher always-on-top?]
+  ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint refresher always-on-top? background]
      :or {canvas (canvas 200 200)
           window-name (str "Clojure2D - " (to-hex (rand-int (Integer/MAX_VALUE)) 8))
           fps 60
@@ -2010,7 +2031,8 @@ See [[set-color]]."
           setup nil
           hint nil
           refresher nil
-          always-on-top? false}}]
+          always-on-top? false
+          background :white}}]
    (let [w (or w (width canvas))
          h (or h (height canvas))
          active? (atom true)
@@ -2025,7 +2047,9 @@ See [[set-color]]."
                           w
                           h
                           window-name
-                          (atom {}))
+                          (atom {})
+                          (get-image (with-canvas-> (clojure2d.core/canvas w h)
+                                       (set-background background))))
          setup-state (when setup (with-canvas-> canvas
                                    (setup window))) 
          refresh-screen-task (if (= refresher :fast)

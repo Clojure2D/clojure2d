@@ -1,6 +1,8 @@
 package clojure2d.java;
 
 import java.awt.image.BufferedImage;
+import java.awt.image.Raster;
+import java.awt.image.WritableRaster;
 
 import fastmath.vector.Vec4;
 
@@ -11,19 +13,39 @@ public final class Pixels {
         setImagePixels(img,p);
         return img;
     }
-    
-    public static int[] getImagePixels(BufferedImage img, int x, int y, int w, int h) {
+
+    public static int[] getRasterPixels(Raster raster, int x, int y, int w, int h) {
         int[] buff = new int[4 * w * h];
-        return img.getRaster().getPixels(x,y,w,h,buff);
+        return raster.getPixels(x,y,w,h,buff);
     }
 
-    public static int[] getImagePixels(BufferedImage img) { return getImagePixels(img, 0, 0, img.getWidth(), img.getHeight()); }
+    public static int[] getRasterPixels(Raster raster) {
+        return getRasterPixels(raster, 0, 0, raster.getWidth(), raster.getHeight());
+    }
+    
+    public static int[] getImagePixels(BufferedImage img, int x, int y, int w, int h) {
+        return getRasterPixels(img.getRaster(),x,y,w,h);
+    }
+
+    public static int[] getImagePixels(BufferedImage img) {
+        return getRasterPixels(img.getRaster(), 0, 0, img.getWidth(), img.getHeight());
+    }
+
+    public static void setRasterPixels(WritableRaster raster, int x, int y, int w, int h, int[] p) {
+        raster.setPixels(x,y,w,h,p);
+    }
+
+    public static void setRasterPixels(WritableRaster raster, int[] p) {
+        setRasterPixels(raster, 0, 0, raster.getWidth(), raster.getHeight(), p);
+    }
 
     public static void setImagePixels(BufferedImage img, int x, int y, int w, int h, int[] p) {
         img.getRaster().setPixels(x,y,w,h,p);
     }
 
-    public static void setImagePixels(BufferedImage img, int[] p) { setImagePixels(img, 0, 0, img.getWidth(), img.getHeight(), p); }
+    public static void setImagePixels(BufferedImage img, int[] p) {
+        setImagePixels(img, 0, 0, img.getWidth(), img.getHeight(), p);
+    }
 
     public static int[] getChannel(int[] p, int ch) {
         int[] buff = new int[p.length >> 2];

@@ -496,23 +496,30 @@
 (defn blend-colors
   "Blend colors with blending function. Set `alpha?` if you want to blend alpha channel (default: `false`)."
   {:metadoc/categories #{:bl}}
-  (^Vec4 [f c1 c2 alpha?]
-   (let [^Vec4 cc1 (v/mult (to-color c1) rev255)
-         ^Vec4 cc2 (v/mult (to-color c2) rev255)]
-     (Vec4. (* 255.0 ^double (f (.x cc1) (.x cc2)))
-            (* 255.0 ^double (f (.y cc1) (.y cc2)))
-            (* 255.0 ^double (f (.z cc1) (.z cc2)))
-            (if alpha?
-              (* 255.0 ^double (f (.w cc1) (.w cc2)))
-              (* 255.0 (.w cc1))))))
-  (^Vec4 [f c1 c2] (blend-colors f c1 c2 false)))
+  ^Vec4 [f cb cs]
+  (let [^Vec4 ccb (v/mult (to-color cb) rev255)
+        ^Vec4 ccs (v/mult (to-color cs) rev255)
+        ^double br (f (.x ccb) (.x ccs))
+        ^double bg (f (.y ccb) (.y ccs))
+        ^double bb (f (.z ccb) (.z ccs))
+        a- (- 1.0 (.w ccb))
+        rs (+ (* a- (.x ccs)) (* (.w ccb) br))
+        gs (+ (* a- (.y ccs)) (* (.w ccb) bg))
+        bs (+ (* a- (.z ccs)) (* (.w ccb) bb))
+        fb (- 1.0 (.w ccs))
+        fbccb (* fb (.w ccb))
+        ao (+ (.w ccs) (* (.w ccb) fb))
+        ro (+ (* (.w ccs) rs) (* fbccb (.x ccb)))
+        go (+ (* (.w ccs) gs) (* fbccb (.y ccb)))
+        bo (+ (* (.w ccs) bs) (* fbccb (.z ccb)))]
+    (v/mult (Vec4. (/ ro ao) (/ go ao) (/ bo ao) ao) 255.0)))
 
 ;; Plenty of blending functions. Bleding functions operate on 0.0-1.0 values and return new value in the same range.
 
 (defn blend-none
   "Return first value only. Do nothing."
   {:metadoc/categories #{:bl}}
-  ^double [a b] a)
+  ^double [a b] b)
 
 (defn blend-add
   "Add channel values."

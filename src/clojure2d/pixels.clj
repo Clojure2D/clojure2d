@@ -131,7 +131,8 @@
             [fastmath.random :as r])
   (:import [clojure2d.core Canvas Window]
            [fastmath.vector Vec2 Vec4]
-           [java.awt.image BufferedImage]
+           [java.awt.image BufferedImage Raster WritableRaster]
+           [java.awt Composite CompositeContext]
            [clojure.lang Counted Seqable Sequential]))
 
 (set! *warn-on-reflection* true)
@@ -425,8 +426,8 @@
      target))
   ([f p]
    (filter-channels f f f nil p))
-  ([f do-alpha p]
-   (if do-alpha
+  ([f do-alpha? p]
+   (if do-alpha?
      (filter-channels f f f f p)
      (filter-channels f f f nil p))))
 
@@ -470,8 +471,8 @@
      target))
   ([f p1 p2]
    (blend-channels f f f nil p1 p2))
-  ([f do-alpha p1 p2]
-   (if do-alpha
+  ([f do-alpha? p1 p2]
+   (if do-alpha?
      (blend-channels f f f f p1 p2)
      (blend-channels f f f nil p1 p2))))
 
@@ -493,13 +494,40 @@
   You can give blending method name as keyword defined in [[blends-names]]. Or it can be blending function which accepts 2 doubles from 0.0 to 1.0 and returns double (0.0 - 1.0). It's a wrapper for [[blend-channels]] function."
   {:metadoc/categories #{:filt}}
   ([n1 n2 n3 n4 p1 p2]
-   (blend-channels (make-compose n1) (make-compose n2) (make-compose n3) (make-compose n4) p1 p2))
+   (blend-channels (make-compose n1) (make-compose n2) (make-compose n3)
+                   (or (make-compose n4) (blend-channel (fn [^double a ^double b] (min 255.0 (+ a b))))) p1 p2))
   ([n p1 p2]
    (compose-channels n n n nil p1 p2))
-  ([n do-alpha p1 p2]
-   (if do-alpha
+  ([n do-alpha? p1 p2]
+   (if do-alpha?
      (compose-channels n n n n p1 p2)
      (compose-channels n n n nil p1 p2))))
+
+(defn- blend-colors-xy
+  [f back source x y]
+  (let [cb (get-color back x y)
+        cs (get-color source x y)]
+    (c/blend-colors f cb cs)))
+
+(defn composite
+  "Create java.awt.Composite object which can be used in [[set-composite]].
+
+  Used to change default blending during drawing."
+  {:metadoc/categories #{:filt}}
+  ([n] (composite n false))
+  ([n do-alpha?]
+   (reify
+     Composite
+     (createContext [this _ _ _] this)
+     CompositeContext
+     (dispose [_])
+     (^void compose [_ ^Raster src ^Raster dst-in ^WritableRaster dst-out]
+      (let [w (min (.getWidth src) (.getWidth dst-in))
+            h (min (.getHeight src) (.getHeight dst-in))
+            p1 (pixels (clojure2d.java.Pixels/getRasterPixels src 0 0 w h) w h)
+            p2 (pixels (clojure2d.java.Pixels/getRasterPixels dst-in 0 0 w h) w h)
+            ^Pixels res (filter-colors-xy (partial blend-colors-xy (c/blends n) p2) p1)]
+        (clojure2d.java.Pixels/setRasterPixels dst-out 0 0 w h (.p res)))))))
 
 ;; ## Filters
 (defn- make-quantile

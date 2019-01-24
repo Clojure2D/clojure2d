@@ -8,6 +8,13 @@ All notable changes to this project will be documented in this file. This change
 * `:always-on-top?` parameter to set window to be on top
 * `orient-canvas` - axis orientation functions
 * `filter-channel`, `filter-channel-xy`, `blend-channel` and `blend-channel-xy` can accept function as a parameter single parameter (acts a partial)..
+* `set-composite` and `composite` to compose drawing with canvas by Java2d, see java.awt.Composite
+* new window parameter, `:background` set panel background color
+
+### Changed
+
+* BREAKING: by default canvas is fully transparent. Window background is set to white. This is made to match html canvas behaviour.
+* BREAKING: `set-background` uses SrcOver (default) composite. Previously was Src.
 
 ## 1.1.0
 

@@ -59,10 +59,10 @@
 (def c200 (* rev255 200))
 
 (deftest blend-test
-  (is (== c100 (blend-none c100 1)))
-  (is (== c200 (blend-none c200 0)))
-  (is (== 0.0 (blend-none 0 1)))
-  (is (== 1.0 (blend-none 1 0)))
+  (is (== 1 (blend-none c100 1)))
+  (is (== 0 (blend-none c200 0)))
+  (is (== 1.0 (blend-none 0 1)))
+  (is (== 0.0 (blend-none 1 0)))
 
   (is (== 1.0 (blend-add c100 c200)))
   (is (== (* rev255 150) (blend-add c50 c100)))
