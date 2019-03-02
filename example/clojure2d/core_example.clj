@@ -481,17 +481,23 @@
       (font-ascent))))
 
 (add-examples text-width
-  (example "Size of some string."
-    (with-canvas-> (canvas 10 10)
-      (text-width "Size of some string."))))
+              (example "Size of some string."
+                       (with-canvas-> (canvas 10 10)
+                         (text-width "Size of some string."))))
+
+(add-examples text-bounding-box
+              (example "Size of some string."
+                       (with-canvas-> (canvas 10 10)
+                         (text-bounding-box "Size of some string."))))
+
 
 (add-examples text
-  (example-snippet "Font attributes" drawing-snippet :image
-    (fn [canvas]
-      (-> canvas
-          (text "Align left" 100 50 :left)
-          (text "Align center" 100 100 :center)
-          (text "Align right" 100 150 :right)))))
+              (example-snippet "Font attributes" drawing-snippet :image
+                               (fn [canvas]
+                                 (-> canvas
+                                     (text "Align left" 100 50 :left)
+                                     (text "Align center" 100 100 :center)
+                                     (text "Align right" 100 150 :right)))))
 
 (add-examples set-awt-color
   (example-snippet "Set color with `java.awt.Color`." drawing-snippet :image

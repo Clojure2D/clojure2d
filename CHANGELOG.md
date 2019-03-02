@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file. This change
 * `filter-channel`, `filter-channel-xy`, `blend-channel` and `blend-channel-xy` can accept function as a parameter single parameter (acts a partial)..
 * `set-composite` and `composite` to compose drawing with canvas by Java2d, see java.awt.Composite
 * new window parameter, `:background` set panel background color
+* bounding box for given text
 
 ### Changed
 
