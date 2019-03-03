@@ -1292,15 +1292,16 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   Possible alignments are: `:right`, `:center`, `:left`."
   {:metadoc/categories #{:write}}
   ([^Canvas canvas s x y align]
-   (let [x (long x)
-         y (long y)]
+   (let [x (float x)
+         y (float y)
+         s (str s)]
      (case align
        :right (let [w (.stringWidth (.getFontMetrics ^Graphics2D (.graphics canvas)) s)]
-                (.drawString ^Graphics2D (.graphics canvas) ^String s (- x w) y))
+                (.drawString ^Graphics2D (.graphics canvas) s (- x w) y))
        :center (let [w (/ (.stringWidth (.getFontMetrics ^Graphics2D (.graphics canvas)) s) 2.0)]
-                 (.drawString ^Graphics2D (.graphics canvas) ^String s (m/round (- x w)) y))
-       :left (.drawString ^Graphics2D (.graphics canvas) ^String s x y)
-       (.drawString ^Graphics2D (.graphics canvas) ^String s x y))) 
+                 (.drawString ^Graphics2D (.graphics canvas) s (float (- x w)) y))
+       :left (.drawString ^Graphics2D (.graphics canvas) s x y)
+       (.drawString ^Graphics2D (.graphics canvas) s x y))) 
    canvas)
   ([canvas s x y]
    (text canvas s x y :left)))
