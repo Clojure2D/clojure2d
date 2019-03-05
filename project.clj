@@ -19,7 +19,7 @@
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}
              :dev {:plugins [[refactor-nrepl "2.4.0"]
-                             [cider/cider-nrepl "0.20.0"]
+                             [cider/cider-nrepl "0.21.1"]
                              [lein-ancient "0.6.15"]
                              [com.jakemccrary/lein-test-refresh "0.23.0"]
                              [lein-codox "0.10.5"]]
