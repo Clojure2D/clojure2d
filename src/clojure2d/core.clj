@@ -1274,15 +1274,15 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 (defn text-width
   "Returns width of the provided string. Should be called within context."
   {:metadoc/categories #{:write}}
-  ^long [^Canvas canvas ^String txt]
-  (.stringWidth (.getFontMetrics ^Graphics2D (.graphics canvas)) txt))
+  ^long [^Canvas canvas txt]
+  (.stringWidth (.getFontMetrics ^Graphics2D (.graphics canvas)) (str txt)))
 
 (defn text-bounding-box
   "Returns bounding box [x,y,w,h] for given text. `[x,y]` position is relative to base line."
   {:metadoc/categories #{:write}}
-  [^Canvas canvas ^String txt]
+  [^Canvas canvas txt]
   (let [^Graphics2D g (.graphics canvas)
-        ^Rectangle2D b (.getStringBounds (.getFontMetrics g) txt g)]
+        ^Rectangle2D b (.getStringBounds (.getFontMetrics g) (str txt) g)]
     [(.getX b) (.getY b)
      (.getWidth b) (.getHeight b)]))
 
