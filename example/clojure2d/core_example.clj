@@ -612,8 +612,16 @@
   (example-snippet "Set some gradient and fill" drawing-snippet :image
     (fn [canvas]
       (-> canvas
-          (gradient-mode 20 20 :maroon 180 180 :black)
-          (ellipse 100 100 190 190)))))
+         (gradient-mode 20 20 :maroon 180 180 :black)
+         (ellipse 100 100 190 190)))))
+
+(add-examples pattern-mode
+  (example-snippet "Set some pattern and fill" drawing-snippet :image
+    (fn [canvas]
+      (let [i (load-url-image "http://static.colourlovers.com/images/patterns/465/465753.png")]
+        (-> canvas
+           (pattern-mode i)
+           (ellipse 100 100 190 190))))))
 
 (add-examples image
   (example-snippet "Draw image at given position." drawing-snippet :image

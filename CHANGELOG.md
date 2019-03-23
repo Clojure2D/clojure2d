@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file. This change
 * `set-composite` and `composite` to compose drawing with canvas by Java2d, see java.awt.Composite
 * new window parameter, `:background` set panel background color
 * bounding box for given text
+* `load-url-image` to handle loading from URL
+* `pattern-mode` to set textured fill for shapes
 
 ### Changed
 

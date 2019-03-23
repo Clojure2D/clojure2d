@@ -185,7 +185,8 @@
             [clojure.reflect :as ref]
             [fastmath.random :as r]
             [clojure.string :as s]
-            [fastmath.grid :as grid])
+            [fastmath.grid :as grid]
+            [clojure.java.io :as io])
   (:import [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
            [java.awt.event InputEvent ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
            [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double Arc2D Arc2D$Double]
@@ -220,6 +221,16 @@
 
 ;; ### Load image
 
+(defn- force-argb-image
+  "Create ARGB buffered image from given image."
+  [^Image img]
+  (let [^BufferedImage bimg (BufferedImage. (.getWidth img nil) (.getHeight img nil) BufferedImage/TYPE_INT_ARGB)
+        ^Graphics2D gr (.createGraphics bimg)]
+    (.drawImage gr img 0 0 nil)
+    (.dispose gr)
+    (.flush img)
+    bimg))
+
 (defn load-image 
   "Load Image from file.
 
@@ -230,16 +241,15 @@
   {:metadoc/categories #{:image}}
   [^String filename]
   (try
-    (let [^Image img (.getImage (ImageIcon. filename))
-          ;; ^BufferedImage img (ImageIO/read (file filename)) ;; SVG - need to set parameters...
-          ]
-      (let [^BufferedImage bimg (BufferedImage. (.getWidth img nil) (.getHeight img nil) BufferedImage/TYPE_INT_ARGB)
-            ^Graphics2D gr (.createGraphics bimg)]
-        (.drawImage gr img 0 0 nil)
-        (.dispose gr)
-        (.flush img)
-        bimg))
+    (force-argb-image (.getImage (ImageIcon. filename)))
     (catch Exception e (println "Can't load image: " filename " " (.getMessage e)))))
+
+(defn load-url-image
+  "Load image from given URL"
+  [^String url]
+  (try
+    (force-argb-image (ImageIO/read (io/as-url url)))
+    (catch Exception e (println "Can't load image from URL: " url " " (.getMessage e)))))
 
 ;; ### Save image
 
@@ -1436,6 +1446,30 @@ See [[set-color]]."
          ^Graphics2D g (.graphics canvas)]
      (.setPaint g gp)
      canvas)))
+
+;; ### Pattern mode
+
+(defn pattern-mode
+  "Set paint mode to pattern.
+
+  Default anchor is set to `(0,0)`. Default width and height are the same as texture dimensions.
+
+  To revert call [[paint-mode]]"
+  {:metadoc/categories #{:draw}}
+  ([canvas image]
+   (let [^BufferedImage image (get-image image)]
+     (pattern-mode canvas image 0 0 (.getWidth image) (.getHeight image))))
+  ([canvas image w h]
+   (let [^BufferedImage image (get-image image)]
+     (pattern-mode canvas image 0 0 w h))) 
+  ([^Canvas canvas image anchor-x anchor-y w h]
+   (let [image (get-image image)
+         rect (Rectangle2D$Double. anchor-x anchor-y w h)
+         texture (java.awt.TexturePaint. image rect)
+         ^Graphics2D g (.graphics canvas)]
+     (.setPaint g texture)
+     canvas)))
+
 
 ;; ### Image
 
