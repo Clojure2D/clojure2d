@@ -22,7 +22,7 @@
                              [cider/cider-nrepl "0.21.1"]
                              [lein-ancient "0.6.15"]
                              [com.jakemccrary/lein-test-refresh "0.23.0"]
-                             [lein-codox "0.10.5"]]
+                             [lein-codox "0.10.6"]]
                    :source-paths ["example"]
                    :dependencies [[codox-theme-rdash "0.1.2"]
                                   [criterium "0.4.4"]
