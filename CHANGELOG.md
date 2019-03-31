@@ -19,6 +19,10 @@ All notable changes to this project will be documented in this file. This change
 * BREAKING: by default canvas is fully transparent. Window background is set to white. This is made to match html canvas behaviour.
 * BREAKING: `set-background` uses SrcOver (default) composite. Previously was Src.
 
+### Fixed
+
+* Bring window to top
+
 ## 1.1.0
 
 ### Added

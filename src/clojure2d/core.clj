@@ -1913,6 +1913,7 @@ See [[set-color]]."
       (.setBackground Color/white)
       (.setLocationRelativeTo nil)
       (.setVisible true)
+      (.toFront)
       (.setAlwaysOnTop on-top?))
     (doto panel
       (.requestFocus)
