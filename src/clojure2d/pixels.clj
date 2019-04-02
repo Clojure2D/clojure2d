@@ -728,7 +728,16 @@
 
 ;; ## Log-density rendering
 
+(defprotocol RendererProto
+  (add-pixel [r x y] [r x y c])
+  (get-pixel [r x y]))
+
 (defrecord LDRenderer [^clojure2d.java.LogDensity buff ^long w ^long h]
+  RendererProto
+  (add-pixel [r x y c]
+    (.addPixel buff x y (c/to-color c))
+    r)
+  (get-pixel [r x y] (get-color r x y))
   PixelsProto
   (set-color [r x y c]
     (.addPixel buff x y (c/to-color c))
@@ -804,7 +813,7 @@
    (LDRenderer. (clojure2d.java.LogDensity. w h (create-filter filter filter-radius filter-params))
                 w h))
   ([w h filter] (renderer w h filter nil nil))
-  ([w h] (renderer w h (clojure2d.java.LogDensity. w h nil))))
+  ([w h] (LDRenderer. (clojure2d.java.LogDensity. w h nil) w h)))
 
 (defn- merge-two-renderers
   "Paralelly merge two renderers. Be sure `a` and `b` are equal. Use this function to merge results created in separated threads.
@@ -828,4 +837,57 @@
   {:metadoc/categories #{:ld}}
   ^LDRenderer [^LDRenderer target & renderers]
   (reduce merge-two-renderers target renderers))
+
+;;
+
+(defrecord GradientRenderer [^clojure2d.java.GradientDensity buff ^long w ^long h]
+  RendererProto
+  (add-pixel [r x y]
+    (.addPixel buff x y)
+    r)
+  (get-pixel [r x y]
+    (fastmath.java.Array/get2d (.cnt buff) w (unchecked-int x) (unchecked-int y)))
+  PixelsProto
+  (to-pixels [r] (to-pixels r {}))
+  (to-pixels [r {:keys [logarithmic? gradient]
+                 :or {logarithmic? false gradient (c/gradient-presets :glitterboy)}}]
+    
+    (let [size (* w h)
+          arr (int-array (* 4 size))
+          conf (clojure2d.java.GradientDensity$Config. buff (boolean logarithmic?) ^clojure.lang.IFn gradient)
+          parts (segment-range size)
+          tasks (doall (map #(future (let [[start end] %]
+                                       (.toPixels buff arr start end conf))) parts))]
+      (run! deref tasks)
+      (pixels arr w h)))
+  core/ImageProto
+  (get-image [b] (core/get-image (to-pixels b)))
+  (width [_] w)
+  (height [_] h)
+  (save [b n] (core/save (to-pixels b) n))
+  (convolve [b t] (core/convolve (to-pixels b) t)))
+
+(defn gradient-renderer
+  "Create gradient renderer.
+
+  Optionally you can pass antialiasing filter and its parameters. Default `:none`."
+  {:metadoc/categories #{:ld}}
+  ([w h filter filter-radius & filter-params]
+   (GradientRenderer. (clojure2d.java.GradientDensity. w h (create-filter filter filter-radius filter-params))
+                      w h))
+  ([w h filter] (gradient-renderer w h filter nil nil))
+  ([w h] (GradientRenderer. (clojure2d.java.GradientDensity. w h) w h)))
+
+(defn merge-gradient-renderers
+  
+  "Merge gradient renderers and store result to the target.
+
+  Use this function to merge separate rendereing results (ex. from separeted threads).
+  
+  This is mutating function. Data from list of renderers is added to the target."
+  {:metadoc/categories #{:ld}}
+  ^GradientRenderer [^GradientRenderer target & renderers]
+  (reduce #(.merge ^clojure2d.java.GradientDensity (.buff target)
+                   ^clojure2d.java.GradientDensity (.buff ^GradientRenderer %)) target renderers))
+
 

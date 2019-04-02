@@ -7,7 +7,7 @@ import java.awt.Color;
 
 import clojure2d.java.reconstruction.AFilter;
 
-public class LogDensity {    
+public final class LogDensity {    
     public int w,h,size;
     public AFilter f;
 

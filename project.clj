@@ -6,7 +6,7 @@
   :dependencies [[org.clojure/clojure "1.10.0"]
                  [generateme/fastmath "1.3.0-SNAPSHOT"]
                  [thi.ng/color "1.3.0"] ;; iq gradients
-                 [org.apache.xmlgraphics/batik-transcoder "1.10"] ;; SVG
+                 [org.apache.xmlgraphics/batik-transcoder "1.11"] ;; SVG
                  ;; [org.bytedeco/javacv-platform "1.4.1"]
                  ]
   :resource-path "resources/"
@@ -26,8 +26,8 @@
                    :source-paths ["example"]
                    :dependencies [[codox-theme-rdash "0.1.2"]
                                   [criterium "0.4.4"]
-                                  [metadoc "0.2.4"]
-                                  [hiccup "1.0.5"]]
+                                  [metadoc "0.2.5"]
+                                  [hiccup "2.0.0-alpha2"]]
                    :jvm-opts ["-Xmx4096M"
                               ;; "-Dcom.sun.management.jmxremote"
                               ;; "-Dcom.sun.management.jmxremote.ssl=false"
