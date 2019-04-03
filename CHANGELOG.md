@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file. This change
 * bounding box for given text
 * `load-url-image` to handle loading from URL
 * `pattern-mode` to set textured fill for shapes
+* Gradient density rendering
 
 ### Changed
 

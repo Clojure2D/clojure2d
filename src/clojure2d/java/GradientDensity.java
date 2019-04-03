@@ -97,7 +97,7 @@ public class GradientDensity {
 
     public void toPixels(int[] res, int start, int end, Config conf) {
         for (int i=start; i<end; i++) {
-            double hit = cnt[i];
+            double hit = Math.max(0,cnt[i]);
             double pos = conf.is_log ? FastMath.log(hit+1.0) * conf.lmx : hit * conf.mx;  
             Pixels.setColor(res, i, (Vec4)conf.gradient.invoke(pos));
         }

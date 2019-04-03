@@ -6,9 +6,12 @@
             [clojure2d.pixels :as p]
             [fastmath.vector :as v]
             [fastmath.core :as m]
+            [fastmath.random :as r]
             [fastmath.easings :as e]
             [fastmath.interpolation :as i]
             [fastmath.rbf :as rbf]))
+
+(r/set-seed! r/default-rng 1)
 
 (defmacro example-color [description ex]
   `(assoc (example ~description ~ex) :type :color))
