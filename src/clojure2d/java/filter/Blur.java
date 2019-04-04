@@ -7,7 +7,7 @@ import net.jafama.FastMath;
 
 public final class Blur {
 
-    private static void internalProcessH(int[] scl, int[] tcl, int w, int h, int r) {
+    private static void internalProcessH(final int[] scl, int[] tcl, int w, int h, int r) {
         double iarr = 1.0 / (r + r + 1);
         for(int i=0; i<h; i++) {
             int ti = i*w;
@@ -37,7 +37,7 @@ public final class Blur {
         }
     }
     
-    private static void internalProcessV(int[] scl, int[] tcl, int w, int h, int r) {
+    private static void internalProcessV(final int[] scl, int[] tcl, int w, int h, int r) {
         double iarr = 1.0 / (r + r + 1);
         
         for(int i=0; i<w; i++) {
@@ -75,31 +75,31 @@ public final class Blur {
     }
 
     
-    public static void horizontalBlur(int[] in, int[] out, int ch, int w, int h, int r) {
+    public static void horizontalBlur(final int[] in, int[] out, int ch, int w, int h, int r) {
         int[] channel = Pixels.getChannel(in, ch);
         int[] target = new int[channel.length];
         internalProcessH(channel, target, w, h, r);
         Pixels.setChannel(out, ch, target);
     }
 
-    public static void verticalBlur(int[] in, int[] out, int ch, int w, int h, int r) {
+    public static void verticalBlur(final int[] in, int[] out, int ch, int w, int h, int r) {
         int[] channel = Pixels.getChannel(in, ch);
         int[] target = new int[channel.length];
         internalProcessV(channel, target, w, h, r);
         Pixels.setChannel(out, ch, target);
     }
     
-    public static void boxBlur(int[] in, int[] out, int ch, int w, int h, int r) {
+    public static void boxBlur(final int[] in, int[] out, int ch, int w, int h, int r) {
         int[] channel = Pixels.getChannel(in, ch);
         int[] target = new int[channel.length];
         internalProcessH(channel, target, w, h, r);
         internalProcessV(target, channel, w, h, r);
-        Pixels.setChannel(out, ch, channel);
+        Pixels.setChannel(out, ch, channel); 
     }
 
     //
 
-        private static int[] boxesForGauss(double sigma, int n) {
+    private static int[] boxesForGauss(double sigma, int n) {
         double wIdeal = FastMath.sqrt((12.0*sigma*sigma/n)+1.0);
         int wl = (int)FastMath.floor(wIdeal);
         if( (wl & 1) == 0) { wl--; }
@@ -114,7 +114,7 @@ public final class Blur {
         return sizes;
     }
 
-    public static void gaussianBlur(int[] in, int[] out, int ch, int w, int h, int r) {
+    public static void gaussianBlur(final int[] in, int[] out, int ch, int w, int h, int r) {
         int[] channel = Pixels.getChannel(in, ch);
         int[] target = new int[channel.length];
         int[] bxs = boxesForGauss(r,3);
@@ -127,5 +127,98 @@ public final class Blur {
         Pixels.setChannel(out, ch, channel);
     }
 
+    // double part
+
+    private static void internalProcessH(final double[] scl, double[] tcl, int w, int h, int r) {
+        double iarr = 1.0 / (r + r + 1);
+        for(int i=0; i<h; i++) {
+            int ti = i*w;
+            int li = ti;
+            int ri = ti+r;
+            double fv = scl[ti];
+            double lv = scl[ti+w-1];
+            double val = (r+1)*fv;
+            
+            for(int j=0; j<r; j++) val += scl[ti+j];
+            
+            for(int j=0; j<=r; j++) {
+                val += scl[ri++] - fv;
+                tcl[ti++] = val*iarr;
+            }
+            
+            for(int j=r+1; j<w-r; j++) {
+                val += scl[ri++] - scl[li++];
+                tcl[ti++] = val*iarr;
+            }
+            
+            for(int j=w-r; j<w; j++) {
+                val += lv - scl[li++];
+                tcl[ti++] = val*iarr;
+            }
+            
+        }
+    }
     
+    private static void internalProcessV(final double[] scl, double[] tcl, int w, int h, int r) {
+        double iarr = 1.0 / (r + r + 1);
+        
+        for(int i=0; i<w; i++) {
+            int ti = i;
+            int li = ti;
+            int ri = ti+r*w;
+            double fv = scl[ti];
+            double lv = scl[ti+w*(h-1)];
+            double val = (r+1)*fv;
+            
+            for(int j=0; j<r; j++) val += scl[ti+j*w];
+            
+            for(int j=0; j<=r; j++) {
+                val += scl[ri] - fv;
+                tcl[ti] = val*iarr;
+                ri+=w;
+                ti+=w;
+            }
+            
+            for(int j=r+1; j<h-r; j++) {
+                val += scl[ri] - scl[li];
+                tcl[ti] = val*iarr;
+                li+=w;
+                ri+=w;
+                ti+=w;
+            }
+            
+            for(int j=h-r; j<h; j++) {
+                val += lv - scl[li];
+                tcl[ti] = val*iarr;
+                li+=w;
+                ti+=w;
+            }
+        }
+    }
+
+    public static void horizontalBlur(final double[] in, double[] out, int w, int h, int r) {
+        internalProcessH(in, out, w, h, r);
+    }
+
+    public static void verticalBlur(final double[] in, double[] out, int w, int h, int r) {
+        internalProcessV(in, out, w, h, r);
+    }
+    
+    public static void boxBlur(final double[] in, double[] out, int w, int h, int r) {
+        double[] target = new double[in.length];
+        internalProcessH(in, target, w, h, r);
+        internalProcessV(target, out, w, h, r);
+    }
+
+    public static void gaussianBlur(final double[] in, double[] out, int w, int h, int r) {
+        double[] target = new double[in.length];
+        int[] bxs = boxesForGauss(r,3);
+        internalProcessH(in, target, w, h, (bxs[0]-1)/2);
+        internalProcessV(target, out, w, h, (bxs[0]-1)/2);
+        internalProcessH(out, target, w, h, (bxs[1]-1)/2);
+        internalProcessV(target, out, w, h, (bxs[1]-1)/2);
+        internalProcessH(out, target, w, h, (bxs[2]-1)/2);
+        internalProcessV(target, out, w, h, (bxs[2]-1)/2);
+    }
+
 }
