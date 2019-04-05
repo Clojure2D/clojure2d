@@ -23,6 +23,7 @@ All notable changes to this project will be documented in this file. This change
 ### Fixed
 
 * Bring window to top
+* Headless mode fix
 
 ## 1.1.0
 

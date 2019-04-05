@@ -621,11 +621,13 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   Font you set while creating canvas will be default font. You can set another font in the code with [[set-font]] and [[set-font-attributes]] functions. However these set font temporary."
   {:metadoc/categories #{:canvas}}
   ([^long width ^long height hint ^String font]
-   (let [^BufferedImage buffer (.. GraphicsEnvironment 
-                                   (getLocalGraphicsEnvironment)
-                                   (getDefaultScreenDevice)
-                                   (getDefaultConfiguration)
-                                   (createCompatibleImage width height Transparency/TRANSLUCENT))        
+   (let [^BufferedImage buffer (try (.. GraphicsEnvironment 
+                                        (getLocalGraphicsEnvironment)
+                                        (getDefaultScreenDevice)
+                                        (getDefaultConfiguration)
+                                        (createCompatibleImage width height Transparency/TRANSLUCENT))
+                                    (catch java.awt.HeadlessException _
+                                      (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)))
          result (Canvas. nil
                          buffer
                          (Line2D$Double.)
