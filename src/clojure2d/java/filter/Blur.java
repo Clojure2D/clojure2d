@@ -21,17 +21,17 @@ public final class Blur {
             
             for(int j=0; j<=r; j++) {
                 val += scl[ri++] - fv;
-                tcl[ti++] = (int)(0.5+val*iarr);
+                tcl[ti++] = (int)(val*iarr);
             }
             
             for(int j=r+1; j<w-r; j++) {
                 val += scl[ri++] - scl[li++];
-                tcl[ti++] = (int)(0.5+val*iarr);
+                tcl[ti++] = (int)(val*iarr);
             }
             
             for(int j=w-r; j<w; j++) {
                 val += lv - scl[li++];
-                tcl[ti++] = (int)(0.5+val*iarr);
+                tcl[ti++] = (int)(val*iarr);
             }
             
         }
@@ -52,14 +52,14 @@ public final class Blur {
             
             for(int j=0; j<=r; j++) {
                 val += scl[ri] - fv;
-                tcl[ti] = (int)(0.5+val*iarr);
+                tcl[ti] = (int)(val*iarr);
                 ri+=w;
                 ti+=w;
             }
             
             for(int j=r+1; j<h-r; j++) {
                 val += scl[ri] - scl[li];
-                tcl[ti] = (int)(0.5+val*iarr);
+                tcl[ti] = (int)(val*iarr);
                 li+=w;
                 ri+=w;
                 ti+=w;
@@ -67,7 +67,7 @@ public final class Blur {
             
             for(int j=h-r; j<h; j++) {
                 val += lv - scl[li];
-                tcl[ti] = (int)(0.5+val*iarr);
+                tcl[ti] = (int)(val*iarr);
                 li+=w;
                 ti+=w;
             }
