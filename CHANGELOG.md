@@ -1,7 +1,7 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
-## 1.2.0
+## 1.2.0-SNAPSHOT
 
 ### Added
 
@@ -20,10 +20,16 @@ All notable changes to this project will be documented in this file. This change
 * BREAKING: by default canvas is fully transparent. Window background is set to white. This is made to match html canvas behaviour.
 * BREAKING: `set-background` uses SrcOver (default) composite. Previously was Src.
 
+### Removed
+
+* thi.ng/color dependency
+
 ### Fixed
 
-* Bring window to top
+* Bring window to top // (still doesn't work well)
 * Headless mode fix
+* Blur algorithm rounding (ghosting effect)
+* Native color conversion `from-` was clumping an input
 
 ## 1.1.0
 

@@ -3,9 +3,8 @@
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
-  :dependencies [[org.clojure/clojure "1.10.0"]
-                 [generateme/fastmath "1.3.0-SNAPSHOT"]
-                 [thi.ng/color "1.3.0"] ;; iq gradients
+  :dependencies [[org.clojure/clojure "1.10.1"]
+                 [generateme/fastmath "1.4.0-SNAPSHOT"]
                  [org.apache.xmlgraphics/batik-transcoder "1.11"] ;; SVG
                  ;; [org.bytedeco/javacv-platform "1.4.1"]
                  ]

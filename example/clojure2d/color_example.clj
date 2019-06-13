@@ -9,7 +9,7 @@
             [fastmath.random :as r]
             [fastmath.easings :as e]
             [fastmath.interpolation :as i]
-            [fastmath.rbf :as rbf]))
+            [fastmath.kernel :as rbf]))
 
 (r/set-seed! r/default-rng 1)
 
@@ -80,8 +80,7 @@
     (to-color (v/vec4 11 22 33 44))
     (to-color [3 4 5])
     (to-color (range 4))
-    (to-color 0xaafffeeb)
-    (to-color (to-thing-rgba :khaki))))
+    (to-color 0xaafffeeb)))
 
 (add-examples to-awt-color
   (example-session "Various conversions"
@@ -129,24 +128,17 @@
   (example-session "Usage" (format-hex :maroon) (format-hex (color 4 55 222))))
 
 (add-examples pack
-  (example-session "Pack colors into 32 bit int"
-    (pack :green)
-    (pack 1233456)
-    (pack 0x1122ff)
-    (pack (to-color 0x1122ff))
-    (pack (color 12 33 255))))
-
-;; -- thing
-
-(add-examples to-thing-rgba
-  (example-session "Usage"
-    (to-thing-rgba :lightblue)
-    (to-thing-rgba (color 128 16 16))))
+              (example-session "Pack colors into 32 bit int"
+                               (pack :green)
+                               (pack 1233456)
+                               (pack 0x1122ff)
+                               (pack (to-color 0x1122ff))
+                               (pack (color 12 33 255))))
 
 ;; --
 
 (add-examples to-linear
-  (example "Gamma correction" (to-linear 0.5)))
+              (example "Gamma correction" (to-linear 0.5)))
 
 (add-examples from-linear
   (example "Gamma correction" (from-linear 0.5)))
@@ -390,7 +382,7 @@
   (example-gradient "Linear, Yxy" (gradient :Yxy (colourlovers-palettes 5)))
   (example-gradient "Cubic, Yxy" (gradient :Yxy :cubic-spline (colourlovers-palettes 5)))
   (example-gradient "Loess, Yxy" (gradient :Yxy :loess (colourlovers-palettes 5)))
-  (example-gradient "RBF, Yxy" (gradient :Yxy (partial i/rbf (rbf/rbf :thinplate)) (colourlovers-palettes 5)))
+  (example-gradient "RBF, Yxy" (gradient :Yxy (partial i/rbf (rbf/rbf :thin-plate)) (colourlovers-palettes 5)))
   (example-gradient "Shepard, Yxy, irregular spacing" (gradient :Yxy :shepard [0 0.1 0.15 0.8 1.0] (colourlovers-palettes 5)))
   (example-palette "Easy way to create palette from gradient" (m/sample (gradient :HSL :cubic-spline [:blue :green]) 10)))
 

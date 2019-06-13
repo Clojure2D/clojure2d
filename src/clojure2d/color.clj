@@ -124,14 +124,10 @@
             [fastmath.interpolation :as i]
             [fastmath.clustering :as cl]
             [fastmath.easings :as e]
-            [clojure.java.io :refer :all]
-            [thi.ng.color.presets :as tpres]
-            [thi.ng.color.gradients :as tgrad]
-            [thi.ng.color.core :as tcol])
+            [clojure.java.io :refer :all])
   (:import [fastmath.vector Vec3 Vec4]           
            [java.awt Color]
-           [clojure.lang Seqable]
-           [thi.ng.color.core RGBA]))
+           [clojure.lang APersistentVector ISeq]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -310,13 +306,13 @@
   "Clamp all color channels to `[0-255]` range."
   {:metadoc/categories #{:ops}}
   [c]
-  (v/applyf (to-color c) clamp255))
+  (v/fmap (to-color c) clamp255))
 
 (defn lclamp
   "Clamp all color channels to `[0-255]` range. Round if necessary."
   {:metadoc/categories #{:ops}}
   [c]
-  (v/applyf (to-color c) lclamp255))
+  (v/fmap (to-color c) lclamp255))
 
 (defn gray
   "Create grayscale color based on intensity `v`. Optional parameter alpha `a`.
@@ -427,41 +423,38 @@
   (to-color [^String c] (to-color (Long/parseLong (strip-hash c) 16)))
   (to-awt-color [c] (to-awt-color (to-color c)))
   (luma [c] (luma (to-color c)))
-  Seqable
-  (to-color [c] (apply color c))
-  (alpha [c] (alpha (to-color c)))
-  (red [c] (red (to-color c)))
-  (green [c] (green (to-color c)))
-  (blue [c] (blue (to-color c)))
-  (ch0 [c] (ch0 (to-color c)))
-  (ch1 [c] (ch1 (to-color c)))
-  (ch2 [c] (ch2 (to-color c)))
+  APersistentVector
+  (to-color [[r g b a :as c]] (case (count c)
+                                0 (Vec4. 0 0 0 255)
+                                1 (gray r)
+                                2 (gray r a)
+                                3 (Vec4. r g b 255)
+                                (Vec4. r g b a)))
+  (alpha [c] (get c 3 255.0))
+  (red [c] (c 0))
+  (green [c] (c 1))
+  (blue [c] (c 2))
+  (ch0 [c] (c 0))
+  (ch1 [c] (c 1))
+  (ch2 [c] (c 2))
   (to-awt-color [c] (to-awt-color (to-color c)))
   (luma [c] (luma (to-color c)))
-  RGBA
-  (to-color [c] (v/mult (color (tcol/red c) (tcol/green c) (tcol/blue c) (tcol/alpha c)) 255.0))
-  (alpha [c] (* 255.0 ^double (tcol/alpha c)))
-  (red [c] (* 255.0 ^double (tcol/red c)))
-  (green [c] (* 255.0 ^double (tcol/green c)))
-  (blue [c] (* 255.0 ^double (tcol/blue c)))
-  (ch0 [c] (* 255.0 ^double (tcol/red c)))
-  (ch1 [c] (* 255.0 ^double (tcol/green c)))
-  (ch2 [c] (* 255.0 ^double (tcol/blue c)))
+  ISeq
+  (to-color [[r g b a :as c]] (case (count c)
+                                0 (Vec4. 0 0 0 255)
+                                1 (gray r)
+                                2 (gray r a)
+                                3 (Vec4. r g b 255)
+                                (Vec4. r g b a)))
+  (alpha [c] (nth c 3 255.0))
+  (red [c] (first c))
+  (green [c] (second c))
+  (blue [c] (nth c 2))
+  (ch0 [c] (first c))
+  (ch1 [c] (second c))
+  (ch2 [c] (nth c 2))
   (to-awt-color [c] (to-awt-color (to-color c)))
-  (luma [c] (* 255.0 ^double (tcol/luminance c))))
-
-(extend-type Vec4
-  tcol/IRGBConvert
-  (as-rgba [c] (let [^Vec4 col (-> c
-                                   (to-color)
-                                   (v/div 255.0))]
-                 (tcol/rgba (.x col) (.y col) (.z col) (.w col)))))
-
-(defn to-thing-rgba
-  "Convert Clojure2d color to thi.ng RGBA."
-  {:metadoc/categories #{:ops}}
-  [c]
-  (tcol/as-rgba (to-color c)))
+  (luma [c] (luma (to-color c))))
 
 (defn format-hex
   "Convert color to hex string (css)."
@@ -1015,7 +1008,7 @@ See [[blends-list]] for names."}
   (let [^Vec4 c (to-color c)]
     (v/vec4 (-> (Vec3. (.x c) (.y c) (.z c))
                 (v/div 255.0)
-                (v/applyf from-linear)
+                (v/fmap from-linear)
                 (v/mult 255.0))
             (.w c))))
 
@@ -1026,7 +1019,7 @@ See [[blends-list]] for names."}
   (let [^Vec4 c (to-color c)]
     (v/vec4 (-> (Vec3. (.x c) (.y c) (.z c))
                 (v/div 255.0)
-                (v/applyf to-linear)
+                (v/fmap to-linear)
                 (v/mult 255.0))
             (.w c))))
 
@@ -1053,7 +1046,7 @@ See [[blends-list]] for names."}
   (let [^Vec4 c (to-color c)]
     (let [xyz-raw (to-XYZ- (-> (Vec3. (.x c) (.y c) (.z c))
                                (v/div 255.0)
-                               (v/applyf to-linear)
+                               (v/fmap to-linear)
                                (v/mult 100.0)))]
       (v/vec4 xyz-raw (.w c)))))
 
@@ -1079,7 +1072,7 @@ See [[blends-list]] for names."}
   {:metadoc/categories #{:conv}}
   [c] 
   (let [^Vec4 c (to-color c)
-        ^Vec3 rgb-raw (v/mult (v/applyf (from-XYZ- (v/div (Vec3. (.x c) (.y c) (.z c)) 100.0)) from-linear) 255.0)]
+        ^Vec3 rgb-raw (v/mult (v/fmap (from-XYZ- (v/div (Vec3. (.x c) (.y c) (.z c)) 100.0)) from-linear) 255.0)]
     (v/vec4 rgb-raw (.w c))))
 
 (defn from-XYZ*
@@ -1433,7 +1426,7 @@ See [[blends-list]] for names."}
         ^Vec3 LMS (-> (Vec3. (+ (* 0.4002 (.x c)) (* 0.7075 (.y c)) (* -0.0807 (.z c)))
                              (+ (* -0.228 (.x c)) (* 1.15 (.y c)) (* 0.0612 (.z c)))
                              (* 0.9184 (.z c)))
-                      (v/applyf spow-043))]
+                      (v/fmap spow-043))]
     (Vec4. (+ (* 0.4 (.x LMS)) (* 0.4 (.y LMS)) (* 0.2 (.z LMS)))
            (+ (* 4.455 (.x LMS)) (* -4.851 (.y LMS)) (* 0.396 (.z LMS)))
            (+ (* 0.8056 (.x LMS)) (* 0.3572 (.y LMS)) (* -1.1628 (.z LMS)))
@@ -1457,7 +1450,7 @@ See [[blends-list]] for names."}
         ^Vec3 LMS' (-> (Vec3. (+ (* 1.0000000000000002 (.x c)) (* 0.0975689305146139 (.y c)) (* 0.2052264331645916 (.z c)))
                               (+ (* 0.9999999999999999 (.x c)) (* -0.1138764854731471 (.y c)) (* 0.13321715836999806 (.z c)))
                               (+ (* 0.9999999999999999 (.x c)) (* 0.0326151099170664 (.y c)) (* -0.6768871830691793 (.z c))))
-                       (v/applyf spow-r043))]
+                       (v/fmap spow-r043))]
     (from-XYZ (Vec4. (+ (* 1.8502429449432056 (.x LMS')) (* -1.1383016378672328 (.y LMS')) (* 0.23843495850870136 (.z LMS')))
                      (+ (* 0.3668307751713486 (.x LMS')) (* 0.6438845448402355 (.y LMS')) (* -0.010673443584379992 (.z LMS')))
                      (* 1.088850174216028 (.z LMS'))
@@ -1509,7 +1502,7 @@ See [[blends-list]] for names."}
         ^Vec3 LMS' (-> (Vec3. (+ (* 0.41478972 X') (* 0.579999 Y') (* 0.0146480 (.z c)))
                               (+ (* -0.2015100 X') (* 1.120649 Y') (* 0.0531008 (.z c)))
                               (+ (* -0.0166008 X') (* 0.264800 Y') (* 0.6684799 (.z c))))
-                       (v/applyf jab-lms->lms'))
+                       (v/fmap jab-lms->lms'))
         ^Vec3 Iab (Vec3. (+ (* 0.5 (.x LMS')) (* 0.5 (.y LMS')))
                          (+ (* 3.524000 (.x LMS')) (* -4.066708 (.y LMS')) (* 0.542708 (.z LMS')))
                          (+ (* 0.199076 (.x LMS')) (* 1.096799 (.y LMS')) (* -1.295875 (.z LMS'))))]
@@ -1543,7 +1536,7 @@ See [[blends-list]] for names."}
         ^Vec3 LMS (-> (Vec3. (+ (* 1.0000000000000002 I) (* 0.1386050432715393 (.y c)) (* 0.05804731615611886 (.z c)))
                              (+ (* 0.9999999999999999 I) (* -0.1386050432715393 (.y c)) (* -0.05804731615611886 (.z c)))
                              (+ (* 0.9999999999999998 I) (* -0.09601924202631895 (.y c)) (* -0.8118918960560388 (.z c))))
-                      (v/applyf jab-lms'->lms))
+                      (v/fmap jab-lms'->lms))
         ^Vec3 XYZ' (Vec3. (+ (* 1.9242264357876069 (.x LMS)) (* -1.0047923125953657 (.y LMS)) (* 0.037651404030617994 (.z LMS)))
                           (+ (* 0.350316762094999 (.x LMS)) (* 0.7264811939316552 (.y LMS)) (* -0.06538442294808501 (.z LMS)))
                           (+ (* -0.09098281098284752 (.x LMS)) (* -0.3127282905230739 (.y LMS)) (* 1.5227665613052603 (.z LMS))))
@@ -2383,7 +2376,7 @@ See [[blends-list]] for names."}
              ch2 (* 255.0 (/ (.y v) ^double ch2-scale))
              ch3 (* 255.0 (/ (.z v) ^double ch3-scale))
              ch4 (* 255.0 (/ (.w v) ^double ch4-scale))]
-         (colorspace-fn (v/applyf (Vec4. ch1 ch2 ch3 ch4) clamp255))))))
+         (colorspace-fn (v/fmap (Vec4. ch1 ch2 ch3 ch4) clamp255))))))
   ([cs ch1-scale ch2-scale ch3-scale] (color-converter cs ch1-scale ch2-scale ch3-scale 255.0))
   ([cs ch-scale] (color-converter cs ch-scale ch-scale ch-scale ch-scale))
   ([cs] (second (colorspaces* cs))))
@@ -2416,6 +2409,26 @@ See [[blends-list]] for names."}
 
 ;; http://iquilezles.org/www/articles/palettes/palettes.htm
 
+(defn- cosine-coefficients
+  "Computes coefficients defining a cosine gradient between
+  the two given colors. The colors can be in any color space,
+  but the resulting gradient will always be computed in RGB.
+
+  amp = (R1 - R2) / 2
+  dc = R1 - amp
+  freq = -0.5
+
+  Code borrowed from thi.ng/color"
+  ([c1 c2]
+   (let [c1 (v/vec3 (red c1) (green c1) (blue c1))
+         c2 (v/vec3 (red c1) (green c2) (blue c2))
+         amp (v/mult (v/sub c1 c2) 0.5)
+         offset (v/sub c1 amp)]
+     [(v/div offset 255.0)
+      (v/div amp 255.0)
+      (v/vec3 -0.500 -0.500 -0.500)
+      (v/vec3)])))
+
 (defn iq-gradient
   "Create gradient generator function with given parametrization or two colors.
 
@@ -2424,20 +2437,19 @@ See [[blends-list]] for names."}
   Parameters should be `Vec3` type."
   {:metadoc/categories #{:gr}}
   ([c1 c2]
-   (apply iq-gradient (->> (tgrad/cosine-coefficients (to-color c1) (to-color c2))
-                           (map #(apply v/vec3 %)))))
+   (apply iq-gradient (cosine-coefficients c1 c2)))
   ([a b c d]
    (fn [t]
-     (let [^Vec3 cc (-> (->> t
-                             (v/mult c)
-                             (v/add d))
-                        (v/mult m/TWO_PI)
-                        (v/applyf #(m/cos %))
-                        (v/emult b)
-                        (v/add a))]
+     (let [^Vec3 cc (apply v/vec3 (-> (->> t
+                                           (v/mult c)
+                                           (v/add d))
+                                      (v/mult m/TWO_PI)
+                                      (v/fmap #(m/cos %))
+                                      (v/emult b)
+                                      (v/add a)))]
        (-> (Vec4. (.x cc) (.y cc) (.z cc) 1.0)
            (v/mult 255.0)
-           (v/applyf clamp255))))))
+           (v/fmap clamp255))))))
 
 (declare paletton)
 
@@ -2863,157 +2875,239 @@ See [[blends-list]] for names."}
 ;; colors
 
 (def ^:private named-colors-map
-  (merge
-   tpres/colors
-   {:aliceblue 0xf0f8ff,
-    :antiquewhite 0xfaebd7,
-    :amber (color 178 140 0)
-    :aqua 0x00ffff,
-    :aquamarine 0x7fffd4,
-    :azure 0xf0ffff,
-    :beige 0xf5f5dc,
-    :bisque 0xffe4c4,
-    :black 0x000000,
-    :blanchedalmond 0xffebcd,
-    :blue 0x0000ff,
-    :blueviolet 0x8a2be2,
-    :brown 0xa52a2a,
-    :burlywood 0xdeb887,
-    :cadetblue 0x5f9ea0,
-    :chartreuse 0x7fff00,
-    :chocolate 0xd2691e,
-    :coral 0xff7f50,
-    :cornflowerblue 0x6495ed,
-    :cornsilk 0xfff8dc,
-    :crimson 0xdc143c,
-    :cyan 0x00ffff,
-    :darkblue 0x00008b,
-    :darkcyan 0x008b8b,
-    :darkgoldenrod 0xb8860b,
-    :darkgray 0xa9a9a9,
-    :darkgreen 0x006400,
-    :darkgrey 0xa9a9a9,
-    :darkkhaki 0xbdb76b,
-    :darkmagenta 0x8b008b,
-    :darkolivegreen 0x556b2f,
-    :darkorange 0xff8c00,
-    :darkorchid 0x9932cc,
-    :darkred 0x8b0000,
-    :darksalmon 0xe9967a,
-    :darkseagreen 0x8fbc8f,
-    :darkslateblue 0x483d8b,
-    :darkslategray 0x2f4f4f,
-    :darkslategrey 0x2f4f4f,
-    :darkturquoise 0x00ced1,
-    :darkviolet 0x9400d3,
-    :deeppink 0xff1493,
-    :deepskyblue 0x00bfff,
-    :dimgray 0x696969,
-    :dimgrey 0x696969,
-    :dodgerblue 0x1e90ff,
-    :firebrick 0xb22222,
-    :floralwhite 0xfffaf0,
-    :forestgreen 0x228b22,
-    :fuchsia 0xff00ff,
-    :gainsboro 0xdcdcdc,
-    :ghostwhite 0xf8f8ff,
-    :gold 0xffd700,
-    :goldenrod 0xdaa520,
-    :gray 0x808080,
-    :green 0x008000,
-    :greenyellow 0xadff2f,
-    :grey 0x808080,
-    :honeydew 0xf0fff0,
-    :hotpink 0xff69b4,
-    :indianred 0xcd5c5c,
-    :indigo 0x4b0082,
-    :ivory 0xfffff0,
-    :khaki 0xf0e68c,
-    :lavender 0xe6e6fa,
-    :lavenderblush 0xfff0f5,
-    :lawngreen 0x7cfc00,
-    :lemonchiffon 0xfffacd,
-    :lightblue 0xadd8e6,
-    :lightcoral 0xf08080,
-    :lightcyan 0xe0ffff,
-    :lightgoldenrodyellow 0xfafad2,
-    :lightgray 0xd3d3d3,
-    :lightgreen 0x90ee90,
-    :lightgrey 0xd3d3d3,
-    :lightpink 0xffb6c1,
-    :lightsalmon 0xffa07a,
-    :lightseagreen 0x20b2aa,
-    :lightskyblue 0x87cefa,
-    :lightslategray 0x778899,
-    :lightslategrey 0x778899,
-    :lightsteelblue 0xb0c4de,
-    :lightyellow 0xffffe0,
-    :lime 0x00ff00,
-    :limegreen 0x32cd32,
-    :linen 0xfaf0e6,
-    :magenta 0xff00ff,
-    :maroon 0x800000,
-    :mediumaquamarine 0x66cdaa,
-    :mediumblue 0x0000cd,
-    :mediumorchid 0xba55d3,
-    :mediumpurple 0x9370db,
-    :mediumseagreen 0x3cb371,
-    :mediumslateblue 0x7b68ee,
-    :mediumspringgreen 0x00fa9a,
-    :mediumturquoise 0x48d1cc,
-    :mediumvioletred 0xc71585,
-    :midnightblue 0x191970,
-    :mintcream 0xf5fffa,
-    :mistyrose 0xffe4e1,
-    :moccasin 0xffe4b5,
-    :navajowhite 0xffdead,
-    :navy 0x000080,
-    :oldlace 0xfdf5e6,
-    :olive 0x808000,
-    :olivedrab 0x6b8e23,
-    :orange 0xffa500,
-    :orangered 0xff4500,
-    :orchid 0xda70d6,
-    :palegoldenrod 0xeee8aa,
-    :palegreen 0x98fb98,
-    :paleturquoise 0xafeeee,
-    :palevioletred 0xdb7093,
-    :papayawhip 0xffefd5,
-    :peachpuff 0xffdab9,
-    :peru 0xcd853f,
-    :pink 0xffc0cb,
-    :plum 0xdda0dd,
-    :powderblue 0xb0e0e6,
-    :purple 0x800080,
-    :rebeccapurple 0x663399,
-    :red 0xff0000,
-    :rosybrown 0xbc8f8f,
-    :royalblue 0x4169e1,
-    :saddlebrown 0x8b4513,
-    :salmon 0xfa8072,
-    :sandybrown 0xf4a460,
-    :seagreen 0x2e8b57,
-    :seashell 0xfff5ee,
-    :sienna 0xa0522d,
-    :silver 0xc0c0c0,
-    :skyblue 0x87ceeb,
-    :slateblue 0x6a5acd,
-    :slategray 0x708090,
-    :slategrey 0x708090,
-    :snow 0xfffafa,
-    :springgreen 0x00ff7f,
-    :steelblue 0x4682b4,
-    :tan 0xd2b48c,
-    :teal 0x008080,
-    :thistle 0xd8bfd8,
-    :tomato 0xff6347,
-    :turquoise 0x40e0d0,
-    :violet 0xee82ee,
-    :wheat 0xf5deb3,
-    :white 0xffffff,
-    :whitesmoke 0xf5f5f5,
-    :yellow 0xffff00,
-    :yellowgreen 0x9acd32}))
+  {:alice-blue            0xf0f8ff
+   :antique-white         0xfaebd7
+   :blanched-almond       0xffebcd
+   :blue-violet           0x8a2be2
+   :burly-wood            0xdeb887
+   :cadet-blue            0x5f9ea0
+   :cornflower-blue       0x6495ed
+   :dark-blue             0x00008b
+   :dark-cyan             0x008b8b
+   :dark-goldenrod        0xb8860b
+   :dark-gray             0xa9a9a9
+   :dark-green            0x006400
+   :dark-khaki            0xbdb76b
+   :dark-magenta          0x8b008b
+   :dark-olivegreen       0x556b2f
+   :dark-orange           0xff8c00
+   :dark-orchid           0x9932cc
+   :dark-red              0x8b0000
+   :dark-salmon           0xe9967a
+   :dark-seagreen         0x8fbc8f
+   :dark-slateblue        0x483d8b
+   :dark-slategray        0x2f4f4f
+   :dark-turquoise        0x00ced1
+   :dark-violet           0x9400d3
+   :deep-pink             0xff1493
+   :deep-skyblue          0x00bfff
+   :dim-gray              0x696969
+   :dodger-blue           0x1e90ff
+   :fire-brick            0xb22222
+   :floral-white          0xfffaf0
+   :forest-green          0x228b22
+   :ghost-white           0xf8f8ff
+   :green-yellow          0xadff2f
+   :hot-pink              0xff69b4
+   :indian-red            0xcd5c5c
+   :lavender-blush        0xfff0f5
+   :lawn-green            0x7cfc00
+   :lemon-chiffon         0xfffacd
+   :light-blue            0xadd8e6
+   :light-coral           0xf08080
+   :light-cyan            0xe0ffff
+   :light-goldenrodyellow 0xfafad2
+   :light-green           0x90ee90
+   :light-grey            0xd3d3d3
+   :light-pink            0xffb6c1
+   :light-salmon          0xffa07a
+   :light-seagreen        0x20b2aa
+   :light-skyblue         0x87cefa
+   :light-slategray       0x778899
+   :light-steelblue       0xb0c4de
+   :light-yellow          0xffffe0
+   :medium-aquamarine     0x66cdaa
+   :medium-blue           0x0000cd
+   :medium-orchid         0xba55d3
+   :medium-purple         0x9370db
+   :medium-seagreen       0x3cb371
+   :medium-slateblue      0x7b68ee
+   :medium-springgreen    0x00fa9a
+   :medium-turquoise      0x48d1cc
+   :medium-violetred      0xc71585
+   :midnight-blue         0x191970
+   :mint-cream            0xf5fffa
+   :misty-rose            0xffe4e1
+   :navajo-white          0xffdead
+   :old-lace              0xfdf5e6
+   :olive-drab            0x6b8e23
+   :orange-red            0xff4500
+   :pale-goldenrod        0xeee8aa
+   :pale-green            0x98fb98
+   :pale-violetred        0xdb7093
+   :papaya-whip           0xffefd5
+   :peach-puff            0xffdab9
+   :powder-blue           0xb0e0e6
+   :rosy-brown            0xbc8f8f
+   :royal-blue            0x4169e1
+   :saddle-brown          0x8b4513
+   :sandy-brown           0xfaa460
+   :sea-green             0x2e8b57
+   :slate-blue            0x6a5acd
+   :slate-gray            0x708090
+   :spring-green          0x00ff7f
+   :steel-blue            0x4682b4
+   :white-smoke           0xf5f5f5
+   :yellow-green          0x9acd32
+   :aliceblue             0xf0f8ff
+   :antiquewhite          0xfaebd7
+   :amber                 (color 178 140 0)
+   :aqua                  0x00ffff
+   :aquamarine            0x7fffd4
+   :azure                 0xf0ffff
+   :beige                 0xf5f5dc
+   :bisque                0xffe4c4
+   :black                 0x000000
+   :blanchedalmond        0xffebcd
+   :blue                  0x0000ff
+   :blueviolet            0x8a2be2
+   :brown                 0xa52a2a
+   :burlywood             0xdeb887
+   :cadetblue             0x5f9ea0
+   :chartreuse            0x7fff00
+   :chocolate             0xd2691e
+   :coral                 0xff7f50
+   :cornflowerblue        0x6495ed
+   :cornsilk              0xfff8dc
+   :crimson               0xdc143c
+   :cyan                  0x00ffff
+   :darkblue              0x00008b
+   :darkcyan              0x008b8b
+   :darkgoldenrod         0xb8860b
+   :darkgray              0xa9a9a9
+   :darkgreen             0x006400
+   :darkgrey              0xa9a9a9
+   :darkkhaki             0xbdb76b
+   :darkmagenta           0x8b008b
+   :darkolivegreen        0x556b2f
+   :darkorange            0xff8c00
+   :darkorchid            0x9932cc
+   :darkred               0x8b0000
+   :darksalmon            0xe9967a
+   :darkseagreen          0x8fbc8f
+   :darkslateblue         0x483d8b
+   :darkslategray         0x2f4f4f
+   :darkslategrey         0x2f4f4f
+   :darkturquoise         0x00ced1
+   :darkviolet            0x9400d3
+   :deeppink              0xff1493
+   :deepskyblue           0x00bfff
+   :dimgray               0x696969
+   :dimgrey               0x696969
+   :dodgerblue            0x1e90ff
+   :firebrick             0xb22222
+   :floralwhite           0xfffaf0
+   :forestgreen           0x228b22
+   :fuchsia               0xff00ff
+   :gainsboro             0xdcdcdc
+   :ghostwhite            0xf8f8ff
+   :gold                  0xffd700
+   :goldenrod             0xdaa520
+   :gray                  0x808080
+   :green                 0x008000
+   :greenyellow           0xadff2f
+   :grey                  0x808080
+   :honeydew              0xf0fff0
+   :hotpink               0xff69b4
+   :indianred             0xcd5c5c
+   :indigo                0x4b0082
+   :ivory                 0xfffff0
+   :khaki                 0xf0e68c
+   :lavender              0xe6e6fa
+   :lavenderblush         0xfff0f5
+   :lawngreen             0x7cfc00
+   :lemonchiffon          0xfffacd
+   :lightblue             0xadd8e6
+   :lightcoral            0xf08080
+   :lightcyan             0xe0ffff
+   :lightgoldenrodyellow  0xfafad2
+   :lightgray             0xd3d3d3
+   :lightgreen            0x90ee90
+   :lightgrey             0xd3d3d3
+   :lightpink             0xffb6c1
+   :lightsalmon           0xffa07a
+   :lightseagreen         0x20b2aa
+   :lightskyblue          0x87cefa
+   :lightslategray        0x778899
+   :lightslategrey        0x778899
+   :lightsteelblue        0xb0c4de
+   :lightyellow           0xffffe0
+   :lime                  0x00ff00
+   :limegreen             0x32cd32
+   :linen                 0xfaf0e6
+   :magenta               0xff00ff
+   :maroon                0x800000
+   :mediumaquamarine      0x66cdaa
+   :mediumblue            0x0000cd
+   :mediumorchid          0xba55d3
+   :mediumpurple          0x9370db
+   :mediumseagreen        0x3cb371
+   :mediumslateblue       0x7b68ee
+   :mediumspringgreen     0x00fa9a
+   :mediumturquoise       0x48d1cc
+   :mediumvioletred       0xc71585
+   :midnightblue          0x191970
+   :mintcream             0xf5fffa
+   :mistyrose             0xffe4e1
+   :moccasin              0xffe4b5
+   :navajowhite           0xffdead
+   :navy                  0x000080
+   :oldlace               0xfdf5e6
+   :olive                 0x808000
+   :olivedrab             0x6b8e23
+   :orange                0xffa500
+   :orangered             0xff4500
+   :orchid                0xda70d6
+   :palegoldenrod         0xeee8aa
+   :palegreen             0x98fb98
+   :paleturquoise         0xafeeee
+   :palevioletred         0xdb7093
+   :papayawhip            0xffefd5
+   :peachpuff             0xffdab9
+   :peru                  0xcd853f
+   :pink                  0xffc0cb
+   :plum                  0xdda0dd
+   :powderblue            0xb0e0e6
+   :purple                0x800080
+   :rebeccapurple         0x663399
+   :red                   0xff0000
+   :rosybrown             0xbc8f8f
+   :royalblue             0x4169e1
+   :saddlebrown           0x8b4513
+   :salmon                0xfa8072
+   :sandybrown            0xf4a460
+   :seagreen              0x2e8b57
+   :seashell              0xfff5ee
+   :sienna                0xa0522d
+   :silver                0xc0c0c0
+   :skyblue               0x87ceeb
+   :slateblue             0x6a5acd
+   :slategray             0x708090
+   :slategrey             0x708090
+   :snow                  0xfffafa
+   :springgreen           0x00ff7f
+   :steelblue             0x4682b4
+   :tan                   0xd2b48c
+   :teal                  0x008080
+   :thistle               0xd8bfd8
+   :tomato                0xff6347
+   :turquoise             0x40e0d0
+   :violet                0xee82ee
+   :wheat                 0xf5deb3
+   :white                 0xffffff
+   :whitesmoke            0xf5f5f5
+   :yellow                0xffff00
+   :yellowgreen           0x9acd32})
 
 (def ^{:doc "List of html color names
 
@@ -3162,212 +3256,212 @@ See [[blends-list]] for names."}
        :metadoc/categories #{:pal}} palette-presets
   (merge
    image-palettes
-   (d3->palettes "brbg" ["d8b365f5f5f55ab4ac",
-                         "a6611adfc27d80cdc1018571",
-                         "a6611adfc27df5f5f580cdc1018571",
-                         "8c510ad8b365f6e8c3c7eae55ab4ac01665e",
-                         "8c510ad8b365f6e8c3f5f5f5c7eae55ab4ac01665e",
-                         "8c510abf812ddfc27df6e8c3c7eae580cdc135978f01665e",
-                         "8c510abf812ddfc27df6e8c3f5f5f5c7eae580cdc135978f01665e",
-                         "5430058c510abf812ddfc27df6e8c3c7eae580cdc135978f01665e003c30",
+   (d3->palettes "brbg" ["d8b365f5f5f55ab4ac"
+                         "a6611adfc27d80cdc1018571"
+                         "a6611adfc27df5f5f580cdc1018571"
+                         "8c510ad8b365f6e8c3c7eae55ab4ac01665e"
+                         "8c510ad8b365f6e8c3f5f5f5c7eae55ab4ac01665e"
+                         "8c510abf812ddfc27df6e8c3c7eae580cdc135978f01665e"
+                         "8c510abf812ddfc27df6e8c3f5f5f5c7eae580cdc135978f01665e"
+                         "5430058c510abf812ddfc27df6e8c3c7eae580cdc135978f01665e003c30"
                          "5430058c510abf812ddfc27df6e8c3f5f5f5c7eae580cdc135978f01665e003c30"])
-   (d3->palettes "prgn" ["af8dc3f7f7f77fbf7b",
-                         "7b3294c2a5cfa6dba0008837",
-                         "7b3294c2a5cff7f7f7a6dba0008837",
-                         "762a83af8dc3e7d4e8d9f0d37fbf7b1b7837",
-                         "762a83af8dc3e7d4e8f7f7f7d9f0d37fbf7b1b7837",
-                         "762a839970abc2a5cfe7d4e8d9f0d3a6dba05aae611b7837",
-                         "762a839970abc2a5cfe7d4e8f7f7f7d9f0d3a6dba05aae611b7837",
-                         "40004b762a839970abc2a5cfe7d4e8d9f0d3a6dba05aae611b783700441b",
+   (d3->palettes "prgn" ["af8dc3f7f7f77fbf7b"
+                         "7b3294c2a5cfa6dba0008837"
+                         "7b3294c2a5cff7f7f7a6dba0008837"
+                         "762a83af8dc3e7d4e8d9f0d37fbf7b1b7837"
+                         "762a83af8dc3e7d4e8f7f7f7d9f0d37fbf7b1b7837"
+                         "762a839970abc2a5cfe7d4e8d9f0d3a6dba05aae611b7837"
+                         "762a839970abc2a5cfe7d4e8f7f7f7d9f0d3a6dba05aae611b7837"
+                         "40004b762a839970abc2a5cfe7d4e8d9f0d3a6dba05aae611b783700441b"
                          "40004b762a839970abc2a5cfe7d4e8f7f7f7d9f0d3a6dba05aae611b783700441b"])
-   (d3->palettes "piyg" ["e9a3c9f7f7f7a1d76a",
-                         "d01c8bf1b6dab8e1864dac26",
-                         "d01c8bf1b6daf7f7f7b8e1864dac26",
-                         "c51b7de9a3c9fde0efe6f5d0a1d76a4d9221",
-                         "c51b7de9a3c9fde0eff7f7f7e6f5d0a1d76a4d9221",
-                         "c51b7dde77aef1b6dafde0efe6f5d0b8e1867fbc414d9221",
-                         "c51b7dde77aef1b6dafde0eff7f7f7e6f5d0b8e1867fbc414d9221",
-                         "8e0152c51b7dde77aef1b6dafde0efe6f5d0b8e1867fbc414d9221276419",
+   (d3->palettes "piyg" ["e9a3c9f7f7f7a1d76a"
+                         "d01c8bf1b6dab8e1864dac26"
+                         "d01c8bf1b6daf7f7f7b8e1864dac26"
+                         "c51b7de9a3c9fde0efe6f5d0a1d76a4d9221"
+                         "c51b7de9a3c9fde0eff7f7f7e6f5d0a1d76a4d9221"
+                         "c51b7dde77aef1b6dafde0efe6f5d0b8e1867fbc414d9221"
+                         "c51b7dde77aef1b6dafde0eff7f7f7e6f5d0b8e1867fbc414d9221"
+                         "8e0152c51b7dde77aef1b6dafde0efe6f5d0b8e1867fbc414d9221276419"
                          "8e0152c51b7dde77aef1b6dafde0eff7f7f7e6f5d0b8e1867fbc414d9221276419"])
-   (d3->palettes "puor" ["998ec3f7f7f7f1a340",
-                         "5e3c99b2abd2fdb863e66101",
-                         "5e3c99b2abd2f7f7f7fdb863e66101",
-                         "542788998ec3d8daebfee0b6f1a340b35806",
-                         "542788998ec3d8daebf7f7f7fee0b6f1a340b35806",
-                         "5427888073acb2abd2d8daebfee0b6fdb863e08214b35806",
-                         "5427888073acb2abd2d8daebf7f7f7fee0b6fdb863e08214b35806",
-                         "2d004b5427888073acb2abd2d8daebfee0b6fdb863e08214b358067f3b08",
+   (d3->palettes "puor" ["998ec3f7f7f7f1a340"
+                         "5e3c99b2abd2fdb863e66101"
+                         "5e3c99b2abd2f7f7f7fdb863e66101"
+                         "542788998ec3d8daebfee0b6f1a340b35806"
+                         "542788998ec3d8daebf7f7f7fee0b6f1a340b35806"
+                         "5427888073acb2abd2d8daebfee0b6fdb863e08214b35806"
+                         "5427888073acb2abd2d8daebf7f7f7fee0b6fdb863e08214b35806"
+                         "2d004b5427888073acb2abd2d8daebfee0b6fdb863e08214b358067f3b08"
                          "2d004b5427888073acb2abd2d8daebf7f7f7fee0b6fdb863e08214b358067f3b08"])
-   (d3->palettes "rdbu" ["ef8a62f7f7f767a9cf",
-                         "ca0020f4a58292c5de0571b0",
-                         "ca0020f4a582f7f7f792c5de0571b0",
-                         "b2182bef8a62fddbc7d1e5f067a9cf2166ac",
-                         "b2182bef8a62fddbc7f7f7f7d1e5f067a9cf2166ac",
-                         "b2182bd6604df4a582fddbc7d1e5f092c5de4393c32166ac",
-                         "b2182bd6604df4a582fddbc7f7f7f7d1e5f092c5de4393c32166ac",
-                         "67001fb2182bd6604df4a582fddbc7d1e5f092c5de4393c32166ac053061",
+   (d3->palettes "rdbu" ["ef8a62f7f7f767a9cf"
+                         "ca0020f4a58292c5de0571b0"
+                         "ca0020f4a582f7f7f792c5de0571b0"
+                         "b2182bef8a62fddbc7d1e5f067a9cf2166ac"
+                         "b2182bef8a62fddbc7f7f7f7d1e5f067a9cf2166ac"
+                         "b2182bd6604df4a582fddbc7d1e5f092c5de4393c32166ac"
+                         "b2182bd6604df4a582fddbc7f7f7f7d1e5f092c5de4393c32166ac"
+                         "67001fb2182bd6604df4a582fddbc7d1e5f092c5de4393c32166ac053061"
                          "67001fb2182bd6604df4a582fddbc7f7f7f7d1e5f092c5de4393c32166ac053061"])
-   (d3->palettes "rdgy" ["ef8a62ffffff999999",
-                         "ca0020f4a582bababa404040",
-                         "ca0020f4a582ffffffbababa404040",
-                         "b2182bef8a62fddbc7e0e0e09999994d4d4d",
-                         "b2182bef8a62fddbc7ffffffe0e0e09999994d4d4d",
-                         "b2182bd6604df4a582fddbc7e0e0e0bababa8787874d4d4d",
-                         "b2182bd6604df4a582fddbc7ffffffe0e0e0bababa8787874d4d4d",
-                         "67001fb2182bd6604df4a582fddbc7e0e0e0bababa8787874d4d4d1a1a1a",
+   (d3->palettes "rdgy" ["ef8a62ffffff999999"
+                         "ca0020f4a582bababa404040"
+                         "ca0020f4a582ffffffbababa404040"
+                         "b2182bef8a62fddbc7e0e0e09999994d4d4d"
+                         "b2182bef8a62fddbc7ffffffe0e0e09999994d4d4d"
+                         "b2182bd6604df4a582fddbc7e0e0e0bababa8787874d4d4d"
+                         "b2182bd6604df4a582fddbc7ffffffe0e0e0bababa8787874d4d4d"
+                         "67001fb2182bd6604df4a582fddbc7e0e0e0bababa8787874d4d4d1a1a1a"
                          "67001fb2182bd6604df4a582fddbc7ffffffe0e0e0bababa8787874d4d4d1a1a1a"])
-   (d3->palettes "rdylbu" ["fc8d59ffffbf91bfdb",
-                           "d7191cfdae61abd9e92c7bb6",
-                           "d7191cfdae61ffffbfabd9e92c7bb6",
-                           "d73027fc8d59fee090e0f3f891bfdb4575b4",
-                           "d73027fc8d59fee090ffffbfe0f3f891bfdb4575b4",
-                           "d73027f46d43fdae61fee090e0f3f8abd9e974add14575b4",
-                           "d73027f46d43fdae61fee090ffffbfe0f3f8abd9e974add14575b4",
-                           "a50026d73027f46d43fdae61fee090e0f3f8abd9e974add14575b4313695",
+   (d3->palettes "rdylbu" ["fc8d59ffffbf91bfdb"
+                           "d7191cfdae61abd9e92c7bb6"
+                           "d7191cfdae61ffffbfabd9e92c7bb6"
+                           "d73027fc8d59fee090e0f3f891bfdb4575b4"
+                           "d73027fc8d59fee090ffffbfe0f3f891bfdb4575b4"
+                           "d73027f46d43fdae61fee090e0f3f8abd9e974add14575b4"
+                           "d73027f46d43fdae61fee090ffffbfe0f3f8abd9e974add14575b4"
+                           "a50026d73027f46d43fdae61fee090e0f3f8abd9e974add14575b4313695"
                            "a50026d73027f46d43fdae61fee090ffffbfe0f3f8abd9e974add14575b4313695"])
-   (d3->palettes "rdylgn" ["fc8d59ffffbf91cf60",
-                           "d7191cfdae61a6d96a1a9641",
-                           "d7191cfdae61ffffbfa6d96a1a9641",
-                           "d73027fc8d59fee08bd9ef8b91cf601a9850",
-                           "d73027fc8d59fee08bffffbfd9ef8b91cf601a9850",
-                           "d73027f46d43fdae61fee08bd9ef8ba6d96a66bd631a9850",
-                           "d73027f46d43fdae61fee08bffffbfd9ef8ba6d96a66bd631a9850",
-                           "a50026d73027f46d43fdae61fee08bd9ef8ba6d96a66bd631a9850006837",
+   (d3->palettes "rdylgn" ["fc8d59ffffbf91cf60"
+                           "d7191cfdae61a6d96a1a9641"
+                           "d7191cfdae61ffffbfa6d96a1a9641"
+                           "d73027fc8d59fee08bd9ef8b91cf601a9850"
+                           "d73027fc8d59fee08bffffbfd9ef8b91cf601a9850"
+                           "d73027f46d43fdae61fee08bd9ef8ba6d96a66bd631a9850"
+                           "d73027f46d43fdae61fee08bffffbfd9ef8ba6d96a66bd631a9850"
+                           "a50026d73027f46d43fdae61fee08bd9ef8ba6d96a66bd631a9850006837"
                            "a50026d73027f46d43fdae61fee08bffffbfd9ef8ba6d96a66bd631a9850006837"])
-   (d3->palettes "spectral" ["fc8d59ffffbf99d594",
-                             "d7191cfdae61abdda42b83ba",
-                             "d7191cfdae61ffffbfabdda42b83ba",
-                             "d53e4ffc8d59fee08be6f59899d5943288bd",
-                             "d53e4ffc8d59fee08bffffbfe6f59899d5943288bd",
-                             "d53e4ff46d43fdae61fee08be6f598abdda466c2a53288bd",
-                             "d53e4ff46d43fdae61fee08bffffbfe6f598abdda466c2a53288bd",
-                             "9e0142d53e4ff46d43fdae61fee08be6f598abdda466c2a53288bd5e4fa2",
+   (d3->palettes "spectral" ["fc8d59ffffbf99d594"
+                             "d7191cfdae61abdda42b83ba"
+                             "d7191cfdae61ffffbfabdda42b83ba"
+                             "d53e4ffc8d59fee08be6f59899d5943288bd"
+                             "d53e4ffc8d59fee08bffffbfe6f59899d5943288bd"
+                             "d53e4ff46d43fdae61fee08be6f598abdda466c2a53288bd"
+                             "d53e4ff46d43fdae61fee08bffffbfe6f598abdda466c2a53288bd"
+                             "9e0142d53e4ff46d43fdae61fee08be6f598abdda466c2a53288bd5e4fa2"
                              "9e0142d53e4ff46d43fdae61fee08bffffbfe6f598abdda466c2a53288bd5e4fa2"])
-   (d3->palettes "bugn" ["e5f5f999d8c92ca25f",
-                         "edf8fbb2e2e266c2a4238b45",
-                         "edf8fbb2e2e266c2a42ca25f006d2c",
-                         "edf8fbccece699d8c966c2a42ca25f006d2c",
-                         "edf8fbccece699d8c966c2a441ae76238b45005824",
-                         "f7fcfde5f5f9ccece699d8c966c2a441ae76238b45005824",
+   (d3->palettes "bugn" ["e5f5f999d8c92ca25f"
+                         "edf8fbb2e2e266c2a4238b45"
+                         "edf8fbb2e2e266c2a42ca25f006d2c"
+                         "edf8fbccece699d8c966c2a42ca25f006d2c"
+                         "edf8fbccece699d8c966c2a441ae76238b45005824"
+                         "f7fcfde5f5f9ccece699d8c966c2a441ae76238b45005824"
                          "f7fcfde5f5f9ccece699d8c966c2a441ae76238b45006d2c00441b"])
-   (d3->palettes "bupu" ["e0ecf49ebcda8856a7",
-                         "edf8fbb3cde38c96c688419d",
-                         "edf8fbb3cde38c96c68856a7810f7c",
-                         "edf8fbbfd3e69ebcda8c96c68856a7810f7c",
-                         "edf8fbbfd3e69ebcda8c96c68c6bb188419d6e016b",
-                         "f7fcfde0ecf4bfd3e69ebcda8c96c68c6bb188419d6e016b",
+   (d3->palettes "bupu" ["e0ecf49ebcda8856a7"
+                         "edf8fbb3cde38c96c688419d"
+                         "edf8fbb3cde38c96c68856a7810f7c"
+                         "edf8fbbfd3e69ebcda8c96c68856a7810f7c"
+                         "edf8fbbfd3e69ebcda8c96c68c6bb188419d6e016b"
+                         "f7fcfde0ecf4bfd3e69ebcda8c96c68c6bb188419d6e016b"
                          "f7fcfde0ecf4bfd3e69ebcda8c96c68c6bb188419d810f7c4d004b"])
-   (d3->palettes "gnbu" ["e0f3dba8ddb543a2ca",
-                         "f0f9e8bae4bc7bccc42b8cbe",
-                         "f0f9e8bae4bc7bccc443a2ca0868ac",
-                         "f0f9e8ccebc5a8ddb57bccc443a2ca0868ac",
-                         "f0f9e8ccebc5a8ddb57bccc44eb3d32b8cbe08589e",
-                         "f7fcf0e0f3dbccebc5a8ddb57bccc44eb3d32b8cbe08589e",
+   (d3->palettes "gnbu" ["e0f3dba8ddb543a2ca"
+                         "f0f9e8bae4bc7bccc42b8cbe"
+                         "f0f9e8bae4bc7bccc443a2ca0868ac"
+                         "f0f9e8ccebc5a8ddb57bccc443a2ca0868ac"
+                         "f0f9e8ccebc5a8ddb57bccc44eb3d32b8cbe08589e"
+                         "f7fcf0e0f3dbccebc5a8ddb57bccc44eb3d32b8cbe08589e"
                          "f7fcf0e0f3dbccebc5a8ddb57bccc44eb3d32b8cbe0868ac084081"])
-   (d3->palettes "orrd" ["fee8c8fdbb84e34a33",
-                         "fef0d9fdcc8afc8d59d7301f",
-                         "fef0d9fdcc8afc8d59e34a33b30000",
-                         "fef0d9fdd49efdbb84fc8d59e34a33b30000",
-                         "fef0d9fdd49efdbb84fc8d59ef6548d7301f990000",
-                         "fff7ecfee8c8fdd49efdbb84fc8d59ef6548d7301f990000",
+   (d3->palettes "orrd" ["fee8c8fdbb84e34a33"
+                         "fef0d9fdcc8afc8d59d7301f"
+                         "fef0d9fdcc8afc8d59e34a33b30000"
+                         "fef0d9fdd49efdbb84fc8d59e34a33b30000"
+                         "fef0d9fdd49efdbb84fc8d59ef6548d7301f990000"
+                         "fff7ecfee8c8fdd49efdbb84fc8d59ef6548d7301f990000"
                          "fff7ecfee8c8fdd49efdbb84fc8d59ef6548d7301fb300007f0000"])
-   (d3->palettes "pubu" ["ece7f2a6bddb2b8cbe",
-                         "f1eef6bdc9e174a9cf0570b0",
-                         "f1eef6bdc9e174a9cf2b8cbe045a8d",
-                         "f1eef6d0d1e6a6bddb74a9cf2b8cbe045a8d",
-                         "f1eef6d0d1e6a6bddb74a9cf3690c00570b0034e7b",
-                         "fff7fbece7f2d0d1e6a6bddb74a9cf3690c00570b0034e7b",
+   (d3->palettes "pubu" ["ece7f2a6bddb2b8cbe"
+                         "f1eef6bdc9e174a9cf0570b0"
+                         "f1eef6bdc9e174a9cf2b8cbe045a8d"
+                         "f1eef6d0d1e6a6bddb74a9cf2b8cbe045a8d"
+                         "f1eef6d0d1e6a6bddb74a9cf3690c00570b0034e7b"
+                         "fff7fbece7f2d0d1e6a6bddb74a9cf3690c00570b0034e7b"
                          "fff7fbece7f2d0d1e6a6bddb74a9cf3690c00570b0045a8d023858"])
-   (d3->palettes "pubugn" ["ece2f0a6bddb1c9099",
-                           "f6eff7bdc9e167a9cf02818a",
-                           "f6eff7bdc9e167a9cf1c9099016c59",
-                           "f6eff7d0d1e6a6bddb67a9cf1c9099016c59",
-                           "f6eff7d0d1e6a6bddb67a9cf3690c002818a016450",
-                           "fff7fbece2f0d0d1e6a6bddb67a9cf3690c002818a016450",
+   (d3->palettes "pubugn" ["ece2f0a6bddb1c9099"
+                           "f6eff7bdc9e167a9cf02818a"
+                           "f6eff7bdc9e167a9cf1c9099016c59"
+                           "f6eff7d0d1e6a6bddb67a9cf1c9099016c59"
+                           "f6eff7d0d1e6a6bddb67a9cf3690c002818a016450"
+                           "fff7fbece2f0d0d1e6a6bddb67a9cf3690c002818a016450"
                            "fff7fbece2f0d0d1e6a6bddb67a9cf3690c002818a016c59014636"])
-   (d3->palettes "purd" ["e7e1efc994c7dd1c77",
-                         "f1eef6d7b5d8df65b0ce1256",
-                         "f1eef6d7b5d8df65b0dd1c77980043",
-                         "f1eef6d4b9dac994c7df65b0dd1c77980043",
-                         "f1eef6d4b9dac994c7df65b0e7298ace125691003f",
-                         "f7f4f9e7e1efd4b9dac994c7df65b0e7298ace125691003f",
+   (d3->palettes "purd" ["e7e1efc994c7dd1c77"
+                         "f1eef6d7b5d8df65b0ce1256"
+                         "f1eef6d7b5d8df65b0dd1c77980043"
+                         "f1eef6d4b9dac994c7df65b0dd1c77980043"
+                         "f1eef6d4b9dac994c7df65b0e7298ace125691003f"
+                         "f7f4f9e7e1efd4b9dac994c7df65b0e7298ace125691003f"
                          "f7f4f9e7e1efd4b9dac994c7df65b0e7298ace125698004367001f"])
-   (d3->palettes "rdpu" ["fde0ddfa9fb5c51b8a",
-                         "feebe2fbb4b9f768a1ae017e",
-                         "feebe2fbb4b9f768a1c51b8a7a0177",
-                         "feebe2fcc5c0fa9fb5f768a1c51b8a7a0177",
-                         "feebe2fcc5c0fa9fb5f768a1dd3497ae017e7a0177",
-                         "fff7f3fde0ddfcc5c0fa9fb5f768a1dd3497ae017e7a0177",
+   (d3->palettes "rdpu" ["fde0ddfa9fb5c51b8a"
+                         "feebe2fbb4b9f768a1ae017e"
+                         "feebe2fbb4b9f768a1c51b8a7a0177"
+                         "feebe2fcc5c0fa9fb5f768a1c51b8a7a0177"
+                         "feebe2fcc5c0fa9fb5f768a1dd3497ae017e7a0177"
+                         "fff7f3fde0ddfcc5c0fa9fb5f768a1dd3497ae017e7a0177"
                          "fff7f3fde0ddfcc5c0fa9fb5f768a1dd3497ae017e7a017749006a"])
-   (d3->palettes "ylgn" ["f7fcb9addd8e31a354",
-                         "ffffccc2e69978c679238443",
-                         "ffffccc2e69978c67931a354006837",
-                         "ffffccd9f0a3addd8e78c67931a354006837",
-                         "ffffccd9f0a3addd8e78c67941ab5d238443005a32",
-                         "ffffe5f7fcb9d9f0a3addd8e78c67941ab5d238443005a32",
+   (d3->palettes "ylgn" ["f7fcb9addd8e31a354"
+                         "ffffccc2e69978c679238443"
+                         "ffffccc2e69978c67931a354006837"
+                         "ffffccd9f0a3addd8e78c67931a354006837"
+                         "ffffccd9f0a3addd8e78c67941ab5d238443005a32"
+                         "ffffe5f7fcb9d9f0a3addd8e78c67941ab5d238443005a32"
                          "ffffe5f7fcb9d9f0a3addd8e78c67941ab5d238443006837004529"])
-   (d3->palettes "ylgnbu" ["edf8b17fcdbb2c7fb8",
-                           "ffffcca1dab441b6c4225ea8",
-                           "ffffcca1dab441b6c42c7fb8253494",
-                           "ffffccc7e9b47fcdbb41b6c42c7fb8253494",
-                           "ffffccc7e9b47fcdbb41b6c41d91c0225ea80c2c84",
-                           "ffffd9edf8b1c7e9b47fcdbb41b6c41d91c0225ea80c2c84",
+   (d3->palettes "ylgnbu" ["edf8b17fcdbb2c7fb8"
+                           "ffffcca1dab441b6c4225ea8"
+                           "ffffcca1dab441b6c42c7fb8253494"
+                           "ffffccc7e9b47fcdbb41b6c42c7fb8253494"
+                           "ffffccc7e9b47fcdbb41b6c41d91c0225ea80c2c84"
+                           "ffffd9edf8b1c7e9b47fcdbb41b6c41d91c0225ea80c2c84"
                            "ffffd9edf8b1c7e9b47fcdbb41b6c41d91c0225ea8253494081d58"])
-   (d3->palettes "ylorbr" ["fff7bcfec44fd95f0e",
-                           "ffffd4fed98efe9929cc4c02",
-                           "ffffd4fed98efe9929d95f0e993404",
-                           "ffffd4fee391fec44ffe9929d95f0e993404",
-                           "ffffd4fee391fec44ffe9929ec7014cc4c028c2d04",
-                           "ffffe5fff7bcfee391fec44ffe9929ec7014cc4c028c2d04",
+   (d3->palettes "ylorbr" ["fff7bcfec44fd95f0e"
+                           "ffffd4fed98efe9929cc4c02"
+                           "ffffd4fed98efe9929d95f0e993404"
+                           "ffffd4fee391fec44ffe9929d95f0e993404"
+                           "ffffd4fee391fec44ffe9929ec7014cc4c028c2d04"
+                           "ffffe5fff7bcfee391fec44ffe9929ec7014cc4c028c2d04"
                            "ffffe5fff7bcfee391fec44ffe9929ec7014cc4c02993404662506"])
-   (d3->palettes "ylorrd" ["ffeda0feb24cf03b20",
-                           "ffffb2fecc5cfd8d3ce31a1c",
-                           "ffffb2fecc5cfd8d3cf03b20bd0026",
-                           "ffffb2fed976feb24cfd8d3cf03b20bd0026",
-                           "ffffb2fed976feb24cfd8d3cfc4e2ae31a1cb10026",
-                           "ffffccffeda0fed976feb24cfd8d3cfc4e2ae31a1cb10026",
+   (d3->palettes "ylorrd" ["ffeda0feb24cf03b20"
+                           "ffffb2fecc5cfd8d3ce31a1c"
+                           "ffffb2fecc5cfd8d3cf03b20bd0026"
+                           "ffffb2fed976feb24cfd8d3cf03b20bd0026"
+                           "ffffb2fed976feb24cfd8d3cfc4e2ae31a1cb10026"
+                           "ffffccffeda0fed976feb24cfd8d3cfc4e2ae31a1cb10026"
                            "ffffccffeda0fed976feb24cfd8d3cfc4e2ae31a1cbd0026800026"])
-   (d3->palettes "blues" ["deebf79ecae13182bd",
-                          "eff3ffbdd7e76baed62171b5",
-                          "eff3ffbdd7e76baed63182bd08519c",
-                          "eff3ffc6dbef9ecae16baed63182bd08519c",
-                          "eff3ffc6dbef9ecae16baed64292c62171b5084594",
-                          "f7fbffdeebf7c6dbef9ecae16baed64292c62171b5084594",
+   (d3->palettes "blues" ["deebf79ecae13182bd"
+                          "eff3ffbdd7e76baed62171b5"
+                          "eff3ffbdd7e76baed63182bd08519c"
+                          "eff3ffc6dbef9ecae16baed63182bd08519c"
+                          "eff3ffc6dbef9ecae16baed64292c62171b5084594"
+                          "f7fbffdeebf7c6dbef9ecae16baed64292c62171b5084594"
                           "f7fbffdeebf7c6dbef9ecae16baed64292c62171b508519c08306b"])
-   (d3->palettes "greens" ["e5f5e0a1d99b31a354",
-                           "edf8e9bae4b374c476238b45",
-                           "edf8e9bae4b374c47631a354006d2c",
-                           "edf8e9c7e9c0a1d99b74c47631a354006d2c",
-                           "edf8e9c7e9c0a1d99b74c47641ab5d238b45005a32",
-                           "f7fcf5e5f5e0c7e9c0a1d99b74c47641ab5d238b45005a32",
+   (d3->palettes "greens" ["e5f5e0a1d99b31a354"
+                           "edf8e9bae4b374c476238b45"
+                           "edf8e9bae4b374c47631a354006d2c"
+                           "edf8e9c7e9c0a1d99b74c47631a354006d2c"
+                           "edf8e9c7e9c0a1d99b74c47641ab5d238b45005a32"
+                           "f7fcf5e5f5e0c7e9c0a1d99b74c47641ab5d238b45005a32"
                            "f7fcf5e5f5e0c7e9c0a1d99b74c47641ab5d238b45006d2c00441b"])
-   (d3->palettes "greys" ["f0f0f0bdbdbd636363",
-                          "f7f7f7cccccc969696525252",
-                          "f7f7f7cccccc969696636363252525",
-                          "f7f7f7d9d9d9bdbdbd969696636363252525",
-                          "f7f7f7d9d9d9bdbdbd969696737373525252252525",
-                          "fffffff0f0f0d9d9d9bdbdbd969696737373525252252525",
+   (d3->palettes "greys" ["f0f0f0bdbdbd636363"
+                          "f7f7f7cccccc969696525252"
+                          "f7f7f7cccccc969696636363252525"
+                          "f7f7f7d9d9d9bdbdbd969696636363252525"
+                          "f7f7f7d9d9d9bdbdbd969696737373525252252525"
+                          "fffffff0f0f0d9d9d9bdbdbd969696737373525252252525"
                           "fffffff0f0f0d9d9d9bdbdbd969696737373525252252525000000"])
-   (d3->palettes "oranges" ["fee6cefdae6be6550d",
-                            "feeddefdbe85fd8d3cd94701",
-                            "feeddefdbe85fd8d3ce6550da63603",
-                            "feeddefdd0a2fdae6bfd8d3ce6550da63603",
-                            "feeddefdd0a2fdae6bfd8d3cf16913d948018c2d04",
-                            "fff5ebfee6cefdd0a2fdae6bfd8d3cf16913d948018c2d04",
+   (d3->palettes "oranges" ["fee6cefdae6be6550d"
+                            "feeddefdbe85fd8d3cd94701"
+                            "feeddefdbe85fd8d3ce6550da63603"
+                            "feeddefdd0a2fdae6bfd8d3ce6550da63603"
+                            "feeddefdd0a2fdae6bfd8d3cf16913d948018c2d04"
+                            "fff5ebfee6cefdd0a2fdae6bfd8d3cf16913d948018c2d04"
                             "fff5ebfee6cefdd0a2fdae6bfd8d3cf16913d94801a636037f2704"])
-   (d3->palettes "purples" ["efedf5bcbddc756bb1",
-                            "f2f0f7cbc9e29e9ac86a51a3",
-                            "f2f0f7cbc9e29e9ac8756bb154278f",
-                            "f2f0f7dadaebbcbddc9e9ac8756bb154278f",
-                            "f2f0f7dadaebbcbddc9e9ac8807dba6a51a34a1486",
-                            "fcfbfdefedf5dadaebbcbddc9e9ac8807dba6a51a34a1486",
+   (d3->palettes "purples" ["efedf5bcbddc756bb1"
+                            "f2f0f7cbc9e29e9ac86a51a3"
+                            "f2f0f7cbc9e29e9ac8756bb154278f"
+                            "f2f0f7dadaebbcbddc9e9ac8756bb154278f"
+                            "f2f0f7dadaebbcbddc9e9ac8807dba6a51a34a1486"
+                            "fcfbfdefedf5dadaebbcbddc9e9ac8807dba6a51a34a1486"
                             "fcfbfdefedf5dadaebbcbddc9e9ac8807dba6a51a354278f3f007d"])
-   (d3->palettes "reds" ["fee0d2fc9272de2d26",
-                         "fee5d9fcae91fb6a4acb181d",
-                         "fee5d9fcae91fb6a4ade2d26a50f15",
-                         "fee5d9fcbba1fc9272fb6a4ade2d26a50f15",
-                         "fee5d9fcbba1fc9272fb6a4aef3b2ccb181d99000d",
-                         "fff5f0fee0d2fcbba1fc9272fb6a4aef3b2ccb181d99000d",
+   (d3->palettes "reds" ["fee0d2fc9272de2d26"
+                         "fee5d9fcae91fb6a4acb181d"
+                         "fee5d9fcae91fb6a4ade2d26a50f15"
+                         "fee5d9fcbba1fc9272fb6a4ade2d26a50f15"
+                         "fee5d9fcbba1fc9272fb6a4aef3b2ccb181d99000d"
+                         "fff5f0fee0d2fcbba1fc9272fb6a4aef3b2ccb181d99000d"
                          "fff5f0fee0d2fcbba1fc9272fb6a4aef3b2ccb181da50f1567000d"])
    
    
@@ -3401,9 +3495,9 @@ See [[blends-list]] for names."}
     :viridis-inferno (d3->palette "00000401000501010601010802010a02020c02020e03021004031204031405041706041907051b08051d09061f0a07220b07240c08260d08290e092b10092d110a30120a32140b34150b37160b39180c3c190c3e1b0c411c0c431e0c451f0c48210c4a230c4c240c4f260c51280b53290b552b0b572d0b592f0a5b310a5c320a5e340a5f3609613809623909633b09643d09653e0966400a67420a68440a68450a69470b6a490b6a4a0c6b4c0c6b4d0d6c4f0d6c510e6c520e6d540f6d550f6d57106e59106e5a116e5c126e5d126e5f136e61136e62146e64156e65156e67166e69166e6a176e6c186e6d186e6f196e71196e721a6e741a6e751b6e771c6d781c6d7a1d6d7c1d6d7d1e6d7f1e6c801f6c82206c84206b85216b87216b88226a8a226a8c23698d23698f24699025689225689326679526679727669827669a28659b29649d29649f2a63a02a63a22b62a32c61a52c60a62d60a82e5fa92e5eab2f5ead305dae305cb0315bb1325ab3325ab43359b63458b73557b93556ba3655bc3754bd3853bf3952c03a51c13a50c33b4fc43c4ec63d4dc73e4cc83f4bca404acb4149cc4248ce4347cf4446d04545d24644d34743d44842d54a41d74b3fd84c3ed94d3dda4e3cdb503bdd513ade5238df5337e05536e15635e25734e35933e45a31e55c30e65d2fe75e2ee8602de9612bea632aeb6429eb6628ec6726ed6925ee6a24ef6c23ef6e21f06f20f1711ff1731df2741cf3761bf37819f47918f57b17f57d15f67e14f68013f78212f78410f8850ff8870ef8890cf98b0bf98c0af98e09fa9008fa9207fa9407fb9606fb9706fb9906fb9b06fb9d07fc9f07fca108fca309fca50afca60cfca80dfcaa0ffcac11fcae12fcb014fcb216fcb418fbb61afbb81dfbba1ffbbc21fbbe23fac026fac228fac42afac62df9c72ff9c932f9cb35f8cd37f8cf3af7d13df7d340f6d543f6d746f5d949f5db4cf4dd4ff4df53f4e156f3e35af3e55df2e661f2e865f2ea69f1ec6df1ed71f1ef75f1f179f2f27df2f482f3f586f3f68af4f88ef5f992f6fa96f8fb9af9fc9dfafda1fcffa4")
     :viridis-plasma (d3->palette "0d088710078813078916078a19068c1b068d1d068e20068f2206902406912605912805922a05932c05942e05952f059631059733059735049837049938049a3a049a3c049b3e049c3f049c41049d43039e44039e46039f48039f4903a04b03a14c02a14e02a25002a25102a35302a35502a45601a45801a45901a55b01a55c01a65e01a66001a66100a76300a76400a76600a76700a86900a86a00a86c00a86e00a86f00a87100a87201a87401a87501a87701a87801a87a02a87b02a87d03a87e03a88004a88104a78305a78405a78606a68707a68808a68a09a58b0aa58d0ba58e0ca48f0da4910ea3920fa39410a29511a19613a19814a099159f9a169f9c179e9d189d9e199da01a9ca11b9ba21d9aa31e9aa51f99a62098a72197a82296aa2395ab2494ac2694ad2793ae2892b02991b12a90b22b8fb32c8eb42e8db52f8cb6308bb7318ab83289ba3388bb3488bc3587bd3786be3885bf3984c03a83c13b82c23c81c33d80c43e7fc5407ec6417dc7427cc8437bc9447aca457acb4679cc4778cc4977cd4a76ce4b75cf4c74d04d73d14e72d24f71d35171d45270d5536fd5546ed6556dd7566cd8576bd9586ada5a6ada5b69db5c68dc5d67dd5e66de5f65de6164df6263e06363e16462e26561e26660e3685fe4695ee56a5de56b5de66c5ce76e5be76f5ae87059e97158e97257ea7457eb7556eb7655ec7754ed7953ed7a52ee7b51ef7c51ef7e50f07f4ff0804ef1814df1834cf2844bf3854bf3874af48849f48948f58b47f58c46f68d45f68f44f79044f79143f79342f89441f89540f9973ff9983ef99a3efa9b3dfa9c3cfa9e3bfb9f3afba139fba238fca338fca537fca636fca835fca934fdab33fdac33fdae32fdaf31fdb130fdb22ffdb42ffdb52efeb72dfeb82cfeba2cfebb2bfebd2afebe2afec029fdc229fdc328fdc527fdc627fdc827fdca26fdcb26fccd25fcce25fcd025fcd225fbd324fbd524fbd724fad824fada24f9dc24f9dd25f8df25f8e125f7e225f7e425f6e626f6e826f5e926f5eb27f4ed27f3ee27f3f027f2f227f1f426f1f525f0f724f0f921")
 
-    :microsoft-1 [(color 91 155 213) (color 237 125 49) (color 164 164 164) (color 255 192 0) (color 68 113 196) (color 112 173 71) (color 36 94 145) (color 158 72 14)],
-    :microsoft-2 [(color 91 155 213) (color 164 164 164) (color 68 113 196) (color 36 94 145) (color 99 99 99) (color 37 68 119) (color 124 175 221) (color 183 183 183)],
-    :microsoft-3 [(color 237 125 49) (color 255 192 0) (color 112 173 71) (color 158 72 14) (color 153 115 0) (color 67 103 43) (color 240 151 90) (color 255 205 51)],
+    :microsoft-1 [(color 91 155 213) (color 237 125 49) (color 164 164 164) (color 255 192 0) (color 68 113 196) (color 112 173 71) (color 36 94 145) (color 158 72 14)]
+    :microsoft-2 [(color 91 155 213) (color 164 164 164) (color 68 113 196) (color 36 94 145) (color 99 99 99) (color 37 68 119) (color 124 175 221) (color 183 183 183)]
+    :microsoft-3 [(color 237 125 49) (color 255 192 0) (color 112 173 71) (color 158 72 14) (color 153 115 0) (color 67 103 43) (color 240 151 90) (color 255 205 51)]
     :microsoft-4 [(color 112 173 71) (color 68 113 196) (color 255 192 0) (color 67 103 43) (color 37 68 119) (color 153 115 0) (color 139 193 103) (color 105 142 208)]
     
     :tableau-10 [(color 31 119 180) (color 255 127 14) (color 44 160 44) (color 214 39 40) (color 148 103 189) (color 140 86 75) (color 227 119 194) (color 127 127 127) (color 188 189 34) (color 23 190 207)] 
@@ -3457,7 +3551,10 @@ See [[blends-list]] for names."}
     :grand-budapest-1 (mapv to-color '(0xF1BB7B 0xFD6467 0x5B1A18 0xD67236))
     :grand-budapest-2 (mapv to-color '(0xE6A0C4 0xC6CDF7 0xD8A499 0x7294D4))
     :isle-of-dogs-1 (mapv to-color '(0x9986A5 0x79402E 0xCCBA72 0x0F0D0E 0xD9D0D3 0x8D8680))
-    :isle-of-dogs-2 (mapv to-color '(0xEAD3BF 0xAA9486 0xB6854D 0x39312F 0x1C1718))}))
+    :isle-of-dogs-2 (mapv to-color '(0xEAD3BF 0xAA9486 0xB6854D 0x39312F 0x1C1718))
+
+    ;;
+    :guell (mapv to-color [0xD9B993,0xC66403,0x1C477E,0xB12903,0x1A422A,0xD9B993,0xC66403,0x1C477E])}))
 
 (def ^{:doc "Color palette presets list."
        :metadoc/categories #{:pal}} palette-presets-list (sort (keys palette-presets)))
@@ -3475,7 +3572,26 @@ Map with name (keyword) as key and gradient function as value.
   (merge
    (into {} (for [[k v] image-palettes]
               [k (gradient :LAB :cubic-spline v)]))
-   (into {} (for [[k v] tgrad/cosine-schemes]
+   (into {} (for [[k v] {:rainbow1              [[0.5 0.5 0.5] [0.5 0.5 0.5] [1.0 1.0 1.0] [0 0.3333 0.6666]]
+                         :rainbow2              [[0.5 0.5 0.5] [0.666 0.666 0.666] [1.0 1.0 1.0] [0 0.3333 0.6666]]
+                         :rainbow3              [[0.5 0.5 0.5] [0.75 0.75 0.75] [1.0 1.0 1.0] [0 0.3333 0.6666]]
+                         :rainbow4              [[0.5 0.5 0.5] [1 1 1] [1.0 1.0 1.0] [0 0.3333 0.6666]]
+                         :yellow-magenta-cyan   [[1 0.5 0.5] [0.5 0.5 0.5] [0.75 1.0 0.6666] [0.8 1.0 0.3333]]
+                         :orange-blue           [[0.5 0.5 0.5] [0.5 0.5 0.5] [0.8 0.8 0.5] [0 0.2 0.5]]
+                         :green-magenta         [[0.6666 0.5 0.5] [0.5 0.6666 0.5] [0.6666 0.666 0.5] [0.2 0.0 0.5]]
+                         :green-red             [[0.5 0.5 0] [0.5 0.5 0] [0.5 0.5 0] [0.5 0.0 0]]
+                         :green-cyan            [[0.0 0.5 0.5] [0 0.5 0.5] [0.0 0.3333 0.5] [0.0 0.6666 0.5]]
+                         :yellow-red            [[0.5 0.5 0] [0.5 0.5 0] [0.1 0.5 0] [0.0 0.0 0]]
+                         :blue-cyan             [[0.0 0.5 0.5] [0 0.5 0.5] [0.0 0.5 0.3333] [0.0 0.5 0.6666]]
+                         :red-blue              [[0.5 0 0.5] [0.5 0 0.5] [0.5 0 0.5] [0 0 0.5]]
+                         :yellow-green-blue     [[0.650 0.5 0.310] [-0.650 0.5 0.6] [0.333 0.278 0.278] [0.660 0.0 0.667]]
+                         :blue-white-red        [[0.660 0.56 0.680] [0.718 0.438 0.720] [0.520 0.8 0.520] [-0.430 -0.397 -0.083]]
+                         :cyan-magenta          [[0.610 0.498 0.650] [0.388 0.498 0.350] [0.530 0.498 0.620] [3.438 3.012 4.025]]
+                         :yellow-purple-magenta [[0.731 1.098 0.192] [0.358 1.090 0.657] [1.077 0.360 0.328] [0.965 2.265 0.837]]
+                         :green-blue-orange     [[0.892 0.725 0.000] [0.878 0.278 0.725] [0.332 0.518 0.545] [2.440 5.043 0.732]]
+                         :orange-magenta-blue   [[0.821 0.328 0.242] [0.659 0.481 0.896] [0.612 0.340 0.296] [2.820 3.026 -0.273]]
+                         :blue-magenta-orange   [[0.938 0.328 0.718] [0.659 0.438 0.328] [0.388 0.388 0.296] [2.538 2.478 0.168]]
+                         :magenta-green         [[0.590 0.811 0.120] [0.410 0.392 0.590] [0.940 0.548 0.278] [-4.242 -6.611 -4.045]]}]
               [k (apply iq-gradient (map #(apply v/vec3 %) v))])) ;; thi.ng presets
    {:iq-1 (iq-gradient vec3-05 vec3-05 vec3-10
                        (Vec3. 0.0 0.33 0.67))
@@ -3500,10 +3616,10 @@ Map with name (keyword) as key and gradient function as value.
     :warm (gradient-cubehelix e/linear (Vec4. -100.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
     :cool (gradient-cubehelix e/linear (Vec4. 260.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
     :rainbow (fn [^double t] (let [ts (m/abs (- t 0.5))]
-                               (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
-                                                      (- 1.5 (* 1.5 ts))
-                                                      (- 0.8 (* 0.9 ts))
-                                                      255.0))))}))
+                              (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
+                                                     (- 1.5 (* 1.5 ts))
+                                                     (- 0.8 (* 0.9 ts))
+                                                     255.0))))}))
 
 (def ^{:doc "Gradient presets names."
        :metadoc/categories #{:grad}} gradient-presets-list (sort (keys gradient-presets)))
