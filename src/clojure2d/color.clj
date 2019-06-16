@@ -412,6 +412,17 @@
   (to-color [^long c] (Vec4. (red c) (green c) (blue c) (if (zero? (bit-and 0xff000000 c)) 255 (alpha c))))
   (to-awt-color [c] (to-awt-color (to-color c)))
   (luma [c] (luma (to-color c)))
+  Integer
+  (alpha [c] (bit-and 0xff (>> ^int c 24)))
+  (red [c] (bit-and 0xff (>> ^int c 16)))
+  (green [c] (bit-and 0xff (>> ^int c 8)))
+  (blue [c] (bit-and 0xff ^int c))
+  (ch0 [c] (bit-and 0xff (>> ^int c 16)))
+  (ch1 [c] (bit-and 0xff (>> ^int c 8)))
+  (ch2 [c] (bit-and 0xff ^int c))
+  (to-color [c] (Vec4. (red c) (green c) (blue c) (if (zero? (bit-and 0xff000000 ^int c)) 255 (alpha c))))
+  (to-awt-color [c] (to-awt-color (to-color c)))
+  (luma [c] (luma (to-color c)))
   String
   (alpha [^String c] (alpha (Long/parseLong (strip-hash c) 16)))
   (red [^String c] (red (Long/parseLong (strip-hash c) 16)))
