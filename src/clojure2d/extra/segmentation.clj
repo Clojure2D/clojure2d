@@ -2,8 +2,7 @@
   "Segment image into parts.
 
   Currently contains only quadtree segmentation."
-  (:require [clojure2d.core :as core]
-            [fastmath.core :as m]
+  (:require [fastmath.core :as m]
             [fastmath.random :as r]
             [clojure2d.pixels :as p])
   (:import [clojure2d.pixels Pixels]))

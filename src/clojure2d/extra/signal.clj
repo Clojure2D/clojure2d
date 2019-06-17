@@ -311,9 +311,9 @@
   (if-not (.next e)
     (let [^SampleAndState r ((.effect e) sample (.state e))]
       (EffectsList. (.effect-name e) (.sample r) (.effect e) (.state r) nil))
-    (let [^EffectsList prev (single-pass (.next e) sample)]
-      (let [^SampleAndState r ((.effect e) (.sample prev) (.state e))]
-        (EffectsList. (.effect-name e) (.sample r) (.effect e) (.state r) prev)))))
+    (let [^EffectsList prev (single-pass (.next e) sample)
+          ^SampleAndState r ((.effect e) (.sample prev) (.state e))]
+      (EffectsList. (.effect-name e) (.sample r) (.effect e) (.state r) prev))))
 
 (defn apply-effects
   "Apply effects to signal.

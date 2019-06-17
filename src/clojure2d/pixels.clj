@@ -420,8 +420,8 @@
    (let [target (clone-pixels p)
          ch0 (future (when f0 (f0 0 target p)))
          ch1 (future (when f1 (f1 1 target p)))
-         ch2 (future (when f2 (f2 2 target p)))
-         ch3 (when f3 (f3 3 target p))]
+         ch2 (future (when f2 (f2 2 target p)))]
+     (when f3 (f3 3 target p))
      (run! deref [ch0 ch1 ch2])
      target))
   ([f p]
@@ -465,8 +465,8 @@
    (let [target (clone-pixels p1)
          ch0 (future (when f0 (f0 0 target p1 p2)))
          ch1 (future (when f1 (f1 1 target p1 p2)))
-         ch2 (future (when f2 (f2 2 target p1 p2)))
-         ch3 (when f3 (f3 3 target p1 p2))]
+         ch2 (future (when f2 (f2 2 target p1 p2)))]
+     (when f3 (f3 3 target p1 p2))
      (run! deref [ch0 ch1 ch2])
      target))
   ([f p1 p2]
@@ -514,20 +514,19 @@
 
   Used to change default blending during drawing."
   {:metadoc/categories #{:filt}}
-  ([n] (composite n false))
-  ([n do-alpha?]
-   (reify
-     Composite
-     (createContext [this _ _ _] this)
-     CompositeContext
-     (dispose [_])
-     (^void compose [_ ^Raster src ^Raster dst-in ^WritableRaster dst-out]
-      (let [w (min (.getWidth src) (.getWidth dst-in))
-            h (min (.getHeight src) (.getHeight dst-in))
-            p1 (pixels (clojure2d.java.Pixels/getRasterPixels src 0 0 w h) w h)
-            p2 (pixels (clojure2d.java.Pixels/getRasterPixels dst-in 0 0 w h) w h)
-            ^Pixels res (filter-colors-xy (partial blend-colors-xy (c/blends n) p2) p1)]
-        (clojure2d.java.Pixels/setRasterPixels dst-out 0 0 w h (.p res)))))))
+  [n]
+  (reify
+    Composite
+    (createContext [this _ _ _] this)
+    CompositeContext
+    (dispose [_])
+    (^void compose [_ ^Raster src ^Raster dst-in ^WritableRaster dst-out]
+     (let [w (min (.getWidth src) (.getWidth dst-in))
+           h (min (.getHeight src) (.getHeight dst-in))
+           p1 (pixels (clojure2d.java.Pixels/getRasterPixels src 0 0 w h) w h)
+           p2 (pixels (clojure2d.java.Pixels/getRasterPixels dst-in 0 0 w h) w h)
+           ^Pixels res (filter-colors-xy (partial blend-colors-xy (c/blends n) p2) p1)]
+       (clojure2d.java.Pixels/setRasterPixels dst-out 0 0 w h (.p res))))))
 
 ;; ## Filters
 (defn- make-quantile
@@ -823,8 +822,8 @@
   ^LDRenderer [^LDRenderer a ^LDRenderer b]
   (let [ch0 (future (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 0))
         ch1 (future (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 1))
-        ch2 (future (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 2))
-        ch3 (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 3)]
+        ch2 (future (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 2))]
+    (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 3)
     (run! deref [ch0 ch1 ch2])
     a))
 

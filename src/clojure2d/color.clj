@@ -487,7 +487,7 @@
   (* 255.0 ^double (f (* rev255 a) (* rev255 b))))
 
 (defn blend-colors
-  "Blend colors with blending function. Set `alpha?` if you want to blend alpha channel (default: `false`)."
+  "Blend colors with blending function. Alpha aware."
   {:metadoc/categories #{:bl}}
   ^Vec4 [f cb cs]
   (let [^Vec4 ccb (v/mult (to-color cb) rev255)
@@ -512,7 +512,7 @@
 (defn blend-none
   "Return first value only. Do nothing."
   {:metadoc/categories #{:bl}}
-  ^double [a b] b)
+  ^double [_ b] b)
 
 (defn blend-add
   "Add channel values."
@@ -1043,12 +1043,12 @@ See [[blends-list]] for names."}
   "RGB -> XYZ"
   {:metadoc/categories #{:conv}}
   [c]
-  (let [^Vec4 c (to-color c)]
-    (let [xyz-raw (to-XYZ- (-> (Vec3. (.x c) (.y c) (.z c))
-                               (v/div 255.0)
-                               (v/fmap to-linear)
-                               (v/mult 100.0)))]
-      (v/vec4 xyz-raw (.w c)))))
+  (let [^Vec4 c (to-color c)
+        xyz-raw (to-XYZ- (-> (Vec3. (.x c) (.y c) (.z c))
+                             (v/div 255.0)
+                             (v/fmap to-linear)
+                             (v/mult 100.0)))]
+    (v/vec4 xyz-raw (.w c))))
 
 (defn to-XYZ*
   "RGB -> XYZ, normalized"

@@ -183,7 +183,6 @@
             [fastmath.vector :as v]
             [fastmath.core :as m]
             [clojure.reflect :as ref]
-            [fastmath.random :as r]
             [clojure.string :as s]
             [fastmath.grid :as grid]
             [clojure.java.io :as io])
@@ -1871,7 +1870,7 @@ See [[set-color]]."
 
 (defn- create-panel
   "Create panel which displays canvas. Attach mouse events, give a name (same as window), set size etc."
-  [buffer windowname width height]
+  [windowname width height]
   (let [panel (java.awt.Canvas.)
         d (Dimension. width height)]
     (doto panel
@@ -1957,18 +1956,18 @@ See [[set-color]]."
                                                                     (draw-fun window cnt result))))
                                          (catch Throwable e
                                            (.printStackTrace e)
-                                           (WithExceptionT. true e)))] 
-        (let [at (System/nanoTime)
-              diff (/ (- at t) 1.0e6)
-              delay (- stime diff overt)]
-          (when (pos? delay)
-            (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay)))))
-          (repaint (.panel window) @(.buffer window) (.background window) hints)
-          (when (bool-and @(.active? window) (not (.exception? new-result)))
-            (recur (inc cnt)
-                   (.value new-result)
-                   (System/nanoTime)
-                   (if (pos? delay) (- (/ (- (System/nanoTime) at) 1.0e6) delay) 0.0))))))))
+                                           (WithExceptionT. true e))) 
+            at (System/nanoTime)
+            diff (/ (- at t) 1.0e6)
+            delay (- stime diff overt)]
+        (when (pos? delay)
+          (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay)))))
+        (repaint (.panel window) @(.buffer window) (.background window) hints)
+        (when (bool-and @(.active? window) (not (.exception? new-result)))
+          (recur (inc cnt)
+                 (.value new-result)
+                 (System/nanoTime)
+                 (if (pos? delay) (- (/ (- (System/nanoTime) at) 1.0e6) delay) 0.0)))))))
 
 
 (defn- refresh-screen-task-speed
@@ -1987,18 +1986,18 @@ See [[set-color]]."
                                                                     (draw-fun canvas window cnt result)))
                                            (catch Throwable e
                                              (when @(.active? window) (.printStackTrace e))
-                                             (WithExceptionT. true e)))] 
-          (let [at (System/nanoTime)
-                diff (/ (- at t) 1.0e6)
-                delay (- stime diff overt)]
-            (when (pos? delay)
-              (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay)))))
-            (repaint (.panel window) @(.buffer window) (.background window) hints)
-            (when (bool-and @(.active? window) (not (.exception? new-result)))
-              (recur (inc cnt)
-                     (.value new-result)
-                     (System/nanoTime)
-                     (if (pos? delay) (- (/ (- (System/nanoTime) at) 1.0e6) delay) 0.0)))))))))
+                                             (WithExceptionT. true e))) 
+              at (System/nanoTime)
+              diff (/ (- at t) 1.0e6)
+              delay (- stime diff overt)]
+          (when (pos? delay)
+            (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay)))))
+          (repaint (.panel window) @(.buffer window) (.background window) hints)
+          (when (bool-and @(.active? window) (not (.exception? new-result)))
+            (recur (inc cnt)
+                   (.value new-result)
+                   (System/nanoTime)
+                   (if (pos? delay) (- (/ (- (System/nanoTime) at) 1.0e6) delay) 0.0))))))))
 
 ;;
 
@@ -2085,7 +2084,7 @@ See [[set-color]]."
          active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
-         panel (create-panel buffer window-name w h)
+         panel (create-panel window-name w h)
          window (->Window frame
                           active?
                           buffer

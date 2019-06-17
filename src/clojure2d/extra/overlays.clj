@@ -69,10 +69,9 @@
          l2 (tinter2 rimg)
          cnvs (with-canvas-> (canvas w h)
                 (image (get-image l1))
-                (draw-lines w h))]
-     
-     (let [l1 (p/to-pixels cnvs)]
-       (get-image (p/blend-channels (partial p/blend-channel-xy blend-shift-and-add-f) l1 l2)))))
+                (draw-lines w h))
+         l1 (p/to-pixels cnvs)]
+     (get-image (p/blend-channels (partial p/blend-channel-xy blend-shift-and-add-f) l1 l2))))
   ([p] (render-rgb-scanlines p {})))
 
 ;; ## CRT Scanlines
@@ -97,8 +96,6 @@
   ([img {:keys [^double resolution ^double hardpix ^double hardscan ^double mask-dark ^double mask-light ^int mask-mult]
          :or {resolution 6.0 hardpix -4.0 hardscan -12.0 mask-dark 1.0 mask-light 1.0 mask-mult 3.0}}]
    (let [img (get-image img)
-         ^int w (width img)
-         ^int h (height img)
          p (p/to-pixels img)]
 
      (letfn [(dist [^double pos]

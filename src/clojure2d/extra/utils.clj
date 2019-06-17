@@ -69,7 +69,7 @@
   (let [c (canvas 800 800)]
     (with-canvas [c c]
       (set-color c :white 8)
-      (dotimes [i 2500000]
+      (dotimes [_ 2500000]
         (let [x (r/drand (- m/PI) m/PI)
               y (r/drand (- m/PI) m/PI)
               v (f (v/vec2 x y))]
