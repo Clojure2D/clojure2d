@@ -1239,7 +1239,10 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 ;;
 
 (def ^{:doc "List of all available font names."
-       :metadoc/categories #{:write}} fonts-list (into [] (.getAvailableFontFamilyNames (java.awt.GraphicsEnvironment/getLocalGraphicsEnvironment))))
+       :metadoc/categories #{:write}} fonts-list
+  (try
+    (into [] (.getAvailableFontFamilyNames (java.awt.GraphicsEnvironment/getLocalGraphicsEnvironment)))
+    (catch Exception _ []))) ;; in headless mode function call fails
 
 (defn set-font
   "Set font by name."
