@@ -1,6 +1,7 @@
 (ns clojure2d.extra.utils
   "Set of various utilities which can be used to display various objects."
-  (:require [clojure2d.core :refer :all]
+  (:require [clojure2d.core :refer [canvas height width with-canvas set-background set-color rect show-window with-canvas->
+                                    set-font-attributes text point image get-image]]
             [clojure2d.color :as c]
             [fastmath.vector :as v]
             [fastmath.core :as m]

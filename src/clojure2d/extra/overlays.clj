@@ -12,7 +12,7 @@
 ;; See example 12 for usage
 
 (ns clojure2d.extra.overlays
-  (:require [clojure2d.core :refer :all]
+  (:require [clojure2d.core :refer [set-color line get-image width height resize with-canvas-> canvas image]]
             [clojure2d.pixels :as p]
             [clojure2d.color :as c]
             [fastmath.core :as m]
@@ -78,7 +78,7 @@
 
 (defn- adjust-pos-value 
   "Adjust given position according to offset and resolution"
-  [^double value ^double offset ^double resolution]
+  [^long value ^double offset ^double resolution]
   (* resolution (m/floor (+ offset (/ value resolution)))))
 
 (defn render-crt-scanlines

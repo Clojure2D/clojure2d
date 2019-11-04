@@ -22,7 +22,7 @@
   (:require [fastmath.core :as m]
             [fastmath.random :as r]
             [clojure2d.pixels :as p]
-            [clojure2d.core :refer :all]
+            [clojure2d.core :refer [width height int-array-2d]]
             [fastmath.vector :as v]
             [clojure2d.extra.signal :as s]
             [clojure2d.color :as c]
@@ -364,7 +364,7 @@
              (let [^int c (p/get-value source ch x y)
                    [^int ncurrentc ^int nlastx] (if (<= tolerance (m/abs (- currentc c)))
                                                   (let [^int gval (grid x y)
-                                                        ^int myx (if (bool-and whole (< lastx gval)) lastx gval)]
+                                                        ^int myx (if (and whole (< lastx gval)) lastx gval)]
                                                     (dotimes [xx (- x myx)] (p/set-value target ch (+ myx xx) y c))
                                                     [c x])
                                                   [currentc lastx])]
@@ -431,33 +431,33 @@
 
 ;; find best matching pixels
 
-(comment defn blend-images-filter
-         ""
-         [{:keys [names pixels mode distance cs]
-           :or {names [] pixels [] distance :euclid-sq mode :color cs :RGB}} ^Pixels p]
-         (let [images (concat pixels (map (comp (partial p/filter-colors (first (c/colorspaces* cs))) p/load-pixels) names))
-               ^int w (width p)
-               ^int h (height p)
-               df (v/distances distance)]
-           (if (= mode :color)
-             (p/filter-colors-xy (fn [p ^long x ^long y]
-                                   (let [c (p/get-color p x y)]
-                                     (first (reduce (fn [curr img]
-                                                      (let [nx (unchecked-int (m/norm x 0 w 0 (width img)))
-                                                            ny (unchecked-int (m/norm y 0 h 0 (height img)))
-                                                            [currc ^double currd] curr
-                                                            nc (p/get-color img nx ny) 
-                                                            ^double nd (df c nc)] 
-                                                        (if (< nd currd) [nc nd] curr)))
-                                                    [c Double/MAX_VALUE] images)))) p)
-             (p/filter-channels (partial p/filter-channel-xy (fn [ch p ^long x ^long y]
-                                                               (let [^int c (p/get-value p ch x y)]
-                                                                 (first (reduce (fn [curr img]
-                                                                                  (let [nx (unchecked-int (m/norm x 0 w 0 (width img)))
-                                                                                        ny (unchecked-int (m/norm y 0 h 0 (height img)))
-                                                                                        [currc ^double currd] curr
-                                                                                        ^int nc (p/get-value img ch nx ny) 
-                                                                                        nd (m/abs (- c nc))]
-                                                                                    (if (< nd currd) [nc nd] curr)))
-                                                                                [c Double/MAX_VALUE] images))))) p))))
+#_(comment defn blend-images-filter
+           ""
+           [{:keys [names pixels mode distance cs]
+             :or {names [] pixels [] distance :euclid-sq mode :color cs :RGB}} ^Pixels p]
+           (let [images (concat pixels (map (comp (partial p/filter-colors (first (c/colorspaces* cs))) p/load-pixels) names))
+                 ^int w (width p)
+                 ^int h (height p)
+                 df (v/distances distance)]
+             (if (= mode :color)
+               (p/filter-colors-xy (fn [p ^long x ^long y]
+                                     (let [c (p/get-color p x y)]
+                                       (first (reduce (fn [curr img]
+                                                        (let [nx (unchecked-int (m/norm x 0 w 0 (width img)))
+                                                              ny (unchecked-int (m/norm y 0 h 0 (height img)))
+                                                              [currc ^double currd] curr
+                                                              nc (p/get-color img nx ny) 
+                                                              ^double nd (df c nc)] 
+                                                          (if (< nd currd) [nc nd] curr)))
+                                                      [c Double/MAX_VALUE] images)))) p)
+               (p/filter-channels (partial p/filter-channel-xy (fn [ch p ^long x ^long y]
+                                                                 (let [^int c (p/get-value p ch x y)]
+                                                                   (first (reduce (fn [curr img]
+                                                                                    (let [nx (unchecked-int (m/norm x 0 w 0 (width img)))
+                                                                                          ny (unchecked-int (m/norm y 0 h 0 (height img)))
+                                                                                          [currc ^double currd] curr
+                                                                                          ^int nc (p/get-value img ch nx ny) 
+                                                                                          nd (m/abs (- c nc))]
+                                                                                      (if (< nd currd) [nc nd] curr)))
+                                                                                  [c Double/MAX_VALUE] images))))) p))))
 

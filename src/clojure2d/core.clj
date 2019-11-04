@@ -178,8 +178,7 @@
                         :session "Session"
                         :write "Text / font"
                         :transform "Transform canvas"}}
-  (:require [clojure.java.io :refer :all]
-            [clojure2d.color :as c]
+  (:require [clojure2d.color :as c]
             [fastmath.vector :as v]
             [fastmath.core :as m]
             [clojure.reflect :as ref]
@@ -297,7 +296,7 @@
   ([filename img ^ImageWriter writer]
    (do-save filename img writer (.getDefaultWriteParam writer)))
   ([filename ^BufferedImage img ^ImageWriter writer param]
-   (with-open [os (output-stream filename)]
+   (with-open [os (io/output-stream filename)]
      (doto writer
        (.setOutput (ImageIO/createImageOutputStream os))
        (.write nil (IIOImage. img nil nil) param)
@@ -361,7 +360,7 @@
   {:metadoc/categories #{:image}}
   [b filename]
   (println (str "saving: " filename "..."))
-  (make-parents filename)
+  (io/make-parents filename)
   (let [iwriter (get-image-writer filename)]
     (if-not (nil? iwriter)
       (do
@@ -759,7 +758,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   * `-` as suffix - means default orientation (y-axis reversed)
   * `+` as suffix - means usual (mathematical) orientation (y-axis not reversed)."
   {:metadoc/categories #{:transform :canvas}}
-  (fn [orientation c] orientation))
+  (fn [orientation _] orientation))
 
 (defmethod orient-canvas :default [_ c] c)
 (defmethod orient-canvas :top-left- [_ c] c)
@@ -771,22 +770,22 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 (defmethod orient-canvas :top-right- [_ ^Canvas c]
   (-> c
-      (translate (dec (.w c)) 0)
+      (translate (dec (.w c)) 0.0)
       (rotate m/HALF_PI)))
 
 (defmethod orient-canvas :top-right+ [_ ^Canvas c]
   (-> c
-      (translate (dec (.w c)) 0)
+      (translate (dec (.w c)) 0.0)
       (flip-x)))
 
 (defmethod orient-canvas :bottom-left+ [_ ^Canvas c]
   (-> c
-      (translate 0 (dec (.h c)))
+      (translate 0.0 (dec (.h c)))
       (flip-y)))
 
 (defmethod orient-canvas :bottom-left- [_ ^Canvas c]
   (-> c
-      (translate 0 (dec (.h c)))
+      (translate 0.0 (dec (.h c)))
       (rotate m/-HALF_PI)))
 
 (defmethod orient-canvas :bottom-right+ [_ ^Canvas c]
@@ -1104,9 +1103,9 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   (let [c1 (v/mult (v/add v0 v1) 0.5)
         c2 (v/mult (v/add v1 v2) 0.5)
         c3 (v/mult (v/add v2 v3) 0.5)
-        ^double len1 (v/mag c1)
-        ^double len2 (v/mag c2)
-        ^double len3 (v/mag c3)
+        len1 (v/mag c1)
+        len2 (v/mag c2)
+        len3 (v/mag c3)
         k1 (/ len1 (+ len1 len2))
         k2 (/ len2 (+ len2 len3))
         m1 (v/add c1 (v/mult (v/sub c2 c1) k1))
@@ -1502,7 +1501,7 @@ See [[set-color]]."
                                                SVGConstants/SVG_NAMESPACE_URI
                                                SVGConstants/SVG_SVG_TAG
                                                (str "file:///" svg-filename)
-                                               (input-stream (file svg-filename)))))
+                                               (io/input-stream (io/file svg-filename)))))
 
 (defn transcode-svg
   "Convert transcoder input into BufferedImage. See [[load-svg]]."
@@ -1647,8 +1646,8 @@ See [[set-color]]."
   "Check if mouse is inside window."
   {:metadoc/categories #{:window}}
   [window]
-  (bool-and (>= ^int (mouse-x window) 0.0)
-            (>= ^int (mouse-y window) 0.0)))
+  (and (>= ^int (mouse-x window) 0.0)
+       (>= ^int (mouse-y window) 0.0)))
 
 ;; ### Global state management
 ;;
@@ -1703,7 +1702,7 @@ See [[set-color]]."
     (assoc state :some (calculate-something state)))
   ```"
   {:metadoc/categories #{:events}}
-  (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))
+  (fn [^KeyEvent e _] [(event-window-name e) (.getKeyChar e)]))
 ;; Do nothing on default
 (defmethod key-pressed :default [_ s]  s)
 
@@ -1722,7 +1721,7 @@ See [[set-color]]."
     (assoc state :some (calculate-something state)))
   ```"
   {:metadoc/categories #{:events}}
-  (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))
+  (fn [^KeyEvent e _] [(event-window-name e) (.getKeyChar e)]))
 ;; Do nothing on default
 (defmethod key-released :default [_ s]  s)
 
@@ -1741,7 +1740,7 @@ See [[set-color]]."
     (assoc state :some (calculate-something state)))
   ```"
   {:metadoc/categories #{:events}}
-  (fn [^KeyEvent e state] [(event-window-name e) (.getKeyChar e)]))
+  (fn [^KeyEvent e _] [(event-window-name e) (.getKeyChar e)]))
 ;; Do nothing on default
 (defmethod key-typed :default [_ s]  s)
 
@@ -1767,7 +1766,7 @@ See [[set-color]]."
     state)
   ```"
   {:metadoc/categories #{:events}}
-  (fn [^KeyEvent e state] [(event-window-name e) (key-event-map (.getID e))]))
+  (fn [^KeyEvent e _] [(event-window-name e) (key-event-map (.getID e))]))
 ;; Do nothing on default
 (defmethod key-event :default [_ s] s)
 
@@ -1796,7 +1795,7 @@ See [[set-color]]."
     state)
   ```"
   {:metadoc/categories #{:events}}
-  (fn [^MouseEvent e state] [(event-window-name e) (mouse-event-map (.getID e))]))
+  (fn [^MouseEvent e _] [(event-window-name e) (mouse-event-map (.getID e))]))
 ;; Do nothing on default
 (defmethod mouse-event :default [_ s] s)
 
@@ -1895,7 +1894,7 @@ See [[set-color]]."
   (.dispose frame))
 
 ;; Create lazy list of icons to be loaded by frame
-(def ^:private window-icons (map #(.getImage (ImageIcon. (resource (str "icons/i" % ".png")))) [10 16 20 24 30 32 40 44 64 128]))
+(def ^:private window-icons (map #(.getImage (ImageIcon. (io/resource (str "icons/i" % ".png")))) [10 16 20 24 30 32 40 44 64 128]))
 
 (defn- build-frame
   "Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event."
@@ -1966,7 +1965,7 @@ See [[set-color]]."
         (when (pos? delay)
           (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay)))))
         (repaint (.panel window) @(.buffer window) (.background window) hints)
-        (when (bool-and @(.active? window) (not (.exception? new-result)))
+        (when (and @(.active? window) (not (.exception? new-result)))
           (recur (inc cnt)
                  (.value new-result)
                  (System/nanoTime)
@@ -1996,7 +1995,7 @@ See [[set-color]]."
           (when (pos? delay)
             (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay)))))
           (repaint (.panel window) @(.buffer window) (.background window) hints)
-          (when (bool-and @(.active? window) (not (.exception? new-result)))
+          (when (and @(.active? window) (not (.exception? new-result)))
             (recur (inc cnt)
                    (.value new-result)
                    (System/nanoTime)
@@ -2215,8 +2214,8 @@ See [[set-color]]."
   "Create writer for logger"
   [session-name]
   (let [fname (log-name)]
-    (make-parents fname) 
-    (let [^java.io.Writer no (writer fname :append true)]
+    (io/make-parents fname) 
+    (let [^java.io.Writer no (io/writer fname :append true)]
       (.write no (str "Session id: " (second session-name) (System/lineSeparator) (System/lineSeparator)))
       no)))
 

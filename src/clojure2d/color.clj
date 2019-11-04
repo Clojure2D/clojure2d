@@ -124,7 +124,7 @@
             [fastmath.interpolation :as i]
             [fastmath.clustering :as cl]
             [fastmath.easings :as e]
-            [clojure.java.io :refer :all])
+            [clojure.java.io :refer [input-stream resource]])
   (:import [fastmath.vector Vec3 Vec4]           
            [java.awt Color]
            [clojure.lang APersistentVector ISeq]))
@@ -714,7 +714,7 @@
   ^double [^double a ^double b]
   (let [c (- (+ a a) 1.0)]
     (cond (< b c) c
-          (bool-and (<= c b) (< b (+ c 1.0))) b
+          (and (<= c b) (< b (+ c 1.0))) b
           :else (+ c 1.0))))
 
 (defn blend-pinlight
@@ -1886,11 +1886,11 @@ See [[blends-list]] for names."}
             r (/ (- mx mn))
             e (* (- md mn) r)
             ^long k (cond
-                      (bool-and (> (.x c) (.y c)) (>= (.y c) (.z c))) 0
-                      (bool-and (>= (.y c) (.x c)) (> (.x c) (.z c))) 1
-                      (bool-and (> (.y c) (.z c)) (>= (.z c) (.x c))) 2
-                      (bool-and (>= (.z c) (.y c)) (> (.y c) (.x c))) 3
-                      (bool-and (> (.z c) (.x c)) (>= (.x c) (.y c))) 4
+                      (and (> (.x c) (.y c)) (>= (.y c) (.z c))) 0
+                      (and (>= (.y c) (.x c)) (> (.x c) (.z c))) 1
+                      (and (> (.y c) (.z c)) (>= (.z c) (.x c))) 2
+                      (and (>= (.z c) (.y c)) (> (.y c) (.x c))) 3
+                      (and (> (.z c) (.x c)) (>= (.x c) (.y c))) 4
                       :else 5)
             f (if (even? k)
                 e
@@ -2655,7 +2655,7 @@ See [[blends-list]] for names."}
   * `:angle` - hue angle for additional colors for `:triad` and `:tetrad`.
   * `:adj` - for `:triad` only, generate adjacent (default `true`) values or not."
   {:metadoc/categories #{:pal}}
-  (fn [m hue & conf] m))
+  (fn [m _ & _] m))
 
 (defmethod paletton :monochromatic [_ hue & conf]
   (let [{compl :compl 
@@ -2826,9 +2826,9 @@ See [[blends-list]] for names."}
          c2 (to-LAB c2)
          ^Vec4 diff (v/abs (v/sub c1 c2))
          ^Vec3 nd (nd-lab-interval s p)]
-     (bool-or (>= (.x diff) (.x nd))
-              (>= (.y diff) (.y nd))
-              (>= (.z diff) (.z nd))))))
+     (or (>= (.x diff) (.x nd))
+         (>= (.y diff) (.y nd))
+         (>= (.z diff) (.z nd))))))
 
 (defn nearest-color
   "Find nearest color from a set. Input: distance function (default euclidean), list of target colors and source color."

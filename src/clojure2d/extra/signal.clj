@@ -177,8 +177,7 @@
                         :sig "Signal"}}
   (:require [fastmath.core :as m]
             [clojure2d.pixels :as p]
-            [clojure2d.core :refer :all]
-            [clojure.java.io :refer :all]
+            [clojure.java.io :refer [file make-parents output-stream input-stream]]
             [fastmath.vector :as v]
             [fastmath.random :as r])
   (:import [clojure2d.pixels Pixels]
@@ -405,7 +404,7 @@
 
   Effect can be considered as function: call with sample to effect with next state or call without parameter to obtain latest result. Effects are also composable with [[compose-effects]]."
   {:metadoc/categories #{:eff}}
-  (fn [m & conf] m))
+  (fn [m & _] m))
 
 ;; ### Simple Low/High pass filters
 (defn- calc-filter-alpha
@@ -669,15 +668,15 @@
                 (fn
                   ([^double sample ^StateDivider state]
                    (let [count (inc (.count state))
-                         ^StateDivider s1 (if (bool-or (bool-and (> sample 0.0) (<= (.last state) 0.0))
-                                                       (bool-and (neg? sample) (>= (.last state) 0.0)))
+                         ^StateDivider s1 (if (or (and (> sample 0.0) (<= (.last state) 0.0))
+                                                  (and (neg? sample) (>= (.last state) 0.0)))
                                             (if (== denom 1)
                                               (StateDivider. (if (pos? (.out state)) -1.0 1.0) 0.0 0.0 (/ (.amp state) count) (.last state) 0)
                                               (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (inc (.zeroxs state))))
                                             (StateDivider. (.out state) (.amp state) count (.lamp state) (.last state) (.zeroxs state)))
                          amp (+ (.amp s1) (m/abs sample))
-                         ^StateDivider s2 (if (bool-and (> denom 1)
-                                                        (== ^long (rem (.zeroxs s1) denom) (dec denom)))
+                         ^StateDivider s2 (if (and (> denom 1)
+                                                   (== ^long (rem (.zeroxs s1) denom) (dec denom)))
                                             (StateDivider. (if (pos? (.out s1)) -1.0 1.0) 0.0 0 (/ amp (.count s1)) (.last s1) 0)
                                             (StateDivider. (.out s1) amp (.count s1) (.lamp s1) (.last s1) (.zeroxs s1)))]
                      (SampleAndState. (* (.out s2) (.lamp s2)) (StateDivider. (.out s2) (.amp s2) (.count s2) (.lamp s2) sample (.zeroxs s2)))))

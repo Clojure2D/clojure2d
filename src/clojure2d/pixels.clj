@@ -127,8 +127,7 @@
   (:require [clojure2d.color :as c]
             [clojure2d.core :as core]
             [fastmath.core :as m]
-            [fastmath.vector :as v]
-            [fastmath.random :as r])
+            [fastmath.vector :as v])
   (:import [clojure2d.core Canvas Window]
            [fastmath.vector Vec2 Vec4]
            [java.awt.image BufferedImage Raster WritableRaster]
@@ -299,10 +298,10 @@
   PixelsProto
   {:to-pixels (fn [^BufferedImage i] (get-image-pixels i))
    :get-color (fn [^BufferedImage i ^long x ^long y]
-                (if (bool-or (< x 0)
-                             (< y 0)
-                             (>= x (.getWidth i))
-                             (>= y (.getHeight i)))
+                (if (or (< x 0)
+                        (< y 0)
+                        (>= x (.getWidth i))
+                        (>= y (.getHeight i)))
                   (c/color 0 0 0)
                   (let [b (int-array 1)
                         ^java.awt.image.Raster raster (.getRaster i)]
