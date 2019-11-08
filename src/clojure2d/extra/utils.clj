@@ -70,11 +70,13 @@
   (let [c (canvas 800 800)]
     (with-canvas [c c]
       (set-color c :white 8)
+      (set-background c :black)
       (dotimes [_ 2500000]
         (let [x (r/drand (- m/PI) m/PI)
               y (r/drand (- m/PI) m/PI)
-              v (f (v/vec2 x y))]
-          (point c (norm-out (v 0)) (norm-out (v 1))))))
+              v1 (v/vec2 x y)
+              v2 (v/add v1 (f v1))]
+          (line c  (norm-out x) (norm-out y) (norm-out (v2 0)) (norm-out (v2 1))))))
     (show-window {:canvas c})))
 
 (defn show-image
