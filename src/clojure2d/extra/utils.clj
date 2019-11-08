@@ -74,9 +74,8 @@
       (dotimes [_ 2500000]
         (let [x (r/drand (- m/PI) m/PI)
               y (r/drand (- m/PI) m/PI)
-              v1 (v/vec2 x y)
-              v2 (v/add v1 (f v1))]
-          (line c  (norm-out x) (norm-out y) (norm-out (v2 0)) (norm-out (v2 1))))))
+              v (f (v/vec2 x y))]
+          (point c (norm-out (v 0)) (norm-out (v 1))))))
     (show-window {:canvas c})))
 
 (defn show-image
