@@ -104,11 +104,7 @@
   
   ## Distances
 
-  Several functions to calculate distance between colors (`euclidean`, `delta-xxx` etc.).
-
-  ## Thi.ng interoperability
-
-  Thi.ng `RGBA` type implements [[ColorProto]]. To convert any color to `RGBA` use [[to-thing-rgba]]."
+  Several functions to calculate distance between colors (`euclidean`, `delta-xxx` etc.)."
   {:metadoc/categories {:ops "Color/channel operations"
                         :conv "Color conversions"
                         :bl "Color blendings"
@@ -2405,14 +2401,13 @@ See [[blends-list]] for names."}
 [See all](../static/colourlovers.html)"}
   colourlovers-palettes
   (let [f (fn [xml-in] (map (fn [x] (map #((:content %) 0) (:content (first (filter #(= (:tag %) :colors) (:content ((:content xml-in) x))))))) (range 100))) ;; parser
-        all (->> (range 5) ;; five files
-                 (map clojure.core/inc) ;; index 1-5
-                 (map #(str "cl" % ".xml.gz")) ;; filename
-                 (map resource) ;; as resource
-                 (map input-stream) ;; as input stream
-                 (map #(java.util.zip.GZIPInputStream. %)) ;; unzip
-                 (map xml/parse) ;; parse
-                 (map f) ;; extract palettes
+        all (->> (range 1 6) ;; five files
+                 (map #(-> (str "cl" % ".xml.gz")
+                           (resource)
+                           (input-stream)
+                           (java.util.zip.GZIPInputStream.)
+                           (xml/parse)
+                           (f)))
                  (apply concat))] ;; join them
     (mapv (fn [x] (mapv to-color x)) all)))
 
@@ -2481,9 +2476,9 @@ See [[blends-list]] for names."}
 
 (def ^:private paletton-base-data
   (let [s (fn ^double [^double e ^double t ^double n] (if (== n -1.0) e
-                                                          (+ e (/ (- t e) (inc n)))))
+                                                         (+ e (/ (- t e) (inc n)))))
         i (fn ^double [^double e ^double t ^double n] (if (== n -1.0) t
-                                                          (+ t (/ (- e t) (inc n)))))
+                                                         (+ t (/ (- e t) (inc n)))))
         paletton-base-values   {:r  [1.0 1.0]
                                 :rg [1.0 1.0]
                                 :g  [1.0 0.8]
@@ -2493,7 +2488,7 @@ See [[blends-list]] for names."}
     {120.0 {:a (:r paletton-base-values)
             :b (:rg paletton-base-values)
             :f (fn ^double [^double e]
-                 (if (== e 0.0) -1.0
+                 (if (zero? e) -1.0
                      (* 0.5 (m/tan (* m/HALF_PI (/ (- 120.0 e) 120.0))))))
             :fi (fn ^double [^double e]
                   (if (== e -1.0) 0.0
@@ -2545,7 +2540,7 @@ See [[blends-list]] for names."}
      360.0 {:a (:br paletton-base-values)
             :b (:r paletton-base-values)
             :f (fn ^double [^double e]
-                 (if (== e 0.0) -1.0
+                 (if (zero? e) -1.0
                      (* 1.33 (m/tan (* m/HALF_PI (/ (- e 315.0) 45.0))))))
             :fi (fn ^double [^double e]
                   (if (== e -1.0) 0.0
@@ -2560,8 +2555,8 @@ See [[blends-list]] for names."}
         kv (m/constrain kv 0.0 2.0)
         h (mod hue 360.0)
         upd (fn ^double [^double e ^double t] (if (<= t 1.0)
-                                                (* e t)
-                                                (+ e (* (- 1.0 e) (dec t)))))
+                                               (* e t)
+                                               (+ e (* (- 1.0 e) (dec t)))))
         {:keys [a b f g rgb]} (second (first (filter #(< h ^double (% 0)) paletton-base-data)))
         av (second a)
         bv (second b)
@@ -3216,7 +3211,7 @@ See [[blends-list]] for names."}
    (gradient-easing :RGB e/linear col1 col2)))
 
 (def ^{:metadoc/categories #{:grad}
-       :doc "Cubehelix gradient generator."}
+       :doc "Cubehelix gradient generator from two colors."}
   gradient-cubehelix (partial gradient-easing :Cubehelix))
 
 (defn resample
@@ -3581,6 +3576,13 @@ Map with name (keyword) as key and gradient function as value.
        :metadoc/categories #{:grad}}
   gradient-presets
   (merge
+   (into {} (for [[k v] (-> "mathematica.edn.gz"
+                            (resource)
+                            (input-stream)
+                            (java.util.zip.GZIPInputStream.)
+                            (slurp)
+                            (read-string))]
+              [k (gradient v)])) ;; linear scale
    (into {} (for [[k v] image-palettes]
               [k (gradient :LAB :cubic-spline v)]))
    (into {} (for [[k v] {:rainbow1              [[0.5 0.5 0.5] [0.5 0.5 0.5] [1.0 1.0 1.0] [0 0.3333 0.6666]]
