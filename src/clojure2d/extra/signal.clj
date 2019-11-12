@@ -171,7 +171,7 @@
   * `:depth-mod`
   * `:feedback`
   
-  _Warning: like `:echo` internal state is kept in doubles array._"
+  _Warning: internal state is kept in doubles array._"
   {:metadoc/categories {:eff "Effects"
                         :wave "Wave"
                         :sig "Signal"}}
