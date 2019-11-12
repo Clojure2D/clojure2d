@@ -888,4 +888,3 @@
   (reduce #(.merge ^clojure2d.java.GradientDensity (.buff target)
                    ^clojure2d.java.GradientDensity (.buff ^GradientRenderer %)) target renderers))
 
-

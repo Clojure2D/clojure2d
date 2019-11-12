@@ -1,6 +1,20 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 1.3.0-alpha1 (not released, in progress)
+
+### Added
+
+* mathematica gradients (thanks to [Chris N.](https://github.com/techascent/tech.datatype/blob/master/src/tech/v2/tensor/color_gradients.clj))
+
+### Changed
+
+* deps bumped
+
+### Removed
+
+* Signal processing - moved to fastmath
+
 ## 1.2.0-SNAPSHOT
 
 ### Added
