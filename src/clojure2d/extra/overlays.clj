@@ -59,8 +59,8 @@
   Correct with normalize filter if necessary."
   ([p {:keys [^double scale] :or {scale 1.6}}] 
    (let [p (get-image p)
-         ^int w (width p)
-         ^int h (height p)
+         w (width p)
+         h (height p)
          rimg (-> p
                   (resize (unchecked-int (/ w scale)) (unchecked-int (/ h scale)))
                   (resize w h)
@@ -108,9 +108,9 @@
                      x- (adjust-pos-value xx -1.0 resolution)
                      x (adjust-pos-value xx 0.0 resolution)
                      x+ (adjust-pos-value xx 1.0 resolution)
-                     ^int a (p/get-value p ch x- y)
-                     ^int b (p/get-value p ch x y)
-                     ^int c (p/get-value p ch x+ y)
+                     a (p/get-value p ch x- y)
+                     b (p/get-value p ch x y)
+                     c (p/get-value p ch x+ y)
                      ^double dst (dist xx)
                      ^double wa (gauss (dec dst) hardpix)
                      ^double wb (gauss dst hardpix)
@@ -126,9 +126,9 @@
                    (let [y- (adjust-pos-value yy -1.0 resolution)
                          y (adjust-pos-value yy 0.0 resolution)
                          y+ (adjust-pos-value yy 1.0 resolution)
-                         ^int a (p/get-value p ch xx y-)
-                         ^int b (p/get-value p ch xx y)
-                         ^int c (p/get-value p ch xx y+)
+                         a (p/get-value p ch xx y-)
+                         b (p/get-value p ch xx y)
+                         c (p/get-value p ch xx y+)
                          ^double dst (dist yy)
                          ^double wa (gauss (dec dst) hardscan)
                          ^double wb (gauss dst hardscan)
@@ -159,8 +159,8 @@
               (c/lclamp255 (+ 100.0 (* 20.0 (r/grand)))))
          fa (constantly (int alpha))
          p (p/filter-channels (partial p/filter-channel fc) nil nil (partial p/filter-channel fa) (p/pixels w h))]
-     (p/set-channel p 1 (p/get-channel p 0))
-     (p/set-channel p 2 (p/get-channel p 0))
+     (p/set-channel! p 1 (p/get-channel p 0))
+     (p/set-channel! p 2 (p/get-channel p 0))
      (get-image p)))
   ([w h] (noise-overlay w h {})))
 
@@ -209,11 +209,11 @@
                                      (aset pc (+ ^long m (* w ^long n)) bc)
                                      (aset pa (+ ^long m (* w ^long n)) a)))))))
     (let [p (p/pixels w h)]
-      (p/set-channel p 0 pc)
-      (p/set-channel p 3 pa)
+      (p/set-channel! p 0 pc)
+      (p/set-channel! p 3 pa)
       (let [res (p/filter-channels p/dilate nil nil p/dilate p)]
-        (p/set-channel res 1 (p/get-channel res 0))
-        (p/set-channel res 2 (p/get-channel res 0))
+        (p/set-channel! res 1 (p/get-channel res 0))
+        (p/set-channel! res 2 (p/get-channel res 0))
         (get-image res)))))
 
 (defn spots-overlay

@@ -233,7 +233,7 @@
   (example-snippet "Orient and draw." drawing-snippet :image
     (fn [canvas]
       (with-oriented-canvas :bottom-left+ [c canvas]
-        (doseq [p (range 0 100 4)]
+        (doseq [^long p (range 0 100 4)]
           (set-color c (* p 2) 200 200)
           (line c p 0 (+ p 100) 50))))))
 

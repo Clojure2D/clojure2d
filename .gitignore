@@ -16,3 +16,5 @@ _site
 *.lock
 /results/ex16/*.raw
 /results/ex18/*.raw
+/log
+

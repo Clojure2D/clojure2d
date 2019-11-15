@@ -184,7 +184,8 @@
             [clojure.reflect :as ref]
             [clojure.string :as s]
             [fastmath.grid :as grid]
-            [clojure.java.io :as io])
+            [clojure.java.io :as io]
+            [clojure2d.protocols :as pr])
   (:import [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
            [java.awt.event InputEvent ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
            [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double Arc2D Arc2D$Double]
@@ -370,16 +371,6 @@
 
 ;;
 
-(defprotocol ImageProto
-  "Image Protocol"
-  (^{:metadoc/categories #{:image :canvas :window}} get-image [i] "Return BufferedImage")
-  (^{:metadoc/categories #{:image :canvas :window}} width [i] "Width of the image.")
-  (^{:metadoc/categories #{:image :canvas :window}} height [i] "Height of the image.")
-  (^{:metadoc/categories #{:image :canvas :window}} save [i n] "Save image `i` to a file `n`.")
-  (^{:metadoc/categories #{:image :canvas :window}} convolve [i t] "Convolve with Java ConvolveOp. See [[convolution-matrices]] for kernel names.")
-  (^{:metadoc/categories #{:image :canvas :window}} subimage [i x y w h] "Return part of the image.")
-  (^{:metadoc/categories #{:image :canvas}} resize [i w h] "Resize image."))
-
 (declare set-rendering-hints-by-key)
 
 (defn- resize-image
@@ -440,7 +431,7 @@
 
 ;; Add ImageProto functions to BufferedImae
 (extend BufferedImage
-  ImageProto
+  pr/ImageProto
   {:get-image identity
    :width (fn [^BufferedImage i] (.getWidth i))
    :height (fn [^BufferedImage i] (.getHeight i))
@@ -472,13 +463,13 @@
             ^long h
             transform-stack
             font]
-  ImageProto
+  pr/ImageProto
   (get-image [_] buffer)
   (width [_] w)
   (height [_] h)
   (save [c n] (save-image buffer n) c)
   (convolve [_ t]
-    (convolve buffer t))
+    (pr/convolve buffer t))
   (resize [c w h] (resize-canvas c w h))
   (subimage [_ x y w h] (get-subimage buffer x y w h)))
 
@@ -656,7 +647,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   [^Canvas c width height]
   (let [ncanvas (canvas width height (.hints c))]
     (with-canvas-> ncanvas
-      (image (get-image c)))))
+      (image (pr/get-image c)))))
 
 ;;
 
@@ -836,7 +827,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   See also [[clip]]."
   {:metadoc/categories #{:canvas}}
   [^Canvas canvas] 
-  (.setClip ^Graphics2D (.graphics canvas) 0 0 (width canvas) (height canvas))
+  (.setClip ^Graphics2D (.graphics canvas) 0 0 (pr/width canvas) (pr/height canvas))
   canvas)
 
 ;; Drawing functions
@@ -1460,13 +1451,13 @@ See [[set-color]]."
   To revert call [[paint-mode]]"
   {:metadoc/categories #{:draw}}
   ([canvas image]
-   (let [^BufferedImage image (get-image image)]
+   (let [^BufferedImage image (pr/get-image image)]
      (pattern-mode canvas image 0 0 (.getWidth image) (.getHeight image))))
   ([canvas image w h]
-   (let [^BufferedImage image (get-image image)]
+   (let [^BufferedImage image (pr/get-image image)]
      (pattern-mode canvas image 0 0 w h))) 
   ([^Canvas canvas image anchor-x anchor-y w h]
-   (let [image (get-image image)
+   (let [image (pr/get-image image)
          rect (Rectangle2D$Double. anchor-x anchor-y w h)
          texture (java.awt.TexturePaint. image rect)
          ^Graphics2D g (.graphics canvas)]
@@ -1482,12 +1473,12 @@ See [[set-color]]."
   You can specify position and size of the image. Default it's placed on whole canvas."
   {:metadoc/categories #{:draw}}
   ([^Canvas canvas img x y w h]
-   (.drawImage ^Graphics2D (.graphics canvas) (get-image img) x y w h nil)
+   (.drawImage ^Graphics2D (.graphics canvas) (pr/get-image img) x y w h nil)
    canvas)
   ([^Canvas canvas img]
    (image canvas img 0 0 (.w canvas) (.h canvas)))
   ([^Canvas canvas img x y]
-   (image canvas img x y (width img) (height img))))
+   (image canvas img x y (pr/width img) (pr/height img))))
 
 ;; SVG
 
@@ -1532,34 +1523,75 @@ See [[set-color]]."
                                                      (clojure.string/lower-case)
                                                      (keyword))) {})))
 
-(defprotocol MouseXYProto
-  "Mouse position."
-  (^{:metadoc/categories #{:window :events}} mouse-x [m] "Mouse horizontal position within window. 0 - left side. -1 outside window.")
-  (^{:metadoc/categories #{:window :events}} mouse-y [m] "Mouse vertical position. 0 - top, -1 outside window.")
-  (^{:metadoc/categories #{:window :events}} mouse-pos [m] "Mouse position as [[Vec2]] type. [0,0] - top left, [-1,-1] outside window."))
+(defn mouse-x
+  "Mouse horizontal position within window. 0 - left side. -1 outside window."
+  {:metadoc/categories #{:window :events}}
+  ^long [m] (pr/mouse-x m))
 
-(defprotocol MouseButtonProto
-  "Get pressed mouse button status."
-  (^{:metadoc/categories #{:window :events}} mouse-button [m] "Get mouse pressed button status: :left :right :center or :none"))
+(defn mouse-y
+  "Mouse vertical position within window. 0 - left side. -1 outside window."
+  {:metadoc/categories #{:window :events}}
+  ^long [m] (pr/mouse-y m))
 
-(defprotocol KeyEventProto
-  "Access to key event data"
-  (^{:metadoc/categories #{:window :events}} key-code [e] "Keycode mapped to keyword. See `java.awt.event.KeyEvent` documentation. Eg. `VK_LEFT` is mapped to `:left`.")
-  (^{:metadoc/categories #{:window :events}} key-char [e] "Key as char.")
-  (^{:metadoc/categories #{:window :events}} key-raw [e] "Raw value for pressed key (as integer)."))
+(defn mouse-pos
+  "Mouse position as [[Vec2]] type. [0,0] - top left, [-1,-1] outside window."
+  {:metadoc/categories #{:window :events}}
+  [m] (pr/mouse-pos m))
 
-(defprotocol ModifiersProto
-  "Get state of keyboard modifiers."
-  (^{:metadoc/categories #{:window :events}} control-down? [e] "CONTROL key state as boolean.")
-  (^{:metadoc/categories #{:window :events}} alt-down? [e] "ALT key state as boolean.")
-  (^{:metadoc/categories #{:window :events}} meta-down? [e] "META key state as boolean.")
-  (^{:metadoc/categories #{:window :events}} shift-down? [e] "SHIFT key state as boolean.")
-  (^{:metadoc/categories #{:window :events}} alt-gr-down? [e] "ALT-GR key state as boolean."))
+(defn mouse-button
+  "Get mouse pressed button status: :left :right :center or :none"
+  {:metadoc/categories #{:window :events}}
+  [m] (pr/mouse-button m))
 
-(defprotocol PressedProto
-  "Key or mouse pressed status."
-  (^{:metadoc/categories #{:window :events}} key-pressed? [w] "Any key pressed? (boolean)")
-  (^{:metadoc/categories #{:window :events}} mouse-pressed? [w] "Any mouse button pressed? (boolean)"))
+(defn key-code
+  "Keycode mapped to keyword. See `java.awt.event.KeyEvent` documentation. Eg. `VK_LEFT` is mapped to `:left`."
+  {:metadoc/categories #{:window :events}}
+  [e] (pr/key-code e))
+
+(defn key-char
+  "Key as char."
+  {:metadoc/categories #{:window :events}}
+  [e] (pr/key-char e))
+
+(defn key-raw
+  "Raw value for pressed key (as integer)."
+  {:metadoc/categories #{:window :events}}
+  ^long [e] (pr/key-raw e))
+
+(defn control-down?
+  "CONTROL key state as boolean."
+  {:metadoc/categories #{:window :events}}
+  [e] (pr/control-down? e))
+
+(defn alt-down?
+  "ALT key state as boolean."
+  {:metadoc/categories #{:window :events}}
+  [e] (pr/alt-down? e))
+
+(defn meta-down?
+  "META key state as boolean."
+  {:metadoc/categories #{:window :events}}
+  [e] (pr/meta-down? e))
+
+(defn shift-down?
+  "SHIFT key state as boolean."
+  {:metadoc/categories #{:window :events}}
+  [e] (pr/shift-down? e))
+
+(defn alt-gr-down?
+  "ALT-GR key state as boolean."
+  {:metadoc/categories #{:window :events}}
+  [e] (pr/alt-gr-down? e))
+
+(defn key-pressed?
+  "Any key pressed? (boolean)"
+  {:metadoc/categories #{:window :events}}
+  [w] (pr/key-pressed? w))
+
+(defn mouse-pressed?
+  "Any mouse button pressed? (boolean)"
+  {:metadoc/categories #{:window :events}}
+  [w] (pr/mouse-pressed? w))
 
 ;; `Window` type definition, equiped with `get-image` method returning bound canvas' image.
 (defrecord Window [^JFrame frame
@@ -1572,29 +1604,29 @@ See [[set-color]]."
                    window-name
                    events
                    background]
-  ImageProto
-  (get-image [_] (get-image @buffer))
+  pr/ImageProto
+  (get-image [_] (pr/get-image @buffer))
   (width [_] w)
   (height [_] h)
-  (save [w n] (save-image (get-image @buffer) n) w)
-  (convolve [w n] (convolve @buffer n))
+  (save [w n] (save-image (pr/get-image @buffer) n) w)
+  (convolve [w n] (pr/convolve @buffer n))
   (subimage [_ x y w h] (get-subimage @buffer x y w h))
-  PressedProto
+  pr/PressedProto
   (key-pressed? [_] (:key-pressed? @events))
   (mouse-pressed? [_] (:mouse-pressed? @events))
-  ModifiersProto
+  pr/ModifiersProto
   (control-down? [_] (:control-down? @events))
   (alt-down? [_] (:alt-down? @events)) 
   (meta-down? [_] (:meta-down? @events))
   (shift-down? [_] (:shift-down? @events))
   (alt-gr-down? [_] (:alt-gr-down? @events))
-  KeyEventProto
+  pr/KeyEventProto
   (key-code [_] (:key-code @events))
   (key-char [_] (:key-char @events))
   (key-raw [_] (:key-raw @events))
-  MouseButtonProto
+  pr/MouseButtonProto
   (mouse-button [_] (:mouse-button @events))
-  MouseXYProto
+  pr/MouseXYProto
   (mouse-pos [_]
     (let [^java.awt.Point p (.getMousePosition panel)]
       (if (nil? p)
@@ -1609,30 +1641,31 @@ See [[set-color]]."
 
 ;; ### Events function
 (extend MouseEvent
-  MouseButtonProto
-  {:mouse-button #(condp = (.getButton ^MouseEvent %)
-                    MouseEvent/BUTTON1 :left
-                    MouseEvent/BUTTON2 :center
-                    MouseEvent/BUTTON3 :right
-                    :none)}
-  MouseXYProto
-  {:mouse-x #(.getX ^MouseEvent %)
-   :mouse-y #(.getY ^MouseEvent %)
-   :mouse-pos #(v/vec2 (mouse-x %) (mouse-y %))})
+  pr/MouseButtonProto
+  {:mouse-button (fn [^MouseEvent e]
+                   (condp = (.getButton e)
+                     MouseEvent/BUTTON1 :left
+                     MouseEvent/BUTTON2 :center
+                     MouseEvent/BUTTON3 :right
+                     :none))}
+  pr/MouseXYProto
+  {:mouse-x (fn ^long [^MouseEvent e] (.getX e))
+   :mouse-y (fn ^long [^MouseEvent e] (.getY e))
+   :mouse-pos (fn [^MouseEvent e] (v/vec2 (.getX e) (.getY e)))})
 
 (extend KeyEvent
-  KeyEventProto
-  {:key-code #(keycodes-map (.getKeyCode ^KeyEvent %))
-   :key-char #(.getKeyChar ^KeyEvent %)
-   :key-raw #(.getKeyCode ^KeyEvent %)})
+  pr/KeyEventProto
+  {:key-code (fn [^KeyEvent e] (keycodes-map (.getKeyCode e)))
+   :key-char (fn [^KeyEvent e] (.getKeyChar e))
+   :key-raw (fn ^long [^KeyEvent e] (long (.getKeyCode e)))})
 
 (extend InputEvent
-  ModifiersProto
-  {:control-down? #(.isControlDown ^InputEvent %)
-   :alt-down? #(.isAltDown ^InputEvent %)
-   :meta-down? #(.isMetaDown ^InputEvent %)
-   :shift-down? #(.isShiftDown ^InputEvent %)
-   :alt-gr-down? #(.isAltGraphDown ^InputEvent %)})
+  pr/ModifiersProto
+  {:control-down? (fn [^InputEvent e] (.isControlDown e))
+   :alt-down? (fn [^InputEvent e] (.isAltDown e))
+   :meta-down? (fn [^InputEvent e] (.isMetaDown e))
+   :shift-down? (fn [^InputEvent e] (.isShiftDown e))
+   :alt-gr-down? (fn [^InputEvent e] (.isAltGraphDown e))})
 
 ;; ### Window type helper functions
 
@@ -1646,8 +1679,8 @@ See [[set-color]]."
   "Check if mouse is inside window."
   {:metadoc/categories #{:window}}
   [window]
-  (and (>= ^int (mouse-x window) 0.0)
-       (>= ^int (mouse-y window) 0.0)))
+  (and (>= (mouse-x window) 0)
+       (>= (mouse-y window) 0)))
 
 ;; ### Global state management
 ;;
@@ -1771,8 +1804,8 @@ See [[set-color]]."
 (defmethod key-event :default [_ s] s)
 
 ;; Map Java mouse event names onto keywords
-(def   ^{:doc "Map of supported mouse events"
-         :metadoc/categories #{:events}}
+(def ^{:doc "Map of supported mouse events"
+       :metadoc/categories #{:events}}
   mouse-event-map {MouseEvent/MOUSE_CLICKED  :mouse-clicked
                    MouseEvent/MOUSE_DRAGGED  :mouse-dragged
                    MouseEvent/MOUSE_PRESSED  :mouse-pressed
@@ -1890,7 +1923,6 @@ See [[set-color]]."
   "Close window frame"
   [^JFrame frame active? windowname]
   (reset! active? false)
-  (clear-state! windowname)
   (.dispose frame))
 
 ;; Create lazy list of icons to be loaded by frame
@@ -1957,7 +1989,7 @@ See [[set-color]]."
                                                                   (with-canvas-> @(.buffer window)
                                                                     (draw-fun window cnt result))))
                                          (catch Throwable e
-                                           (.printStackTrace e)
+                                           (.printStackTrace e) 
                                            (WithExceptionT. true e))) 
             at (System/nanoTime)
             diff (/ (- at t) 1.0e6)
@@ -1965,11 +1997,12 @@ See [[set-color]]."
         (when (pos? delay)
           (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay)))))
         (repaint (.panel window) @(.buffer window) (.background window) hints)
-        (when (and @(.active? window) (not (.exception? new-result)))
+        (if (and @(.active? window) (not (.exception? new-result)))
           (recur (inc cnt)
                  (.value new-result)
                  (System/nanoTime)
-                 (if (pos? delay) (- (/ (- (System/nanoTime) at) 1.0e6) delay) 0.0)))))))
+                 (if (pos? delay) (- (/ (- (System/nanoTime) at) 1.0e6) delay) 0.0))
+          (clear-state! (.window-name window)))))))
 
 
 (defn- refresh-screen-task-speed
@@ -1995,11 +2028,12 @@ See [[set-color]]."
           (when (pos? delay)
             (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay)))))
           (repaint (.panel window) @(.buffer window) (.background window) hints)
-          (when (and @(.active? window) (not (.exception? new-result)))
+          (if (and @(.active? window) (not (.exception? new-result)))
             (recur (inc cnt)
                    (.value new-result)
                    (System/nanoTime)
-                   (if (pos? delay) (- (/ (- (System/nanoTime) at) 1.0e6) delay) 0.0))))))))
+                   (if (pos? delay) (- (/ (- (System/nanoTime) at) 1.0e6) delay) 0.0))
+            (clear-state! (.window-name window))))))))
 
 ;;
 
@@ -2081,8 +2115,8 @@ See [[set-color]]."
           refresher nil
           always-on-top? false
           background :white}}]
-   (let [w (or w (width canvas))
-         h (or h (height canvas))
+   (let [w (or w (pr/width canvas))
+         h (or h (pr/height canvas))
          active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
@@ -2096,8 +2130,8 @@ See [[set-color]]."
                           h
                           window-name
                           (atom {})
-                          (get-image (with-canvas-> (clojure2d.core/canvas w h)
-                                       (set-background background))))
+                          (pr/get-image (with-canvas-> (clojure2d.core/canvas w h)
+                                          (set-background background))))
          setup-state (when setup (with-canvas-> canvas
                                    (setup window))) 
          refresh-screen-task (if (= refresher :fast)
@@ -2181,7 +2215,7 @@ See [[set-color]]."
                         counter])
 
 ;; Session is stored in agent
-(defonce ^:private session-agent (agent (map->SessionType {})))
+(defonce ^:private session-atom (atom nil))
 
 ;; Logging to file is turned off by default.
 (def ^:dynamic ^{:doc "Should [[log]] save to file under [[log-name]]. Print to terminal if `false` (default)."
@@ -2194,7 +2228,7 @@ See [[set-color]]."
     (when-not (nil? o)
       (.flush o)
       (.close o)))
-  (map->SessionType {}))
+  nil)
 
 (defn- make-session-name
   "Create unique session name based on current time. Result is a vector with date and hash represented as hexadecimary number."
@@ -2231,22 +2265,20 @@ See [[set-color]]."
   "Create session via agent"
   {:metadoc/categories #{:session}}
   []
-  (send session-agent make-session-fn)
-  (await-for 1000 session-agent)
-  (:name @session-agent))
+  (swap! session-atom make-session-fn)
+  (:name @session-atom))
 
 (defn close-session
   "Close session via agent"
   {:metadoc/categories #{:session}}
   []
-  (send session-agent close-session-fn)
-  (await-for 1000 session-agent))
+  (swap! session-atom close-session-fn))
 
 (defn ensure-session
   "Ensure that session is active (create one if not)"
   {:metadoc/categories #{:session}}
   []
-  (when (nil? (:name @session-agent))
+  (when (nil? @session-atom)
     (make-session)))
 
 (defn session-name
@@ -2254,14 +2286,14 @@ See [[set-color]]."
   {:metadoc/categories #{:session}}
   []
   (ensure-session)
-  (:name @session-agent))
+  (:name @session-atom))
 
 (defn next-filename
   "Create next unique filename based on session"
   {:metadoc/categories #{:session}}
   ([prefix]
    (ensure-session)
-   (let [s @session-agent]
+   (let [s @session-atom]
      (str prefix (second (:name s)) "_" (format "%06d" ((:counter s))))))
   ([prefix suffix]
    (str (next-filename prefix) suffix)))
@@ -2273,7 +2305,7 @@ See [[set-color]]."
   (let [to-log (str (.format simple-date-format-full (java.util.Date.)) ": " message (System/lineSeparator))]
     (ensure-session)
     (if *log-to-file*
-      (send session-agent (fn [s]
+      (swap! session-atom (fn [s]
                             (let [^java.io.Writer o (or (:logger s) (make-logger-fn (:name s)))]
                               (.write o to-log)
                               (.flush o)
@@ -2307,3 +2339,41 @@ See [[set-color]]."
 
 ;;
 
+(defn get-image
+  "Return BufferedImage"
+  {:metadoc/categories #{:image :canvas :window}}
+  [i] (pr/get-image i))
+
+(defn width
+  "Width of the image."
+  {:metadoc/categories #{:image :canvas :window}}
+  ^long [i] (pr/width i))
+
+(defn height
+  "height of the image."
+  {:metadoc/categories #{:image :canvas :window}}
+  ^long [i] (pr/height i))
+
+(defn save
+  "Save image `i` to a file `n`."
+  {:metadoc/categories #{:image :canvas :window}}
+  [i n] (pr/save i n))
+
+(defn convolve
+  "Convolve with Java ConvolveOp.
+
+  Kernel can be predefined as keywords or sequence of numbers (row-wise).
+  
+  See [[convolution-matrices]] for kernel names."
+  {:metadoc/categories #{:image :canvas :window}}
+  [i kernel] (pr/convolve i kernel))
+
+(defn subimage
+  "Return rectangular subimage"
+  {:metadoc/categories #{:image :canvas :window}}
+  [i x y w h] (pr/subimage i x y w h))
+
+(defn resize
+  "Resize image."
+  {:metadoc/categories #{:image :canvas}}
+  [i w h] (pr/resize i w h))

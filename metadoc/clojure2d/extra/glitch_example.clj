@@ -43,7 +43,6 @@
            (p/filter-colors c/to-HSV*)
            (p/filter-channels filt filt nil nil)
            (p/filter-colors c/from-HSV*)))))
-
 ;;
 
 (add-examples slitscan2-random-config

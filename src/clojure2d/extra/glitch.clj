@@ -24,7 +24,7 @@
             [clojure2d.pixels :as p]
             [clojure2d.core :refer [width height int-array-2d]]
             [fastmath.vector :as v]
-            [clojure2d.extra.signal :as s]
+            [fastmath.signal :as s]
             [clojure2d.color :as c]
             [fastmath.fields :as var])
   (:import [clojure2d.pixels Pixels]
@@ -66,7 +66,7 @@
 (defn- make-slitscan-waves
   "Create function from waves definision."
   [waves]
-  (apply s/sum-waves (map #(s/wave (:wave %) (:freq %) (:amp %) (:phase %)) waves)))
+  (apply s/oscillators-sum (map #(s/oscillator (:wave %) (:freq %) (:amp %) (:phase %)) waves)))
 
 (defn- do-slitscan
   "Shift pixels by amount returned by functions fx and fy."
@@ -159,7 +159,7 @@
                    ^Vec2 vv (v/interpolate v1 v2 xlerp)
                    xx (unchecked-int (m/norm (.x vv) r- r 0.0 (.w p)))
                    yy (unchecked-int (m/norm (.y vv) r- r 0.0 (.h p)))]
-               (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
+               (p/set-value! t ch x y (p/get-value p ch xx yy)))))))))
   ([]
    (slitscan2 (slitscan2-random-config))))
 
@@ -189,7 +189,7 @@
                    ^Vec2 vv (f (Vec2. xv yv))
                    xx (unchecked-int (m/norm (.x vv) r- r 0.0 (.w p)))
                    yy (unchecked-int (m/norm (.y vv) r- r 0.0 (.h p)))]
-               (p/set-value t ch x y (p/get-value p ch xx yy)))))))))
+               (p/set-value! t ch x y (p/get-value p ch xx yy)))))))))
   ([]
    (fold (fold-random-config))))
 
@@ -198,10 +198,10 @@
 (defn- mi-draw-point
   ""
   ([ch target source oldx oldy newx newy sx sy]
-   (p/set-value target ch (+ ^long newx ^long sx) (+ ^long newy ^long sy)
-                (p/get-value source ch (+ ^long oldx ^long sx) (+ ^long oldy ^long sy))))
+   (p/set-value! target ch (+ ^long newx ^long sx) (+ ^long newy ^long sy)
+                 (p/get-value source ch (+ ^long oldx ^long sx) (+ ^long oldy ^long sy))))
   ([ch target source oldx oldy newx newy]
-   (p/set-value target ch newx newy (p/get-value source ch oldx oldy))))
+   (p/set-value! target ch newx newy (p/get-value source ch oldx oldy))))
 
 (defn- mi-do-horizontal
   ""
@@ -357,22 +357,22 @@
    (fn [ch target ^Pixels source]
      (let [grid (pix2line-grid (width source) (height source) config)]
        (dotimes [y (height source)]
-         (loop [^int currentc (p/get-value source ch 0 y)
-                lastx 0
+         (loop [currentc (p/get-value source ch 0 y)
+                lastx (long 0)
                 x (int 1)]
            (if (< x (.w source))
-             (let [^int c (p/get-value source ch x y)
-                   [^int ncurrentc ^int nlastx] (if (<= tolerance (m/abs (- currentc c)))
-                                                  (let [^int gval (grid x y)
-                                                        ^int myx (if (and whole (< lastx gval)) lastx gval)]
-                                                    (dotimes [xx (- x myx)] (p/set-value target ch (+ myx xx) y c))
-                                                    [c x])
-                                                  [currentc lastx])]
-               (recur ncurrentc (int nlastx) (unchecked-inc x)))
+             (let [c (p/get-value source ch x y)
+                   [ncurrentc nlastx] (if (<= tolerance (m/abs (- currentc c)))
+                                        (let [^int gval (grid x y)
+                                              ^int myx (if (and whole (< lastx gval)) lastx gval)]
+                                          (dotimes [xx (- x myx)] (p/set-value! target ch (+ myx xx) y c))
+                                          [c x])
+                                        [currentc lastx])]
+               (recur (long ncurrentc) (long nlastx) (unchecked-inc x)))
              (let [x- (dec x)
                    ^int gval (grid x- y)
                    ^int myx (if (< lastx gval) lastx gval)]
-               (dotimes [xx (- x- myx)] (p/set-value target ch (+ myx xx) y currentc))))))))))
+               (dotimes [xx (- x- myx)] (p/set-value! target ch (+ myx xx) y currentc))))))))))
 
 ;; blend machine
 

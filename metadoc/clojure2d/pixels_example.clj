@@ -43,7 +43,7 @@
 (def ld-get-set (example "Low density pixels color access."
                   (let [ldp (renderer 100 100)
                         v0 (get-color ldp 50 50) 
-                        v1 (get-color (set-color ldp 50 50 :maroon) 50 50)]
+                        v1 (get-color (set-color! ldp 50 50 :maroon) 50 50)]
                     {:before v0
                      :after v1})))
 
@@ -58,20 +58,20 @@
     (get-color (core/load-image "docs/cockatoo.jpg") 50 50))
   ld-get-set)
 
-(add-examples set-color
+(add-examples set-color!
   (example "Set color in pixels"
     (let [p (pixels 100 100)
           v0 (get-color p 50 50) 
-          v1 (get-color (set-color p 50 50 :maroon) 50 50)]
+          v1 (get-color (set-color! p 50 50 :maroon) 50 50)]
       {:before v0
        :after v1}))
   ld-get-set)
 
-(add-examples set-value
+(add-examples set-value!
   (example "Set value in pixels"
     (let [p (pixels 100 100)
           v0 (get-value p 1 50 50) 
-          v1 (get-value (set-value p 50 50 111) 50 50)]
+          v1 (get-value (set-value! p 50 50 111) 50 50)]
       {:before v0
        :after v1})))
 
@@ -86,9 +86,9 @@
   (example "Extract one channel from Pixels."
     (first (get-channel cockatoo 1))))
 
-(add-examples set-channel
+(add-examples set-channel!
   (example "Copy channels"
-    (get-color (set-channel (clone-pixels cockatoo) 0 (get-channel cockatoo 1)) 20 20)))
+    (get-color (set-channel! (clone-pixels cockatoo) 0 (get-channel cockatoo 1)) 20 20)))
 
 (add-examples pixels
   (example "Create pixels" (pixels 100 100))
@@ -96,7 +96,7 @@
 
 (add-examples clone-pixels
   (example "Usage" (let [p1 (pixels 100 100)]
-                     (set-color p1 10 10 :maroon)
+                     (set-color! p1 10 10 :maroon)
                      (get-color (clone-pixels p1) 10 10))))
 
 (add-examples set-image-pixels!
@@ -119,42 +119,42 @@
   (example-snippet "Convert to other colorspace." saver :image (fn [] (filter-colors c/to-LUV* cockatoo))))
 
 (add-examples filter-colors-xy
-  (example-snippet "Shift image up." saver :image (fn [] (let [filter (fn [p x y]
-                                                                        (get-color p x (+ y 75)))] 
-                                                           (binding [*pixels-edge* :wrap] (filter-colors-xy filter cockatoo))))))
+  (example-snippet "Shift image up." saver :image (fn [] (let [filter (fn [p ^long x ^long y]
+                                                                       (get-color p x (+ y 75)))] 
+                                                          (binding [*pixels-edge* :wrap] (filter-colors-xy filter cockatoo))))))
 
 (add-examples filter-channel
   (example-snippet "Operate on blue channel" saver :image (fn [] (let [target (pixels 150 150)
-                                                                       filter (fn [v] (- 255 (/ v 2)))]
-                                                                   (filter-channel filter 2 target cockatoo)
-                                                                   target))))
+                                                                      filter (fn [^long v] (- 255 (/ v 2)))]
+                                                                  (filter-channel filter 2 target cockatoo)
+                                                                  target))))
 
 (add-examples filter-channel-xy
   (example-snippet "Create filter and process channel."
     saver :image (fn [] (let [target (pixels 150 150)
-                              filter (fn [ch p x y] (let [v1 (get-value p ch (dec x) y)
-                                                          v2 (get-value p ch (inc x) y)
-                                                          v3 (get-value p ch x (dec y))
-                                                          v4 (get-value p ch x (inc y))
-                                                          avg (/ (+ v1 v2 v3 v4) 4)]
-                                                      (if (< avg 128) 0 255)))]
-                          (filter-channel-xy filter 0 target cockatoo)
-                          (let [c0 (get-channel target 0)]
-                            (set-channel target 1 c0)
-                            (set-channel target 2 c0))
-                          target)))
+                             filter (fn [ch p ^long x ^long y] (let [v1 (get-value p ch (dec x) y)
+                                                                    v2 (get-value p ch (inc x) y)
+                                                                    v3 (get-value p ch x (dec y))
+                                                                    v4 (get-value p ch x (inc y))
+                                                                    avg (/ (+ v1 v2 v3 v4) 4.0)]
+                                                                (if (< avg 128) 0 255)))]
+                         (filter-channel-xy filter 0 target cockatoo)
+                         (let [c0 (get-channel target 0)]
+                           (set-channel! target 1 c0)
+                           (set-channel! target 2 c0))
+                         target)))
   (example-snippet "Create filter and process channel. Using [[filter-channels]]."
-    saver :image (fn [] (let [filter (filter-channel-xy (fn [ch p x y] (let [v1 (get-value p ch (dec x) y)
-                                                                             v2 (get-value p ch (inc x) y)
-                                                                             v3 (get-value p ch x (dec y))
-                                                                             v4 (get-value p ch x (inc y))
-                                                                             avg (/ (+ v1 v2 v3 v4) 4)]
-                                                                         (if (< avg 128) 0 255))))
-                              target (filter-channels filter nil nil nil cockatoo)]
-                          (let [c0 (get-channel target 0)]
-                            (set-channel target 1 c0)
-                            (set-channel target 2 c0))
-                          target))))
+    saver :image (fn [] (let [filter (filter-channel-xy (fn [ch p ^long x ^long y] (let [v1 (get-value p ch (dec x) y)
+                                                                                       v2 (get-value p ch (inc x) y)
+                                                                                       v3 (get-value p ch x (dec y))
+                                                                                       v4 (get-value p ch x (inc y))
+                                                                                       avg (/ (+ v1 v2 v3 v4) 4.0)]
+                                                                                   (if (< avg 128) 0 255))))
+                             target (filter-channels filter nil nil nil cockatoo)]
+                         (let [c0 (get-channel target 0)]
+                           (set-channel! target 1 c0)
+                           (set-channel! target 2 c0))
+                         target))))
 
 (add-examples filter-channels
   (example-snippet "Apply equalize filter for all channels" saver :image
@@ -162,18 +162,18 @@
   (example-snippet "Apply 2 filters separately for 2 channels" saver :image
     (fn [] (filter-channels negate (box-blur 10) nil nil cockatoo)))
   (example-snippet "Create gamma filter and use it to process channels" saver :image
-    (fn [] (let [gamma-fn (fn [amt v] (let [vv (/ v 255.0)
-                                            p (m/pow vv (/ 1.0 amt))]
-                                        (* p 255.0)))
-                 my-gamma (partial gamma-fn 0.2)]
-             (filter-channels (partial filter-channel my-gamma) cockatoo)))))
+    (fn [] (let [gamma-fn (fn [^double amt ^double v] (let [vv (/ v 255.0)
+                                                          p (m/pow vv (/ amt))]
+                                                      (* p 255.0)))
+                my-gamma (partial gamma-fn 0.2)]
+            (filter-channels (partial filter-channel my-gamma) cockatoo)))))
 
 (add-examples blend-channel
   (example-snippet "Create own blending function and apply to second channel of image and its blurred version."
     saver :image (fn [] (let [target (clone-pixels cockatoo)
-                              wrong-avg (fn [v1 v2] (/ (+ v1 v2) 4.0))]
-                          (blend-channel wrong-avg 1 target cockatoo (filter-channels box-blur-5 cockatoo))
-                          target))))
+                             wrong-avg (fn [^double v1 ^double v2] (/ (+ v1 v2) 4.0))]
+                         (blend-channel wrong-avg 1 target cockatoo (filter-channels box-blur-5 cockatoo))
+                         target))))
 
 (add-examples blend-channel-xy
   (example-snippet "Create flip blender and apply to second channel."
@@ -199,7 +199,7 @@
   (example-snippet "Use different blending method for every channel." saver :image
     (fn [] (compose-channels :divide :multiply :mburn nil cockatoo (filter-channels solarize cockatoo))))
   (example-snippet "Use custom function" saver :image
-    (fn [] (compose-channels (fn [v1 v2] (* v1 (- 1.0 v2))) cockatoo (filter-channels solarize cockatoo)))))
+    (fn [] (compose-channels (fn [^double v1 ^double v2] (* v1 (- 1.0 v2))) cockatoo (filter-channels solarize cockatoo)))))
 
 (add-examples dilate
   (example-snippet "Apply filter 5 times." saver :image
@@ -374,10 +374,10 @@
                y (+ 150 (r/grand 30))
                x (+ x (* 20.0 (- ^double (local-noise (/ x 50.0) (/ y 50.0) 0.34) 0.5)))
                y (+ y (* 20.0 (- ^double (local-noise (/ y 50.0) (/ x 50.0) 2.23) 0.5)))]
-           (set-color r x y :white)))
+           (add-pixel! r x y :white)))
        (to-pixels r {:gamma-alpha 0.6 :gamma-color 0.8})))
   (example-snippet "Compare to native Java2d rendering. You can observe oversaturation." saver :image
-    #(let [r (core/canvas 300 300)]
+    #(let [r (core/black-canvas 300 300)]
        (core/with-canvas [c r]
          (core/set-color c :white 5)
          (dotimes [i 2000000]
@@ -388,3 +388,31 @@
              (core/point c x y))))
        (to-pixels r))))
 
+(add-examples gradient-renderer
+  (example-snippet "Usage" saver :image
+    #(let [r (gradient-renderer 300 300)]
+       (dotimes [i 4000000]
+         (let [x (+ 150 (r/grand 30))
+               y (+ 150 (r/grand 30))
+               x (+ x (* 20.0 (- ^double (local-noise (/ x 50.0) (/ y 50.0) 0.34) 0.5)))
+               y (+ y (* 20.0 (- ^double (local-noise (/ y 50.0) (/ x 50.0) 2.23) 0.5)))]
+           (add-pixel! r x y)))
+       (to-pixels r)))
+  (example-snippet "Render with different gradient" saver :image
+    #(let [r (gradient-renderer 300 300)]
+       (dotimes [i 4000000]
+         (let [x (+ 150 (r/grand 30))
+               y (+ 150 (r/grand 30))
+               x (+ x (* 20.0 (- ^double (local-noise (/ x 50.0) (/ y 50.0) 0.34) 0.5)))
+               y (+ y (* 20.0 (- ^double (local-noise (/ y 50.0) (/ x 50.0) 2.23) 0.5)))]
+           (add-pixel! r x y)))
+       (to-pixels r {:gradient (c/gradient :prl-10)})))
+  (example-snippet "Render with logarithmic scale" saver :image
+    #(let [r (gradient-renderer 300 300)]
+       (dotimes [i 4000000]
+         (let [x (+ 150 (r/grand 30))
+               y (+ 150 (r/grand 30))
+               x (+ x (* 20.0 (- ^double (local-noise (/ x 50.0) (/ y 50.0) 0.34) 0.5)))
+               y (+ y (* 20.0 (- ^double (local-noise (/ y 50.0) (/ x 50.0) 2.23) 0.5)))]
+           (add-pixel! r x y)))
+       (to-pixels r {:logarithmic? true}))))

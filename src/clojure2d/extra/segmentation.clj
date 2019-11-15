@@ -22,7 +22,7 @@
             k 1
             pos *sequence-generator*]
        (let [p (first pos)
-             ^int xk (p/get-value pixels ch (+ ^long sx (* ^long size ^double (p 0))) (+ ^long sy (* ^long size ^double (p 1))))
+             xk (p/get-value pixels ch (+ ^long sx (* ^long size ^double (p 0))) (+ ^long sy (* ^long size ^double (p 1))))
              xk-A (- xk A)
              newA (+ A (/ xk-A k))
              newQ (+ Q (* xk-A (- xk newA)) )]

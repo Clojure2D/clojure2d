@@ -10,10 +10,10 @@
 
 (defn pixels-fixture
   [f]
-  (p/set-color pixels 10 10 (c/color 100 200 10 22))
-  (p/set-color pixels 222 (c/color 1 2 3 4))
-  (p/set-value pixels 2 20 20 123)
-  (p/set-value pixels 1 5555 30)
+  (p/set-color! pixels 10 10 (c/color 100 200 10 22))
+  (p/set-color! pixels 222 (c/color 1 2 3 4))
+  (p/set-value! pixels 2 20 20 123)
+  (p/set-value! pixels 1 5555 30)
   (f))
 
 (use-fixtures :once pixels-fixture)

@@ -127,7 +127,8 @@
   (:require [clojure2d.color :as c]
             [clojure2d.core :as core]
             [fastmath.core :as m]
-            [fastmath.vector :as v])
+            [fastmath.vector :as v]
+            [clojure2d.protocols :as pr])
   (:import [clojure2d.core Canvas Window]
            [fastmath.vector Vec2 Vec4]
            [java.awt.image BufferedImage Raster WritableRaster]
@@ -150,33 +151,18 @@
   ^:dynamic *pixels-edge* :edge)
 
 ;; ## Pixels type
-
-(defprotocol PixelsProto
-  "Functions for accessing and setting channel values or colors. PixelsProto is used in following types:
-
-  * `Pixels` - all functions
-  * `Image`, `Canvas`, `Window` - Only [[get-value]] and [[get-color]] for given position and conversion to Pixels. Accessing color or channel value is slow.
-  * `Low density renderer` - Only [[set-color]], [[get-color]] and conversion to Pixels.  "
-  (^{:metadoc/categories #{:pix}} get-value [pixels ch x y] [pixels ch idx] "Get channel value by index or position.")
-  (^{:metadoc/categories #{:pix :ld}} get-color [pixels x y] [pixels idx] "Get color by index or position. In case of low density rendering returns current average color without alpha value.")
-  (^{:metadoc/categories #{:pix}} set-value [pixels ch x y v] [pixels ch idx v] "Set channel value by index or position")
-  (^{:metadoc/categories #{:pix :ld}} set-color [pixels x y v] [pixels idx v] "Set color value by index or position.")
-  (^{:metadoc/categories #{:pix}} get-channel [pixels ch] "Return whole `ints` array with chosen channel")
-  (^{:metadoc/categories #{:pix}} set-channel [pixels ch v] "Set whole channel (as `ints` array)")
-  (^{:metadoc/categories #{:pix :ld}} to-pixels [pixels] [pixels cfg] "Convert to Pixels. For low density rendering provide configuration. Works with Image/Canvas/Window and low density renderer."))
-
 (deftype Pixels [^ints p ^int w ^int h ^int size]
   
-  core/ImageProto
+  pr/ImageProto
   (get-image [_] (clojure2d.java.Pixels/imageFromPixels p w h))
   (width [_] w)
   (height [_] h)
   (save [px n]
-    (core/save-image (clojure2d.java.Pixels/imageFromPixels p w h) n)
+    (pr/save (clojure2d.java.Pixels/imageFromPixels p w h) n)
     px)
   (convolve [_ t]
-    (core/convolve (clojure2d.java.Pixels/imageFromPixels p w h) t))
-  (resize [_ wi he] (to-pixels (core/resize (clojure2d.java.Pixels/imageFromPixels p w h) wi he)))
+    (pr/convolve (clojure2d.java.Pixels/imageFromPixels p w h) t))
+  (resize [_ wi he] (pr/to-pixels (pr/resize (clojure2d.java.Pixels/imageFromPixels p w h) wi he)))
   
   Counted
   (count [_] size)
@@ -186,9 +172,9 @@
              (clojure2d.java.Pixels/getColor p idx)))
   Sequential
   
-  PixelsProto
+  pr/PixelsProto
   (get-channel [_ ch] (clojure2d.java.Pixels/getChannel p ch))
-  (set-channel [px ch v] (clojure2d.java.Pixels/setChannel p ch v) px) 
+  (set-channel! [px ch v] (clojure2d.java.Pixels/setChannel p ch v) px) 
 
   (get-value [_ ch idx]
     (clojure2d.java.Pixels/getValue p ch idx))
@@ -210,19 +196,19 @@
       :wrap (clojure2d.java.Pixels/getColor p x y w h -2)
       (clojure2d.java.Pixels/getColor p x y w h *pixels-edge*)))
 
-  (set-value [px ch x y v]
+  (set-value! [px ch x y v]
     (clojure2d.java.Pixels/setValue p ch x y w v)
     px)
 
-  (set-value [px ch idx v]
+  (set-value! [px ch idx v]
     (clojure2d.java.Pixels/setValue p ch idx v)
     px)
   
-  (set-color [px x y v]
+  (set-color! [px x y v]
     (clojure2d.java.Pixels/setColor p x y w (c/to-color v))
     px)
 
-  (set-color [px idx v]
+  (set-color! [px idx v]
     (clojure2d.java.Pixels/setColor p idx (c/to-color v))
     px)
 
@@ -295,9 +281,9 @@
   (get-image-pixels (core/load-image n)))
 
 (extend BufferedImage
-  PixelsProto
+  pr/PixelsProto
   {:to-pixels (fn [^BufferedImage i] (get-image-pixels i))
-   :get-color (fn [^BufferedImage i ^long x ^long y]
+   :get-color (fn ^Vec4 [^BufferedImage i ^long x ^long y]
                 (if (or (< x 0)
                         (< y 0)
                         (>= x (.getWidth i))
@@ -314,25 +300,25 @@
                       (if (== (.getNumBands raster) 3)
                         (c/color r g b)
                         (c/color r g b a))))))
-   :get-value (fn [^BufferedImage i ^long ch x y]
-                (let [c (get-color i x y)]
-                  (case ch
-                    0 (c/ch0 c)
-                    1 (c/ch1 c)
-                    2 (c/ch2 c)
-                    3 (c/alpha c))))})
+   :get-value (fn ^long [^BufferedImage i ^long ch x y]
+                (let [c (pr/get-color i x y)]
+                  (long (case ch
+                          0 (c/ch0 c)
+                          1 (c/ch1 c)
+                          2 (c/ch2 c)
+                          3 (c/alpha c)))))})
 
 (extend Canvas
-  PixelsProto
-  {:to-pixels (fn [^Canvas c] (get-canvas-pixels c))
-   :get-color (fn [^Canvas c x y] (get-color (.buffer c) x y))
-   :get-value (fn [^Canvas c ch x y] (get-value (.buffer c) ch x y))})
+  pr/PixelsProto
+  {:to-pixels (fn ^Pixels [^Canvas c] (get-canvas-pixels c))
+   :get-color (fn ^Vec4 [^Canvas c x y] (pr/get-color (.buffer c) x y))
+   :get-value (fn ^long [^Canvas c ch x y] (pr/get-value (.buffer c) ch x y))})
 
 (extend Window
-  PixelsProto
-  {:to-pixels (fn [^Window w] (get-canvas-pixels @(.buffer w)))
-   :get-color (fn [^Window w x y] (get-color @(.buffer w) x y))
-   :get-value (fn [^Window c ch x y] (get-value @(.buffer c) ch x y))})
+  pr/PixelsProto
+  {:to-pixels (fn ^Pixels [^Window w] (get-canvas-pixels @(.buffer w)))
+   :get-color (fn ^Vec4 [^Window w x y] (pr/get-color @(.buffer w) x y))
+   :get-value (fn ^long [^Window w ch x y] (pr/get-value @(.buffer w) ch x y))})
 
 (defn- segment-range
   "Segment range into parts based on cores"
@@ -355,7 +341,7 @@
                #(future (let [[^long start ^long end] %]
                           (loop [idx start]
                             (when (< idx end)
-                              (set-color target idx (f (get-color p idx)))
+                              (pr/set-color! target idx (f (pr/get-color p idx)))
                               (recur (unchecked-inc idx))))))
                parts))]
     (run! deref ftrs)
@@ -375,7 +361,7 @@
                           (loop [x start]
                             (when (< x end)
                               (dotimes [y (.h p)]
-                                (set-color target x y (f p x y)))
+                                (pr/set-color! target x y (f p x y)))
                               (recur (unchecked-inc x))))))
                parts))]
     (run! deref ftrs)
@@ -390,7 +376,7 @@
   {:metadoc/categories #{:filt}}
   ([f ch ^Pixels target p]
    (dotimes [idx (.size target)]
-     (set-value target ch idx (f (get-value p ch idx))))
+     (pr/set-value! target ch idx (f (pr/get-value p ch idx))))
    true)
   ([f] (partial filter-channel f)))
 
@@ -406,7 +392,7 @@
   ([f ch ^Pixels target p]
    (dotimes [y (.h target)]
      (dotimes [x (.w target)]
-       (set-value target ch x y (f ch p x y))))
+       (pr/set-value! target ch x y (f ch p x y))))
    true)
   ([f] (partial filter-channel-xy f)))
 
@@ -439,7 +425,7 @@
   {:metadoc/categories #{:filt}}
   ([f ch ^Pixels target p1 p2]
    (dotimes [i (.size target)]
-     (set-value target ch i (f (get-value p1 ch i) (get-value p2 ch i))))
+     (pr/set-value! target ch i (f (pr/get-value p1 ch i) (pr/get-value p2 ch i))))
    true)
   ([f] (partial blend-channel f)))
 
@@ -451,7 +437,7 @@
   ([f ch ^Pixels target p1 p2]
    (dotimes [x (.w target)]
      (dotimes [y (.h target)]
-       (set-value target ch x y (f ch p1 p2 x y))))
+       (pr/set-value! target ch x y (f ch p1 p2 x y))))
    true)
   ([f] (partial blend-channel-xy f)))
 
@@ -504,8 +490,8 @@
 
 (defn- blend-colors-xy
   [f back source x y]
-  (let [cb (get-color back x y)
-        cs (get-color source x y)]
+  (let [cb (pr/get-color back x y)
+        cs (pr/get-color source x y)]
     (c/blend-colors f cb cs)))
 
 (defn composite
@@ -725,19 +711,14 @@
      (clojure2d.java.filter.ContrastBrightness/process (.p p) (.p target) ch brightness 1.0))))
 
 ;; ## Log-density rendering
-
-(defprotocol RendererProto
-  (add-pixel [r x y] [r x y c])
-  (get-pixel [r x y]))
-
 (defrecord LDRenderer [^clojure2d.java.LogDensity buff ^long w ^long h]
-  RendererProto
-  (add-pixel [r x y c]
+  pr/RendererProto
+  (add-pixel! [r x y c]
     (.addPixel buff x y (c/to-color c))
     r)
-  (get-pixel [r x y] (get-color r x y))
-  PixelsProto
-  (set-color [r x y c]
+  (get-pixel [r x y] (pr/get-color r x y))
+  pr/PixelsProto
+  (set-color! [r x y c]
     (.addPixel buff x y (c/to-color c))
     r)
   (get-color [r x y]
@@ -748,7 +729,7 @@
              (/ (fastmath.java.Array/get2d (.g buff) w x y) a)
              (/ (fastmath.java.Array/get2d (.b buff) w x y) a)
              255.0)))
-  (to-pixels [r] (to-pixels r {}))
+  (to-pixels [r] (pr/to-pixels r {}))
   (to-pixels [r {:keys [background ^double gamma-alpha ^double gamma-color ^double vibrancy
                         ^double saturation ^double brightness ^double contrast]
                  :or {background :black
@@ -766,12 +747,12 @@
                                        (.toPixels buff arr start end conf (c/to-color background)))) parts))]
       (run! deref tasks)
       (pixels arr w h)))
-  core/ImageProto
-  (get-image [b] (core/get-image (to-pixels b)))
+  pr/ImageProto
+  (get-image [b] (pr/get-image (pr/to-pixels b)))
   (width [_] w)
   (height [_] h)
-  (save [b n] (core/save (to-pixels b) n))
-  (convolve [b t] (core/convolve (to-pixels b) t)))
+  (save [b n] (pr/save (pr/to-pixels b) n))
+  (convolve [b t] (pr/convolve (pr/to-pixels b) t)))
 
 (defn- create-filter
   "Create antialiasing filter."
@@ -805,7 +786,7 @@
 (defn renderer
   "Create renderer.
 
-  Optionally you can pass antialiasing filter and its parameters. Default `:none`."
+  Optionally you can pass antialiasing filter and its parameters. Defaults to `:none`."
   {:metadoc/categories #{:ld}}
   ([w h filter filter-radius & filter-params]
    (LDRenderer. (clojure2d.java.LogDensity. w h (create-filter filter filter-radius filter-params))
@@ -839,14 +820,14 @@
 ;;
 
 (defrecord GradientRenderer [^clojure2d.java.GradientDensity buff ^long w ^long h]
-  RendererProto
-  (add-pixel [r x y]
+  pr/RendererProto
+  (add-pixel! [r x y]
     (.addPixel buff x y)
     r)
   (get-pixel [r x y]
     (fastmath.java.Array/get2d (.cnt buff) w (unchecked-int x) (unchecked-int y)))
-  PixelsProto
-  (to-pixels [r] (to-pixels r {}))
+  pr/PixelsProto
+  (to-pixels [r] (pr/to-pixels r {}))
   (to-pixels [r {:keys [logarithmic? gradient]
                  :or {logarithmic? false gradient (c/gradient-presets :glitterboy)}}]
     
@@ -858,17 +839,17 @@
                                        (.toPixels buff arr start end conf))) parts))]
       (run! deref tasks)
       (pixels arr w h)))
-  core/ImageProto
-  (get-image [b] (core/get-image (to-pixels b)))
+  pr/ImageProto
+  (get-image [b] (pr/get-image (pr/to-pixels b)))
   (width [_] w)
   (height [_] h)
-  (save [b n] (core/save (to-pixels b) n))
-  (convolve [b t] (core/convolve (to-pixels b) t)))
+  (save [b n] (pr/save (pr/to-pixels b) n))
+  (convolve [b t] (pr/convolve (pr/to-pixels b) t)))
 
 (defn gradient-renderer
   "Create gradient renderer.
 
-  Optionally you can pass antialiasing filter and its parameters. Default `:none`."
+  Optionally you can pass antialiasing filter and its parameters. Defaults to `:none`."
   {:metadoc/categories #{:ld}}
   ([w h filter filter-radius & filter-params]
    (GradientRenderer. (clojure2d.java.GradientDensity. w h (create-filter filter filter-radius filter-params))
@@ -877,7 +858,6 @@
   ([w h] (GradientRenderer. (clojure2d.java.GradientDensity. w h) w h)))
 
 (defn merge-gradient-renderers
-  
   "Merge gradient renderers and store result to the target.
 
   Use this function to merge separate rendereing results (ex. from separeted threads).
@@ -888,3 +868,55 @@
   (reduce #(.merge ^clojure2d.java.GradientDensity (.buff target)
                    ^clojure2d.java.GradientDensity (.buff ^GradientRenderer %)) target renderers))
 
+;;
+
+(defn get-value
+  "Get channel value by index or position."
+  {:metadoc/categories #{:pix}}
+  (^long [pixels ch x y] (pr/get-value pixels ch x y))
+  (^long [pixels ch idx] (pr/get-value pixels ch idx)))
+
+(defn get-color
+  "Get color by index or position. In case of low density rendering returns current average color without alpha value."
+  {:metadoc/categories #{:pix :ld}}
+  (^Vec4 [pixels x y] (pr/get-color pixels x y))
+  (^Vec4 [pixels idx] (pr/get-color pixels idx)))
+
+(defn set-value!
+  "Set channel value by index or position"
+  {:metadoc/categories #{:pix}}
+  ([pixels ch x y v] (pr/set-value! pixels ch x y v))
+  ([pixels ch idx v] (pr/set-value! pixels ch idx v)))
+
+(defn set-color!
+  "Set color value by index or position"
+  {:metadoc/categories #{:pix :ld}}
+  ([pixels x y v] (pr/set-color! pixels x y v))
+  ([pixels idx v] (pr/set-color! pixels idx v)))
+
+(defn get-channel
+  "Return whole `ints` array with chosen channel"
+  {:metadoc/categories #{:pix}}
+  ^ints [pixels ch] (pr/get-channel pixels ch))
+
+(defn set-channel!
+  "Set whole channel (as `ints` array)"
+  {:metadoc/categories #{:pix}}
+  [pixels ch v] (pr/set-channel! pixels ch v))
+
+(defn to-pixels
+  "Convert to Pixels. For low density rendering provide configuration. Works with Image/Canvas/Window and low density renderer."
+  {:metadoc/categories #{:pix :ld}}
+  (^Pixels [pixels] (pr/to-pixels pixels))
+  (^Pixels [pixels cfg] (pr/to-pixels pixels cfg)))
+
+(defn add-pixel!
+  "Add pixel to renderer buffer."
+  {:metadoc/categories #{:ld}} 
+  ([r x y] (pr/add-pixel! r x y))
+  ([r x y c] (pr/add-pixel! r x y c)))
+
+(defn get-pixel
+  "Get pixel (color) from renderer buffer"
+  {:metadoc/categories #{:ld}} 
+  (^Vec4 [r x y] (pr/get-pixel r x y)))

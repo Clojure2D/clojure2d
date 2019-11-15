@@ -6,14 +6,21 @@ All notable changes to this project will be documented in this file. This change
 ### Added
 
 * mathematica gradients (thanks to [Chris N.](https://github.com/techascent/tech.datatype/blob/master/src/tech/v2/tensor/color_gradients.clj))
+* `palette` helper function
 
 ### Changed
 
 * deps bumped
+* pixels mutating functions are now with `!`
+* `gradient` 
 
 ### Removed
 
 * Signal processing - moved to fastmath
+
+### Fixed
+
+* Closing window during `draw` can cause NPE when accessing global state.
 
 ## 1.2.0-SNAPSHOT
 

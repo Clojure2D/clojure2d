@@ -18,18 +18,18 @@
   Input: list of colors."
   [palette]
   (let [c (canvas 1000 300)
-        h2 (/ ^int (height c) 2)
-        bottom (- ^int (height c) 100)
-        step (/ (- ^int (width c) 100.0) (count palette))
+        h2 (/ (height c) 2)
+        bottom (- (height c) 100)
+        step (/ (- (width c) 100.0) (count palette))
         cstep (inc (m/ceil step))]
     (with-canvas [c c]
       (-> c
           (set-background 30 30 30)
           (set-color 225 225 225)
           (rect 0 h2 (width c) h2))
-      (doseq [col-no (range (count palette))]
+      (doseq [^long col-no (range (count palette))]
         (set-color c (nth palette col-no))
-        (rect c (+ 50 (* ^int col-no step)) 50 cstep bottom)))
+        (rect c (+ 50 (* col-no step)) 50 cstep bottom)))
     (show-window {:canvas c})
     c))
 
@@ -60,7 +60,7 @@
     (dotimes [x 800]
       (dotimes [y 800]
         (let [col (g (norm-out (f (v/vec2 (norm-in x) (norm-in y)))))]
-          (p/set-color p x y col))))
+          (p/set-color! p x y col))))
     (p/set-canvas-pixels! c p)
     (show-window {:canvas c})))
 

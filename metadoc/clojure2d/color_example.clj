@@ -105,6 +105,9 @@
 (add-examples set-ch0 (example-color "Usage" (set-ch0 :khaki 11)))
 (add-examples set-ch1 (example-color "Usage" (set-ch1 :khaki 11)))
 (add-examples set-ch2 (example-color "Usage" (set-ch2 :khaki 11)))
+(add-examples set-red (example-color "Usage" (set-red :khaki 11)))
+(add-examples set-green (example-color "Usage" (set-green :khaki 11)))
+(add-examples set-blue (example-color "Usage" (set-blue :khaki 11)))
 (add-examples set-awt-alpha (example-color "Usage" (set-awt-alpha :khaki 200)))
 
 (add-examples gray (example-color "Usage" (gray 123)))
@@ -256,13 +259,21 @@
   (example-palette "Palette 201" (colourlovers-palettes 201))
   (example-palette "Palette 499" (colourlovers-palettes 499)))
 
+(add-examples palette
+  (example-palette "Named palette" (palette :set3))
+  (example-palette "Colourlovers palette" (palette 0))
+  (example-palette "Resampled palette" (palette 0 10))
+  (example-palette "Resampled palette with interpolation and color space" (palette 0 10 :LUV :loess))
+  (example-palette "Sampled from gradient" (palette (gradient :prl-10)))
+  (example-palette "Sampled from gradient with number of colors" (palette (gradient :prl-10) 10)))
+
 (add-examples iq-gradient
   (example-gradient "Create gradient from 4 coeffs"
                     (iq-gradient
-                     (v/vec3 0.5 0.5 0.5)
-                     (v/vec3 0.4 0.5 0.6)
-                     (v/vec3 0.2 0.2 1.0)
-                     (v/vec3 1.0 0.1 1.0)))
+                     [0.5 0.5 0.5]
+                     [0.4 0.5 0.6]
+                     [0.2 0.2 1.0]
+                     [1.0 0.1 1.0]))
   (example-gradient "Create gradient from two colors"
                     (iq-gradient :red :blue)))
 
@@ -318,7 +329,6 @@
 (add-examples noticable-different?
   (example "Contrast ratio" (noticable-different? :pink :hotpink))
   (example "Contrast ratio" (noticable-different? "00aabb" "00baba")))
-
 
 (def some-palette (paletton :triad 210 {:angle 40}))
 
@@ -377,6 +387,8 @@
 ;; ----
 
 (add-examples gradient
+  (example-gradient "Default" (gradient))
+  (example-gradient "Named gradient" (gradient :rainbow-m))
   (example-gradient "Linear, RGB" (gradient (colourlovers-palettes 5)))
   (example-gradient "Linear, HSL" (gradient :HSL (colourlovers-palettes 5)))
   (example-gradient "Linear, Yxy" (gradient :Yxy (colourlovers-palettes 5)))
@@ -384,7 +396,7 @@
   (example-gradient "Loess, Yxy" (gradient :Yxy :loess (colourlovers-palettes 5)))
   (example-gradient "RBF, Yxy" (gradient :Yxy (partial i/rbf (rbf/rbf :thin-plate)) (colourlovers-palettes 5)))
   (example-gradient "Shepard, Yxy, irregular spacing" (gradient :Yxy :shepard [0 0.1 0.15 0.8 1.0] (colourlovers-palettes 5)))
-  (example-palette "Easy way to create palette from gradient" (m/sample (gradient :HSL :cubic-spline [:blue :green]) 10)))
+  (example-palette "Easy way to create palette from gradient" (palette (gradient :HSL :cubic-spline [:blue :green]) 10))  )
 
 (add-examples gradient-easing
   (example-gradient "Linear, HCL" (gradient-easing :HCL [300 0.2 0.2] [200 0.8 0.9]))
