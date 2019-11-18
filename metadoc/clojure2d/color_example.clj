@@ -76,10 +76,14 @@
     (to-color :khaki)
     (to-color "abcc12")
     (to-color "#1234af")
-    (to-color (v/vec3 44 33.3 22))
-    (to-color (v/vec4 11 22 33 44))
-    (to-color [3 4 5])
-    (to-color (range 4))
+    (to-color "a")
+    (to-color "4a")
+    (to-color "fac")
+    (to-color (v/vec2 120 120))
+    (to-color (v/vec3 144 133.3 122))
+    (to-color (v/vec4 111 122 133 44))
+    (to-color [30 40 50])
+    (to-color (range 200 220 5))
     (to-color 0xaafffeeb)))
 
 (add-examples to-awt-color
@@ -96,8 +100,8 @@
 (add-examples ch1 (example-session "Usage" (ch0 0x152535) (ch1 :khaki)))
 (add-examples ch2 (example-session "Usage" (ch0 0x152535) (ch2 :khaki)))
 
-(add-examples hue (example-session "Usage" (hue :red) (hue :green) (hue :blue) (hue "#12f5e6") (hue-polar "#12f5e6")))
-(add-examples hue-polar (example-session "Usage" (hue-polar "#4455f6") (hue "#4455f6")))
+(add-examples hue (example-session "Usage" (hue :red) (hue :green) (hue :blue) (hue "#12f5e6") (hue-polar "#12f5e6") (hue-paletton "#4455f6")))
+(add-examples hue-polar (example-session "Usage" (hue-polar "#4455f6") (hue "#4455f6") (hue-paletton "#4455f6")))
 
 (add-examples lerp (example-palette "Usage" [(lerp :red :blue 0) (lerp :red :blue 0.5) (lerp :red :blue 1.0)]))
 
@@ -286,11 +290,12 @@
 (add-examples paletton-presets-list
   (example "List of all paletton presets" paletton-presets-list))
 
-(add-examples paletton-rgb-to-hue
+(add-examples hue-paletton
   (example-session "Convert RGB to paletton hue."
     (hue :amber)
-    (paletton-rgb-to-hue :amber)
-    (paletton-rgb-to-hue 22 33 123)))
+    (hue-polar :amber)
+    (hue-paletton :amber)
+    (hue-paletton 22 33 123)))
 
 (add-examples paletton
   (example-palette "Monochromatic dark-neon palette" (paletton :monochromatic 140 {:preset :dark-neon}))

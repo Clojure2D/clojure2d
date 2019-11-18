@@ -3,7 +3,7 @@
 
   This namespace contains color manipulation functions which can be divided into following groups:
 
-  * Representation
+  * Color representation
   * Channel manipulations
   * Conversions
   * Blending
@@ -15,8 +15,9 @@
   Color can be represented by following types:
   
   * fastmath `Vec4` - this is core type representing 3 color channels and alpha (RGBA). Values are `double` type from `[0-255]` range. [[color]], [[gray]] creators returns `Vec4` representation. To ensure `Vec4` use [[to-color]] function.
-  * fastmath `Vec3` - 3 color channels, assuming `alpha` set to value of `255`.
-  * `java.awt.Color` - Java AWT representation. Creators are [[awt-color]], [[awt-gray]]. Use [[to-awt-color]] to convert to this representations.
+  * fastmath `Vec3` - 3 channels (RGB), assuming `alpha` set to value of `255`.
+  * fastmath `Vec2` - gray with alpha
+  * `java.awt.Color` - Java AWT representation. Creators are [[awt-color]], [[awt-gray]]. Use [[to-awt-color]] to convert to this representation.
   * `keyword` - one of the defined names (see [[named-colors-list]])
   * `Integer` - packed ARGB value. Example: `0xffaa01`.
   * `String` - CSS (\"#ab1122\") or 6 chars string containg hexadecimal representation (\"ffaa01\")
@@ -122,7 +123,7 @@
             [fastmath.easings :as e]
             [clojure2d.protocols :as pr]
             [clojure.java.io :refer [input-stream resource]])
-  (:import [fastmath.vector Vec3 Vec4]           
+  (:import [fastmath.vector Vec2 Vec3 Vec4]           
            [java.awt Color]
            [clojure.lang APersistentVector ISeq]))
 
@@ -387,14 +388,30 @@
 (declare named-awt-color)
 (declare named-color)
 
-(defn- strip-hash
+(defn- strip-hash-and-enhance
   "Remove # from beginning of the string."
   [^String s]
-  (if (= (first s) \#) (subs s 1) s))
+  (let [^String s (if (= (first s) \#) (subs s 1) s)]
+    (condp = (count s)
+      1 (str s s s s s s)
+      2 (str s s s)
+      3 (let [[r g b] s] (str r r g g b b))
+      s)))
 
 ;; Equip `Vec3`, `Vec4`, `Keyword` and `java.awt.Color` types with `ColorProto` functions.
 ;; For keyword use one of 140 names from html/css palettes (list: https://www.w3schools.com/colors/colors_names.asp)
 (extend-protocol pr/ColorProto
+  Vec2
+  (to-color ^Vec4 [^Vec2 c]
+    (Vec4. (.x c) (.x c) (.x c) (.y c)))
+  (to-awt-color ^Color [^Vec2 c]
+    (let [v (lclamp255 (.x c))]      
+      (Color. v v v (lclamp255 (.y c)))))
+  (luma ^double [^Vec2 c] (.x c))
+  (red ^double [^Vec2 c] (.x c))
+  (green ^double [^Vec2 c] (.x c))
+  (blue ^double [^Vec2 c] (.x c))
+  (alpha ^double [^Vec2 c] (.y c))
   Vec3
   (to-color ^Vec4 [^Vec3 c]
     (Vec4. (.x c) (.y c) (.z c) 255))
@@ -442,6 +459,10 @@
   nil
   (to-color [_] nil)
   (to-awt-color [_] nil)
+  (alpha [_] nil)
+  (red [_] nil)
+  (green [_] nil)
+  (blue [_] nil)
   Long
   (alpha ^double [^long c] (bit-and 0xff (>> c 24)))
   (red ^double [^long c] (bit-and 0xff (>> c 16)))
@@ -465,13 +486,13 @@
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
   (luma ^double [c] (pr/luma (pr/to-color c)))
   String
-  (alpha ^double [^String c] (pr/alpha (Long/parseLong (strip-hash c) 16)))
-  (red ^double [^String c] (pr/red (Long/parseLong (strip-hash c) 16)))
-  (green ^double [^String c] (pr/green (Long/parseLong (strip-hash c) 16)))
-  (blue ^double [^String c] (pr/blue (Long/parseLong (strip-hash c) 16)))
-  (to-color ^Vec4 [^String c] (pr/to-color (Long/parseLong (strip-hash c) 16)))
-  (to-awt-color ^Color [^String c] (pr/to-awt-color (pr/to-color (Long/parseLong (strip-hash c) 16))))
-  (luma ^double [^String c] (pr/luma (pr/to-color (Long/parseLong (strip-hash c) 16))))
+  (alpha ^double [^String c] (pr/alpha (Long/parseLong (strip-hash-and-enhance c) 16)))
+  (red ^double [^String c] (pr/red (Long/parseLong (strip-hash-and-enhance c) 16)))
+  (green ^double [^String c] (pr/green (Long/parseLong (strip-hash-and-enhance c) 16)))
+  (blue ^double [^String c] (pr/blue (Long/parseLong (strip-hash-and-enhance c) 16)))
+  (to-color ^Vec4 [^String c] (pr/to-color (Long/parseLong (strip-hash-and-enhance c) 16)))
+  (to-awt-color ^Color [^String c] (pr/to-awt-color (pr/to-color (Long/parseLong (strip-hash-and-enhance c) 16))))
+  (luma ^double [^String c] (pr/luma (pr/to-color (Long/parseLong (strip-hash-and-enhance c) 16))))
   APersistentVector
   (to-color ^Vec4 [c] (case (count c)
                         0 (Vec4. 0.0 0.0 0.0 255.0)
@@ -885,7 +906,7 @@
    (blend-lightthreshold a b *blend-threshold*)))
 
 ;; List of all blend functions stored in `blends` map
-(def
+(defonce
   ^{:metadoc/categories #{:bl}
     :doc "Map of all blending functions.
 
@@ -2604,7 +2625,7 @@ See [[blends-list]] for names."}
               (/ (+ r (* n b)) (inc n)))]
     (rgb r g b)))
 
-(defn paletton-rgb-to-hue
+(defn hue-paletton
   "Convert color to paletton HUE (which is different than hexagon or polar conversion)."
   {:metadoc/categories #{:ops}}
   (^double [^double r ^double g ^double b]
@@ -2628,10 +2649,11 @@ See [[blends-list]] for names."}
            s (i (if (== l p) -1.0
                     (/ (- f l) (- l p))))]
        s)))
-  ([c] (paletton-rgb-to-hue (pr/red c) (pr/green c) (pr/blue c))))
+  ([c] (let [cc (to-color c)]
+         (hue-paletton (.x cc) (.y cc) (.z cc)))))
 
 ;; List of paletton presets
-(def ^:private paletton-presets
+(defonce ^:private paletton-presets
   {:pale-light          [[0.24649 1.78676] [0.09956 1.95603] [0.17209 1.88583] [0.32122 1.65929] [0.39549 1.50186]]
    :pastels-bright      [[0.65667 1.86024] [0.04738 1.99142] [0.39536 1.89478] [0.90297 1.85419] [1.86422 1.8314]]
    :shiny               [[1.00926 2] [0.3587 2] [0.5609 2] [2 0.8502] [2 0.65438]]
@@ -2673,7 +2695,7 @@ See [[blends-list]] for names."}
   Input:
 
   * type - one of: `:monochromatic` (one hue), `:triad` (three hues), `:tetrad` (four hues)
-  * hue - paletton version of hue (use [[paletton-rgb-to-hue]] to get hue value).
+  * hue - paletton version of hue (use [[hue-paletton]] to get hue value).
   * configuration as a map
 
   Configuration consist:
@@ -2913,7 +2935,7 @@ See [[blends-list]] for names."}
 
 ;; colors
 
-(def ^:private named-colors-map
+(defonce ^:private named-colors-map
   {:alice-blue            0xf0f8ff
    :antique-white         0xfaebd7
    :blanched-almond       0xffebcd
@@ -3263,7 +3285,7 @@ See [[blends-list]] for names."}
   [number-of-colors palette & gradient-params]
   (m/sample (apply gradient (conj (vec gradient-params) palette)) number-of-colors))
 
-(def ^:private image-palettes
+(defonce ^:private image-palettes
   {:k2 [(color 0.4113482181302168, 0.7654335528693236, 10.992247503581464, 255.0) (color 0.22061087801919138, 62.95308516147251, 143.36625434970534, 255.0) (color 14.456361206680231, 83.01644652628998, 160.63248513207887, 255.0) (color 56.2006580334195, 132.6336074038975, 200.55892997048295, 255.0) (color 127.369257346748, 191.58760556287123, 236.15585077189115, 255.0) (color 254.81532816694084, 255.0744678455372, 254.87237723195426, 255.0)]
    :k2b [(color 10.3881796935232, 32.06677355252445, 75.39140006088721, 255.0) (color 19.351729266643563, 57.72422893906951, 128.30134963880397, 255.0) (color 148.2897398287252, 183.3436537239422, 211.82830156200507, 255.0) (color 222.90167413854766, 232.7120359623188, 241.72338629444977, 255.0)]
    :road-dubai [(color 32.6393594293625, 46.281295964576934, 59.57356199376628, 255.0) (color 233.17102229055934, 184.68752890208228, 144.55829790294206, 255.0) (color 244.68546295625484, 195.45608515013302, 154.92438050553642, 255.0) (color 245.09929596284874, 218.08638324946338, 208.74921795045734, 255.0)]
@@ -3297,10 +3319,10 @@ See [[blends-list]] for names."}
         names (map #(keyword (str name "-" (count %))) pals)]
     (into {} (map vector names pals))))
 
-(def ^{:doc "Color palette presets.
+(defonce ^{:doc "Color palette presets.
 
 [See all](../static/palettes.html)"
-       :metadoc/categories #{:pal}} palette-presets
+           :metadoc/categories #{:pal}} palette-presets
   (merge
    image-palettes
    (d3->palettes "brbg" ["d8b365f5f5f55ab4ac"
@@ -3625,15 +3647,12 @@ See [[blends-list]] for names."}
      (m/sample p number-of-colors)
      (apply resample number-of-colors (palette p) gradient-params))))
 
-(def ^:private ^:const vec3-05 (Vec3. 0.5 0.5 0.5))
-(def ^:private ^:const vec3-10 (Vec3. 1.0 1.0 1.0))
-
-(def ^{:doc "Ready to use gradients containing Inigo Quilez, Cubehelix sets and other.
+(defonce ^{:doc "Ready to use gradients containing Inigo Quilez, Cubehelix sets and other.
 
 Map with name (keyword) as key and gradient function as value.
 
 [See all](../static/gradients.html)"
-       :metadoc/categories #{:grad}}
+           :metadoc/categories #{:grad}}
   gradient-presets
   (merge
    (into {} (for [[k v] (-> "mathematica.edn.gz"
@@ -3665,20 +3684,29 @@ Map with name (keyword) as key and gradient function as value.
                          :orange-magenta-blue   [[0.821 0.328 0.242] [0.659 0.481 0.896] [0.612 0.340 0.296] [2.820 3.026 -0.273]]
                          :blue-magenta-orange   [[0.938 0.328 0.718] [0.659 0.438 0.328] [0.388 0.388 0.296] [2.538 2.478 0.168]]
                          :magenta-green         [[0.590 0.811 0.120] [0.410 0.392 0.590] [0.940 0.548 0.278] [-4.242 -6.611 -4.045]]}]
-              [k (apply iq-gradient (map #(apply v/vec3 %) v))])) ;; thi.ng presets
-   {:iq-1 (iq-gradient vec3-05 vec3-05 vec3-10
+              [k (apply iq-gradient v)])) ;; thi.ng presets
+   {:iq-1 (iq-gradient (Vec3. 0.5 0.5 0.5)
+                       (Vec3. 0.5 0.5 0.5)
+                       (Vec3. 1.0 1.0 1.0)
                        (Vec3. 0.0 0.33 0.67))
-    :iq-2 (iq-gradient vec3-05 vec3-05 vec3-10
+    :iq-2 (iq-gradient (Vec3. 0.5 0.5 0.5)
+                       (Vec3. 0.5 0.5 0.5)
+                       (Vec3. 1.0 1.0 1.0)
                        (Vec3. 0.0 0.1 0.2))
-    :iq-3 (iq-gradient vec3-05 vec3-05 vec3-10 
+    :iq-3 (iq-gradient (Vec3. 0.5 0.5 0.5)
+                       (Vec3. 0.5 0.5 0.5)
+                       (Vec3. 1.0 1.0 1.0)
                        (Vec3. 0.3 0.2 0.2))
-    :iq-4 (iq-gradient vec3-05 vec3-05
+    :iq-4 (iq-gradient (Vec3. 0.5 0.5 0.5)
+                       (Vec3. 0.5 0.5 0.5)
                        (Vec3. 1.0 1.0 0.5)
                        (Vec3. 0.8 0.9 0.3))
-    :iq-5 (iq-gradient vec3-05 vec3-05
+    :iq-5 (iq-gradient (Vec3. 0.5 0.5 0.5)
+                       (Vec3. 0.5 0.5 0.5)
                        (Vec3. 1.0 0.7 0.4)
                        (Vec3. 0.0 0.15 0.2))
-    :iq-6 (iq-gradient vec3-05 vec3-05
+    :iq-6 (iq-gradient (Vec3. 0.5 0.5 0.5)
+                       (Vec3. 0.5 0.5 0.5)
                        (Vec3. 2.0 1.0 0.0)
                        (Vec3. 0.5 0.2 0.25))
     :iq-7 (iq-gradient (Vec3. 0.8 0.5 0.4)
