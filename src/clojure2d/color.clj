@@ -105,7 +105,13 @@
   
   ## Distances
 
-  Several functions to calculate distance between colors (`euclidean`, `delta-xxx` etc.)."
+  Several functions to calculate distance between colors (`euclidean`, `delta-xxx` etc.).
+
+  ## References
+
+  * https://vis4.net/chromajs/
+  * https://github.com/thi-ng/color
+  "
   {:metadoc/categories {:ops "Color/channel operations"
                         :conv "Color conversions"
                         :bl "Color blendings"
@@ -183,6 +189,22 @@
   {:metadoc/categories #{:ops}}
   ^double [c] (pr/luma c))
 
+(defn- luma-fn
+  "Local luma conversion function"
+  ^double [^double r ^double g ^double b]
+  (+ (* 0.212671 r)
+     (* 0.715160 g)
+     (* 0.072169 b)))
+
+(declare from-sRGB)
+
+(defn relative-luma
+  "Returns relative luminance"
+  {:metadoc/categories #{:ops}}
+  ^double [c]
+  (let [^Vec4 c (from-sRGB c)]
+    (luma-fn (.x c) (.y c) (.z c))))
+
 (defn red
   "Returns red (first channel) value."
   {:metadoc/categories #{:ops}}
@@ -218,15 +240,19 @@
   {:metadoc/categories #{:ops}}
   ^double [c] (pr/blue c))
 
-(defn- luma-fn
-  "Local luma conversion function"
-  ^double [^double r ^double g ^double b]
-  (+ (* 0.212671 r)
-     (* 0.715160 g)
-     (* 0.072169 b)))
+(defn hue-polar
+  "Hue value of color (any representation). Returns angle (0-360).
+  
+  Uses polar transformation. See also [[hue]]."
+  {:metadoc/categories #{:ops}}
+  ^double [c]
+  (let [^Vec4 c (pr/to-color c)
+        a (* 0.5 (- (+ (.x c) (.x c)) (.y c) (.z c)))
+        b (* 0.8660254037844386 (- (.y c) (.z c)))
+        h (m/degrees (m/atan2 b a))]
+    (if (neg? h) (+ 360.0 h) h)))
 
 (declare to-HC)
-(declare to-HC-polar)
 
 (defn hue
   "Hue value of color (any representation). Returns angle (0-360).
@@ -235,22 +261,6 @@
   {:metadoc/categories #{:ops}}
   ^double [c]
   (let [^Vec4 ret (to-HC (pr/to-color c))] (.x ret)))
-
-(defn hue-polar
-  "Hue value of color (any representation). Returns angle (0-360).
-  
-  Uses polar transformation. See also [[hue]]."
-  {:metadoc/categories #{:ops}}
-  ^double [c]
-  (let [^Vec4 ret (to-HC-polar (pr/to-color c))] (.x ret)))
-
-(defn lerp
-  "Lineary interpolate color between two values.
-
-  See also [[gradient]] or `fastmath` vector interpolations."
-  {:metadoc/categories #{:interp}}
-  [c1 c2 t]
-  (v/interpolate (pr/to-color c1) (pr/to-color c2) t))
 
 (defn set-alpha
   "Set alpha channel and return new color"
@@ -520,13 +530,23 @@
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
   (luma [c] ^double (pr/luma (pr/to-color c))))
 
+(defn valid?
+  [c]
+  (try
+    (let [c (to-color c)]
+      (instance? Vec4 c))
+    (catch Exception e false)))
+
 (defn format-hex
   "Convert color to hex string (css)."
   {:metadoc/categories #{:ops}}
   [c]
-  (str "#" (format "%02x" (lclamp255 (pr/red c)))
-       (format "%02x" (lclamp255 (pr/green c)))
-       (format "%02x" (lclamp255 (pr/blue c)))))
+  (let [^Vec4 c (pr/to-color c)
+        s (str "#" (format "%02x" (lclamp255 (.x c)))
+               (format "%02x" (lclamp255 (.y c)))
+               (format "%02x" (lclamp255 (.z c))))
+        a (lclamp255 (.w c))]
+    (if (< a 255) (str s (format "%02x" a)) s)))
 
 (defn pack
   "Pack color to ARGB 32bit integer."
@@ -1680,15 +1700,6 @@ See [[blends-list]] for names."}
                         :else (+ 4.0 (* rC (- (.x c) (.y c)))))))]
     (Vec4. (* 60.0 h) C M m)))
 
-(defn- to-HC-polar
-  "Calculate hue and chroma - polar version"
-  ^Vec4 [^Vec4 c]
-  (let [a (* 0.5 (- (+ (.x c) (.x c)) (.y c) (.z c)))
-        b (* 0.8660254037844386 (- (.y c) (.z c)))
-        h (m/degrees (m/atan2 b a))
-        c2 (m/hypot-sqrt a b)]
-    (Vec4. (if (neg? h) (+ 360.0 h) h) c2 (max (.x c) (.y c) (.z c)) (min (.x c) (.y c) (.z c)))))
-
 (defn- from-HCX
   "Convert HCX to RGB"
   ^Vec3 [^double h ^double c ^double x]
@@ -1814,29 +1825,78 @@ See [[blends-list]] for names."}
 (def ^{:metadoc/categories #{:conv} :doc "HSL -> RGB, normalized"} from-HSL* (comp from-HSL denormalize-HSx pr/to-color))
 
 ;; HCL
+;; http://w3.uqo.ca/missaoui/Publications/TRColorSpace.zip
 
 (defn to-HCL
-  "RGB -> HCL"
+  "RGB -> HCL, by Sarifuddin and Missaou"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        hc (to-HC c)
-        L (+ (* 0.298839 (.x c)) (* 0.586811 (.y c)) (* 0.114350 (.z c)))]
-    (Vec4. (.x hc) (/ (.y hc) 255.0) (/ L 255.0) (.w c))))
+        r (.x c)
+        g (.y c)
+        b (.z c)
+        mn (min r g b)
+        mx (max r g b)
+        Q (m/exp (if (zero? mx) 0.0 (* 0.1 (/ mn mx))))
+        L (* 0.5 (+ (* Q mx) (* (dec Q) mn)))
+        gb- (- g b)
+        rg- (- r g)
+        C (* (/ Q 3.0) (+ (m/abs rg-)
+                          (m/abs gb-)
+                          (m/abs (- b r))))
+        H (m/degrees (if (zero? gb-) 0.0 (m/atan (/ gb- rg-))))
+        H (cond
+            (and (>= rg- 0.0) (>= gb- 0,0)) (* H m/TWO_THIRD)
+            (and (>= rg- 0.0) (neg? gb-)) (* 2.0 m/TWO_THIRD H)
+            (and (neg? rg-) (>= gb- 0,0)) (+ (* 2.0 m/TWO_THIRD H) 180.0)
+            (and (neg? rg-) (neg? gb-)) (- (* m/TWO_THIRD H) 180.0) 
+            :else H)]
+    (Vec4. H C L (.w c))))
 
 (defn from-HCL
-  "HCL -> RGB"
+  "HCL -> RGB, by Sarifuddin and Missaou"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        h' (/ (wrap-hue (.x c)) 60.0)
-        X (* (.y c) (- 1.0 (m/abs (dec (mod h' 2.0)))))
-        ^Vec3 rgb' (v/add (from-HCX h' (.y c) X))
-        m (- (.z c) (* 0.298839 (.x rgb')) (* 0.586811 (.y rgb')) (* 0.114350 (.z rgb')))]
-    (v/vec4 (v/mult (v/add rgb' (Vec3. m m m)) 255.0) (.w c))))
+        H (m/constrain (.x c) -179.8496181535773 180.0)
+        C (* 3.0 (.y c))
+        L (* 4.0 (.z c))
+        Q (* 2.0 (m/exp (* 0.1 (- 1.0 (/ C L)))))
+        mn (/ (- L C) (* 2.0 (dec Q)))
+        mx (+ mn (/ C Q))]
+    (cond
+      (<= 0.0 H 60.0) (let [t (m/tan (m/radians (* 1.5 H)))]
+                        (Vec4. mx (/ (+ (* mx t) mn) (inc t)) mn (.w c)))
+      (<= 60.0 H 120.0) (let [t (m/tan (m/radians (* 0.75 (- H 180.0))))]
+                          (Vec4. (/ (- (* mx (inc t)) mn) t) mx mn (.w c)))
+      (<= 120.0 H 180.0) (let [t (m/tan (m/radians (* 0.75 (- H 180.0))))]
+                           (Vec4. mn mx (- (* mx (inc t)) (* mn t)) (.w c)))
+      (<= -60.0 H 0.0) (let [t (m/tan (m/radians (* 0.75 H)))]
+                         (Vec4. mx mn (- (* mn (inc t)) (* mx t)) (.w c)))
+      (<= -120.0 H -60.0) (let [t (m/tan (m/radians (* 0.75 H)))]
+                            (Vec4. (/ (- (* mn (inc t)) mx) t) mn mx (.w c)))
+      (<= -180.0 H -120.0) (let [t (m/tan (m/radians (* 1.5 (+ H 180.0))))]
+                             (Vec4. mn (/ (+ (* mn t) mx) (inc t)) mx (.w c))))))
 
-(def ^{:metadoc/categories #{:conv} :doc "RGB -> HCL, normalized"} to-HCL* (comp normalize-HSx to-HCL))
-(def ^{:metadoc/categories #{:conv} :doc "HCL -> RGB, normalized"} from-HCL* (comp from-HCL denormalize-HSx pr/to-color))
+(defn to-HCL*
+  "RGB -> HCL, normalized"
+  {:metadoc/categories #{:conv}}
+  ^Vec4 [c] 
+  (let [cc (to-HCL c)]
+    (Vec4. (m/mnorm (.x cc) -179.8496181535773 180.0 0.0 255.0)
+           (* 255.0 (/ (.y cc) 170.0))
+           (* 255.0 (/ (.z cc) 154.3185841092901))
+           (.w cc))))
+
+(defn from-HCL*
+  "HCL -> RGB, normalized"
+  {:metadoc/categories #{:conv}}
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)]
+    (from-HCL (Vec4. (m/mnorm (.x c) 0.0 255.0 -179.8496181535773 180.0)
+                     (* 170.0 (/ (.y c) 255.0))
+                     (* 154.3185841092901 (/ (.z c) 255.0))
+                     (.w c)))))
 
 ;; HSB = HSV
 
@@ -2850,8 +2910,8 @@ See [[blends-list]] for names."}
   Based on YUV luma."
   {:metadoc/categories #{:dist}}
   [c1 c2]
-  (let [l1 (luma c1)
-        l2 (luma c2)]
+  (let [l1 (/ (relative-luma c1) 255.0)
+        l2 (/ (relative-luma c2) 255.0)]
     (if (> l1 l2)
       (/ (+ l1 0.05) (+ l2 0.05))
       (/ (+ l2 0.05) (+ l1 0.05)))))
@@ -2906,13 +2966,38 @@ See [[blends-list]] for names."}
   ([xs]
    (v/average-vectors (map pr/to-color xs))))
 
-(defn mix
-  "Mix colors in given optional `colorspace` (default: `:RGB`) and optional ratio (default: 0.5)."
-  ([colorspace x1 x2 t]
+(defn lerp
+  "Lineary interpolate color between two values.
+
+  See also [[gradient]] or `fastmath` vector interpolations."
+  {:metadoc/categories #{:interp}}
+  ([colorspace c1 c2 ^double t]
    (let [[to from] (colorspaces colorspace)]
-     (from (lerp (to x1) (to x2) t))))
-  ([x1 x2 t] (lerp x1 x2 t))
-  ([x1 x2] (lerp x1 x2 0.5)))
+     (from (lerp (to c1) (to c2) t))))
+  ([c1 c2] (lerp c1 c2 0.5))
+  ([c1 c2 ^double t]
+   (v/interpolate (pr/to-color c1) (pr/to-color c2) t)))
+
+(defn- mix-interpolator
+  ^double [^double a ^double b ^double t]
+  (m/sqrt (+ (* a a (- 1.0 t))
+             (* b b t))))
+
+(defn mix
+  "Mix colors in given optional `colorspace` (default: `:RGB`) and optional ratio (default: 0.5).
+
+  chroma.js way"
+  (^Vec4 [colorspace c1 c2 ^double t]
+   (let [[to from] (colorspaces colorspace)]
+     (from (mix (to c1) (to c2) t))))
+  (^Vec4 [c1 c2] (mix c1 c2 0.5))
+  (^Vec4 [c1 c2 ^double t]
+   (let [^Vec4 c1 (pr/to-color c1)
+         ^Vec4 c2 (pr/to-color c2)]
+     (Vec4. (mix-interpolator (.x c1) (.x c2) t)
+            (mix-interpolator (.y c1) (.y c2) t)
+            (mix-interpolator (.z c1) (.z c2) t)
+            (m/mlerp (.w c1) (.w c2) t)))))
 
 ;; color reduction using x-means
 
@@ -3180,39 +3265,78 @@ See [[blends-list]] for names."}
 
 ;;
 
-(defn change-lab-luma
-  "Change luma for givent color by given amount. Works in LAB color space.
-
-  Luma value can't exceed `[0-100]` range."
+(defn brighten
+  "Change luma for givent color by given amount. Works in LAB color space. See [[darken]]."
   {:metadoc/categories #{:ops}}
-  ^Vec4 [^double amt col]
-  (let [c (to-LAB col)]
-    (from-LAB (Vec4. (m/constrain (+ (.x c) amt) 0.0 100.0) (.y c) (.z c) (.w c)))))
+  (^Vec4 [col] (brighten col 1.0))
+  (^Vec4 [col ^double amt]
+   (let [c (to-LAB col)]
+     (from-LAB (Vec4. (max 0.0 (+ (.x c) (* 18.0 amt))) (.y c) (.z c) (.w c))))))
 
-(def ^{:doc "Make color darker. See [[brighten]]."
-       :metadoc/categories #{:ops}}
-  darken (partial change-lab-luma -10.0))
-
-(def ^{:doc "Make color brighter. See [[darken]]."
-       :metadoc/categories #{:ops}}
-  brighten  (partial change-lab-luma 10.0))
-
-(defn change-saturation
-  "Change color saturation in LCH color space.
-
-  Saturation value can't exceed `[0-134]` range."
+(defn darken
+  "Change luma for givent color by given amount. Works in LAB color space. See [[brighten]]."
   {:metadoc/categories #{:ops}}
-  ^Vec4 [^double amt col]
-  (let [c (to-LCH col)
-        ns (m/constrain (+ (.y c) amt) 0.0 134.0)]
-    (from-LCH (Vec4. (.x c) ns (.z c) (.w c)))))
+  (^Vec4 [col] (brighten col -1.0))
+  (^Vec4 [col ^double amt] (brighten col (- amt))))
 
-(def ^{:doc "Saturate color"
-       :metadoc/categories #{:ops}}
-  saturate (partial change-saturation 10.0))
-(def ^{:doc "Desaturate color"
-       :metadoc/categories #{:ops}}
-  desaturate (partial change-saturation -10.0))
+(defn saturate
+  "Change color saturation in LCH color space."
+  {:metadoc/categories #{:ops}}
+  (^Vec4 [col] (saturate col 1.0))
+  (^Vec4 [col ^double amt]
+   (let [c (to-LCH col)
+         ns (max 0.0 (+ (.y c) (* 18.0 amt)))]
+     (from-LCH (Vec4. (.x c) ns (.z c) (.w c))))))
+
+(defn desaturate
+  "Change color saturation in LCH color space."
+  {:metadoc/categories #{:ops}}
+  (^Vec4 [col] (saturate col -1.0))
+  (^Vec4 [col ^double amt] (saturate col (- amt))))
+
+(defn modulate
+  "Modulate (multiply) chosen channel by given amount. Works with any color space."
+  {:metadoc/categories #{:ops}}
+  (^Vec4 [colorspace col ^long channel ^double amount]
+   (let [[to from] (colorspaces colorspace)]
+     (from (modulate (to col) channel amount))))
+  (^Vec4 [col ^long channel ^double amount]
+   (let [^Vec4 c (pr/to-color col)]
+     (case channel
+       0 (Vec4. (* amount (.x c)) (.y c) (.z c) (.w c))
+       1 (Vec4. (.x c) (* amount (.y c)) (.z c) (.w c))
+       2 (Vec4. (.x c) (.y c) (* amount (.z c)) (.w c))
+       3 (Vec4. (.x c) (.y c) (.z c) (* amount (.w c)))
+       c))))
+
+(defn set-channel
+  "Set chosen channel with given value. Works with any color space."
+  {:metadoc/categories #{:ops}}
+  (^Vec4 [colorspace col ^long channel ^double val]
+   (let [[to from] (colorspaces colorspace)]
+     (from (set-channel (to col) channel val))))
+  (^Vec4 [col ^long channel ^double val]
+   (let [^Vec4 c (pr/to-color col)]
+     (case channel
+       0 (Vec4. val (.y c) (.z c) (.w c))
+       1 (Vec4. (.x c) val (.z c) (.w c))
+       2 (Vec4. (.x c) (.y c) val (.w c))
+       3 (Vec4. (.x c) (.y c) (.z c) val)
+       c))))
+
+(defn get-channel
+  "Get chosen channel. Works with any color space."
+  {:metadoc/categories #{:ops}}
+  (^double [colorspace col ^long channel]
+   (let [to (first (colorspaces colorspace))]
+     (get-channel (to col) channel)))
+  (^double [col ^long channel]
+   (case channel
+     0 (ch0 col)
+     1 (ch1 col)
+     2 (ch2 col)
+     3 (alpha col)
+     ##NaN)))
 
 ;;
 (declare gradient-presets)
@@ -3758,3 +3882,9 @@ Map with name (keyword) as key and gradient function as value.
                     (r/randval :linear :cubic-spline)
                     pal))
     (rand-nth (vals gradient-presets))))
+
+(defn random-color
+  "Generate random color"
+  {:metadoc/categories #{:pal}}
+  ([alpha] (set-alpha (random-color) alpha))
+  ([] (Vec4. (r/drand 255.0) (r/drand 255.0) (r/drand 255.0) 255.0)))

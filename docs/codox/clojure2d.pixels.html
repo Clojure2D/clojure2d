@@ -14,7 +14,7 @@
 <ul>
   <li><a href="clojure2d.pixels.html#var-get-value">get-value</a>, <a href="null">set-value</a> - read or set channel value for given pixel and channel. Value should be within <code>[0-255]</code> range.</li>
   <li><a href="clojure2d.pixels.html#var-get-color">get-color</a>, <a href="clojure2d.core.html#var-set-color">set-color</a> - read or set color for given pixel. Returned color has <a href="null">Vec4</a> type.</li>
-  <li><a href="clojure2d.pixels.html#var-get-channel">get-channel</a>, <a href="null">set-channel</a> - read or set whole channel as <code>ints</code>.</li>
+  <li><a href="clojure2d.pixels.html#var-get-channel">get-channel</a>, <a href="clojure2d.color.html#var-set-channel">set-channel</a> - read or set whole channel as <code>ints</code>.</li>
 </ul>
 <p>Pixel access can be made by <code>(x,y)</code> coordinates or by index which is equivalent to <code>(+ x (* y width))</code>.</p>
 <p>Pixels implement <a href="clojure2d.protocols.html#var-ImageProto">ImageProto</a>.</p>

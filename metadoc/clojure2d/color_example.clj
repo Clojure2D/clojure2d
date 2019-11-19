@@ -354,21 +354,15 @@
   (example-palette "Reduce cockatoo image palette (15 colors)" (reduce-colors i1 15))
   (example-palette "Reduce cockatoo image palette in LAB (15 colors)" (reduce-colors :LAB i1 15)))
 
-(add-examples change-lab-luma
-  (example-color "Given color" :khaki)
-  (example-color "Lighten by 30" (change-lab-luma 30 :khaki))
-  (example-color "Darken by 50" (change-lab-luma -50 :khaki)))
-
 (add-examples darken
-  (example-palette "Make palette" (take 10 (iterate darken :amber))))
+  (example-palette "Make palette" (take 10 (iterate #(darken % 0.5) :amber)))
+  (example-color "Given color" :khaki)
+  (example-color "Darken" (darken :khaki 2.0)))
 
 (add-examples brighten
-  (example-palette "Make palette" (take 10 (iterate brighten "03100f"))))
-
-(add-examples change-saturation
+  (example-palette "Make palette" (take 10 (iterate #(brighten % 0.5) "03100f")))
   (example-color "Given color" :khaki)
-  (example-color "Saturate by 30" (change-saturation 30 :khaki))
-  (example-color "Desaturate by 30" (change-saturation -30 :khaki)))
+  (example-color "Brighten" (brighten :khaki 1.0)))
 
 (add-examples saturate
   (example-palette "Make palette" (take 10 (iterate saturate (from-HSL (color 300 0.0 0.5))))))
@@ -401,11 +395,11 @@
   (example-gradient "Loess, Yxy" (gradient :Yxy :loess (colourlovers-palettes 5)))
   (example-gradient "RBF, Yxy" (gradient :Yxy (partial i/rbf (rbf/rbf :thin-plate)) (colourlovers-palettes 5)))
   (example-gradient "Shepard, Yxy, irregular spacing" (gradient :Yxy :shepard [0 0.1 0.15 0.8 1.0] (colourlovers-palettes 5)))
-  (example-palette "Easy way to create palette from gradient" (palette (gradient :HSL :cubic-spline [:blue :green]) 10))  )
+  (example-palette "Easy way to create palette from gradient" (palette (gradient :HSL :cubic-spline [:blue :green]) 10)))
 
 (add-examples gradient-easing
-  (example-gradient "Linear, HCL" (gradient-easing :HCL [300 0.2 0.2] [200 0.8 0.9]))
-  (example-gradient "Bounce in-out, HCL" (gradient-easing :HCL e/bounce-in-out [300 0.2 0.2] [200 0.8 0.9])))
+  (example-gradient "Linear, HCL" (gradient-easing :HCL [-120 10 10] [120 120 130]))
+  (example-gradient "Bounce in-out, HCL" (gradient-easing :HCL e/bounce-in-out [-120 10 10] [120 120 130])))
 
 (add-examples gradient-cubehelix
   (example-gradient "Cubehelix gradient" (gradient-cubehelix [300 0.2 0.2] [200 0.8 0.9])))
@@ -464,3 +458,6 @@
   (example-palette "Randomly generated palette" (random-palette))
   (example-palette "Randomly generated palette" (random-palette)))
 
+(add-examples random-color
+  (example-color "Random color" (random-color))
+  (example-color "Random color (with alpha set)" (random-color 180)))
