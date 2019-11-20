@@ -1002,13 +1002,14 @@ See [[blends-list]] for names."}
     (let [r (bit-and 0xff (bit-shift-right cc 16))
           g (bit-and 0xff (bit-shift-right cc 8))
           b (bit-and 0xff cc)
-          ^Vec4 res (f (Vec4. r g b 255))
+          ^Vec4 res (f (Vec4. r g b 255.0))
           nmnr (if (< (.x res) mnr) (.x res) mnr)
           nmxr (if (> (.x res) mxr) (.x res) mxr)
           nmng (if (< (.y res) mng) (.y res) mng)
           nmxg (if (> (.y res) mxg) (.y res) mxg)
           nmnb (if (< (.z res) mnb) (.z res) mnb)
           nmxb (if (> (.z res) mxb) (.z res) mxb)]
+      #_(when (> (.y res) 2000.0) (println r g b res))
       (if (< cc 0x1000000)
         (recur (inc cc) (double nmnr) (double nmxr) (double nmng) (double nmxg) (double nmnb) (double nmxb))
         {:min-r nmnr :max-r nmxr :min-g nmng :max-g nmxg :min-b nmnb :max-b nmxb}))))
@@ -2591,6 +2592,70 @@ See [[blends-list]] for names."}
                   (/ (.z c) 255.0)
                   (.w c))]
     (from-Cubehelix cc)))
+
+;; OSA
+;; https://github.com/nschloe/colorio/blob/master/colorio/_osa.py
+
+(defn to-OSA
+  "OSA-UCS -> RGB"
+  ^Vec4 [c]
+  (let [xyz (to-XYZ c)
+        X (.x xyz)
+        Y (.y xyz)
+        Z (.z xyz)
+        sum-xyz (+ X Y Z)
+        x (if (zero? X) 0.0 (/ X sum-xyz))
+        y (if (zero? Y) 0.0 (/ Y sum-xyz))
+        K (+ (* 4.4934 x x)
+             (* 4.3034 y y)
+             (* -4.276 x y)
+             (* -1.3744 x)
+             (* -2.5643 y)
+             1.8103)
+        Y0 (* Y K)
+        Y03 (- (m/cbrt Y0) m/TWO_THIRD)
+        L' (* 5.9 (+ Y03 (* 0.042 (m/cbrt (- Y0 30.0)))))
+        C (/ L' (* 5.9 Y03))
+        R3 (m/cbrt (+ (* 0.7990 X) (* 0.4194 Y) (* -0.1648 Z)))
+        G3 (m/cbrt (+ (* -0.4493 X) (* 1.3265 Y) (* 0.0927 Z)))
+        B3 (m/cbrt (+ (* -0.1149 X) (* 0.3394 Y) (* 0.7170 Z)))
+        a (+ (* -13.7 R3) (* 17.7 G3) (* -4.0 B3))
+        b (+ (* 1.7 R3) (* 8.0 G3) (* -9.7 B3))
+        L (/ (- L' 14.3993) m/SQRT2)]
+    (Vec4. L (* C a) (* C b) (.w xyz))))
+
+(defonce ^:private ^:const ^double OSA-v (* 0.042 0.042 0.042))
+(defonce ^:private ^:const ^double OSA-30v (* 30.0 OSA-v))
+(defonce ^:private ^:const ^double OSA-a (- 1.0 OSA-v))
+
+(defn from-OSA
+  "RGB -> OSA-UCS"
+  [c]
+  (let [^Vec4 c (pr/to-color c)
+        L (.x c)
+        g (.y c)
+        j (.z c)
+        L' (+ (* m/SQRT2 L) 14.3993)
+        u (+ (/ L' 5.9) m/TWO_THIRD)
+        a OSA-a
+        b (* 3.0 u)
+        c (* -3.0 u u)
+        d (+ (* u u u) OSA-30v)
+        p (/ (- (* 3.0 a c)
+                (* b b))
+             (* 3.0 a a))
+        aa27 (* 27.0 a a)
+        q (/ (+ (* 2.0 b b b)
+                (* -9.0 a b c)
+                (* aa27 d))
+             (* aa27 a))
+        q2 (* 0.5 q)
+        s (m/sqrt (+ (m/sq q2)
+                     (m/pow3 (* 0.5 p))))
+        t (- (+ (m/cbrt (- s q2))
+                (m/cbrt (- (- q2) s)))
+             (/ b (* 3.0 a)))
+        Y0 (* t t t)]))
 
 ;; ### Grayscale
 
