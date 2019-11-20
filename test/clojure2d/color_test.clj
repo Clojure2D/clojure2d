@@ -109,7 +109,7 @@
   (is (colorspace-validity :YDbDr))
   (is (colorspace-validity :YPbPr))
   (is (colorspace-validity :GLHS))
-  #_  (is (colorspace-validity :HCL))
+  (is (colorspace-validity :HCL))
   (is (colorspace-validity :HSL))
   (is (colorspace-validity :HSB))
   (is (colorspace-validity :HSV))

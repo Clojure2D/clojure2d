@@ -7,6 +7,10 @@ All notable changes to this project will be documented in this file. This change
 
 * mathematica gradients (thanks to [Chris N.](https://github.com/techascent/tech.datatype/blob/master/src/tech/v2/tensor/color_gradients.clj))
 * `palette` helper function
+* `temperature` to convert black-body emissions to color
+* `get-channel`, `set-channel`, `modulate` - to manipulate channels in selected color space
+* `relative-luma` (WCAG version)
+* more String as color (single letter, triplets)
 
 ### Changed
 
@@ -21,6 +25,10 @@ All notable changes to this project will be documented in this file. This change
 ### Fixed
 
 * Closing window during `draw` can cause NPE when accessing global state.
+* `HCL` is now proper HCL by Sarifuddin and Missaou (to use CIELab version use LCH)
+* `brighten`/`darken` and `saturate`/`desaturate` corresponds to chroma.js now
+* `mix` corresponds to chroma.js now
+* `contrast-ratio` reflects WCAG definition
 
 ## 1.2.0-SNAPSHOT
 

@@ -572,11 +572,14 @@
   [f ^double a ^double b]
   (* 255.0 ^double (f (* rev255 a) (* rev255 b))))
 
+(declare blends blend-none)
+
 (defn blend-colors
   "Blend colors with blending function. Alpha aware."
   {:metadoc/categories #{:bl}}
-  ^Vec4 [f cb cs]
-  (let [^Vec4 ccb (v/mult (pr/to-color cb) rev255)
+  ^Vec4 [blend-name-or-fn cb cs]
+  (let [f (if (keyword? blend-name-or-fn) (get blends blend-name-or-fn blend-none) blend-name-or-fn)
+        ^Vec4 ccb (v/mult (pr/to-color cb) rev255)
         ^Vec4 ccs (v/mult (pr/to-color cs) rev255)
         ^double br (f (.x ccb) (.x ccs))
         ^double bg (f (.y ccb) (.y ccs))
@@ -1029,7 +1032,13 @@ See [[blends-list]] for names."}
 ;; ### OHTA
 
 (defn to-OHTA
-  "RGB -> OHTA"
+  "RGB -> OHTA
+
+  Returned ranges:
+
+  * I1: 0.0 - 255.0
+  * I2: -127.5 - 127.5
+  * I3: -127.5 - 127.5"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c] 
   (let [^Vec4 c (pr/to-color c)
@@ -1050,7 +1059,9 @@ See [[blends-list]] for names."}
 (def ^:private ^:const ^double c43 (/ 4.0 3.0))
 
 (defn from-OHTA
-  "OHTA -> RGB"
+  "OHTA -> RGB
+
+  For ranges, see [[to-OHTA]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -1127,7 +1138,13 @@ See [[blends-list]] for names."}
          (+ (* (.x c) 0.0193) (* (.y c) 0.1192) (* (.z c) 0.9505))))
 
 (defn to-XYZ
-  "RGB -> XYZ"
+  "RGB -> XYZ
+
+  Returned ranges (D65):
+
+  * X: 0.0 - 95.047
+  * Y: 0.0 - 100.0
+  * Z: 0.0 - 108.883"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -1155,7 +1172,9 @@ See [[blends-list]] for names."}
          (+ (* (.x v)  0.0557) (* (.y v) -0.2040) (* (.z v)  1.0570))))
 
 (defn from-XYZ
-  "XYZ -> RGB"
+  "XYZ -> RGB
+
+  For ranges, see [[to-XYZ]]"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c] 
   (let [^Vec4 c (pr/to-color c)
@@ -1176,7 +1195,6 @@ See [[blends-list]] for names."}
 
 (def ^:private ^:const ^double CIEEpsilon (/ 216.0 24389.0))
 (def ^:private ^:const ^double CIEK (/ 24389.0 27.0))
-(def ^:private ^:const ^double OneThird (/ 1.0 3.0))
 (def ^:private ^:const ^double REF-U (/ (* 4.0 D65X) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
 (def ^:private ^:const ^double REF-V (/ (* 9.0 D65Y) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
 
@@ -1186,11 +1204,17 @@ See [[blends-list]] for names."}
   "LAB correction"
   ^double [^double v]
   (if (> v CIEEpsilon)
-    (m/pow v OneThird)
+    (m/cbrt v)
     (/ (+ 16.0 (* v CIEK)) 116.0)))
 
 (defn to-LAB
-  "RGB -> LAB"
+  "RGB -> LAB
+
+  Returned ranges:
+
+  * L: 0.0 - 100.0
+  * a: -86.18 - 98.25
+  * b: -107.86 - 94.48"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [xyz (to-XYZ c)
@@ -1208,8 +1232,8 @@ See [[blends-list]] for names."}
   ^Vec4 [c]
   (let [cc (to-LAB c)]
     (Vec4. (m/mnorm (.x cc) 0.0 100.0 0.0 255.0)
-           (m/mnorm (.y cc) -86.18463649762525 98.25421868616114 0.0 255.0)
-           (m/mnorm (.z cc) -107.8636810449517 94.4824854464446 0.0 255.0)
+           (m/mnorm (.y cc) -86.18463649762525 98.25421868616108 0.0 255.0)
+           (m/mnorm (.z cc) -107.86368104495168 94.48248544644461 0.0 255.0)
            (.w cc))))
 
 (defn- from-lab-correct
@@ -1221,7 +1245,9 @@ See [[blends-list]] for names."}
       (/ (- (* 116.0 v) 16.0) CIEK))))
 
 (defn from-LAB
-  "LAB -> RGB"
+  "LAB -> RGB,
+
+  For ranges, see [[to-LAB]]"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -1236,15 +1262,21 @@ See [[blends-list]] for names."}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-LAB (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.0)
-                     (m/mnorm (.y c) 0.0 255.0 -86.18463649762525 98.25421868616114)
-                     (m/mnorm (.z c) 0.0 255.0 -107.8636810449517 94.4824854464446)
+                     (m/mnorm (.y c) 0.0 255.0 -86.18463649762525 98.25421868616108)
+                     (m/mnorm (.z c) 0.0 255.0 -107.86368104495168 94.48248544644461)
                      (.w c)))))
 
 
 ;;
 
 (defn to-LUV
-  "RGB -> LUV"
+  "RGB -> LUV
+
+  Returned ranges:
+
+  * L: 0.0 - 100.0
+  * u: -83.08 - 175.05
+  * v: -134.12 - 107.40"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [cc (to-XYZ c)
@@ -1272,7 +1304,9 @@ See [[blends-list]] for names."}
            (.w cc))))
 
 (defn from-LUV
-  "LUV -> RGB"
+  "LUV -> RGB
+
+  For ranges, see [[to-LUV]]"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -1304,7 +1338,13 @@ See [[blends-list]] for names."}
 (def ^:private ^:const ^double Kb (* (/ 70.0 218.11) (+ D65Y D65Z)))
 
 (defn to-HunterLAB
-  "RGB -> HunterLAB"
+  "RGB -> HunterLAB
+
+  Returned ranges:
+
+  * L: 0.0 - 100.0
+  * a: -69.08 - 109.48
+  * b: -199.78 - 55.72"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [cc (to-XYZ c)
@@ -1330,7 +1370,9 @@ See [[blends-list]] for names."}
            (.w cc))))
 
 (defn from-HunterLAB
-  "HunterLAB -> RGB"
+  "HunterLAB -> RGB
+
+  For ranges, see [[to-HunterLAB]]"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -1353,11 +1395,16 @@ See [[blends-list]] for names."}
                            (m/mnorm (.z c) 0.0 255.0 -199.78221402287008  55.7203132978682)
                            (.w c)))))
 
-
 ;;
 
 (defn to-LCH
-  "RGB -> LCH"
+  "RGB -> LCH
+
+  Returned ranges:
+
+  * L: 0.0 - 100.0
+  * C: 0.0 - 133.82
+  * H: 0.0 - 360.0"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [cc (to-LAB c)
@@ -1379,7 +1426,9 @@ See [[blends-list]] for names."}
            (.w cc))))
 
 (defn from-LCH
-  "LCH -> RGB"
+  "LCH -> RGB
+
+  For ranges, see [[to-LCH]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -1401,7 +1450,13 @@ See [[blends-list]] for names."}
 ;; ### Yxy (xyY)
 
 (defn to-Yxy
-  "RGB -> Yxy"
+  "RGB -> Yxy
+
+  Returned ranges:
+
+  * Y: 0.0 - 100.0
+  * x: 0.15 - 0.64
+  * y: 0.06 - 0.60"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [xyz (to-XYZ c)
@@ -1424,7 +1479,9 @@ See [[blends-list]] for names."}
            (.w cc))))
 
 (defn from-Yxy
-  "Yxy -> RGB"
+  "Yxy -> RGB
+
+  For ranges, see [[to-Yxy]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -1447,7 +1504,9 @@ See [[blends-list]] for names."}
 
 ;; ### LMS - normalized D65
 (defn to-LMS
-  "RGB -> LMS, D65"
+  "RGB -> LMS, D65
+
+  Ranges: 0.0 - 100.0"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [c (to-XYZ c)]
@@ -1467,7 +1526,9 @@ See [[blends-list]] for names."}
            (.w cc))))
 
 (defn from-LMS
-  "LMS -> RGB, D65"
+  "LMS -> RGB, D65
+
+  Ranges: 0.0 - 100.0"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -1504,7 +1565,13 @@ See [[blends-list]] for names."}
   (spow v 2.3255813953488373))
 
 (defn to-IPT
-  "RGB -> IPT"
+  "RGB -> IPT
+
+  Ranges:
+
+  * I: 0.0 - 7.244
+  * Cp: -3.285 - 4.8
+  * Ct: -5.422 - 4.72"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [c (to-XYZ c)
@@ -1577,7 +1644,15 @@ See [[blends-list]] for names."}
               (inc (* jab-c3 v))) jab-p)))
 
 (defn to-JAB
-  "RGB -> JAB"
+  "RGB -> JAB
+
+  Jab https://www.osapublishing.org/oe/abstract.cfm?uri=oe-25-13-15131
+
+  Ranges:
+
+  * J: 0.0 - 0.17
+  * a: -0.09 - 0.11
+  * b: -0.156 - 0.115"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [c (to-XYZ c)
@@ -1610,7 +1685,9 @@ See [[blends-list]] for names."}
                          (- (* jab-c3 v) jab-c2)) jab-rn))))
 
 (defn from-JAB
-  "JAB -> RGB"
+  "JAB -> RGB
+
+  For ranges, see [[to-JAB]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -1641,7 +1718,15 @@ See [[blends-list]] for names."}
 ;;
 
 (defn to-JCH
-  "RGB -> JCH"
+  "RGB -> JCH
+
+  Hue based color space derived from JAB
+  
+  Ranges:
+
+  * J: 0.0 - 0.167
+  * C: 0.0 - 0.159
+  * H: 0.0 - 360.0"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [cc (to-JAB c)
@@ -1663,7 +1748,9 @@ See [[blends-list]] for names."}
            (.w cc))))
 
 (defn from-JCH
-  "JCH -> RGB"
+  "JCH -> RGB
+
+  For ranges, see [[to-JCH]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -1741,7 +1828,13 @@ See [[blends-list]] for names."}
 ;; HSI
 
 (defn to-HSI
-  "RGB -> HSI"
+  "RGB -> HSI
+
+  Ranges:
+
+  * H: 0.0 - 360
+  * S: 0.0 - 1.0
+  * I: 0.0 - 1.0"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -1752,7 +1845,9 @@ See [[blends-list]] for names."}
     (Vec4. (.x hc) S (/ I 255.0) (.w c))))
 
 (defn from-HSI
-  "HSI -> RGB"
+  "HSI -> RGB
+
+  For ranges, see [[to-HSI]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -1770,7 +1865,13 @@ See [[blends-list]] for names."}
 ;; HSV
 
 (defn to-HSV
-  "RGB -> HSV"
+  "RGB -> HSV
+
+    Ranges:
+
+  * H: 0.0 - 360
+  * S: 0.0 - 1.0
+  * V: 0.0 - 1.0"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -1781,7 +1882,11 @@ See [[blends-list]] for names."}
     (Vec4. (.x hc) S (/ V 255.0) (.w c))))
 
 (defn from-HSV
-  "HSV -> RGB"
+  "HSV -> RGB
+
+  Same as HSB.
+  
+  For ranges, see [[to-HSV]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -1795,10 +1900,23 @@ See [[blends-list]] for names."}
 (def ^{:metadoc/categories #{:conv} :doc "RGB -> HSV, normalized"} to-HSV* (comp normalize-HSx to-HSV))
 (def ^{:metadoc/categories #{:conv} :doc "HSV -> RGB, normalized"} from-HSV* (comp from-HSV denormalize-HSx pr/to-color))
 
+;; HSB = HSV
+
+(def ^{:metadoc/categories #{:conv} :doc "RGB -> HSB(V), normalized (see [[to-HSV]])"} to-HSB to-HSV)
+(def ^{:metadoc/categories #{:conv} :doc "HSB(V) -> RGB, normalized (see [[from-HSV]])"} from-HSB from-HSV)
+(def ^{:metadoc/categories #{:conv} :doc "RGB -> HSB(V) (see [[to-HSV*]])"} to-HSB* to-HSV*)
+(def ^{:metadoc/categories #{:conv} :doc "HSB(V) -> RGB (see [[from-HSV*]])"} from-HSB* from-HSV*)
+
 ;; HSL
 
 (defn to-HSL
-  "RGB -> HSL"
+  "RGB -> HSL
+
+  Ranges:
+
+  * H: 0.0 - 360
+  * S: 0.0 - 1.0
+  * L: 0.0 - 1.0"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -1810,7 +1928,9 @@ See [[blends-list]] for names."}
     (Vec4. (.x hc) (/ S 255.0) L (.w c))))
 
 (defn from-HSL
-  "HSL -> RGB"
+  "HSL -> RGB
+
+  For ranges, see [[to-HSL]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -1828,7 +1948,15 @@ See [[blends-list]] for names."}
 ;; http://w3.uqo.ca/missaoui/Publications/TRColorSpace.zip
 
 (defn to-HCL
-  "RGB -> HCL, by Sarifuddin and Missaou"
+  "RGB -> HCL, by Sarifuddin and Missaou.
+
+  lambda = 3.0
+  
+  Returned ranges:
+
+  * H: -180.0 - 180.0
+  * C: 0.0 - 170.0
+  * L: 0.0 - 135.266"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -1837,7 +1965,7 @@ See [[blends-list]] for names."}
         b (.z c)
         mn (min r g b)
         mx (max r g b)
-        Q (m/exp (if (zero? mx) 0.0 (* 0.1 (/ mn mx))))
+        Q (m/exp (if (zero? mx) 0.0 (* 0.03 (/ mn mx))))
         L (* 0.5 (+ (* Q mx) (* (dec Q) mn)))
         gb- (- g b)
         rg- (- r g)
@@ -1854,14 +1982,16 @@ See [[blends-list]] for names."}
     (Vec4. H C L (.w c))))
 
 (defn from-HCL
-  "HCL -> RGB, by Sarifuddin and Missaou"
+  "HCL -> RGB, by Sarifuddin and Missaou.
+
+  For accepted ranges, see [[to-HCL]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
         H (m/constrain (.x c) -179.8496181535773 180.0)
         C (* 3.0 (.y c))
         L (* 4.0 (.z c))
-        Q (* 2.0 (m/exp (* 0.1 (- 1.0 (/ C L)))))
+        Q (* 2.0 (m/exp (* 0.03 (- 1.0 (/ C L)))))
         mn (/ (- L C) (* 2.0 (dec Q)))
         mx (+ mn (/ C Q))]
     (cond
@@ -1885,7 +2015,7 @@ See [[blends-list]] for names."}
   (let [cc (to-HCL c)]
     (Vec4. (m/mnorm (.x cc) -179.8496181535773 180.0 0.0 255.0)
            (* 255.0 (/ (.y cc) 170.0))
-           (* 255.0 (/ (.z cc) 154.3185841092901))
+           (* 255.0 (/ (.z cc) 135.26590615814683))
            (.w cc))))
 
 (defn from-HCL*
@@ -1895,15 +2025,8 @@ See [[blends-list]] for names."}
   (let [^Vec4 c (pr/to-color c)]
     (from-HCL (Vec4. (m/mnorm (.x c) 0.0 255.0 -179.8496181535773 180.0)
                      (* 170.0 (/ (.y c) 255.0))
-                     (* 154.3185841092901 (/ (.z c) 255.0))
+                     (* 135.26590615814683 (/ (.z c) 255.0))
                      (.w c)))))
-
-;; HSB = HSV
-
-(def ^{:metadoc/categories #{:conv} :doc "RGB -> HSB(V), normalized (see [[to-HSV]])"} to-HSB to-HSV)
-(def ^{:metadoc/categories #{:conv} :doc "HSB(V) -> RGB, normalized (see [[from-HSV]])"} from-HSB from-HSV)
-(def ^{:metadoc/categories #{:conv} :doc "RGB -> HSB(V) (see [[to-HSV-raw]])"} to-HSB* to-HSV*)
-(def ^{:metadoc/categories #{:conv} :doc "HSB(V) -> RGB (see [[from-HSV-raw]])"} from-HSB* from-HSV*)
 
 ;; ### HWB
 
@@ -1911,7 +2034,16 @@ See [[blends-list]] for names."}
 ;; by Alvy Ray Smitch and Eric Ray Lyons, 1995-1996
 
 (defn to-HWB
-  "RGB -> HWB"
+  "RGB -> HWB
+
+  HWB - A More Intuitive Hue-Based Color Model
+  by Alvy Ray Smitch and Eric Ray Lyons, 1995-1996
+
+  Ranges:
+
+  * H: 0.0 - 360.0
+  * W: 0.0 - 1.0
+  * B: 0.0 - 1.0"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -1940,7 +2072,9 @@ See [[blends-list]] for names."}
            (.w cc))))
 
 (defn from-HWB
-  "HWB -> RGB"
+  "HWB -> RGB
+
+  For ranges, see [[to-HWB]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -1984,7 +2118,17 @@ See [[blends-list]] for names."}
 (def ^:private ^:const ^double weight-min 0.2)
 
 (defn to-GLHS
-  "RGB -> GLHS"
+  "RGB -> GLHS
+
+  Color Theory and Modeling for Computer Graphics, Visualization, and Multimedia Applications (The Springer International Series in Engineering and Computer Science) by Haim Levkowitz
+
+  Weights: 0.2 (min), 0.1 (mid), 0.7 (max).
+
+  Ranges:
+  
+  * L: 0.0 - 1.0
+  * H: 0.0 - 360.0
+  * S: 0.0 - 1.0"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2024,7 +2168,9 @@ See [[blends-list]] for names."}
            (.w cc))))
 
 (defn from-GLHS
-  "GLHS -> RGB"
+  "GLHS -> RGB
+
+  For ranges, see [[to-GLHS]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2070,7 +2216,13 @@ See [[blends-list]] for names."}
 ;; ### YPbPr
 
 (defn to-YPbPr
-  "RGB -> YPbPr"
+  "RGB -> YPbPr
+
+  Ranges:
+
+  * Y: 0.0 - 255.0
+  * Pb: -236.6 - 236.6
+  * Pr: -200.8 - 200.8"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2092,7 +2244,9 @@ See [[blends-list]] for names."}
            (.w cc))))
 
 (defn from-YPbPr
-  "YPbPr -> RGB"
+  "YPbPr -> RGB
+
+  For ranges, see [[to-YPbPr]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2114,7 +2268,13 @@ See [[blends-list]] for names."}
 ;; ### YDbDr
 
 (defn to-YDbDr
-  "RGB -> YDbDr"
+  "RGB -> YDbDr
+
+  Ranges:
+
+  * Y: 0.0 - 255.0
+  * Db: -340.0 - 340.0
+  * Dr: -340.0 - 340.0"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c] 
   (let [^Vec4 c (pr/to-color c)
@@ -2134,7 +2294,9 @@ See [[blends-list]] for names."}
            (.w cc))))
 
 (defn from-YDbDr
-  "YDbDr -> RGB"
+  "YDbDr -> RGB
+
+  For ranges, see [[to-YDbDr]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2164,7 +2326,15 @@ See [[blends-list]] for names."}
 (def ^:private ^:const y-norm ohta-s)
 
 (defn to-YCbCr
-  "RGB -> YCbCr"
+  "RGB -> YCbCr
+
+  Used in JPEG.
+
+  Ranges;
+  
+  * Y: 0.0 - 255.0
+  * Cb: -127.5 - 127.5
+  * Cr: -127.5 - 127.5"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2180,7 +2350,9 @@ See [[blends-list]] for names."}
   (v/add (to-YCbCr c) y-norm))
 
 (defn from-YCbCr
-  "YCbCr -> RGB"
+  "YCbCr -> RGB
+
+  For ranges, see [[to-YCbCr]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2200,7 +2372,13 @@ See [[blends-list]] for names."}
 ;; ### YUV
 
 (defn to-YUV
-  "RGB -> YUV"
+  "RGB -> YUV
+
+  Ranges:
+
+  * Y: 0.0 - 255.0
+  * u: -111.2 - 111.2
+  * v: -156.8 - 156.8"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -2220,7 +2398,9 @@ See [[blends-list]] for names."}
            (.w cc))))
 
 (defn from-YUV
-  "YUV -> RGB"
+  "YUV -> RGB
+
+  For ranges, see [[to-YUV]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2245,7 +2425,13 @@ See [[blends-list]] for names."}
 ;; ### YIQ
 
 (defn to-YIQ
-  "RGB -> YIQ"
+  "RGB -> YIQ
+
+  Ranges:
+
+  * Y: 0.0 - 255.0
+  * I: -151.9 - 151.9
+  * Q: -133.26 - 133.26"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -2265,7 +2451,9 @@ See [[blends-list]] for names."}
            (.w cc))))
 
 (defn from-YIQ
-  "YIQ -> RGB"
+  "YIQ -> RGB
+
+  For ranges, see [[to-YIQ]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2289,7 +2477,13 @@ See [[blends-list]] for names."}
 ;; ### YCgCo
 
 (defn to-YCgCo
-  "RGB -> YCgCo"
+  "RGB -> YCgCo
+
+  Ranges:
+  
+  * Y: 0.0 - 255.0
+  * Cg: -127.5 - 127.5
+  * Co: -127.5 - 127.5"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2305,7 +2499,9 @@ See [[blends-list]] for names."}
   (v/add (to-YCgCo c) y-norm))
 
 (defn from-YCgCo
-  "YCgCo -> RGB"
+  "YCgCo -> RGB
+
+  For ranges, see [[to-YCgCo]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2333,7 +2529,15 @@ See [[blends-list]] for names."}
 (def ^:private ^:const ^:double ch-bc-da+ed-eb-r (/ (+ ch-bc-da ch-ed (- ch-eb))))
 
 (defn to-Cubehelix
-  "RGB -> Cubehelix"
+  "RGB -> Cubehelix
+
+  D3 version
+  
+  Ranges:
+
+  * H: 0.0 - 360.0
+  * S: 0.0 - 4.61
+  * L: 0.0 - 1.0"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2361,7 +2565,9 @@ See [[blends-list]] for names."}
            (.w cc))))
 
 (defn from-Cubehelix
-  "Cubehelix -> RGB"
+  "Cubehelix -> RGB
+
+  For ranges, see [[to-Cubehelix]]."
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2481,14 +2687,14 @@ See [[blends-list]] for names."}
 (def ^{:doc "List of all color space names." :metadoc/categories #{:conv}} colorspaces-list (keys colorspaces))
 
 (defn color-converter
-  "Create fn which converts provided color from `cs` color space using `ch-scale` as maximum value. (to simulate Processing `colorMode` fn).
+  "Create function which converts provided color from `cs` color space using `ch-scale` as maximum value. (to simulate Processing `colorMode` fn).
 
   Arity:
 
   * 1 - returns from-XXX* function
   * 2 - sets the same maximum value for each channel
   * 3 - sets individual maximum value without alpha, which is set to 0-255 range
-  * 4 - all channels have it's own indivudual maximum value."
+  * 4 - all channels have it's own individual maximum value."
   {:metadoc/categories #{:conv}}
   ([cs ch1-scale ch2-scale ch3-scale ch4-scale]
    (let [colorspace-fn (second (colorspaces* cs))]
@@ -2503,9 +2709,88 @@ See [[blends-list]] for names."}
   ([cs ch-scale] (color-converter cs ch-scale ch-scale ch-scale ch-scale))
   ([cs] (second (colorspaces* cs))))
 
-;; ## Palettes
+;; black body
 
-;; Gradient function
+(defn- kelvin-red
+  ^double [^double k]
+  (if (< k 6500)
+    255.0
+    (let [kk (* 0.0001 k)]
+      (min 255.0 (* 255.0 (from-linear (+ 0.32068362618584273
+                                          (* 0.19668730877673762 (m/pow (+ -0.21298613432655075 kk) -1.5139012907556737))
+                                          (* -0.013883432789258415 (m/ln kk)))))))))
+
+(defn- kelvin-green1
+  ^double [^double k]
+  (let [kk (* 0.0001 k)
+        eekk (+ kk -0.44267061967913873)]
+    (max 0.0 (* 255.0 (from-linear (+ 1.226916242502167
+                                      (* -1.3109482654223614 eekk eekk eekk (m/exp (* eekk -5.089297600846147)))
+                                      (* 0.6453936305542096
+                                         (m/ln kk))))))))
+
+(defn- kelvin-green2
+  ^double [^double k]
+  (let [kk (* 0.0001 k)]
+    (* 255.0 (from-linear (+ 0.4860175851734596
+                             (* 0.1802139719519286 (m/pow (+ -0.14573069517701578 kk) -1.397716496795082))
+                             (* -0.00803698899233844 (m/ln kk)))))))
+
+
+(defn- kelvin-green
+  ^double [^double k]
+  (cond
+    (< k 800) 0.0
+    (< k 6550)(kelvin-green1 k)
+    :else (kelvin-green2 k)))
+
+(defn- kelvin-blue
+  ^double [^double k]
+  (cond
+    (< k 1900) 0.0
+    (> k 6600) 255.0
+    :else (let [kk (* 0.0001 k)
+                eekk (+ kk -1.1367244820333684)]
+            (m/constrain (* 255.0 (from-linear (+ 1.677499032830161
+                                                  (* -0.02313594016938082 eekk eekk eekk
+                                                     (m/exp (* eekk -4.221279555918655)))
+                                                  (* 1.6550275798913296
+                                                     (m/ln kk))))) 0.0 255.0))))
+
+(defn- temperature-name-to-K
+  ^double [t]
+  (case t
+    :candle 1800.0
+    :sunrise 2500.0
+    :sunset 2500.0
+    :lightbulb 2900.0
+    :morning 3500.0
+    :moonlight 4000.0
+    :midday 5500.0
+    :cloudy-sky 6500.0
+    :blue-sky 10000.0
+    :warm 2900.0
+    :white 4250.0
+    :sunlight 4800.0
+    :cool 7250.0
+    t))
+
+(defn temperature
+  "Color representing given black body temperature `t` in Kelvins (or name as keyword).
+
+  Reference: CIE 1964 10 degree CMFs
+  
+  Using improved interpolation functions.
+
+  Possible temperature names: `:candle`, `:sunrise`, `:sunset`, `:lightbulb`, `:morning`, `:moonlight`, `:midday`, `:cloudy-sky`, `:blue-sky`, `:warm`, `:cool`, `:white`, `:sunlight`"
+  ^Vec4 [t]
+  {:metadoc/categories #{:conv}}
+  (let [t (temperature-name-to-K t)]
+    (color (kelvin-red t)
+           (kelvin-green t)
+           (kelvin-blue t))))
+
+;; ## Palettes
 
 ;; ### Colourlovers
 
@@ -2819,8 +3104,8 @@ See [[blends-list]] for names."}
   "Delta H* distance"
   {:metadoc/categories #{:dist}}
   [c1 c2]
-  (let [^Vec4 c1 (to-LAB c1)
-        ^Vec4 c2 (to-LAB c2)
+  (let [c1 (to-LAB c1)
+        c2 (to-LAB c2)
         xde (- (m/hypot-sqrt (.y c2) (.z c2))
                (m/hypot-sqrt (.y c1) (.z c1)))]
     (m/safe-sqrt (- (+ (m/sq (- (.y c1) (.y c2)))
@@ -2830,10 +3115,10 @@ See [[blends-list]] for names."}
 (defn- euclidean-
   "Euclidean distance between colors"
   {:metadoc/categories #{:dist}}
-  ([cs-conv c1 c2]
+  (^double [cs-conv c1 c2]
    (v/dist (cs-conv (pr/to-color c1))
            (cs-conv (pr/to-color c2))))
-  ([c1 c2]
+  (^double [c1 c2]
    (v/dist (pr/to-color c1) (pr/to-color c2))))
 
 (def ^{:metadoc/categories #{:dist}
@@ -2960,6 +3245,7 @@ See [[blends-list]] for names."}
 
 (defn average
   "Average colors in given `colorspace` (default: `:RGB`)"
+  {:metadoc/categories #{:interp}}
   ([colorspace xs]
    (let [[to from] (colorspaces colorspace)]
      (from (v/average-vectors (map to xs)))))
@@ -2967,9 +3253,9 @@ See [[blends-list]] for names."}
    (v/average-vectors (map pr/to-color xs))))
 
 (defn lerp
-  "Lineary interpolate color between two values.
+  "Linear interpolation of two colors.
 
-  See also [[gradient]] or `fastmath` vector interpolations."
+  See also [[lerp+]] [[gradient]] and [[mix]]"
   {:metadoc/categories #{:interp}}
   ([colorspace c1 c2 ^double t]
    (let [[to from] (colorspaces colorspace)]
@@ -2977,6 +3263,18 @@ See [[blends-list]] for names."}
   ([c1 c2] (lerp c1 c2 0.5))
   ([c1 c2 ^double t]
    (v/interpolate (pr/to-color c1) (pr/to-color c2) t)))
+
+(declare set-channel)
+
+(defn lerp+
+  "Linear interpolation of two colors conserving luma of the first color.
+
+  Amount: strength of the blend (defaults to 0.25)"
+  {:metadoc/categories #{:interp}}
+  ([c1 c2] (lerp+ c1 c2 0.25))
+  ([c1 c2 ^double amount]
+   (let [res (lerp c1 c2 amount)]
+     (set-channel :LAB res 0 (ch0 (to-LAB c1))))))
 
 (defn- mix-interpolator
   ^double [^double a ^double b ^double t]
@@ -2987,6 +3285,7 @@ See [[blends-list]] for names."}
   "Mix colors in given optional `colorspace` (default: `:RGB`) and optional ratio (default: 0.5).
 
   chroma.js way"
+  {:metadoc/categories #{:interp}}
   (^Vec4 [colorspace c1 c2 ^double t]
    (let [[to from] (colorspaces colorspace)]
      (from (mix (to c1) (to c2) t))))
@@ -2998,6 +3297,29 @@ See [[blends-list]] for names."}
             (mix-interpolator (.y c1) (.y c2) t)
             (mix-interpolator (.z c1) (.z c2) t)
             (m/mlerp (.w c1) (.w c2) t)))))
+
+(declare gradient)
+
+(defn tinter
+  "Creates fn to tint color using other color(s).
+
+  Tinter can be color or palette."
+  ([tint-colors & gradient-params]
+   (if (or (not (seqable? tint-colors))
+           (number? (first tint-colors)))
+     (let [tint (v/add (pr/to-color tint-colors) (Vec4. 1.0 1.0 1.0 1.0))]
+       (fn [c]
+         (let [c (pr/to-color c)]
+           (v/div (v/econstrain (v/emult c tint) 0.0 65535.0) 256.0))))
+     (let [g (if (fn? tint-colors)
+               tint-colors
+               (apply gradient (conj (vec gradient-params) tint-colors)))]
+       (fn [c]
+         (let [^Vec4 c (v/div (pr/to-color c) 255.0)]
+           (Vec4. (pr/red (g (.x c)))
+                  (pr/green (g (.y c)))
+                  (pr/blue (g (.z c)))
+                  (pr/alpha (g (.w c))))))))))
 
 ;; color reduction using x-means
 
@@ -3337,6 +3659,23 @@ See [[blends-list]] for names."}
      2 (ch2 col)
      3 (alpha col)
      ##NaN)))
+
+(defn adjust-temperature
+  "Adjust temperature of color, palette or gradient.
+
+  Default amount: 0.35
+  
+  See [[temperature]] and [[lerp+]]."
+  {:metadoc/categories #{:ops}}
+  ([in temp] (adjust-temperature in temp 0.35))
+  ([in temp amount]
+   (let [t (temperature temp)
+         l #(lerp+ % t amount)]
+     (cond
+       (fn? in) (comp l in) ;; gradient
+       (and (seqable? in)
+            (not (number? (first in)))) (mapv l in) ;; palette
+       :else (l in)))))
 
 ;;
 (declare gradient-presets)
@@ -3844,7 +4183,8 @@ Map with name (keyword) as key and gradient function as value.
                               (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
                                                      (- 1.5 (* 1.5 ts))
                                                      (- 0.8 (* 0.9 ts))
-                                                     255.0))))}))
+                                                     255.0))))
+    :black-body (fn [^double t] (temperature (m/mlerp 1000 15000 t)))}))
 
 (def ^{:doc "Gradient presets names."
        :metadoc/categories #{:grad}} gradient-presets-list (sort (keys gradient-presets)))
