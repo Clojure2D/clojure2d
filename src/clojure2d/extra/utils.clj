@@ -1,7 +1,7 @@
 (ns clojure2d.extra.utils
   "Set of various utilities which can be used to display various objects."
-  (:require [clojure2d.core :refer [canvas height width with-canvas set-background set-color rect show-window with-canvas->
-                                    set-font-attributes text point image get-image]]
+  (:require [clojure2d.core :refer [canvas height width with-canvas set-background set-color set-stroke rect show-window with-canvas->
+                                    set-font-attributes text point image get-image path]]
             [clojure2d.color :as c]
             [fastmath.vector :as v]
             [fastmath.core :as m]
@@ -16,29 +16,38 @@
   "Display palette.
 
   Input: list of colors."
-  [palette]
-  (let [c (canvas 1000 300)
-        h2 (/ (height c) 2)
-        bottom (- (height c) 100)
-        step (/ (- (width c) 100.0) (count palette))
-        cstep (inc (m/ceil step))]
-    (with-canvas [c c]
-      (-> c
-          (set-background 30 30 30)
-          (set-color 225 225 225)
-          (rect 0 h2 (width c) h2))
-      (doseq [^long col-no (range (count palette))]
-        (set-color c (nth palette col-no))
-        (rect c (+ 50 (* col-no step)) 50 cstep bottom)))
-    (show-window {:canvas c})
-    c))
+  ([palette] (show-palette palette false))
+  ([palette luma?]
+   (let [c (canvas 1000 300)
+         h2 (/ (height c) 2)
+         bottom (- (height c) 100)
+         step (/ (- (width c) 100.0) (count palette))
+         hstep (* 0.5 step)
+         cstep (inc (m/ceil step))]
+     (with-canvas [c c]
+       (-> c
+           (set-background 30 30 30)
+           (set-color 225 225 225)
+           (rect 0 h2 (width c) h2))
+       (doseq [^long col-no (range (count palette))]
+         (set-color c (nth palette col-no))
+         (rect c (+ 50 (* col-no step)) 50 cstep bottom))
+       (when luma?
+         (set-color c :black)
+         (set-stroke c 2.0)
+         (let [p (map #(vector (+ 50 hstep (* ^long % step))
+                               (m/norm (c/ch0 (c/to-LAB (nth palette %))) 0.0 100.0 bottom 50)) (range (count palette)))]
+           (path c p))))
+     (show-window {:canvas c})
+     c)))
 
 (defn show-gradient
   "Display gradient.
 
   Input: gradient function (see [[gradient]])."
-  [gradient]
-  (show-palette (map gradient (range 0.0 1.0 (/ 1.0 700.0)))))
+  ([gradient] (show-gradient gradient false))
+  ([gradient luma?]
+   (show-palette (map gradient (range 0.0 1.0 (/ 1.0 700.0))) luma?)))
 
 (defn show-color
   "Display color.

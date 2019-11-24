@@ -76,6 +76,7 @@
     (to-color :khaki)
     (to-color "abcc12")
     (to-color "#1234af")
+    (to-color "#1234af80")
     (to-color "a")
     (to-color "4a")
     (to-color "fac")

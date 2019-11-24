@@ -172,6 +172,11 @@
   [v]
   `(m/frac ~v))
 
+(defn- possible-color?
+  [c]
+  (or (not (seqable? c))
+      (number? (first c))))
+
 ;; ## Color representation
 
 (defn to-color
@@ -406,6 +411,7 @@
       1 (str s s s s s s)
       2 (str s s s)
       3 (let [[r g b] s] (str r r g g b b))
+      8 (str (subs s 6) (subs s 0 6))
       s)))
 
 ;; Equip `Vec3`, `Vec4`, `Keyword` and `java.awt.Color` types with `ColorProto` functions.
@@ -1009,7 +1015,8 @@ See [[blends-list]] for names."}
           nmxg (if (> (.y res) mxg) (.y res) mxg)
           nmnb (if (< (.z res) mnb) (.z res) mnb)
           nmxb (if (> (.z res) mxb) (.z res) mxb)]
-      #_(when (> (.y res) 2000.0) (println r g b res))
+      #_ (when (or (> (m/abs (.z res)) 2000.0)
+                   (> (m/abs (.y res)) 2000.0)) (println r g b res))
       (if (< cc 0x1000000)
         (recur (inc cc) (double nmnr) (double nmxr) (double nmng) (double nmxg) (double nmnb) (double nmxb))
         {:min-r nmnr :max-r nmxr :min-g nmng :max-g nmxg :min-b nmnb :max-b nmxb}))))
@@ -1645,7 +1652,7 @@ See [[blends-list]] for names."}
               (inc (* jab-c3 v))) jab-p)))
 
 (defn to-JAB
-  "RGB -> JAB
+  "RGB -> JzAzBz
 
   Jab https://www.osapublishing.org/oe/abstract.cfm?uri=oe-25-13-15131
 
@@ -1670,7 +1677,7 @@ See [[blends-list]] for names."}
                  (inc (* jab-d (.x Iab)))) jab-d0) (.y Iab) (.z Iab) (.w c))))
 
 (defn to-JAB*
-  "RGB -> JAB, normalized"
+  "RGB -> JzAzBz, normalized"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [cc (to-JAB c)]
@@ -1686,7 +1693,7 @@ See [[blends-list]] for names."}
                          (- (* jab-c3 v) jab-c2)) jab-rn))))
 
 (defn from-JAB
-  "JAB -> RGB
+  "JzAzBz -> RGB
 
   For ranges, see [[to-JAB]]."
   {:metadoc/categories #{:conv}}
@@ -1707,7 +1714,7 @@ See [[blends-list]] for names."}
                      (.z XYZ') (.w c)))))
 
 (defn from-JAB*
-  "JAB -> RGB, normalized"
+  "JzAzBz -> RGB, normalized"
   {:metadoc/categories #{:conv}}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -2597,7 +2604,17 @@ See [[blends-list]] for names."}
 ;; https://github.com/nschloe/colorio/blob/master/colorio/_osa.py
 
 (defn to-OSA
-  "OSA-UCS -> RGB"
+  "OSA-UCS -> RGB
+
+  https://github.com/nschloe/colorio/blob/master/colorio/_osa.py
+
+  Ranges:
+
+  * L: -13.5 - 7.14
+  * g (around): -20.0 - 12.0 + some extreme values
+  * j (around): -20.0 - 14.0 + some extreme values
+
+  Note that for some cases (like `(to-OSA [18 7 4])`) function returns some extreme values."
   ^Vec4 [c]
   (let [xyz (to-XYZ c)
         X (.x xyz)
@@ -2626,15 +2643,21 @@ See [[blends-list]] for names."}
 
 (defonce ^:private ^:const ^double OSA-v (* 0.042 0.042 0.042))
 (defonce ^:private ^:const ^double OSA-30v (* 30.0 OSA-v))
-(defonce ^:private ^:const ^double OSA-a (- 1.0 OSA-v))
+(defonce ^:private ^:const ^double OSA-a (- (inc OSA-v)))
+(defonce ^:private ^:const ^double OSA-detr (/ -139.68999999999997))
+(defonce ^:private ^:const ^double OSA-omega 4.957506551095124)
+
+(deftype OSAFDF [^double fomega ^double dfomega ^double X ^double Y ^double Z])
 
 (defn from-OSA
-  "RGB -> OSA-UCS"
-  [c]
-  (let [^Vec4 c (pr/to-color c)
-        L (.x c)
-        g (.y c)
-        j (.z c)
+  "RGB -> OSA-UCS
+
+  For ranges, see [[to-OSA]]."
+  ^Vec4 [c]
+  (let [^Vec4 col (pr/to-color c)
+        L (.x col)
+        g (.y col)
+        j (.z col)
         L' (+ (* m/SQRT2 L) 14.3993)
         u (+ (/ L' 5.9) m/TWO_THIRD)
         a OSA-a
@@ -2651,11 +2674,83 @@ See [[blends-list]] for names."}
              (* aa27 a))
         q2 (* 0.5 q)
         s (m/sqrt (+ (m/sq q2)
-                     (m/pow3 (* 0.5 p))))
+                     (m/pow3 (* p m/THIRD))))
         t (- (+ (m/cbrt (- s q2))
                 (m/cbrt (- (- q2) s)))
              (/ b (* 3.0 a)))
-        Y0 (* t t t)]))
+        Y0 (* t t t)
+        C (/ L' (* 5.9 (- t m/TWO_THIRD)))
+        a (/ g C)
+        b (/ j C)
+        ap (* OSA-detr (+ (* -9.7 a) (* 4.0 b)))
+        bp (* OSA-detr (+ (* -8.0 a) (* 17.7 b)))
+        f-df (fn [^double omega]
+               (let [cbrt-R omega
+                     cbrt-G (+ omega ap)
+                     cbrt-B (+ omega bp)
+                     R (m/pow3 cbrt-R)
+                     G (m/pow3 cbrt-G)
+                     B (m/pow3 cbrt-B)
+                     X (+ (* 1.06261827e+00 R) (* -4.12091749e-01 G) (* 2.97517985e-01 B))
+                     Y (+ (* 3.59926645e-01 R) (* 6.40072108e-01 G) (* -2.61830489e-05 B))
+                     Z (+ (* -8.96301459e-05 R) (* -3.69023452e-01 G) (* 1.44239010e+00 B))
+                     sum-xyz (+ X Y Z)
+                     x (if (zero? X) 0.0 (/ X sum-xyz))
+                     y (if (zero? Y) 0.0 (/ Y sum-xyz))
+                     K (+ (* 4.4934 x x)
+                          (* 4.3034 y y)
+                          (* -4.276 x y)
+                          (* -1.3744 x)
+                          (* -2.5643 y)
+                          1.8103)
+                     f (- (* Y K) Y0)
+                     dR (* 3.0 (m/sq cbrt-R))
+                     dG (* 3.0 (m/sq cbrt-G))
+                     dB (* 3.0 (m/sq cbrt-B))
+                     dX (+ (* 1.06261827e+00 dR) (* -4.12091749e-01 dG) (* 2.97517985e-01 dB))
+                     dY (+ (* 3.59926645e-01 dR) (* 6.40072108e-01 dG) (* -2.61830489e-05 dB))
+                     dZ (+ (* -8.96301459e-05 dR) (* -3.69023452e-01 dG) (* 1.44239010e+00 dB))
+                     dsum-xyz (+ dX dY dZ)
+                     dx (if (zero? X) 0.0 (/ (- (* dX sum-xyz) (* X dsum-xyz)) (* sum-xyz sum-xyz)))
+                     dy (if (zero? Y) 0.0 (/ (- (* dY sum-xyz) (* Y dsum-xyz)) (* sum-xyz sum-xyz)))
+                     dK (+ (* 4.4934 2.0 x dx)
+                           (* 4.3034 2.0 y dy)
+                           (* -4.276 (+ (* dx y) (* x dy)))
+                           (* -1.3744 dx)
+                           (* -2.5643 dy))
+                     df (+ (* dY K) (* Y dK))]
+                 (OSAFDF. f df X Y Z)))]
+    (loop [iter (int 0)
+           omega OSA-omega]
+      (let [^OSAFDF res (f-df omega)]
+        (if (and (< iter 20)
+                 (> (.fomega res) 1.0e-10))
+          (recur (inc iter)
+                 (- omega (/ (.fomega res)
+                             (.dfomega res))))
+          (from-XYZ (Vec4. (.X res) (.Y res) (.Z res) (.w col))))))))
+
+(defn to-OSA*
+  "OSA-UCS -> RGB, normalized
+
+  Note that due to some extreme outliers, normalization is triple cubic root for `g` and `j`."
+  ^Vec4 [c]
+  (let [c (to-OSA c)]
+    (Vec4. (m/mnorm (.x c) -13.507581921540849 7.1379048733958435 0.0 255.0)
+           (m/mnorm (m/cbrt (m/cbrt (m/cbrt (.y c)))) -1.4057783957453063 1.4175468647969818 0.0 255.0)
+           (m/mnorm (m/cbrt (m/cbrt (m/cbrt (.z c)))) -1.4073863219389389 1.4228002556769352 0.0 255.0)
+           (.w c))))
+
+(defn from-OSA*
+  "OSA-UCS -> RGB, normalized
+
+  Note that due to some extreme outliers, normalization is triple cubic power for `g` and `j`."
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)]
+    (from-OSA (Vec4. (m/mnorm (.x c) 0.0 255.0 -13.507581921540849 7.1379048733958435)
+                     (m/pow3 (m/pow3 (m/pow3 (m/mnorm (.y c) 0.0 255.0 -1.4057783957453063 1.4175468647969818))))
+                     (m/pow3 (m/pow3 (m/pow3 (m/mnorm (.z c) 0.0 255.0 -1.4073863219389389 1.4228002556769352))))
+                     (.w c)))))
 
 ;; ### Grayscale
 
@@ -2712,6 +2807,7 @@ See [[blends-list]] for names."}
                :Gray  [to-Gray from-Gray]
                :sRGB  [to-sRGB from-sRGB]
                :Cubehelix [to-Cubehelix from-Cubehelix]
+               :OSA [to-OSA from-OSA]
                :RGB   [to-color to-color]})
 
 (def ^{:doc "Map of all normalized color spaces functions
@@ -2746,6 +2842,7 @@ See [[blends-list]] for names."}
                 :Gray  [to-Gray from-Gray]
                 :sRGB  [to-sRGB* from-sRGB*]
                 :Cubehelix [to-Cubehelix* from-Cubehelix*]
+                :OSA [to-OSA* from-OSA*]
                 :RGB   [to-color to-color]})
 
 ;; List of color spaces names
@@ -3370,8 +3467,7 @@ See [[blends-list]] for names."}
 
   Tinter can be color or palette."
   ([tint-colors & gradient-params]
-   (if (or (not (seqable? tint-colors))
-           (number? (first tint-colors)))
+   (if (possible-color? tint-colors)
      (let [tint (v/add (pr/to-color tint-colors) (Vec4. 1.0 1.0 1.0 1.0))]
        (fn [c]
          (let [c (pr/to-color c)]
@@ -3738,8 +3834,7 @@ See [[blends-list]] for names."}
          l #(lerp+ % t amount)]
      (cond
        (fn? in) (comp l in) ;; gradient
-       (and (seqable? in)
-            (not (number? (first in)))) (mapv l in) ;; palette
+       (not (possible-color? in)) (mapv l in) ;; palette
        :else (l in)))))
 
 ;;
@@ -3755,7 +3850,7 @@ See [[blends-list]] for names."}
   To make irregular spacings between colors, provide own `domain`.
 
   If palette is a keyword, preset is returned."
-  {:metadoc/categories #{:grad}}
+  {:metadoc/categories #{:gr}}
   ([] (gradient [:black :white]))
   ([palette-or-gradient-name]
    (if (keyword? palette-or-gradient-name)
@@ -3789,7 +3884,7 @@ See [[blends-list]] for names."}
   Input colors should be in expected color space (default: `RGB`).
 
   You can use easing function to make interpolation non-linear (default: linear)."
-  {:metadoc/categories #{:grad}}
+  {:metadoc/categories #{:gr}}
   ([cs easing col1 col2]
    (let [[_ from] (colorspaces cs)
          col1 (pr/to-color col1)
@@ -3801,7 +3896,7 @@ See [[blends-list]] for names."}
   ([col1 col2]
    (gradient-easing :RGB e/linear col1 col2)))
 
-(def ^{:metadoc/categories #{:grad}
+(def ^{:metadoc/categories #{:gr}
        :doc "Cubehelix gradient generator from two colors."}
   gradient-cubehelix (partial gradient-easing :Cubehelix))
 
@@ -3812,6 +3907,23 @@ See [[blends-list]] for names."}
   {:metadoc/categories #{:pal}}
   [number-of-colors palette & gradient-params]
   (m/sample (apply gradient (conj (vec gradient-params) palette)) number-of-colors))
+
+(defn correct-luma
+  "Create palette or gradient with corrected luma to be linear."
+  {:metadoc/categories #{:pal :gr}}
+  [palette-or-gradient & gradient-params]
+  (if (fn? palette-or-gradient) ;; gradient
+    (let [g palette-or-gradient
+          l0 (ch0 (to-LAB (g 0.0)))
+          l1 (ch0 (to-LAB (g 1.0)))
+          xs (range 0.0 1.005 0.005)
+          ls (map (fn [^double v] (ch0 (to-LAB (g v)))) xs)
+          i (i/linear-smile ls xs)]
+      (fn [^double t]
+        (let [l (m/lerp l0 l1 t)]
+          (g (i l)))))
+    (let [g (linear-luma (apply gradient (conj (vec gradient-params) palette-or-gradient)))]
+      (palette g (count palette-or-gradient)))))
 
 (defonce ^:private image-palettes
   {:k2 [(color 0.4113482181302168, 0.7654335528693236, 10.992247503581464, 255.0) (color 0.22061087801919138, 62.95308516147251, 143.36625434970534, 255.0) (color 14.456361206680231, 83.01644652628998, 160.63248513207887, 255.0) (color 56.2006580334195, 132.6336074038975, 200.55892997048295, 255.0) (color 127.369257346748, 191.58760556287123, 236.15585077189115, 255.0) (color 254.81532816694084, 255.0744678455372, 254.87237723195426, 255.0)]
@@ -4180,7 +4292,7 @@ See [[blends-list]] for names."}
 Map with name (keyword) as key and gradient function as value.
 
 [See all](../static/gradients.html)"
-           :metadoc/categories #{:grad}}
+           :metadoc/categories #{:gr}}
   gradient-presets
   (merge
    (into {} (for [[k v] (-> "mathematica.edn.gz"
@@ -4252,7 +4364,7 @@ Map with name (keyword) as key and gradient function as value.
     :black-body (fn [^double t] (temperature (m/mlerp 1000 15000 t)))}))
 
 (def ^{:doc "Gradient presets names."
-       :metadoc/categories #{:grad}} gradient-presets-list (sort (keys gradient-presets)))
+       :metadoc/categories #{:gr}} gradient-presets-list (sort (keys gradient-presets)))
 
 ;;;
 

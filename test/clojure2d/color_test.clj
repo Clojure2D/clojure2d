@@ -126,7 +126,8 @@
   (is (colorspace-validity :Yxy))
   (is (colorspace-validity :LMS))
   (is (colorspace-validity :IPT))
-  (is (colorspace-validity :OHTA)))
+  (is (colorspace-validity :OHTA))
+  (is (colorspace-validity :OSA)))
 
 ;; chroma.js tests
 
@@ -162,10 +163,10 @@
   (is "#d3a96a" (format-hex (average :LAB average-colors))))
 
 (deftest chroma-valid
-  (is true (valid? :red))
-  (is true (not (valid? :bread)))
-  (is true (valid? "#F0000D"))
-  (is true (not (valid? "#FOOOOD"))))
+  (is (valid? :red))
+  (is (not (valid? :bread)))
+  (is (valid? "#F0000D"))
+  (is (not (valid? "#FOOOOD"))))
 
 (deftest chroma-blend
   (is "#47af22" (format-hex (blend-colors blend-multiply 0x4cbbfc 0xeeee22)))
@@ -214,8 +215,6 @@
   (is 0.35 (m/approx (/ (relative-luma :hotpink) 255.0)))
   (is 0.07 (m/approx (/ (relative-luma :darkslateblue) 255.0)))
   (is 0.0 (/ (relative-luma :black) 255.0)))
-
-(format-hex (set-channel :LAB :aquamarine 0 50))
 
 ;; test iq palette generator
 
