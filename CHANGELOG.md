@@ -10,7 +10,8 @@ All notable changes to this project will be documented in this file. This change
 * `temperature` to convert black-body emissions to color
 * `get-channel`, `set-channel`, `modulate` - to manipulate channels in selected color space
 * `relative-luma` (WCAG version)
-* more String as color (single letter, triplets)
+* more String as color (single letter, triplets, #rgba)
+* correct-lightness for gradient and palette
 
 ### Changed
 

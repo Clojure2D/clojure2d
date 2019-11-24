@@ -136,17 +136,17 @@
   (example-session "Usage" (format-hex :maroon) (format-hex (color 4 55 222))))
 
 (add-examples pack
-              (example-session "Pack colors into 32 bit int"
-                               (pack :green)
-                               (pack 1233456)
-                               (pack 0x1122ff)
-                               (pack (to-color 0x1122ff))
-                               (pack (color 12 33 255))))
+  (example-session "Pack colors into 32 bit int"
+    (pack :green)
+    (pack 1233456)
+    (pack 0x1122ff)
+    (pack (to-color 0x1122ff))
+    (pack (color 12 33 255))))
 
 ;; --
 
 (add-examples to-linear
-              (example "Gamma correction" (to-linear 0.5)))
+  (example "Gamma correction" (to-linear 0.5)))
 
 (add-examples from-linear
   (example "Gamma correction" (from-linear 0.5)))
@@ -395,6 +395,7 @@
   (example-gradient "Cubic, Yxy" (gradient :Yxy :cubic-spline (colourlovers-palettes 5)))
   (example-gradient "Loess, Yxy" (gradient :Yxy :loess (colourlovers-palettes 5)))
   (example-gradient "RBF, Yxy" (gradient :Yxy (partial i/rbf (rbf/rbf :thin-plate)) (colourlovers-palettes 5)))
+  (example-gradient "B-Spline for smoother colors in LAB" (gradient :LAB :b-spline (colourlovers-palettes 5)))
   (example-gradient "Shepard, Yxy, irregular spacing" (gradient :Yxy :shepard [0 0.1 0.15 0.8 1.0] (colourlovers-palettes 5)))
   (example-palette "Easy way to create palette from gradient" (palette (gradient :HSL :cubic-spline [:blue :green]) 10)))
 
@@ -446,6 +447,22 @@
 (add-examples named-colors-list
   (example "List of color names" named-colors-list))
 
+(add-examples correct-luma
+  (example-gradient "Before correction" (gradient [:black :red :yellow :white]))
+  (example-gradient "After correction" (correct-luma (gradient [:black :red :yellow :white])))
+  (example-palette "No correction" (palette [:lightyellow :orangered :deeppink :darkred] 9))
+  (example-palette "B-Spline interpolation" (palette [:lightyellow :orangered :deeppink :darkred] 9 :LAB :b-spline))
+  (example-palette "Lightness correction" (correct-luma (palette [:lightyellow :orangered :deeppink :darkred] 9)))
+  (example-palette "Both" (correct-luma (palette [:lightyellow :orangered :deeppink :darkred] 9 :LAB :b-spline))))
+
+(add-examples adjust-temperature
+  (example-palette "Without adjustment" (palette 0))
+  (example-palette "Cool" (adjust-temperature (palette 0) :cool 0.5))
+  (example-palette "Warm" (adjust-temperature (palette 0) :warm 0.5))
+  (example-gradient "Without adjustment" (gradient))
+  (example-gradient "Cold" (adjust-temperature (gradient) 10000))
+  (example-gradient "Hot" (adjust-temperature (gradient) 1000))
+  (example-color "Adjust color" (adjust-temperature :red 30000)))
 
 ;;
 

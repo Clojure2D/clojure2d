@@ -3838,6 +3838,7 @@ See [[blends-list]] for names."}
        :else (l in)))))
 
 ;;
+
 (declare gradient-presets)
 
 (defn gradient
@@ -3845,7 +3846,7 @@ See [[blends-list]] for names."}
 
   Grandient function accepts value from 0 to 1 and returns interpolated color.
 
-  Optionally interpolate in given `colorspace` and 1d [interpolator](https://generateme.github.io/fastmath/fastmath.interpolation.html#var-interpolators-1d-list) as keyword or function.
+  Optionally interpolate in given `colorspace` and 1d [interpolator](https://generateme.github.io/fastmath/fastmath.interpolation.html#var-interpolators-1d-list) as keyword or function (by default using `:RGB` and `:linear`).
 
   To make irregular spacings between colors, provide own `domain`.
 
@@ -3855,8 +3856,8 @@ See [[blends-list]] for names."}
   ([palette-or-gradient-name]
    (if (keyword? palette-or-gradient-name)
      (gradient-presets palette-or-gradient-name)
-     (gradient :RGB :linear nil palette-or-gradient-name)))
-  ([colorspace palette] (gradient colorspace :linear nil palette))
+     (gradient :RGB :linear-smile nil palette-or-gradient-name)))
+  ([colorspace palette] (gradient colorspace :linear-smile nil palette))
   ([colorspace interpolator palette] (gradient colorspace interpolator nil palette))
   ([colorspace interpolator domain palette]
    (let [[to from] (colorspaces colorspace)
@@ -3876,7 +3877,10 @@ See [[blends-list]] for names."}
          i3 (ifn r c3)] 
      (fn ^Vec4 [^double t]
        (let [ct (m/constrain t 0.0 1.0)]
-         (from (v/vec4 (i0 ct) (i1 ct) (i2 ct) (i3 ct))))))))
+         (v/fmap (from (v/vec4 (i0 ct)
+                               (i1 ct)
+                               (i2 ct)
+                               (i3 ct))) clamp255))))))
 
 (defn gradient-easing
   "Create gradient between two colors.
@@ -3890,7 +3894,7 @@ See [[blends-list]] for names."}
          col1 (pr/to-color col1)
          col2 (pr/to-color col2)]
      (fn [^double t]
-       (from (v/interpolate col1 col2 (easing t))))))
+       (v/fmap (from (v/interpolate col1 col2 (easing t))) clamp255))))
   ([cs col1 col2]
    (gradient-easing cs e/linear col1 col2))
   ([col1 col2]
@@ -3908,8 +3912,32 @@ See [[blends-list]] for names."}
   [number-of-colors palette & gradient-params]
   (m/sample (apply gradient (conj (vec gradient-params) palette)) number-of-colors))
 
+(declare palette-presets)
+
+(defn palette
+  "Get palette.
+
+  If argument is a keyword, returns one from [[palette-presets]].
+  If argument is a number, returns one from [[colourlovers-palettes]].
+  If argument is a gradient, returns 5 or `number-of-colors` samples.
+  
+  Optionally you can pass number of requested colors and other parameters as in [[resample]]"
+  {:metadoc/categories #{:pal}}
+  ([p]
+   (cond
+     (keyword? p) (palette-presets p)
+     (integer? p) (colourlovers-palettes p)
+     (fn? p) (palette p 5)
+     :else p))
+  ([p number-of-colors & gradient-params]
+   (if (fn? p)
+     (m/sample p number-of-colors)
+     (apply resample number-of-colors (palette p) gradient-params))))
+
 (defn correct-luma
-  "Create palette or gradient with corrected luma to be linear."
+  "Create palette or gradient with corrected luma to be linear.
+
+  See [here](https://www.vis4.net/blog/2013/09/mastering-multi-hued-color-scales/#combining-bezier-interpolation-and-lightness-correction)"
   {:metadoc/categories #{:pal :gr}}
   [palette-or-gradient & gradient-params]
   (if (fn? palette-or-gradient) ;; gradient
@@ -3922,8 +3950,9 @@ See [[blends-list]] for names."}
       (fn [^double t]
         (let [l (m/lerp l0 l1 t)]
           (g (i l)))))
-    (let [g (linear-luma (apply gradient (conj (vec gradient-params) palette-or-gradient)))]
-      (palette g (count palette-or-gradient)))))
+    (let [n (count palette-or-gradient)
+          g (correct-luma (apply gradient (conj (vec gradient-params) palette-or-gradient)))]
+      (palette g n))))
 
 (defonce ^:private image-palettes
   {:k2 [(color 0.4113482181302168, 0.7654335528693236, 10.992247503581464, 255.0) (color 0.22061087801919138, 62.95308516147251, 143.36625434970534, 255.0) (color 14.456361206680231, 83.01644652628998, 160.63248513207887, 255.0) (color 56.2006580334195, 132.6336074038975, 200.55892997048295, 255.0) (color 127.369257346748, 191.58760556287123, 236.15585077189115, 255.0) (color 254.81532816694084, 255.0744678455372, 254.87237723195426, 255.0)]
@@ -4266,26 +4295,6 @@ See [[blends-list]] for names."}
 
 (def ^{:doc "Color palette presets list."
        :metadoc/categories #{:pal}} palette-presets-list (sort (keys palette-presets)))
-
-(defn palette
-  "Get palette.
-
-  If argument is a keyword, returns one from [[palette-presets]].
-  If argument is a number, returns one from [[colourlovers-palettes]].
-  If argument is a gradient, returns 5 or `number-of-colors` samples.
-  
-  Optionally you can pass number of requested colors and other parameters as in [[resample]]"
-  {:metadoc/categories #{:pal}}
-  ([p]
-   (cond
-     (keyword? p) (palette-presets p)
-     (integer? p) (colourlovers-palettes p)
-     (fn? p) (palette p 5)
-     :else p))
-  ([p number-of-colors & gradient-params]
-   (if (fn? p)
-     (m/sample p number-of-colors)
-     (apply resample number-of-colors (palette p) gradient-params))))
 
 (defonce ^{:doc "Ready to use gradients containing Inigo Quilez, Cubehelix sets and other.
 

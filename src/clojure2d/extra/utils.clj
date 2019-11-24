@@ -1,7 +1,7 @@
 (ns clojure2d.extra.utils
   "Set of various utilities which can be used to display various objects."
-  (:require [clojure2d.core :refer [canvas height width with-canvas set-background set-color set-stroke rect show-window with-canvas->
-                                    set-font-attributes text point image get-image path]]
+  (:require [clojure2d.core :refer [canvas height width with-canvas set-background set-color set-stroke rect
+                                    show-window with-canvas-> set-font-attributes text point image get-image path black-canvas]]
             [clojure2d.color :as c]
             [fastmath.vector :as v]
             [fastmath.core :as m]
@@ -76,10 +76,9 @@
 (defn show-vector-field
   "Show scalar field R^2->R^2"
   [f norm-out]
-  (let [c (canvas 800 800)]
+  (let [c (black-canvas 800 800)]
     (with-canvas [c c]
       (set-color c :white 8)
-      (set-background c :black)
       (dotimes [_ 2500000]
         (let [x (r/drand (- m/PI) m/PI)
               y (r/drand (- m/PI) m/PI)
