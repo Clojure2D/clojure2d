@@ -125,6 +125,7 @@
                         :filt "Filters"
                         :ld "Log density renderer"}}
   (:require [clojure2d.color :as c]
+            [clojure2d.color.blend :as b]
             [clojure2d.core :as core]
             [fastmath.core :as m]
             [fastmath.vector :as v]
@@ -336,14 +337,12 @@
   [f ^Pixels p]
   (let [target (clone-pixels p)
         parts (segment-range (.size p) 10000)
-        ftrs (doall
-              (map
-               #(future (let [[^long start ^long end] %]
-                          (loop [idx start]
-                            (when (< idx end)
-                              (pr/set-color! target idx (f (pr/get-color p idx)))
-                              (recur (unchecked-inc idx))))))
-               parts))]
+        ftrs (doall (map #(future (let [[^long start ^long end] %]
+                                    (loop [idx start]
+                                      (when (< idx end)
+                                        (pr/set-color! target idx (f (pr/get-color p idx)))
+                                        (recur (unchecked-inc idx)))))))
+                    parts)]
     (run! deref ftrs)
     target))
 
@@ -355,15 +354,13 @@
   [f ^Pixels p]
   (let [target (clone-pixels p)
         parts (segment-range (.w p) 10)
-        ftrs (doall
-              (map
-               #(future (let [[^long start ^long end] %]
-                          (loop [x start]
-                            (when (< x end)
-                              (dotimes [y (.h p)]
-                                (pr/set-color! target x y (f p x y)))
-                              (recur (unchecked-inc x))))))
-               parts))]
+        ftrs (doall (map #(future (let [[^long start ^long end] %]
+                                    (loop [x start]
+                                      (when (< x end)
+                                        (dotimes [y (.h p)]
+                                          (pr/set-color! target x y (f p x y)))
+                                        (recur (unchecked-inc x)))))))
+                    parts)]
     (run! deref ftrs)
     target))
 
@@ -407,7 +404,7 @@
          ch1 (future (when f1 (f1 1 target p)))
          ch2 (future (when f2 (f2 2 target p)))]
      (when f3 (f3 3 target p))
-     (run! deref [ch0 ch1 ch2])
+     (do @ch0 @ch1 @ch2)
      target))
   ([f p]
    (filter-channels f f f nil p))
@@ -452,7 +449,7 @@
          ch1 (future (when f1 (f1 1 target p1 p2)))
          ch2 (future (when f2 (f2 2 target p1 p2)))]
      (when f3 (f3 3 target p1 p2))
-     (run! deref [ch0 ch1 ch2])
+     (do @ch0 @ch1 @ch2)
      target))
   ([f p1 p2]
    (blend-channels f f f nil p1 p2))
@@ -467,9 +464,9 @@
   "Create compose blending function"
   [n]
   (cond 
-    (keyword? n) (partial blend-channel (partial c/blend-values (c/blends n)))
+    (keyword? n) (partial blend-channel (b/blends n))
     (nil? n) nil
-    :else (partial blend-channel (partial c/blend-values n))))
+    :else (partial blend-channel n)))
 
 (def ^:private make-compose (memoize make-compose-f))
 
@@ -492,7 +489,7 @@
   [f back source x y]
   (let [cb (pr/get-color back x y)
         cs (pr/get-color source x y)]
-    (c/blend-colors f cb cs)))
+    (b/blend-colors f cb cs)))
 
 (defn composite
   "Create java.awt.Composite object which can be used in [[set-composite]].
@@ -510,7 +507,7 @@
            h (min (.getHeight src) (.getHeight dst-in))
            p1 (pixels (clojure2d.java.Pixels/getRasterPixels src 0 0 w h) w h)
            p2 (pixels (clojure2d.java.Pixels/getRasterPixels dst-in 0 0 w h) w h)
-           ^Pixels res (filter-colors-xy (partial blend-colors-xy (c/blends n) p2) p1)]
+           ^Pixels res (filter-colors-xy (partial blend-colors-xy (b/blends n) p2) p1)]
        (clojure2d.java.Pixels/setRasterPixels dst-out 0 0 w h (.p res))))))
 
 ;; ## Filters
@@ -804,7 +801,7 @@
         ch1 (future (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 1))
         ch2 (future (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 2))]
     (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 3)
-    (run! deref [ch0 ch1 ch2])
+    (do @ch0 @ch1 @ch2)
     a))
 
 (defn merge-renderers

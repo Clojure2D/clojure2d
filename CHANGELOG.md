@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file. This change
 * deps bumped
 * pixels mutating functions are now with `!`
 * `gradient` 
+* [breaking] all blending functions moved to separate namespace and reweritten from the scratch
 
 ### Removed
 

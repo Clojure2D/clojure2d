@@ -93,6 +93,7 @@
     (to-awt-color 0xaa112233)))
 
 (add-examples luma (example-session "Usage" (luma 0x152535) (luma :red)))
+(add-examples relative-luma (example-session "Usage" (relative-luma 0x152535) (relative-luma :red)))
 (add-examples red (example-session "Usage" (red 0x152535) (red :khaki)))
 (add-examples green (example-session "Usage" (green 0x152535) (green :khaki)))
 (add-examples blue (example-session "Usage" (blue 0x152535) (blue :khaki)))
@@ -101,10 +102,15 @@
 (add-examples ch1 (example-session "Usage" (ch0 0x152535) (ch1 :khaki)))
 (add-examples ch2 (example-session "Usage" (ch0 0x152535) (ch2 :khaki)))
 
+(add-examples get-channel
+  (example (get-channel :green 1))
+  (example "Get first channel from LAB representation of green." (get-channel :LAB :green 0)))
+
 (add-examples hue (example-session "Usage" (hue :red) (hue :green) (hue :blue) (hue "#12f5e6") (hue-polar "#12f5e6") (hue-paletton "#4455f6")))
 (add-examples hue-polar (example-session "Usage" (hue-polar "#4455f6") (hue "#4455f6") (hue-paletton "#4455f6")))
 
 (add-examples lerp (example-palette "Usage" [(lerp :red :blue 0) (lerp :red :blue 0.5) (lerp :red :blue 1.0)]))
+(add-examples lerp+ (example-palette "Usage" [(lerp+ :red :blue 0) (lerp+ :red :blue 0.5) (lerp+ :red :blue 1.0)]))
 
 (add-examples set-alpha (example-color "Usage" (set-alpha :khaki 200)))
 (add-examples set-ch0 (example-color "Usage" (set-ch0 :khaki 11)))
@@ -143,6 +149,11 @@
     (pack (to-color 0x1122ff))
     (pack (color 12 33 255))))
 
+(add-examples modulate
+  (example-color "More red" (modulate [123 22 233] 0 1.2))
+  (example-color "More saturation" (modulate :HSL [123 22 233] 1 1.2))
+  (example-palette "Decrease luma" (mapv #(modulate :LAB % 0 0.8) (palette 0))))
+
 ;; --
 
 (add-examples to-linear
@@ -173,7 +184,8 @@
 
 (add-examples blend-colors
   (example-color "Multiply colors" (blend-colors blend-multiply :brown :khaki))
-  (example-color "Modulo add colors" (blend-colors blend-madd :brown :khaki)))
+  (example-color "Modulo add colors" (blend-colors blend-madd :brown :khaki))
+  (example-color "Hardmix colors" (blend-colors :hardmix :brown :khaki)))
 
 (def i1 (p/load-pixels "docs/cockatoo.jpg"))
 (def i2 (p/load-pixels "docs/cockatoo1.jpg"))
@@ -207,14 +219,14 @@
            (let [n-to (symbol (str "to-" (name n)))]
              `(do (add-examples ~n-to
                     (example-gradient "Gradient between four colors using given color space." (gradient ~n [:maroon :white :black :lightcyan]))
-                    (example "Convert into colorspace value" (~n-to :peru))))))))
+                    (example "Convert into color space value" (~n-to :peru))))))))
 
 (defmacro add-colorspace*-examples
   []
   `(do ~@(for [n colorspaces-list]
            (let [n-to (symbol (str "to-" (name n) "*"))]
              `(do (add-examples ~n-to
-                    (example "Convert into colorspace value" (~n-to :peru))))))))
+                    (example "Convert into color space value" (~n-to :peru))))))))
 
 (add-colorspace-examples)
 (add-colorspace*-examples)
@@ -235,12 +247,12 @@
            (let [n-from (symbol (str "from-" (name n)))
                  n-to (symbol (str "to-" (name n)))]
              `(do (add-examples ~n-from
-                    (example-color "Converting to and from given colorspace should yield almost the same color." (map m/approx ((juxt red green blue) (~n-from (~n-to (color 122 3 254))))))))))))
+                    (example-color "Converting to and from given color space should yield almost the same color." (map m/approx ((juxt red green blue) (~n-from (~n-to (color 122 3 254))))))))))))
 
 (add-colorspace-from-examples)
 
-(add-examples colorspaces
-  (example "List of colorspaces" colorspaces-list))
+(add-examples colorspaces-list
+  (example "List of color spaces" colorspaces-list))
 
 ;;
 
@@ -248,9 +260,11 @@
   (example-session "When you pass only color space, returns normalized from-XXX* function."
     (color-converter :YUV)
     ((color-converter :YUV) [158 94 85]))
-  (example-session "You can maximum value for all channels."
-    ((color-converter :HCL 1.0) [0.5 0.5 0.5 0.2])
-    ((color-converter :HCL 100.0) [50 50 50 100]))
+  (example-session "You can maximum value for all channels or individually."
+    ((color-converter :HCL 1.0) [0.5 0.5 0.5 0.5])
+    ((color-converter :HCL 100.0) [50 50 50 50])
+    ((color-converter :HCL 10 20 30) [5 10 15 127.5])
+    ((color-converter :HCL 10 20 30 40) [5 10 15 20]))
   (example-color "You can set maximum value for each channel separately. Here makes conversion from HSL color space where hue is from range 0-360, saturation and lightness from 0-100. Alpha is from range 0-255."
                  ((color-converter :HCL 360.0 100.0 100.0) [240 50 50])))
 
@@ -259,6 +273,7 @@
 (add-examples colourlovers-palettes
   (example "Number of palettes" (count colourlovers-palettes))
   (example-palette "Palette 0" (colourlovers-palettes 0))
+  (example-palette "Palette 1, alternative access" (palette 1))
   (example-palette "Palette 40" (colourlovers-palettes 40))
   (example-palette "Palette 101" (colourlovers-palettes 101))
   (example-palette "Palette 201" (colourlovers-palettes 201))
@@ -356,12 +371,12 @@
   (example-palette "Reduce cockatoo image palette in LAB (15 colors)" (reduce-colors :LAB i1 15)))
 
 (add-examples darken
-  (example-palette "Make palette" (take 10 (iterate #(darken % 0.5) :amber)))
+  (example-palette "Make palette" (take 10 (iterate (fn [c] (darken c 0.5)) :amber)))
   (example-color "Given color" :khaki)
   (example-color "Darken" (darken :khaki 2.0)))
 
 (add-examples brighten
-  (example-palette "Make palette" (take 10 (iterate #(brighten % 0.5) "03100f")))
+  (example-palette "Make palette" (take 10 (iterate (fn [c] (brighten c 0.5)) "03100f")))
   (example-color "Given color" :khaki)
   (example-color "Brighten" (brighten :khaki 1.0)))
 
@@ -389,25 +404,25 @@
 (add-examples gradient
   (example-gradient "Default" (gradient))
   (example-gradient "Named gradient" (gradient :rainbow-m))
-  (example-gradient "Linear, RGB" (gradient (colourlovers-palettes 5)))
-  (example-gradient "Linear, HSL" (gradient :HSL (colourlovers-palettes 5)))
-  (example-gradient "Linear, Yxy" (gradient :Yxy (colourlovers-palettes 5)))
-  (example-gradient "Cubic, Yxy" (gradient :Yxy :cubic-spline (colourlovers-palettes 5)))
-  (example-gradient "Loess, Yxy" (gradient :Yxy :loess (colourlovers-palettes 5)))
-  (example-gradient "RBF, Yxy" (gradient :Yxy (partial i/rbf (rbf/rbf :thin-plate)) (colourlovers-palettes 5)))
-  (example-gradient "B-Spline for smoother colors in LAB" (gradient :LAB :b-spline (colourlovers-palettes 5)))
-  (example-gradient "Shepard, Yxy, irregular spacing" (gradient :Yxy :shepard [0 0.1 0.15 0.8 1.0] (colourlovers-palettes 5)))
+  (example-gradient "Linear, RGB" (gradient (palette 5)))
+  (example-gradient "Linear, HSL" (gradient :HSL (palette 5)))
+  (example-gradient "Linear, Yxy" (gradient :Yxy (palette 5)))
+  (example-gradient "Cubic, Yxy" (gradient :Yxy :cubic-spline (palette 5)))
+  (example-gradient "Loess, Yxy" (gradient :Yxy :loess (palette 5)))
+  (example-gradient "RBF, Yxy" (gradient :Yxy (partial i/rbf (rbf/rbf :thin-plate)) (palette 5)))
+  (example-gradient "B-Spline for smoother colors in LAB" (gradient :LAB :b-spline (palette 5)))
+  (example-gradient "Shepard, Yxy, irregular spacing" (gradient :Yxy :shepard [0 0.1 0.15 0.8 1.0] (palette 5)))
   (example-palette "Easy way to create palette from gradient" (palette (gradient :HSL :cubic-spline [:blue :green]) 10)))
 
 (add-examples gradient-easing
   (example-gradient "Linear, HCL" (gradient-easing :HCL [-120 10 10] [120 120 130]))
-  (example-gradient "Bounce in-out, HCL" (gradient-easing :HCL e/bounce-in-out [-120 10 10] [120 120 130])))
+  (example-gradient "Bounce in-out, HCL" (gradient-easing :HCL :bounce-in-out [-120 10 10] [120 120 130])))
 
 (add-examples gradient-cubehelix
   (example-gradient "Cubehelix gradient" (gradient-cubehelix [300 0.2 0.2] [200 0.8 0.9])))
 
 (add-examples resample
-  (example-palette "Input palette" (colourlovers-palettes 12))
+  (example-palette "Input palette" (palette 12))
   (example-palette "Resample one of the colourlovers palette." (resample 16 (colourlovers-palettes 12)))
   (example-palette "Resample one of the colourlovers palette. Different gradient settings."
                    (resample 16 (colourlovers-palettes 12) :LUV :cubic-spline)))
@@ -416,30 +431,22 @@
 (add-examples gradient-presets-list  (example "List of ready to use gradients" gradient-presets-list))
 
 (add-examples gradient-presets
-  (example-gradient "Cool" (:cool gradient-presets))
-  (example-gradient "Warm" (:warm gradient-presets))
-  (example-gradient "Cubehelix" (:cubehelix gradient-presets))
-  (example-gradient "Rainbow" (:rainbow gradient-presets))
-  (example-gradient "IQ 1" (:iq-1 gradient-presets))
-  (example-gradient "IQ 2" (:iq-2 gradient-presets))
-  (example-gradient "IQ 3" (:iq-3 gradient-presets))
-  (example-gradient "IQ 4" (:iq-4 gradient-presets))
-  (example-gradient "IQ 5" (:iq-5 gradient-presets))
-  (example-gradient "IQ 6" (:iq-6 gradient-presets))
-  (example-gradient "IQ 7" (:iq-7 gradient-presets)))
+  (example-gradient "Cool" (gradient-presets :cool))
+  (example-gradient "Same as" (gradient :cool))
+  (example-gradient "Warm" (gradient :warm))
+  (example-gradient "Cubehelix" (gradient :cubehelix))
+  (example-gradient "IQ 1" (gradient :iq-1)))
 
 (add-examples palette-presets
   (example-palette "`:prgn-10`" (palette-presets :prgn-10))
-  (example-palette "`:rdylbu-9`" (palette-presets :rdylbu-9))
-  (example-palette "`:spectral-11`" (palette-presets :spectral-11))
-  (example-palette "`:oranges-9`" (palette-presets :oranges-9))
-  (example-palette "`:accent`" (palette-presets :accent))
-  (example-palette "`:dark2`" (palette-presets :dark2))
-  (example-palette "`:set3`" (palette-presets :set3))
-  (example-palette "`:category-20c`" (palette-presets :category20c))
-  (example-palette "`:viridis`" (resample 16 (palette-presets :viridis)))
-  (example-palette "`:microsoft-3`" (resample 16 (palette-presets :microsoft-3)))
-  (example-palette "`:tableau-20-2`" (resample 16 (palette-presets :tableau-20-2))))
+  (example-palette "Same as" (palette :prgn-10))
+  (example-palette "`:rdylbu-9`" (palette :rdylbu-9))
+  (example-palette "`:spectral-11`" (palette :spectral-11))
+  (example-palette "`:set3`" (palette :set3))
+  (example-palette "`:category-20c`" (palette :category20c))
+  (example-palette "`:viridis`" (palette :viridis 16))
+  (example-palette "`:microsoft-3`" (palette :microsoft-3 16))
+  (example-palette "`:tableau-20-2`" (palette-presets :tableau-20-2 16)))
 
 (add-examples palette-presets-list
   (example "List of palettes" palette-presets-list))
