@@ -2,6 +2,7 @@
   (:require [hiccup.core :refer :all]
             [metadoc.examples :refer :all]
             [clojure2d.color :refer :all]
+            [clojure2d.color.blend :as b]
             [clojure2d.core :refer :all]
             [clojure2d.pixels :as p]
             [fastmath.vector :as v]
@@ -65,12 +66,6 @@
 
 ;; --------------
 
-(add-examples clamp255
-  (example-session "Usage" (clamp255 -1) (clamp255 255.1) (clamp255 123.5)))
-
-(add-examples lclamp255
-  (example-session "Usage" (lclamp255 -1) (lclamp255 255.1) (lclamp255 123.5)))
-
 (add-examples to-color
   (example-session "Various conversions"
     (to-color :khaki)
@@ -104,7 +99,7 @@
 
 (add-examples get-channel
   (example (get-channel :green 1))
-  (example "Get first channel from LAB representation of green." (get-channel :LAB :green 0)))
+  (example "Get first channel from LAB representation of green." (get-channel :green :LAB 0)))
 
 (add-examples hue (example-session "Usage" (hue :red) (hue :green) (hue :blue) (hue "#12f5e6") (hue-polar "#12f5e6") (hue-paletton "#4455f6")))
 (add-examples hue-polar (example-session "Usage" (hue-polar "#4455f6") (hue "#4455f6") (hue-paletton "#4455f6")))
@@ -151,8 +146,8 @@
 
 (add-examples modulate
   (example-color "More red" (modulate [123 22 233] 0 1.2))
-  (example-color "More saturation" (modulate :HSL [123 22 233] 1 1.2))
-  (example-palette "Decrease luma" (mapv #(modulate :LAB % 0 0.8) (palette 0))))
+  (example-color "More saturation" (modulate [123 22 233] :HSL 1 1.2))
+  (example-palette "Decrease luma" (mapv #(modulate % :LAB 0 0.8) (palette 0))))
 
 ;; --
 
@@ -172,20 +167,10 @@
 
 ;;
 
-(add-examples *blend-threshold*
-  (example-session "Usage"
-    (blend-opacity 0.23 0.88)
-    (binding [*blend-threshold* 0.9]
-      (blend-opacity 0.23 0.88))
-    (blend-opacity 0.23 0.88 0.9)))
-
-(add-examples blend-values
-  (example-session "Usage" (blend-values blend-multiply 123 44) (blend-values blend-add 123 44)))
-
-(add-examples blend-colors
-  (example-color "Multiply colors" (blend-colors blend-multiply :brown :khaki))
-  (example-color "Modulo add colors" (blend-colors blend-madd :brown :khaki))
-  (example-color "Hardmix colors" (blend-colors :hardmix :brown :khaki)))
+(add-examples b/blend-colors
+  (example-color "Multiply colors" (b/blend-colors b/multiply :brown :khaki))
+  (example-color "Modulo add colors" (b/blend-colors b/madd :brown :khaki))
+  (example-color "Hardmix colors" (b/blend-colors b/hardmix :brown :khaki)))
 
 (def i1 (p/load-pixels "docs/cockatoo.jpg"))
 (def i2 (p/load-pixels "docs/cockatoo1.jpg"))
@@ -198,27 +183,41 @@
 
 (defmacro add-blends-examples
   []
-  `(do ~@(for [x blends-list]
-           (let [n (symbol (str "blend-" (name x)))]
+  `(do ~@(for [x b/blends-list]
+           (let [n (symbol (str "b/" (name x)))]
              `(add-examples ~n
                 (example-snippet "Composed images" blend-images :image ~x)
-                (example-session "Simple calls" (~n 0.43 0.68) (~n 0.22 0.44))
-                (example-palette "Blend two colors" [:salmon :mediumturquoise (blend-colors ~n :salmon :mediumturquoise)]))))))
+                (example-session "Simple calls" (~n 50 200) (~n 80 120) (~n 170 220))
+                (example-palette "Blend two colors" [:salmon :mediumturquoise (b/blend-colors ~n :salmon :mediumturquoise)])
+                (example-palette "Blend two palettes" (b/blend-palettes ~n (palette 5) (palette 35)))
+                (example-gradient "Blend two gradients" (b/blend-gradients ~n (gradient (palette 5)) (gradient (palette 35)))))))))
 
 (add-blends-examples)
 
-(add-examples blends
-  (example-session "Access" (blends :mdodge) ((blends :mdodge) 0.4 0.3)))
+(add-examples b/blends
+  (example-session "Access" (b/blends :mdodge) ((b/blends :mdodge) 0.4 0.3)))
 
-(add-examples blends-list
-  (example "List of blends" blends-list))
+(add-examples b/blends-list
+  (example "List of blends" b/blends-list))
+
+(add-examples b/blend-palettes
+  (example-palette "First palette" (palette 5))
+  (example-palette "Second palette" (palette 35))
+  (example-palette "Blend two palettes using burn mode" (b/blend-palettes b/burn (palette 5) (palette 35)))
+  (example-palette "Blend using different modes for each channel" (b/blend-palettes b/burn b/divide b/difference (palette 5) (palette 35))))
+
+(add-examples b/blend-gradients
+  (example-gradient "First gradient" (gradient (palette 5)))
+  (example-gradient "Second gradient" (gradient (palette 35)))
+  (example-gradient "Blend two gradients using burn mode" (b/blend-gradients b/burn (gradient (palette 5)) (gradient (palette 35))))
+  (example-gradient "Blend using different modes for each channel" (b/blend-gradients b/burn b/divide b/difference (gradient (palette 5)) (gradient (palette 35)))))
 
 (defmacro add-colorspace-examples
   []
   `(do ~@(for [n colorspaces-list]
            (let [n-to (symbol (str "to-" (name n)))]
              `(do (add-examples ~n-to
-                    (example-gradient "Gradient between four colors using given color space." (gradient ~n [:maroon :white :black :lightcyan]))
+                    (example-gradient "Gradient between four colors using given color space." (gradient [:maroon :white :black :lightcyan] {:colorspace ~n}))
                     (example "Convert into color space value" (~n-to :peru))))))))
 
 (defmacro add-colorspace*-examples
@@ -270,22 +269,15 @@
 
 ;;
 
-(add-examples colourlovers-palettes
-  (example "Number of palettes" (count colourlovers-palettes))
-  (example-palette "Palette 0" (colourlovers-palettes 0))
-  (example-palette "Palette 1, alternative access" (palette 1))
-  (example-palette "Palette 40" (colourlovers-palettes 40))
-  (example-palette "Palette 101" (colourlovers-palettes 101))
-  (example-palette "Palette 201" (colourlovers-palettes 201))
-  (example-palette "Palette 499" (colourlovers-palettes 499)))
-
 (add-examples palette
   (example-palette "Named palette" (palette :set3))
   (example-palette "Colourlovers palette" (palette 0))
   (example-palette "Resampled palette" (palette 0 10))
-  (example-palette "Resampled palette with interpolation and color space" (palette 0 10 :LUV :loess))
-  (example-palette "Sampled from gradient" (palette (gradient :prl-10)))
-  (example-palette "Sampled from gradient with number of colors" (palette (gradient :prl-10) 10)))
+  (example-palette "Resampled palette with interpolation and color space" (palette 0 10 {:colorspace :LUV
+                                                                                         :interpolation :loess}))
+  (example-palette "Sampled from gradient" (palette (gradient :cyan-magenta)))
+  (example-palette "Sampled from gradient with number of colors" (palette (gradient :cyan-magenta) 10))
+  (example "List of named palettes" (list (palette))))
 
 (add-examples iq-gradient
   (example-gradient "Create gradient from 4 coeffs"
@@ -296,10 +288,6 @@
                      [1.0 0.1 1.0]))
   (example-gradient "Create gradient from two colors"
                     (iq-gradient :red :blue)))
-
-(add-examples iq-random-gradient
-  (example-gradient "Create gradient" (iq-random-gradient))
-  (example-gradient "Create another gradient" (iq-random-gradient)))
 
 ;; ----
 
@@ -356,19 +344,19 @@
 (add-examples nearest-color
   (example-color "Find nearest color to given color from below palette." [120 0 80])
   (example-palette "All below examples are using this palette" some-palette)
-  (example-color "With Delta C" (nearest-color delta-c some-palette [120 0 80]))
-  (example-color "With Delta H" (nearest-color delta-h some-palette [120 0 80]))
-  (example-color "With Delta E CIE" (nearest-color delta-e-cie some-palette [120 0 80]))
-  (example-color "With Delta E CMC" (nearest-color delta-e-cmc some-palette [120 0 80]))
-  (example-color "With euclidean" (nearest-color euclidean some-palette [120 0 80])))
+  (example-color "With Delta C" (nearest-color some-palette [120 0 80] delta-c))
+  (example-color "With Delta H" (nearest-color some-palette [120 0 80] delta-h))
+  (example-color "With Delta E CIE" (nearest-color some-palette [120 0 80] delta-e-cie))
+  (example-color "With Delta E CMC" (nearest-color some-palette [120 0 80] delta-e-cmc))
+  (example-color "With euclidean" (nearest-color some-palette [120 0 80])))
 
 (add-examples reduce-colors
   (example-palette "Reduce cockatoo image palette (2 colors)" (reduce-colors i1 2))
-  (example-palette "Reduce cockatoo image palette in LAB (2 colors)" (reduce-colors :LAB i1 2))
+  (example-palette "Reduce cockatoo image palette in LAB (2 colors)" (reduce-colors i1 2 :LAB))
   (example-palette "Reduce cockatoo image palette (6 colors)" (reduce-colors i1 6))
-  (example-palette "Reduce cockatoo image palette in LAB (6 colors)" (reduce-colors :LAB i1 6))
+  (example-palette "Reduce cockatoo image palette in LAB (6 colors)" (reduce-colors i1 6 :LAB))
   (example-palette "Reduce cockatoo image palette (15 colors)" (reduce-colors i1 15))
-  (example-palette "Reduce cockatoo image palette in LAB (15 colors)" (reduce-colors :LAB i1 15)))
+  (example-palette "Reduce cockatoo image palette in LAB (15 colors)" (reduce-colors i1 15 :LAB)))
 
 (add-examples darken
   (example-palette "Make palette" (take 10 (iterate (fn [c] (darken c 0.5)) :amber)))
@@ -390,85 +378,72 @@
 
 (add-examples average
   (example-color "Average in RGB" (average [:yellow :red :teal "#dddddd"]))
-  (example-color "Average in LAB" (average :LAB [:yellow :red :teal "#dddddd"]))
-  (example-color "Average in HSL" (average :LCH [:yellow :red :teal "#dddddd"])))
+  (example-color "Average in LAB" (average [:yellow :red :teal "#dddddd"] :LAB))
+  (example-color "Average in HSL" (average [:yellow :red :teal "#dddddd"] :LCH)))
 
 (add-examples mix
   (example-color "Mix" (mix :red :blue))
   (example-color "Mix, different ratio" (mix :red :blue 0.25))
-  (example-color "Mix in LAB" (mix :LAB :red :blue 0.5))
-  (example-color "Mix in HSI" (mix :HSI :red :blue 0.5)))
+  (example-color "Mix in LAB" (mix :red :blue :LAB 0.5))
+  (example-color "Mix in HSI" (mix :red :blue :HSI 0.5)))
 
 ;; ----
 
 (add-examples gradient
-  (example-gradient "Default" (gradient))
   (example-gradient "Named gradient" (gradient :rainbow-m))
   (example-gradient "Linear, RGB" (gradient (palette 5)))
-  (example-gradient "Linear, HSL" (gradient :HSL (palette 5)))
-  (example-gradient "Linear, Yxy" (gradient :Yxy (palette 5)))
-  (example-gradient "Cubic, Yxy" (gradient :Yxy :cubic-spline (palette 5)))
-  (example-gradient "Loess, Yxy" (gradient :Yxy :loess (palette 5)))
-  (example-gradient "RBF, Yxy" (gradient :Yxy (partial i/rbf (rbf/rbf :thin-plate)) (palette 5)))
-  (example-gradient "B-Spline for smoother colors in LAB" (gradient :LAB :b-spline (palette 5)))
-  (example-gradient "Shepard, Yxy, irregular spacing" (gradient :Yxy :shepard [0 0.1 0.15 0.8 1.0] (palette 5)))
-  (example-palette "Easy way to create palette from gradient" (palette (gradient :HSL :cubic-spline [:blue :green]) 10)))
-
-(add-examples gradient-easing
-  (example-gradient "Linear, HCL" (gradient-easing :HCL [-120 10 10] [120 120 130]))
-  (example-gradient "Bounce in-out, HCL" (gradient-easing :HCL :bounce-in-out [-120 10 10] [120 120 130])))
+  (example-gradient "Linear, HSL" (gradient (palette 5) {:colorspace :HSL}))
+  (example-gradient "Linear, Yxy" (gradient (palette 5) {:colorspace :Yxy}))
+  (example-gradient "Cubic, Yxy" (gradient (palette 5) {:colorspace :Yxy :interpolation :cubic-spline}))
+  (example-gradient "Loess, Yxy" (gradient (palette 5) {:colorspace :Yxy :interpolation :loess}))
+  (example-gradient "RBF, Yxy" (gradient (palette 5) {:colorspace :Yxy :interpolation (partial i/rbf (rbf/rbf :thin-plate))}))
+  (example-gradient "B-Spline for smoother colors in LAB" (gradient (palette 5) {:colorspace :LAB :interpolation :b-spline}))
+  (example-gradient "Shepard, Yxy, irregular spacing" (gradient (palette 5) {:colorspace :Yxy :interpolation :shepard :domain [0 0.1 0.15 0.8 1.0]}))
+  (example-gradient "Easing functions as interpolator" (gradient [[-120 0.1 0.2] [120 0.3 1.0]] {:interpolation :bounce-in-out
+                                                                                                 :to? false
+                                                                                                 :colorspace :HSL}))
+  (example-palette "Easy way to create palette from gradient" (palette (gradient [:blue :green] {:colorspace :HSL
+                                                                                                 :interpolation :cubic-spline}) 10))
+  (example "List of ready to use gradients" (sort (gradient))))
 
 (add-examples gradient-cubehelix
-  (example-gradient "Cubehelix gradient" (gradient-cubehelix [300 0.2 0.2] [200 0.8 0.9])))
+  (example-gradient "Cubehelix gradient" (gradient-cubehelix [[300 0.2 0.2] [200 0.8 0.9]])))
 
 (add-examples resample
   (example-palette "Input palette" (palette 12))
-  (example-palette "Resample one of the colourlovers palette." (resample 16 (colourlovers-palettes 12)))
+  (example-palette "Resample one of the colourlovers palette." (resample (palette 12) 16))
   (example-palette "Resample one of the colourlovers palette. Different gradient settings."
-                   (resample 16 (colourlovers-palettes 12) :LUV :cubic-spline)))
+                   (resample (palette 12) 16 {:colorspace :LUV
+                                              :interpolation :cubic-spline})))
+
 ;; ----
 
-(add-examples gradient-presets-list  (example "List of ready to use gradients" gradient-presets-list))
-
-(add-examples gradient-presets
-  (example-gradient "Cool" (gradient-presets :cool))
-  (example-gradient "Same as" (gradient :cool))
+(add-examples gradient
+  (example-gradient "Cool" (gradient :cool))
   (example-gradient "Warm" (gradient :warm))
   (example-gradient "Cubehelix" (gradient :cubehelix))
   (example-gradient "IQ 1" (gradient :iq-1)))
 
-(add-examples palette-presets
-  (example-palette "`:prgn-10`" (palette-presets :prgn-10))
-  (example-palette "Same as" (palette :prgn-10))
-  (example-palette "`:rdylbu-9`" (palette :rdylbu-9))
-  (example-palette "`:spectral-11`" (palette :spectral-11))
-  (example-palette "`:set3`" (palette :set3))
-  (example-palette "`:category-20c`" (palette :category20c))
-  (example-palette "`:viridis`" (palette :viridis 16))
-  (example-palette "`:microsoft-3`" (palette :microsoft-3 16))
-  (example-palette "`:tableau-20-2`" (palette-presets :tableau-20-2 16)))
-
-(add-examples palette-presets-list
-  (example "List of palettes" palette-presets-list))
-
 (add-examples named-colors-list
-  (example "List of color names" named-colors-list))
+  (example "List of color names" (named-colors-list)))
 
 (add-examples correct-luma
   (example-gradient "Before correction" (gradient [:black :red :yellow :white]))
   (example-gradient "After correction" (correct-luma (gradient [:black :red :yellow :white])))
   (example-palette "No correction" (palette [:lightyellow :orangered :deeppink :darkred] 9))
-  (example-palette "B-Spline interpolation" (palette [:lightyellow :orangered :deeppink :darkred] 9 :LAB :b-spline))
+  (example-palette "B-Spline interpolation" (palette [:lightyellow :orangered :deeppink :darkred] 9 {:colorspace :LAB
+                                                                                                     :interpolation :b-spline}))
   (example-palette "Lightness correction" (correct-luma (palette [:lightyellow :orangered :deeppink :darkred] 9)))
-  (example-palette "Both" (correct-luma (palette [:lightyellow :orangered :deeppink :darkred] 9 :LAB :b-spline))))
+  (example-palette "Both" (correct-luma (palette [:lightyellow :orangered :deeppink :darkred] 9 {:colorspace :LAB
+                                                                                                 :interpolation :b-spline}))))
 
 (add-examples adjust-temperature
   (example-palette "Without adjustment" (palette 0))
   (example-palette "Cool" (adjust-temperature (palette 0) :cool 0.5))
   (example-palette "Warm" (adjust-temperature (palette 0) :warm 0.5))
-  (example-gradient "Without adjustment" (gradient))
-  (example-gradient "Cold" (adjust-temperature (gradient) 10000))
-  (example-gradient "Hot" (adjust-temperature (gradient) 1000))
+  (example-gradient "Without adjustment" (gradient [:white :black]))
+  (example-gradient "Cold" (adjust-temperature (gradient [:white :black]) 10000))
+  (example-gradient "Hot" (adjust-temperature (gradient [:white :black]) 1000))
   (example-color "Adjust color" (adjust-temperature :red 30000)))
 
 ;;

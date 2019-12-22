@@ -406,7 +406,7 @@
                x (+ x (* 20.0 (- ^double (local-noise (/ x 50.0) (/ y 50.0) 0.34) 0.5)))
                y (+ y (* 20.0 (- ^double (local-noise (/ y 50.0) (/ x 50.0) 2.23) 0.5)))]
            (add-pixel! r x y)))
-       (to-pixels r {:gradient (c/gradient :prl-10)})))
+       (to-pixels r {:gradient (c/gradient (c/palette :prl-10))})))
   (example-snippet "Render with logarithmic scale" saver :image
     #(let [r (gradient-renderer 300 300)]
        (dotimes [i 4000000]

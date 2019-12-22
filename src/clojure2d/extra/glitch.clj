@@ -26,6 +26,7 @@
             [fastmath.vector :as v]
             [fastmath.signal :as s]
             [clojure2d.color :as c]
+            [clojure2d.color.blend :as b]
             [fastmath.fields :as var])
   (:import [clojure2d.pixels Pixels]
            [fastmath.vector Vec2]))
@@ -382,9 +383,9 @@
   (let [cs1 (r/randval 0.9 (rand-nth c/colorspaces-list) nil) ; let's convert to some colorspace (or leave rgb)
         cs2 (r/randval 0.2 (r/randval 0.9 (rand-nth c/colorspaces-list) nil) cs1) ; maybe different cs on second image?
         outcs (r/randval 0.2 (r/randval 0.9 (rand-nth c/colorspaces-list) nil) cs1) ; maybe some random colorspace on output?
-        bl1 (r/randval 0.85 (rand-nth c/blends-list) nil)    ; ch1 blend
-        bl2 (r/randval 0.85 (rand-nth c/blends-list) nil) ; ch2 blend
-        bl3 (r/randval 0.85 (rand-nth c/blends-list) nil)] ; ch3 blend
+        bl1 (r/randval 0.85 (rand-nth b/blends-list) nil)    ; ch1 blend
+        bl2 (r/randval 0.85 (rand-nth b/blends-list) nil) ; ch2 blend
+        bl3 (r/randval 0.85 (rand-nth b/blends-list) nil)] ; ch3 blend
     {:switch? (r/brand 0.5)
      :in1-cs cs1
      :in2-cs cs2

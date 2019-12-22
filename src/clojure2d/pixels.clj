@@ -341,8 +341,8 @@
                                     (loop [idx start]
                                       (when (< idx end)
                                         (pr/set-color! target idx (f (pr/get-color p idx)))
-                                        (recur (unchecked-inc idx)))))))
-                    parts)]
+                                        (recur (unchecked-inc idx))))))
+                         parts))]
     (run! deref ftrs)
     target))
 
@@ -359,8 +359,8 @@
                                       (when (< x end)
                                         (dotimes [y (.h p)]
                                           (pr/set-color! target x y (f p x y)))
-                                        (recur (unchecked-inc x)))))))
-                    parts)]
+                                        (recur (unchecked-inc x))))))
+                         parts))]
     (run! deref ftrs)
     target))
 
@@ -826,8 +826,7 @@
   pr/PixelsProto
   (to-pixels [r] (pr/to-pixels r {}))
   (to-pixels [r {:keys [logarithmic? gradient]
-                 :or {logarithmic? false gradient (c/gradient-presets :glitterboy)}}]
-    
+                 :or {logarithmic? false gradient (c/gradient (c/palette :glitterboy))}}]
     (let [size (* w h)
           arr (int-array (* 4 size))
           conf (clojure2d.java.GradientDensity$Config. buff (boolean logarithmic?) ^clojure.lang.IFn gradient)

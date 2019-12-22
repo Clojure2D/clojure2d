@@ -13,7 +13,7 @@
 
   Color can be represented by following types:
   
-  * fastmath `Vec4` - this is core type representing 3 color channels and alpha (RGBA). Values are `double` type from `[0-255]` range. [[color]], [[gray]] creators returns `Vec4` representation. To ensure `Vec4` use [[to-color]] function.
+  * fastmath `Vec4` - this is core type representing 3 color channels and alpha (RGBA). Values are `double` type from `[0-255]` range. [[color]], [[gray]] creators returns `Vec4` representation.
   * fastmath `Vec3` - 3 channels (RGB), assuming `alpha` set to value of `255`.
   * fastmath `Vec2` - gray with alpha
   * `java.awt.Color` - Java AWT representation. Creators are [[awt-color]], [[awt-gray]]. Use [[to-awt-color]] to convert to this representation.
@@ -21,13 +21,12 @@
   * `Integer` - packed ARGB value. If value is less than `0xff000000`, alpha is set to `0xff`. Example: `0xffaa01`.
   * `String` - CSS (`#rgb` or `#rgba`) or string containg hexadecimal representation (\"ffaa01\")
   * any `seqable` - list, vector containing 2-4 elements. Conversion is done by applying content to [[color]] function.
-  * `nil` - returning `nil` during color conversion.
 
   To create color from individual channel values use [[color]] function. To create gray for given intensity call [[gray]].
 
   By default color is treated as `RGB` with values from ranges `[0.0-255.0]` inclusive.
 
-  All funtions internally convert any color representation to `Vec4` type.
+  All funtions internally convert any color representation to `Vec4` type using [[to-color]] function..
   
   [Coloured list of all names](../static/colors.html)
   
@@ -82,29 +81,25 @@
 
   There are plenty of them predefined or can be generated:
 
-  * [[colourlovers-palettes]] contains 500 top palettes in vector from [colourlovers](http://www.colourlovers.com/) website.
-  * [[palette-presets]] contains 256 Brewer, categorical, veridis, tableau, microsoft palettes as map. See [[palette-presets-list]] for names.
+  * [[palette]] to access palette by keyword (from presets), by number (from colourlovers). Use [[palette]] to resample palette or convert gradient to palette.
   * [[paletton-palette]] function to generate palette of type: `:monochromatic`, `:triad`, `:tetrad` with complementary color for given hue and configuration. See also [Paletton](http://paletton.com) website for details.
 
-  Use [[palette]] to access palette by keyword (from presets), by number (from colourlovers). Use [[palette]] to resample palette or convert gradient to palette.
+  Call [[palette]] without any parameters to get list of predefined gradients.
   
   ### Gradient
 
-  Gradient is continuous functions which accepts value from `[0-1]` range and returns color. Call [[gradient]], [[gradient-easing]] or [[iq-gradient]] to create one.
+  Gradient is continuous functions which accepts value from `[0-1]` range and returns color. Call [[gradient]] to create one.
 
-  Predefined gradients are collected in [[gradient-presets]] map. You can find them `cubehelix` based and generated from [Inigo Quilez](http://iquilezles.org/www/articles/palettes/palettes.htm) settings.
-
+  Call [[gradient]] without any parameters to obtain list of predefined gradients.
+  
   Use [[gradient]] to convert any palette to gradient or access predefined gradients by keyword.
   
   ### Conversions
 
   To convert palette to gradient call [[gradient]] function. You can set interpolation method and colorspace.
-
   To convert gradient to palette call [[palette]] function.
 
   Call [[palette]] to resample palette to other number of colors. Internally input palette is converted to gradient and sampled back.
-
-  To make gradient from two colors you can use also [[gradient-easing]] where you interpolate between to colors using one of the easings functions from `fastmath`.
 
   Use [[lerp]], [[lerp+]], [[mix]], [[average]] to mix two colors in different ways.
   
@@ -181,6 +176,11 @@
   (delay (into {} (map (fn [[k v]]
                          [k (pr/to-color v)]) (read-gz-edn "color_presets.edn.gz")))))
 
+(defn named-colors-list
+  "Return list of the named colors."
+  {:metadoc/categories #{:pal}}
+  [] (keys @color-presets-delay))
+
 ;; ## Clamping functions
 
 ;; First define some clamping functions
@@ -213,6 +213,7 @@
   Check is done by analyzing type of the argument.
   
   See also [[valid-color?]]."
+  {:metadoc/categories #{:pal}}
   [c]
   (or (string? c)
       (not (seqable? c))
@@ -224,6 +225,7 @@
   "Check if given argument can be considered as palette.
 
   Check is done by analyzing type of the argument."
+  {:metadoc/categories #{:pal}}
   [c]
   (and (seqable? c)
        (not (possible-color? c))
@@ -237,7 +239,7 @@
   Returns color when valid.
 
   See also [[possible-color?]]"
-  {:metadoc/categories meta-ops}
+  {:metadoc/categories #{:pal}}
   [c]
   (try
     (pr/to-color c)
@@ -612,6 +614,7 @@
 
 (defn pack
   "Pack color to ARGB 32bit integer."
+  {:metadoc/categories meta-ops}
   ^long [c]
   (unchecked-long (bit-or (<< (lclamp255 (pr/alpha c)) 24)
                           (<< (lclamp255 (pr/red c)) 16)
@@ -2241,6 +2244,7 @@
   * j (around): -20.0 - 14.0 + some extreme values
 
   Note that for some cases (like `(to-OSA [18 7 4])`) function returns some extreme values."
+  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [xyz (to-XYZ c)
         X (.x xyz)
@@ -2279,6 +2283,7 @@
   "RGB -> OSA-UCS
 
   For ranges, see [[to-OSA]]."
+  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 col (pr/to-color c)
         L (.x col)
@@ -2360,6 +2365,7 @@
   "OSA-UCS -> RGB, normalized
 
   Note that due to some extreme outliers, normalization is triple cubic root for `g` and `j`."
+  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [c (to-OSA c)]
     (Vec4. (m/mnorm (.x c) -13.507581921540849 7.1379048733958435 0.0 255.0)
@@ -2371,6 +2377,7 @@
   "OSA-UCS -> RGB, normalized
 
   Note that due to some extreme outliers, normalization is triple cubic power for `g` and `j`."
+  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-OSA (Vec4. (m/mnorm (.x c) 0.0 255.0 -13.507581921540849 7.1379048733958435)
@@ -2442,39 +2449,74 @@
 * key - name as keyword
 * value - vector with functions containing to-XXX* and from-XXX* converters."
        :metadoc/categories meta-conv}
-  colorspaces* {:CMY*   [to-CMY* from-CMY*]
-                :OHTA*  [to-OHTA* from-OHTA*]
-                :XYZ*   [to-XYZ* from-XYZ*]
-                :Yxy*   [to-Yxy* from-Yxy*]
-                :LMS*   [to-LMS* from-LMS*]
-                :IPT*   [to-IPT* from-IPT*]
-                :LUV*   [to-LUV* from-LUV*]
-                :LAB*   [to-LAB* from-LAB*]
-                :JAB*   [to-JAB* from-JAB*]
-                :HunterLAB*  [to-HunterLAB* from-HunterLAB*]
-                :LCH*   [to-LCH* from-LCH*]
-                :JCH*   [to-JCH* from-JCH*]
-                :HCL*   [to-HCL* from-HCL*]
-                :HSB*   [to-HSB* from-HSB*]
-                :HSI*   [to-HSI* from-HSI*]
-                :HSL*   [to-HSL* from-HSL*]
-                :HSV*   [to-HSV* from-HSV*]
-                :HWB*   [to-HWB* from-HWB*]
-                :GLHS*  [to-GLHS* from-GLHS*]
-                :YPbPr* [to-YPbPr* from-YPbPr*]
-                :YDbDr* [to-YDbDr* from-YDbDr*]
-                :YCbCr* [to-YCbCr* from-YCbCr*]
-                :YCgCo* [to-YCgCo* from-YCgCo*]
-                :YUV*   [to-YUV* from-YUV*]
-                :YIQ*   [to-YIQ* from-YIQ*]
-                :Gray*  [to-Gray from-Gray]
-                :sRGB*  [to-sRGB* from-sRGB*]
-                :Cubehelix* [to-Cubehelix* from-Cubehelix*]
-                :OSA* [to-OSA* from-OSA*]
-                :RGB*   [to-color to-color]})
+  colorspaces* {:CMY   [to-CMY* from-CMY*]
+                :OHTA  [to-OHTA* from-OHTA*]
+                :XYZ   [to-XYZ* from-XYZ*]
+                :Yxy   [to-Yxy* from-Yxy*]
+                :LMS   [to-LMS* from-LMS*]
+                :IPT   [to-IPT* from-IPT*]
+                :LUV   [to-LUV* from-LUV*]
+                :LAB   [to-LAB* from-LAB*]
+                :JAB   [to-JAB* from-JAB*]
+                :HunterLAB  [to-HunterLAB* from-HunterLAB*]
+                :LCH   [to-LCH* from-LCH*]
+                :JCH   [to-JCH* from-JCH*]
+                :HCL   [to-HCL* from-HCL*]
+                :HSB   [to-HSB* from-HSB*]
+                :HSI   [to-HSI* from-HSI*]
+                :HSL   [to-HSL* from-HSL*]
+                :HSV   [to-HSV* from-HSV*]
+                :HWB   [to-HWB* from-HWB*]
+                :GLHS  [to-GLHS* from-GLHS*]
+                :YPbPr [to-YPbPr* from-YPbPr*]
+                :YDbDr [to-YDbDr* from-YDbDr*]
+                :YCbCr [to-YCbCr* from-YCbCr*]
+                :YCgCo [to-YCgCo* from-YCgCo*]
+                :YUV   [to-YUV* from-YUV*]
+                :YIQ   [to-YIQ* from-YIQ*]
+                :Gray  [to-Gray from-Gray]
+                :sRGB  [to-sRGB* from-sRGB*]
+                :Cubehelix [to-Cubehelix* from-Cubehelix*]
+                :OSA [to-OSA* from-OSA*]
+                :RGB   [to-color to-color]})
 
 ;; List of color spaces names
 (def ^{:doc "List of all color space names." :metadoc/categories meta-conv} colorspaces-list (sort (keys colorspaces)))
+
+(defn set-channel
+  "Set chosen channel with given value. Works with any color space."
+  {:metadoc/categories meta-ops}
+  (^Vec4 [col colorspace ^long channel ^double val]
+   (let [[to from] (colorspaces colorspace)
+         ^Vec4 c (to col)]
+     (clamp (from (case channel
+                    0 (Vec4. val (.y c) (.z c) (.w c))
+                    1 (Vec4. (.x c) val (.z c) (.w c))
+                    2 (Vec4. (.x c) (.y c) val (.w c))
+                    3 (Vec4. (.x c) (.y c) (.z c) val)
+                    c)))))
+  (^Vec4 [col ^long channel ^double val]
+   (let [^Vec4 c (pr/to-color col)]
+     (clamp (case channel
+              0 (Vec4. val (.y c) (.z c) (.w c))
+              1 (Vec4. (.x c) val (.z c) (.w c))
+              2 (Vec4. (.x c) (.y c) val (.w c))
+              3 (Vec4. (.x c) (.y c) (.z c) val)
+              c)))))
+
+(defn get-channel
+  "Get chosen channel. Works with any color space."
+  {:metadoc/categories meta-ops}
+  (^double [col colorspace ^long channel]
+   (let [to (first (colorspaces colorspace))]
+     (get-channel (to col) channel)))
+  (^double [col ^long channel]
+   (case channel
+     0 (ch0 col)
+     1 (ch1 col)
+     2 (ch2 col)
+     3 (alpha col)
+     ##NaN)))
 
 (defn color-converter
   "Create function which converts provided color from `cs` color space using `ch-scale` as maximum value. (to simulate Processing `colorMode` fn).
@@ -2567,8 +2609,8 @@
   Using improved interpolation functions.
 
   Possible temperature names: `:candle`, `:sunrise`, `:sunset`, `:lightbulb`, `:morning`, `:moonlight`, `:midday`, `:cloudy-sky`, `:blue-sky`, `:warm`, `:cool`, `:white`, `:sunlight`"
+  {:metadoc/categories #{:pal}}
   ^Vec4 [t]
-  {:metadoc/categories meta-conv}
   (let [k (* 0.0001 (temperature-name-to-K t))
         lnk (m/ln k)]
     (Vec4. (kelvin-red k lnk)
@@ -2982,7 +3024,7 @@
             currdist Double/MAX_VALUE]
        (if (< i s)
          (let [c1 (nth pal i)
-               dist (m/abs (^double  (dist-fn c c1)))]
+               dist (m/abs (dist-fn c c1))]
            (recur (unchecked-inc i)
                   (if (< dist currdist) c1 currc)
                   (if (< dist currdist) dist currdist)))
@@ -3004,14 +3046,12 @@
 
   See also [[lerp+]] [[gradient]] and [[mix]]"
   {:metadoc/categories #{:interp}}
-  ([c1 c2 ^double t colorspace]
+  ([c1 c2  colorspace ^double t]
    (let [[to from] (colorspaces colorspace)]
      (from (lerp (to c1) (to c2) t))))
   ([c1 c2] (lerp c1 c2 0.5))
   ([c1 c2 ^double t]
    (v/interpolate (pr/to-color c1) (pr/to-color c2) t)))
-
-(declare set-channel)
 
 (defn lerp+
   "Linear interpolation of two colors conserving luma of the first color.
@@ -3021,7 +3061,7 @@
   ([c1 c2] (lerp+ c1 c2 0.25))
   ([c1 c2 ^double amount]
    (let [res (lerp c1 c2 amount)]
-     (set-channel :LAB res 0 (ch0 (to-LAB c1))))))
+     (set-channel res :LAB 0 (ch0 (to-LAB c1))))))
 
 (defn- mix-interpolator
   ^double [^double a ^double b ^double t]
@@ -3033,7 +3073,7 @@
 
   chroma.js way"
   {:metadoc/categories #{:interp}}
-  (^Vec4 [c1 c2 ^double t colorspace]
+  (^Vec4 [c1 c2 colorspace ^double t]
    (let [[to from] (colorspaces colorspace)]
      (from (mix (to c1) (to c2) t))))
   (^Vec4 [c1 c2] (mix c1 c2 0.5))
@@ -3046,12 +3086,14 @@
             (m/mlerp (.w c1) (.w c2) t)))))
 
 (declare gradient)
-;;;;;;;;;;;;; REFACTOR
+
 (defn tinter
   "Creates fn to tint color using other color(s).
 
-  Tinter can be color or palette."
-  ([tint-colors & gradient-params]
+  Tinter can be color, palette or gradient."
+  {:metadoc/categories #{:pal}}
+  ([tint-colors] (tinter tint-colors {}))
+  ([tint-colors gradient-params]
    (if (possible-color? tint-colors)
      (let [tint (v/add (pr/to-color tint-colors) (Vec4. 1.0 1.0 1.0 1.0))]
        (fn [c]
@@ -3059,13 +3101,13 @@
            (v/div (v/econstrain (v/emult c tint) 0.0 65535.0) 256.0))))
      (let [g (if (fn? tint-colors)
                tint-colors
-               (apply gradient (conj (vec gradient-params) tint-colors)))]
+               (gradient tint-colors gradient-params))]
        (fn [c]
          (let [^Vec4 c (v/div (pr/to-color c) 255.0)]
            (Vec4. (pr/red (g (.x c)))
                   (pr/green (g (.y c)))
                   (pr/blue (g (.z c)))
-                  (pr/alpha (g (.w c))))))))))
+                  (.w c))))))))
 
 ;; color reduction using x-means
 
@@ -3073,8 +3115,9 @@
   "Reduce colors using x-means clustering in given `colorspace` (default `:RGB`).
 
   Use for long sequences (for example to generate palette from image)."
-  ([xs number-of-colors] (reduce-colors :RGB xs number-of-colors))
-  ([colorspace xs number-of-colors]
+  {:metadoc/categories #{:pal}}
+  ([xs number-of-colors] (reduce-colors xs number-of-colors :RGB))
+  ([xs number-of-colors colorspace]
    (let [[to from] (colorspaces* colorspace)]     
      (sort-by luma ;; sort by brightness
               (for [{:keys [data]} (-> (map to xs) ;; convert to given colorspace
@@ -3120,7 +3163,7 @@
 (defn modulate
   "Modulate (multiply) chosen channel by given amount. Works with any color space."
   {:metadoc/categories meta-ops}
-  (^Vec4 [colorspace col ^long channel ^double amount]
+  (^Vec4 [col colorspace ^long channel ^double amount]
    (let [[to from] (colorspaces colorspace)
          ^Vec4 c (to col)]
      (clamp (from (case channel
@@ -3137,41 +3180,6 @@
               2 (Vec4. (.x c) (.y c) (* amount (.z c)) (.w c))
               3 (Vec4. (.x c) (.y c) (.z c) (* amount (.w c)))
               c)))))
-
-(defn set-channel
-  "Set chosen channel with given value. Works with any color space."
-  {:metadoc/categories meta-ops}
-  (^Vec4 [colorspace col ^long channel ^double val]
-   (let [[to from] (colorspaces colorspace)
-         ^Vec4 c (to col)]
-     (clamp (from (case channel
-                    0 (Vec4. val (.y c) (.z c) (.w c))
-                    1 (Vec4. (.x c) val (.z c) (.w c))
-                    2 (Vec4. (.x c) (.y c) val (.w c))
-                    3 (Vec4. (.x c) (.y c) (.z c) val)
-                    c)))))
-  (^Vec4 [col ^long channel ^double val]
-   (let [^Vec4 c (pr/to-color col)]
-     (clamp (case channel
-              0 (Vec4. val (.y c) (.z c) (.w c))
-              1 (Vec4. (.x c) val (.z c) (.w c))
-              2 (Vec4. (.x c) (.y c) val (.w c))
-              3 (Vec4. (.x c) (.y c) (.z c) val)
-              c)))))
-
-(defn get-channel
-  "Get chosen channel. Works with any color space."
-  {:metadoc/categories meta-ops}
-  (^double [colorspace col ^long channel]
-   (let [to (first (colorspaces colorspace))]
-     (get-channel (to col) channel)))
-  (^double [col ^long channel]
-   (case channel
-     0 (ch0 col)
-     1 (ch1 col)
-     2 (ch2 col)
-     3 (alpha col)
-     ##NaN)))
 
 (defn adjust-temperature
   "Adjust temperature of color, palette or gradient.
@@ -3191,79 +3199,68 @@
 
 ;;
 
-(declare gradient-presets)
+(declare gradient-presets-delay)
 
 (defn gradient
-  "Create gradient function from palette (list of colors).
-
+  "Return gradient function.
+  
   Grandient function accepts value from 0 to 1 and returns interpolated color.
 
-  Optionally interpolate in given `colorspace` and 1d [interpolator](https://generateme.github.io/fastmath/fastmath.interpolation.html#var-interpolators-1d-list) as keyword or function (by default using `:RGB` and `:linear`).
+  Parameters;
 
-  To make irregular spacings between colors, provide own `domain`."
+  * `palette-or-gradient-name` - name of the [predefined gradient](../static/gradients.html) or palette (seq of colors).
+  * (optional) additional parameters map:
+      * `:colorspace` - operate in given color space. Default: `:RGB`.
+      * `:interpolation` - interpolation name or interpolation function. Interpolation can be one of [[interpolators-1d-list]] or [[easings-list]]. When easings is used, only first two colors are interpolated. Default: `:linear-smile`.
+      * `:to?` - turn on/off conversion to given color space. Default: `true`.
+      * `:from?` - turn on/off conversion from given color space. Default: `true`.
+      * `:domain` - interpolation domain as seq of values for each color."
   {:metadoc/categories #{:gr}}
-  ([] (gradient [:black :white]))
-  ([palette-or-gradient-name]
-   (if (keyword? palette-or-gradient-name)
-     (gradient-presets palette-or-gradient-name)
-     (gradient :RGB :linear-smile nil palette-or-gradient-name)))
-  ([colorspace palette] (gradient colorspace :linear-smile nil palette))
-  ([colorspace interpolator palette] (gradient colorspace interpolator nil palette))
-  ([colorspace interpolator domain palette]
-   (let [[to from] (colorspaces colorspace)
-         cpalette (->> palette
-                       (map pr/to-color)
-                       (map to))
-         r (or domain
-               (map (fn [^long v] (m/mnorm v 0.0 (dec (count palette)) 0.0 1.0)) (range (count palette))))
-         c0 (map pr/red cpalette)
-         c1 (map pr/green cpalette)
-         c2 (map pr/blue cpalette)
-         c3 (map pr/alpha cpalette)
-         ifn (if (keyword? interpolator) (i/interpolators-1d-list interpolator) interpolator)
-         i0 (ifn r c0)
-         i1 (ifn r c1)
-         i2 (ifn r c2)
-         i3 (ifn r c3)] 
-     (fn ^Vec4 [^double t]
-       (let [ct (m/constrain t 0.0 1.0)]
-         (v/fmap (from (v/vec4 (i0 ct)
-                               (i1 ct)
-                               (i2 ct)
-                               (i3 ct))) clamp255))))))
+  ([] (keys @gradient-presets-delay))
+  ([palette-or-gradient-name] (gradient palette-or-gradient-name {}))
+  ([palette-or-gradient-name {:keys [colorspace interpolation domain to? from?]
+                              :or {colorspace :RGB
+                                   to? true from? true
+                                   interpolation :linear-smile}}]
+   (cond (keyword? palette-or-gradient-name) (@gradient-presets-delay palette-or-gradient-name) ;; get from presets
+         (and (= interpolation :iq) ;; get from iq
+              (seq? palette-or-gradient-name)) (apply iq-gradient palette-or-gradient-name)
+         :else (let [[to from] (colorspaces colorspace)
+                     to (if to? to identity)
+                     from (if from? from identity)
+                     cpalette (map (comp to pr/to-color) palette-or-gradient-name)]
+                 (if (and (keyword? interpolation)
+                          (contains? e/easings-list interpolation))
 
-(defn gradient-easing
-  "Create gradient between two colors.
+                   ;; easings
+                   (let [c1 (first cpalette)
+                         c2 (second cpalette)
+                         easing (e/easings-list interpolation)]
+                     (fn ^Vec4 [^double t]
+                       (v/fmap (from (v/interpolate c1 c2 (easing t))) clamp255)))
 
-  Input colors should be in expected color space (default: `RGB`).
-
-  You can use easing function or name (keyword) to make interpolation non-linear (default: linear)."
-  {:metadoc/categories #{:gr}}
-  ([cs easing col1 col2]
-   (let [easing (if (keyword? easing) (get e/easings-list easing e/linear) easing)
-         [_ from] (colorspaces cs)
-         col1 (pr/to-color col1)
-         col2 (pr/to-color col2)]
-     (fn [^double t]
-       (v/fmap (from (v/interpolate col1 col2 (easing t))) clamp255))))
-  ([cs col1 col2]
-   (gradient-easing cs e/linear col1 col2))
-  ([col1 col2]
-   (gradient-easing :RGB e/linear col1 col2)))
+                   ;; interpolation
+                   (let [r (or domain 
+                               (map (fn [^long v] (m/mnorm v 0.0 (dec (count cpalette)) 0.0 1.0)) (range (count cpalette))))
+                         c0 (map pr/red cpalette)
+                         c1 (map pr/green cpalette)
+                         c2 (map pr/blue cpalette)
+                         c3 (map pr/alpha cpalette)
+                         ifn (if (keyword? interpolation) (i/interpolators-1d-list interpolation) interpolation)
+                         i0 (ifn r c0)
+                         i1 (ifn r c1)
+                         i2 (ifn r c2)
+                         i3 (ifn r c3)] 
+                     (fn ^Vec4 [^double t]
+                       (let [ct (m/constrain t 0.0 1.0)]
+                         (v/fmap (from (v/vec4 (i0 ct)
+                                               (i1 ct)
+                                               (i2 ct)
+                                               (i3 ct))) clamp255)))))))))
 
 (def ^{:metadoc/categories #{:gr}
        :doc "Cubehelix gradient generator from two colors."}
-  gradient-cubehelix (partial gradient-easing :Cubehelix))
-
-(defn resample
-  "Resample palette.
-
-  Internally it's done by creating gradient and sampling back to colors. You can pass [[gradient]] parameters like colorspace, interpolator name and domain."
-  {:metadoc/categories #{:pal}}
-  [number-of-colors palette & gradient-params]
-  (m/sample (apply gradient (conj (vec gradient-params) palette)) number-of-colors))
-
-(declare palette-presets)
+  gradient-cubehelix #(gradient % {:colorspace :Cubehelix :to? false :interpolation :linear}))
 
 (defn palette
   "Get palette.
@@ -3271,39 +3268,49 @@
   If argument is a keyword, returns one from [[palette-presets]].
   If argument is a number, returns one from [[colourlovers-palettes]].
   If argument is a gradient, returns 5 or `number-of-colors` samples.
+
+  If called without argument, list of presets is returned.
   
   Optionally you can pass number of requested colors and other parameters as in [[resample]]"
   {:metadoc/categories #{:pal}}
+  ([] (keys @palette-presets-delay))
   ([p]
    (cond
      (keyword? p) (@palette-presets-delay p)
      (integer? p) (@colourlovers-palettes-delay p)
      (fn? p) (palette p 5)
      :else p))
-  ([p number-of-colors & gradient-params]
+  ([p number-of-colors] (palette p number-of-colors {}))
+  ([p number-of-colors gradient-params]
    (if (fn? p)
      (m/sample p number-of-colors)
-     (apply resample number-of-colors (palette p) gradient-params))))
+     (m/sample (gradient (palette p) gradient-params) number-of-colors))))
+
+(defn resample
+  "Resample palette.
+
+  Internally it's done by creating gradient and sampling back to colors. You can pass [[gradient]] parameters like colorspace, interpolator name and domain."
+  {:metadoc/categories #{:pal}}
+  ([pal number-of-colors] (resample pal number-of-colors {}))
+  ([pal number-of-colors gradient-params] (palette pal number-of-colors gradient-params)))
 
 (defn correct-luma
   "Create palette or gradient with corrected luma to be linear.
 
   See [here](https://www.vis4.net/blog/2013/09/mastering-multi-hued-color-scales/#combining-bezier-interpolation-and-lightness-correction)"
   {:metadoc/categories #{:pal :gr}}
-  [palette-or-gradient & gradient-params]
-  (if (fn? palette-or-gradient) ;; gradient
-    (let [g palette-or-gradient
-          l0 (ch0 (to-LAB (g 0.0)))
-          l1 (ch0 (to-LAB (g 1.0)))
-          xs (range 0.0 1.005 0.005)
-          ls (map (fn [^double v] (ch0 (to-LAB (g v)))) xs)
-          i (i/linear-smile ls xs)]
-      (fn [^double t]
-        (let [l (m/lerp l0 l1 t)]
-          (g (i l)))))
-    (let [n (count palette-or-gradient)
-          g (correct-luma (apply gradient (conj (vec gradient-params) palette-or-gradient)))]
-      (palette g n))))
+  ([palette-or-gradient] (correct-luma palette-or-gradient {}))
+  ([palette-or-gradient gradient-params]
+   (if (fn? palette-or-gradient) ;; gradient
+     (let [l0 (ch0 (to-LAB (palette-or-gradient 0.0)))
+           l1 (ch0 (to-LAB (palette-or-gradient 1.0)))
+           xs (range 0.0 1.005 0.005)
+           ls (map (fn [^double v] (ch0 (to-LAB (palette-or-gradient v)))) xs)
+           i (i/linear-smile ls xs)]
+       (fn ^Vec4 [^double t] (palette-or-gradient (i (m/lerp l0 l1 t)))))
+     (let [n (count palette-or-gradient)
+           g (correct-luma (gradient palette-or-gradient gradient-params))]
+       (palette g n)))))
 
 (defonce ^{:doc "Ready to use gradients containing Inigo Quilez, Cubehelix sets and other.
 
@@ -3313,80 +3320,77 @@ Same as calling [[gradient]] with keyword as parameter.
 
 [See all](../static/gradients.html)"
            :metadoc/categories #{:gr}}
-  gradient-presets
-  (merge
-   (into {} (for [[k v] (-> "mathematica.edn.gz"
-                            (resource)
-                            (input-stream)
-                            (java.util.zip.GZIPInputStream.)
-                            (slurp)
-                            (read-string))]
-              [k (gradient v)])) ;; linear scale
-   (into {} (for [[k v] {:rainbow1              [[0.5 0.5 0.5] [0.5 0.5 0.5] [1.0 1.0 1.0] [0 0.3333 0.6666]]
-                         :rainbow2              [[0.5 0.5 0.5] [0.666 0.666 0.666] [1.0 1.0 1.0] [0 0.3333 0.6666]]
-                         :rainbow3              [[0.5 0.5 0.5] [0.75 0.75 0.75] [1.0 1.0 1.0] [0 0.3333 0.6666]]
-                         :rainbow4              [[0.5 0.5 0.5] [1 1 1] [1.0 1.0 1.0] [0 0.3333 0.6666]]
-                         :yellow-magenta-cyan   [[1 0.5 0.5] [0.5 0.5 0.5] [0.75 1.0 0.6666] [0.8 1.0 0.3333]]
-                         :orange-blue           [[0.5 0.5 0.5] [0.5 0.5 0.5] [0.8 0.8 0.5] [0 0.2 0.5]]
-                         :green-magenta         [[0.6666 0.5 0.5] [0.5 0.6666 0.5] [0.6666 0.666 0.5] [0.2 0.0 0.5]]
-                         :green-red             [[0.5 0.5 0] [0.5 0.5 0] [0.5 0.5 0] [0.5 0.0 0]]
-                         :green-cyan            [[0.0 0.5 0.5] [0 0.5 0.5] [0.0 0.3333 0.5] [0.0 0.6666 0.5]]
-                         :yellow-red            [[0.5 0.5 0] [0.5 0.5 0] [0.1 0.5 0] [0.0 0.0 0]]
-                         :blue-cyan             [[0.0 0.5 0.5] [0 0.5 0.5] [0.0 0.5 0.3333] [0.0 0.5 0.6666]]
-                         :red-blue              [[0.5 0 0.5] [0.5 0 0.5] [0.5 0 0.5] [0 0 0.5]]
-                         :yellow-green-blue     [[0.650 0.5 0.310] [-0.650 0.5 0.6] [0.333 0.278 0.278] [0.660 0.0 0.667]]
-                         :blue-white-red        [[0.660 0.56 0.680] [0.718 0.438 0.720] [0.520 0.8 0.520] [-0.430 -0.397 -0.083]]
-                         :cyan-magenta          [[0.610 0.498 0.650] [0.388 0.498 0.350] [0.530 0.498 0.620] [3.438 3.012 4.025]]
-                         :yellow-purple-magenta [[0.731 1.098 0.192] [0.358 1.090 0.657] [1.077 0.360 0.328] [0.965 2.265 0.837]]
-                         :green-blue-orange     [[0.892 0.725 0.000] [0.878 0.278 0.725] [0.332 0.518 0.545] [2.440 5.043 0.732]]
-                         :orange-magenta-blue   [[0.821 0.328 0.242] [0.659 0.481 0.896] [0.612 0.340 0.296] [2.820 3.026 -0.273]]
-                         :blue-magenta-orange   [[0.938 0.328 0.718] [0.659 0.438 0.328] [0.388 0.388 0.296] [2.538 2.478 0.168]]
-                         :magenta-green         [[0.590 0.811 0.120] [0.410 0.392 0.590] [0.940 0.548 0.278] [-4.242 -6.611 -4.045]]}]
-              [k (apply iq-gradient v)])) ;; thi.ng presets
-   {:iq-1 (iq-gradient (Vec3. 0.5 0.5 0.5)
-                       (Vec3. 0.5 0.5 0.5)
-                       (Vec3. 1.0 1.0 1.0)
-                       (Vec3. 0.0 0.33 0.67))
-    :iq-2 (iq-gradient (Vec3. 0.5 0.5 0.5)
-                       (Vec3. 0.5 0.5 0.5)
-                       (Vec3. 1.0 1.0 1.0)
-                       (Vec3. 0.0 0.1 0.2))
-    :iq-3 (iq-gradient (Vec3. 0.5 0.5 0.5)
-                       (Vec3. 0.5 0.5 0.5)
-                       (Vec3. 1.0 1.0 1.0)
-                       (Vec3. 0.3 0.2 0.2))
-    :iq-4 (iq-gradient (Vec3. 0.5 0.5 0.5)
-                       (Vec3. 0.5 0.5 0.5)
-                       (Vec3. 1.0 1.0 0.5)
-                       (Vec3. 0.8 0.9 0.3))
-    :iq-5 (iq-gradient (Vec3. 0.5 0.5 0.5)
-                       (Vec3. 0.5 0.5 0.5)
-                       (Vec3. 1.0 0.7 0.4)
-                       (Vec3. 0.0 0.15 0.2))
-    :iq-6 (iq-gradient (Vec3. 0.5 0.5 0.5)
-                       (Vec3. 0.5 0.5 0.5)
-                       (Vec3. 2.0 1.0 0.0)
-                       (Vec3. 0.5 0.2 0.25))
-    :iq-7 (iq-gradient (Vec3. 0.8 0.5 0.4)
-                       (Vec3. 0.2 0.4 0.2)
-                       (Vec3. 2.0 1.0 1.0)
-                       (Vec3. 0.0 0.25 0.25))
-    :cubehelix (gradient-cubehelix e/linear (Vec4. 300.0 0.5 0.0 255.0) (Vec4. -240 0.5 1.0 255.0))
-    :warm (gradient-cubehelix e/linear (Vec4. -100.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
-    :cool (gradient-cubehelix e/linear (Vec4. 260.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0))
-    :rainbow (fn [^double t] (let [ts (m/abs (- t 0.5))]
-                              (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
-                                                     (- 1.5 (* 1.5 ts))
-                                                     (- 0.8 (* 0.9 ts))
-                                                     255.0))))
-    :black-body (fn [^double t] (temperature (m/mlerp 1000 15000 t)))}))
-
-(def ^{:doc "Gradient presets names."
-       :metadoc/categories #{:gr}} gradient-presets-list (sort (keys gradient-presets)))
+  gradient-presets-delay
+  (delay (merge
+          (into {} (for [[k v] (-> "mathematica.edn.gz"
+                                   (resource)
+                                   (input-stream)
+                                   (java.util.zip.GZIPInputStream.)
+                                   (slurp)
+                                   (read-string))]
+                     [k (gradient v)])) ;; linear scale
+          (into {} (for [[k v] {:rainbow1              [[0.5 0.5 0.5] [0.5 0.5 0.5] [1.0 1.0 1.0] [0 0.3333 0.6666]]
+                                :rainbow2              [[0.5 0.5 0.5] [0.666 0.666 0.666] [1.0 1.0 1.0] [0 0.3333 0.6666]]
+                                :rainbow3              [[0.5 0.5 0.5] [0.75 0.75 0.75] [1.0 1.0 1.0] [0 0.3333 0.6666]]
+                                :rainbow4              [[0.5 0.5 0.5] [1 1 1] [1.0 1.0 1.0] [0 0.3333 0.6666]]
+                                :yellow-magenta-cyan   [[1 0.5 0.5] [0.5 0.5 0.5] [0.75 1.0 0.6666] [0.8 1.0 0.3333]]
+                                :orange-blue           [[0.5 0.5 0.5] [0.5 0.5 0.5] [0.8 0.8 0.5] [0 0.2 0.5]]
+                                :green-magenta         [[0.6666 0.5 0.5] [0.5 0.6666 0.5] [0.6666 0.666 0.5] [0.2 0.0 0.5]]
+                                :green-red             [[0.5 0.5 0] [0.5 0.5 0] [0.5 0.5 0] [0.5 0.0 0]]
+                                :green-cyan            [[0.0 0.5 0.5] [0 0.5 0.5] [0.0 0.3333 0.5] [0.0 0.6666 0.5]]
+                                :yellow-red            [[0.5 0.5 0] [0.5 0.5 0] [0.1 0.5 0] [0.0 0.0 0]]
+                                :blue-cyan             [[0.0 0.5 0.5] [0 0.5 0.5] [0.0 0.5 0.3333] [0.0 0.5 0.6666]]
+                                :red-blue              [[0.5 0 0.5] [0.5 0 0.5] [0.5 0 0.5] [0 0 0.5]]
+                                :yellow-green-blue     [[0.650 0.5 0.310] [-0.650 0.5 0.6] [0.333 0.278 0.278] [0.660 0.0 0.667]]
+                                :blue-white-red        [[0.660 0.56 0.680] [0.718 0.438 0.720] [0.520 0.8 0.520] [-0.430 -0.397 -0.083]]
+                                :cyan-magenta          [[0.610 0.498 0.650] [0.388 0.498 0.350] [0.530 0.498 0.620] [3.438 3.012 4.025]]
+                                :yellow-purple-magenta [[0.731 1.098 0.192] [0.358 1.090 0.657] [1.077 0.360 0.328] [0.965 2.265 0.837]]
+                                :green-blue-orange     [[0.892 0.725 0.000] [0.878 0.278 0.725] [0.332 0.518 0.545] [2.440 5.043 0.732]]
+                                :orange-magenta-blue   [[0.821 0.328 0.242] [0.659 0.481 0.896] [0.612 0.340 0.296] [2.820 3.026 -0.273]]
+                                :blue-magenta-orange   [[0.938 0.328 0.718] [0.659 0.438 0.328] [0.388 0.388 0.296] [2.538 2.478 0.168]]
+                                :magenta-green         [[0.590 0.811 0.120] [0.410 0.392 0.590] [0.940 0.548 0.278] [-4.242 -6.611 -4.045]]}]
+                     [k (apply iq-gradient v)])) ;; thi.ng presets
+          {:iq-1 (iq-gradient (Vec3. 0.5 0.5 0.5)
+                              (Vec3. 0.5 0.5 0.5)
+                              (Vec3. 1.0 1.0 1.0)
+                              (Vec3. 0.0 0.33 0.67))
+           :iq-2 (iq-gradient (Vec3. 0.5 0.5 0.5)
+                              (Vec3. 0.5 0.5 0.5)
+                              (Vec3. 1.0 1.0 1.0)
+                              (Vec3. 0.0 0.1 0.2))
+           :iq-3 (iq-gradient (Vec3. 0.5 0.5 0.5)
+                              (Vec3. 0.5 0.5 0.5)
+                              (Vec3. 1.0 1.0 1.0)
+                              (Vec3. 0.3 0.2 0.2))
+           :iq-4 (iq-gradient (Vec3. 0.5 0.5 0.5)
+                              (Vec3. 0.5 0.5 0.5)
+                              (Vec3. 1.0 1.0 0.5)
+                              (Vec3. 0.8 0.9 0.3))
+           :iq-5 (iq-gradient (Vec3. 0.5 0.5 0.5)
+                              (Vec3. 0.5 0.5 0.5)
+                              (Vec3. 1.0 0.7 0.4)
+                              (Vec3. 0.0 0.15 0.2))
+           :iq-6 (iq-gradient (Vec3. 0.5 0.5 0.5)
+                              (Vec3. 0.5 0.5 0.5)
+                              (Vec3. 2.0 1.0 0.0)
+                              (Vec3. 0.5 0.2 0.25))
+           :iq-7 (iq-gradient (Vec3. 0.8 0.5 0.4)
+                              (Vec3. 0.2 0.4 0.2)
+                              (Vec3. 2.0 1.0 1.0)
+                              (Vec3. 0.0 0.25 0.25))
+           :cubehelix (gradient-cubehelix [(Vec4. 300.0 0.5 0.0 255.0) (Vec4. -240 0.5 1.0 255.0)])
+           :warm (gradient-cubehelix [(Vec4. -100.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0)])
+           :cool (gradient-cubehelix [(Vec4. 260.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0)])
+           :rainbow (fn [^double t] (let [ts (m/abs (- t 0.5))]
+                                     (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
+                                                            (- 1.5 (* 1.5 ts))
+                                                            (- 0.8 (* 0.9 ts))
+                                                            255.0))))
+           :black-body (fn [^double t] (temperature (m/mlerp 1000 15000 t)))})))
 
 ;;;
 
-(defn iq-random-gradient
+(defn- iq-random-gradient
   "Create random iq gradient."
   {:metadoc/categories #{:gr}}
   []
@@ -3397,19 +3401,18 @@ Same as calling [[gradient]] with keyword as parameter.
          d (v/generate-vec3 r/drand)]
      (iq-gradient a b c d))
    (let [pal (paletton :monochromatic (r/irand 360) {:compl true :preset (rand-nth [:pastels :pastels-med :full :shiny :dark :pastels-mid-dark :dark-neon :darker])})]
-     (iq-gradient (first pal) (first (drop 5 pal))))))
+     (iq-gradient (second pal) (first (drop 5 pal))))))
 
 (defn random-palette
   "Generate random palette from all collections defined in clojure2d.color namespace."
-  {:metadoc/categories #{:pal}}
+  {:metadoc/categories #{:gr}}
   []
   (condp clojure.core/> (r/drand)
     0.1 (m/sample (iq-random-gradient) (r/irand 3 10))
-    0.6 (let [p (rand-nth (concat colourlovers-palettes
-                                  (vals palette-presets)))]
-          (if (> (count p) 15)
-            (resample 15 p) p))
-    0.7 (m/sample (rand-nth (vals gradient-presets)) (r/irand 3 10))
+    0.3 (rand-nth @colourlovers-palettes-delay)
+    0.6 (let [p (rand-nth (vals @palette-presets-delay))]
+          (if (> (count p) 15) (resample 15 p) p))
+    0.8 (m/sample (rand-nth (vals @gradient-presets-delay)) (r/irand 3 10))
     (let [h (r/drand 360)
           t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
           conf {:compl (r/brand 0.6)
@@ -3422,14 +3425,15 @@ Same as calling [[gradient]] with keyword as parameter.
   "Generate random gradient function."
   {:metadoc/categories #{:pal}}
   []
-  (condp clojure.core/> (r/drand)
-    0.2 (iq-random-gradient)
-    0.7 (let [pal (rand-nth (concat colourlovers-palettes
-                                    (vals palette-presets)))]
-          (gradient (r/randval :RGB (rand-nth colorspaces-list))
-                    (r/randval :linear :cubic-spline)
-                    pal))
-    (rand-nth (vals gradient-presets))))
+  (let [gpars {:colorspace (r/randval :RGB (rand-nth colorspaces-list))
+               :interpolation (r/randval :linear-smile :cubic-spline)}]
+    (condp clojure.core/> (r/drand)
+      0.1 (iq-random-gradient)
+      0.6 (gradient (r/randval (rand-nth (vals @palette-presets-delay))
+                               (rand-nth @colourlovers-palettes-delay)) gpars)
+      0.7 (gradient (rest (paletton :monochromatic (r/drand 360)
+                                    {:preset (rand-nth paletton-presets-list)})) gpars)
+      (rand-nth (vals @gradient-presets-delay)))))
 
 (defn random-color
   "Generate random color"

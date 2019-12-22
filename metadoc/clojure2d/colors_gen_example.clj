@@ -21,27 +21,27 @@
 (spit "docs/static/palettes.html"
       (p/html5
        (p/include-css "static.css")
-       (for [k (sort (keys palette-presets))]
+       (for [k (sort (palette))]
          [:pre.pal
-          [:div [:span.name (name k)] (palette-spans (palette-presets k))]])))
+          [:div [:span.name (name k)] (palette-spans (palette k))]])))
 
 (spit "docs/static/colourlovers.html"
       (p/html5
        (p/include-css "static.css")
-       (for [[i p] (map-indexed vector colourlovers-palettes)]
+       (for [i (range 500)]
          [:pre.pal
-          [:div [:span.name i] (palette-spans p)]])))
+          [:div [:span.name i] (palette-spans (palette i))]])))
 
 (spit "docs/static/gradients.html"
       (p/html5
        (p/include-css "static.css")
-       (for [k (sort (keys gradient-presets))]
+       (for [k (sort (gradient))]
          [:pre.grad
-          [:div [:span.name (name k)] (gradient-spans (gradient-presets k))]])))
+          [:div [:span.name (name k)] (gradient-spans (gradient k))]])))
 
 (spit "docs/static/colors.html"
       (p/html5
        (p/include-css "static.css")
-       (for [k named-colors-list]
+       (for [k (sort-by luma (named-colors-list))]
          [:pre.color
           [:div (color-spans k)]])))

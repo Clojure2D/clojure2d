@@ -17,12 +17,13 @@ All notable changes to this project will be documented in this file. This change
 
 * deps bumped
 * pixels mutating functions are now with `!`
-* `gradient` 
 * [breaking] all blending functions moved to separate namespace and reweritten from the scratch
+* [breaking] changed API for certain color functions. Especially for [[palette]] and [[gradient]]
 
 ### Removed
 
 * Signal processing - moved to fastmath
+* palette/gradient presets as vars (use [[palette]] or [[gradient]] to access them)
 
 ### Fixed
 

@@ -186,12 +186,12 @@
 (defn divide
   "Divide channel values (clamped)."
   ^double [^double a ^double b]
-  (clamp255 (/ a (max m/EPSILON b))))
+  (clamp255 (* 255.0 (/ a (max m/EPSILON b)))))
 
 (defn mdivide
   "Divide channel values (mod 255)."
   ^double [^double a ^double b]
-  (mod255 (/ a (max m/EPSILON b))))
+  (mod255 (* 255.0 (/ a (max m/EPSILON b)))))
 
 (defn or
   "Bitwise `or` of channel values."
@@ -382,8 +382,8 @@
          ^double br (blend-fn1 (.x cb) (.x cs))
          ^double bg (blend-fn2 (.y cb) (.y cs))
          ^double bb (blend-fn3 (.z cb) (.z cs))]
-     (if (and (>= 255.0 (.w cb))
-              (>= 255.0 (.w cs)))
+     (if (clojure.core/and (>= 255.0 (.w cb))
+                           (>= 255.0 (.w cs)))
        (Vec4. br bg bb 255.0)
        (let [ab (* r255 (.w cb))
              as (* r255 (.w cs))

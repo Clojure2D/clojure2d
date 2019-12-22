@@ -1,22 +1,10 @@
 (ns clojure2d.color-test
-  (:require [clojure2d.color :refer :all] 
+  (:require [clojure2d.color :refer :all]
+            [clojure2d.color.blend :as b]
             [fastmath.vector :as v]
             [fastmath.core :as m]
             [fastmath.random :as r]
             [clojure.test :refer :all]))
-
-;; mods
-
-(deftest clamp-test
-  (is (== 255 (lclamp255 254.6)))
-  (is (== 0 (lclamp255 -1)))
-  (is (== 22 (lclamp255 22.49)))
-  (is (== 23 (lclamp255 22.5)))
-  
-  (is (== 254.6 (clamp255 254.6)))
-  (is (== 0.0 (clamp255 -1)))
-  (is (== 22.49 (clamp255 22.49)))
-  (is (== 255.0 (clamp255 255.5))))
 
 ;; color protocol
 
@@ -54,35 +42,32 @@
   (is (= 60.0 (hue (color :beige)))))
 
 ;; test blends
-(def c50 (* rev255 50))
-(def c100 (* rev255 100))
-(def c200 (* rev255 200))
 
 (deftest blend-test
-  (is (== 1 (blend-none c100 1)))
-  (is (== 0 (blend-none c200 0)))
-  (is (== 1.0 (blend-none 0 1)))
-  (is (== 0.0 (blend-none 1 0)))
+  (is (== 255.0 (b/normal 100 255)))
+  (is (== 0.0 (b/normal 200 0)))
+  (is (== 255.0 (b/normal 0 255)))
+  (is (== 0.0 (b/normal 1 0)))
 
-  (is (== 1.0 (blend-add c100 c200)))
-  (is (== (* rev255 150) (blend-add c50 c100)))
-  (is (== 1.0 (blend-add 0 1)))
-  (is (== 1.0 (blend-add 1 0)))
+  (is (== 255.0 (b/add 100 200)))
+  (is (== 150.0 (b/add 50 100)))
+  (is (== 255.0 (b/add 0 255)))
+  (is (== 255.0 (b/add 255 0)))
 
-  (is (== (m/frac (+ c100 c200)) (blend-madd c100 c200)))
-  (is (== (* rev255 150) (blend-madd c50 c100)))
-  (is (== 0.0 (blend-madd 0 1)))
-  (is (== 0.0 (blend-madd 1 0)))
+  (is (== (mod 300 256.0) (b/madd 100 200)))
+  (is (== 150.0 (b/madd 50 100)))
+  (is (== 255.0 (b/madd 0 255)))
+  (is (== 255.0 (b/madd 255 0)))
 
-  (is (== 0.0 (blend-subtract c100 c200)))
-  (is (== c50 (blend-subtract c100 c50)))
-  (is (== 0.0 (blend-subtract 0 1)))
-  (is (== 1.0 (blend-subtract 1 0)))
+  (is (== 0.0 (b/subtract 100 200)))
+  (is (== 50 (b/subtract 100 50)))
+  (is (== 0.0 (b/subtract 0 255)))
+  (is (== 255.0 (b/subtract 255 0)))
 
-  (is (== (m/frac (- c100 c200)) (blend-msubtract c100 c200)))
-  (is (== c50 (blend-msubtract c100 c50)))
-  (is (== 0.0 (blend-msubtract 0 1)))
-  (is (== 0.0 (blend-msubtract 1 0))))
+  (is (== (mod -100 256.0) (b/msubtract 100 200)))
+  (is (== 50 (b/msubtract 100 50)))
+  (is (== 1.0 (b/msubtract 0 255)))
+  (is (== 255.0 (b/msubtract 255 0))))
 
 ;; test color converters
 
@@ -91,12 +76,12 @@
   [cs]
   (let [[to from] (colorspaces cs)
         [to* from*] (colorspaces* cs)
-        c (concat named-colors-list
+        c (concat (named-colors-list)
                   (repeatedly 30000 #(v/vec4 (v/generate-vec3 (fn [] (r/irand 256))) 255))
                   (repeatedly 30000 #(v/generate-vec3 (fn [] (r/irand 256))))
                   (repeatedly 30000 r/irand))]
-    (empty? (concat (filter false? (map = (map to-color c) (map (comp (fn [v] (v/applyf v #(m/round %))) from to) c)))
-                    (filter false? (map = (map to-color c) (map (comp (fn [v] (v/applyf v #(m/round %))) from* to*) c)))))))
+    (empty? (concat (filter false? (map = (map to-color c) (map (comp (fn [v] (v/fmap v #(m/round %))) from to) c)))
+                    (filter false? (map = (map to-color c) (map (comp (fn [v] (v/fmap v #(m/round %))) from* to*) c)))))))
 
 (deftest colorspace-test
   (is (colorspace-validity :RGB))
@@ -153,25 +138,25 @@
   (is "#dd0080" (format-hex (mix :red :blue 0.25)))
   (is "#8000dd" (format-hex (mix :red :blue 0.75)))
   (is "#800080" (format-hex (lerp :red :blue)))
-  (is "#00ff00" (format-hex (lerp :HSL :red :blue 0.5))) ;; different than chroma, shortest path
-  (is "#ca0088" (format-hex (lerp :LAB :red :blue 0.5))))
+  (is "#00ff00" (format-hex (lerp :red :blue :HSL 0.5))) ;; different than chroma, shortest path
+  (is "#ca0088" (format-hex (lerp :red :blue :LAB 0.5))))
 
 (def average-colors ["#ddd", :yellow, :red, :teal])
 
 (deftest chroma-average
   (is "#b79757" (format-hex (average average-colors)))
-  (is "#d3a96a" (format-hex (average :LAB average-colors))))
+  (is "#d3a96a" (format-hex (average average-colors :LAB))))
 
 (deftest chroma-valid
-  (is (valid? :red))
-  (is (not (valid? :bread)))
-  (is (valid? "#F0000D"))
-  (is (not (valid? "#FOOOOD"))))
+  (is (valid-color? :red))
+  (is (not (valid-color? :bread)))
+  (is (valid-color? "#F0000D"))
+  (is (not (valid-color? "#FOOOOD"))))
 
 (deftest chroma-blend
-  (is "#47af22" (format-hex (blend-colors blend-multiply 0x4cbbfc 0xeeee22)))
-  (is "#4cbb22" (format-hex (blend-colors blend-darken 0x4cbbfc 0xeeee22)))
-  (is "#eeeefc" (format-hex (blend-colors blend-lighten 0x4cbbfc 0xeeee22))))
+  (is "#47af22" (format-hex (b/blend-colors b/multiply 0x4cbbfc 0xeeee22)))
+  (is "#4cbb22" (format-hex (b/blend-colors b/darken 0x4cbbfc 0xeeee22)))
+  (is "#eeeefc" (format-hex (b/blend-colors b/lighten 0x4cbbfc 0xeeee22))))
 
 (deftest chroma-contrast
   (is 1.72 (m/approx (contrast-ratio :pink :hotpink)))
@@ -203,12 +188,12 @@
   (is "#e77dea" (format-hex (desaturate :hotpink)))
   (is "#cd8ca8" (format-hex (desaturate :hotpink 2.0)))
   (is "#b299a3" (format-hex (desaturate :hotpink 3.0))) ;; differs a little bit from original, due to rounding
-  (is "#a10000" (format-hex (modulate :LAB :orangered 0 0.5)))
-  (is "#63c56c" (format-hex (modulate :LCH :darkseagreen 1 2.0)))
-  (is "#eb8787" (format-hex (set-channel :HSL :skyblue 0 0)))
-  (is "#ce8ca9" (format-hex (set-channel :LCH :hotpink 1 30)))
-  (is 57.57 (m/approx (get-channel :LAB :orangered 0)))
-  (is 0.5 (m/approx (get-channel :HSL :orangered 2)))
+  (is "#a10000" (format-hex (modulate :orangered :LAB 0 0.5)))
+  (is "#63c56c" (format-hex (modulate :darkseagreen :LCH 1 2.0)))
+  (is "#eb8787" (format-hex (set-channel :skyblue :HSL 0 0)))
+  (is "#ce8ca9" (format-hex (set-channel :hotpink :LCH 1 30)))
+  (is 57.57 (m/approx (get-channel :orangered :LAB 0)))
+  (is 0.5 (m/approx (get-channel :orangered :HSL 2)))
   (is 69.0 (m/approx (get-channel :orangered 1)))
   (is 1.0 (/ (relative-luma :white) 255.0))
   (is 0.81 (m/approx (/ (relative-luma :aquamarine) 255.0)))

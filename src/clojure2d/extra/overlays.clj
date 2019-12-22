@@ -15,6 +15,7 @@
   (:require [clojure2d.core :refer [set-color line get-image width height resize with-canvas-> canvas image]]
             [clojure2d.pixels :as p]
             [clojure2d.color :as c]
+            [clojure2d.color.blend :as b]
             [fastmath.core :as m]
             [fastmath.random :as r]))
 
@@ -24,14 +25,14 @@
 
 ;; ## RGB scanlines
 
-(def ^:private add-compose (:add c/blends))
+(def ^:private add-compose (:add b/blends))
 
 (defn- blend-shift-and-add-f
   "Slightly shift channels"
   [ch p1 p2 x y]
   (let [c1 (p/get-value p1 ch x y)
         c2 (p/get-value p2 ch (dec ^long x) y)]
-    (c/blend-values add-compose c1 c2)))
+    (add-compose c1 c2)))
 
 (defn- draw-lines
   "Draw rgb lines"
@@ -156,7 +157,7 @@
   Use with [[render-noise]]."
   ([w h {:keys [alpha] :or {alpha 80}}]
    (let [fc (fn [_] 
-              (c/lclamp255 (+ 100.0 (* 20.0 (r/grand)))))
+              (m/constrain (+ 100.0 (* 20.0 (r/grand))) 0.0 255.0))
          fa (constantly (int alpha))
          p (p/filter-channels (partial p/filter-channel fc) nil nil (partial p/filter-channel fa) (p/pixels w h))]
      (p/set-channel! p 1 (p/get-channel p 0))
