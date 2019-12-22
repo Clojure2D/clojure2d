@@ -12,11 +12,11 @@
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
 
-(defn show-palette
-  "Display palette.
+(defn palette->image
+  "Create image with rendered palette.
 
   Input: list of colors."
-  ([palette] (show-palette palette false))
+  ([palette] (palette->image palette false))
   ([palette luma?]
    (let [c (canvas 1000 300)
          h2 (/ (height c) 2)
@@ -38,8 +38,22 @@
          (let [p (map #(vector (+ 50 hstep (* ^long % step))
                                (m/norm (c/ch0 (c/to-LAB (nth palette %))) 0.0 100.0 bottom 50)) (range (count palette)))]
            (path c p))))
-     (show-window {:canvas c})
      c)))
+
+(defn show-palette
+  "Display palette.
+
+  Input: list of colors."
+  ([palette] (show-palette palette false))
+  ([palette luma?] (show-window {:canvas (palette->image palette luma?)})))
+
+(defn gradient->image
+  "Create image with rendered gradient.
+
+  Input: gradient function (see [[gradient]])."
+  ([gradient] (gradient->image gradient false))
+  ([gradient luma?]
+   (palette->image (map gradient (range 0.0 1.0 (/ 1.0 700.0))) luma?)))
 
 (defn show-gradient
   "Display gradient.
@@ -47,18 +61,25 @@
   Input: gradient function (see [[gradient]])."
   ([gradient] (show-gradient gradient false))
   ([gradient luma?]
-   (show-palette (map gradient (range 0.0 1.0 (/ 1.0 700.0))) luma?)))
+   (show-window {:canvas (gradient->image gradient luma?)})))
+
+(defn color->image
+  "Render image.
+
+  Input: color"
+  [col]
+  (let [c (palette->image [col])]
+    (with-canvas-> c
+      (set-color :white)
+      (set-font-attributes 14)
+      (text (str col " (" (c/format-hex col) ")") 10 20))))
 
 (defn show-color
   "Display color.
 
   Input: color"
   [col]
-  (let [c (show-palette [col])]
-    (with-canvas-> c
-      (set-color :white)
-      (set-font-attributes 14)
-      (text (str col " (" (c/format-hex col) ")") 10 20))))
+  (show-window {:canvas (color->image col)}))
 
 (defn show-scalar-field
   "Show scalar field R^2->R"
