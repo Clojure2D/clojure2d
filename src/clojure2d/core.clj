@@ -198,7 +198,8 @@
            [org.w3c.dom Document]
            [org.apache.batik.util SVGConstants XMLResourceDescriptor ]
            [org.apache.batik.dom.util SAXDocumentFactory]
-           [org.apache.batik.anim.dom SVGDOMImplementation]))
+           [org.apache.batik.anim.dom SVGDOMImplementation]
+           [fastmath.vector Vec2]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -1536,7 +1537,7 @@ See [[set-color]]."
 (defn mouse-pos
   "Mouse position as [[Vec2]] type. [0,0] - top left, [-1,-1] outside window."
   {:metadoc/categories #{:window :events}}
-  [m] (pr/mouse-pos m))
+  ^Vec2 [m] (pr/mouse-pos m))
 
 (defn mouse-button
   "Get mouse pressed button status: :left :right :center or :none"
@@ -1946,6 +1947,7 @@ See [[set-color]]."
       (.setName windowname)
       (.setTitle windowname)
       (.setBackground Color/white)
+      ;; (.setLocation 100 100)
       (.setLocationRelativeTo nil)
       (.setVisible true)
       (.toFront)

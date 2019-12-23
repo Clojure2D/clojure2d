@@ -382,8 +382,8 @@
          ^double br (blend-fn1 (.x cb) (.x cs))
          ^double bg (blend-fn2 (.y cb) (.y cs))
          ^double bb (blend-fn3 (.z cb) (.z cs))]
-     (if (clojure.core/and (>= 255.0 (.w cb))
-                           (>= 255.0 (.w cs)))
+     (if (clojure.core/and (>= (.w cb) 255.0)
+                           (>= (.w cs) 255.0))
        (Vec4. br bg bb 255.0)
        (let [ab (* r255 (.w cb))
              as (* r255 (.w cs))
