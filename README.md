@@ -13,10 +13,6 @@ Clojure2D is a library supporting generative coding or glitching. It's based on 
 ![ex22](results/small/ex22.jpg "Example 22")
 ![ex23](results/small/ex23.jpg "Example 23")
 
-## WARNING
-
-Version `1.x.x` is after big refactoring and contains plenty of breaking changes.
-
 ## Documentation
 
 [Documentation with examples](https://clojure2d.github.io/clojure2d/docs/codox/)
@@ -53,10 +49,6 @@ Add following line as a dependency to your `project.clj`
 
 ![](https://clojars.org/clojure2d/latest-version.svg)
 
-### Snapshot
-
-`[clojure2d "1.2.0-SNAPSHOT"]`
-
 ## Usage
 
 Since still no tutorials are available, see [documentation](https://clojure2d.github.io/clojure2d/docs/codox/). All namespaces are described below:
@@ -83,8 +75,11 @@ Defines also:
 ### clojure2d.color [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.color.html)
 
 * color space converters
-* collection of blending basic functions (like add, subtract, divide, difference, etc.)
 * huge collection of palettes and gradients
+
+#### clojure2d.color.blend [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.color.blend.html)
+
+* collection of blending basic functions (like add, subtract, divide, difference, etc.)
 
 ### clojure2d.extra
 

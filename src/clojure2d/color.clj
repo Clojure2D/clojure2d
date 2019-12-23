@@ -3408,11 +3408,11 @@ Same as calling [[gradient]] with keyword as parameter.
   {:metadoc/categories #{:gr}}
   []
   (condp clojure.core/> (r/drand)
-    0.1 (m/sample (iq-random-gradient) (r/irand 3 10))
+    0.1 (resample (iq-random-gradient) (r/irand 3 10))
     0.3 (rand-nth @colourlovers-palettes-delay)
     0.6 (let [p (rand-nth (vals @palette-presets-delay))]
           (if (> (count p) 15) (resample 15 p) p))
-    0.8 (m/sample (rand-nth (vals @gradient-presets-delay)) (r/irand 3 10))
+    0.8 (resample (rand-nth (vals @gradient-presets-delay)) (r/irand 3 10))
     (let [h (r/drand 360)
           t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
           conf {:compl (r/brand 0.6)
