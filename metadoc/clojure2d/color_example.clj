@@ -104,8 +104,15 @@
 (add-examples hue (example-session "Usage" (hue :red) (hue :green) (hue :blue) (hue "#12f5e6") (hue-polar "#12f5e6") (hue-paletton "#4455f6")))
 (add-examples hue-polar (example-session "Usage" (hue-polar "#4455f6") (hue "#4455f6") (hue-paletton "#4455f6")))
 
-(add-examples lerp (example-palette "Usage" [(lerp :red :blue 0) (lerp :red :blue 0.5) (lerp :red :blue 1.0)]))
-(add-examples lerp+ (example-palette "Usage" [(lerp+ :red :blue 0) (lerp+ :red :blue 0.5) (lerp+ :red :blue 1.0)]))
+(add-examples lerp
+  (example-palette "Usage" [(lerp :red :blue 0) (lerp :red :blue 0.5) (lerp :red :blue 1.0)])
+  (example-gradient "As gradient" (partial lerp :red :blue)))
+(add-examples lerp+
+  (example-palette "Usage" [(lerp+ :red :blue 0) (lerp+ :red :blue 0.5) (lerp+ :red :blue 1.0)])
+  (example-gradient "As gradient" (partial lerp+ :red :blue)))
+(add-examples lerp-
+  (example-palette "Usage" [(lerp- :red :blue 0) (lerp- :red :blue 0.5) (lerp- :red :blue 1.0)])
+  (example-gradient "As gradient" (partial lerp- :red :blue)))
 
 (add-examples set-alpha (example-color "Usage" (set-alpha :khaki 200)))
 (add-examples set-ch0 (example-color "Usage" (set-ch0 :khaki 11)))
@@ -128,26 +135,65 @@
   (example-color "Usage" (awt-color 200 200 112 200)))
 
 (add-examples clamp
-  (example "Usage" (clamp (v/vec4 304 -123 3.4 22.9))))
+  (example "Usage" (clamp (color 304 -123 3.4 22.9))))
 
 (add-examples lclamp
-  (example "Usage" (lclamp (v/vec4 304 -123 3.4 22.9))))
+  (example "Usage" (lclamp (color 304 -123 3.4 22.9))))
 
 (add-examples format-hex
-  (example-session "Usage" (format-hex :maroon) (format-hex (color 4 55 222))))
+  (example-session "Usage"
+    (format-hex :maroon)
+    (format-hex (color 4 55 222))
+    (format-hex (color 4 55 222 127.5))))
 
 (add-examples pack
-  (example-session "Pack colors into 32 bit int"
+  (example-session "Pack colors into 32 bit int."
     (pack :green)
-    (pack 1233456)
+    (pack (color 12 33 255)))
+  (example-session "See the difference about treating alpha when packing raw integer."
     (pack 0x1122ff)
-    (pack (to-color 0x1122ff))
-    (pack (color 12 33 255))))
+    (pack (to-color 0x1122ff))))
 
 (add-examples modulate
   (example-color "More red" (modulate [123 22 233] 0 1.2))
   (example-color "More saturation" (modulate [123 22 233] :HSL 1 1.2))
   (example-palette "Decrease luma" (mapv #(modulate % :LAB 0 0.8) (palette 0))))
+
+;;
+
+(add-examples possible-color?
+  (example-session "Usage"
+    (possible-color? :blue)
+    (possible-color? :not-a-color)
+    (possible-color? [1 2 3 255])
+    (possible-color? [:red :green :blue])
+    (possible-color? (gradient [:red :blue]))))
+
+(add-examples valid-color?
+  (example-session "Usage"
+    (valid-color? :blue)
+    (valid-color? :not-a-color)
+    (valid-color? [1 2 3 255])
+    (valid-color? [:red :green :blue])
+    (valid-color? (gradient [:red :blue]))))
+
+
+(add-examples possible-palette?
+  (example-session "Usage"
+    (possible-palette? :blue)
+    (possible-palette? [1 2 3 255])
+    (possible-palette? [:red :green :blue])
+    (possible-palette? (gradient [:red :blue]))))
+
+(add-examples temperature
+  (example-color "Warm" (temperature :warm))
+  (example-color "Blue sky" (temperature :blue-sky))
+  (example-color "3000K" (temperature 3000)))
+
+(add-examples tinter
+  (example-palette "Input palette" (palette [:red :yellow] 10))
+  (example-palette "Make any color red" (map (tinter [255 55 55]) (palette [:red :yellow] 10)))
+  (example-palette "Tint using gradient" (map (tinter (gradient [:red :yellow :blue])) (palette [:red :yellow] 10))))
 
 ;; --
 
@@ -159,11 +205,11 @@
 
 (add-examples colorspaces
   (example-color "Example conversion" (let [[to from] (colorspaces :Cubehelix)]
-                                        (map m/approx (from (to [100 200 50]))))))
+                                        (mapv m/approx (from (to [100 200 50]))))))
 
 (add-examples colorspaces*
   (example-color "Example conversion" (let [[to from] (colorspaces* :Cubehelix)]
-                                        (map m/approx (from (to [100 200 50]))))))
+                                        (mapv m/approx (from (to [100 200 50]))))))
 
 ;;
 
@@ -176,7 +222,7 @@
 (def i2 (p/load-pixels "docs/cockatoo1.jpg"))
 
 (defsnippet clojure2d.color blend-images
-  "Compose two cockatoo images (one is rotated) with given blend method."
+  "Compose two cockatoo images (one is rotated) with given blend method." true
   (let [n (str "images/color/" (first opts) ".jpg")]
     (save (p/compose-channels f false i1 i2) (str "docs/" n))
     (str "../" n)))
@@ -246,7 +292,7 @@
            (let [n-from (symbol (str "from-" (name n)))
                  n-to (symbol (str "to-" (name n)))]
              `(do (add-examples ~n-from
-                    (example-color "Converting to and from given color space should yield almost the same color." (map m/approx ((juxt red green blue) (~n-from (~n-to (color 122 3 254))))))))))))
+                    (example-color "Converting to and from given color space should yield almost the same color." (lclamp (~n-from (~n-to  "#7a03fe"))))))))))
 
 (add-colorspace-from-examples)
 
@@ -259,7 +305,7 @@
   (example-session "When you pass only color space, returns normalized from-XXX* function."
     (color-converter :YUV)
     ((color-converter :YUV) [158 94 85]))
-  (example-session "You can maximum value for all channels or individually."
+  (example-session "You can set maximum value for all channels or individually."
     ((color-converter :HCL 1.0) [0.5 0.5 0.5 0.5])
     ((color-converter :HCL 100.0) [50 50 50 50])
     ((color-converter :HCL 10 20 30) [5 10 15 127.5])
@@ -366,7 +412,7 @@
 (add-examples brighten
   (example-palette "Make palette" (take 10 (iterate (fn [c] (brighten c 0.5)) "03100f")))
   (example-color "Given color" :khaki)
-  (example-color "Brighten" (brighten :khaki 1.0)))
+  (example-color "Brighten" (brighten :khaki 0.5)))
 
 (add-examples saturate
   (example-palette "Make palette" (take 10 (iterate saturate (from-HSL (color 300 0.0 0.5))))))
@@ -383,6 +429,7 @@
 
 (add-examples mix
   (example-color "Mix" (mix :red :blue))
+  (example-gradient "As gradient" (partial mix :red :blue))
   (example-color "Mix, different ratio" (mix :red :blue 0.25))
   (example-color "Mix in LAB" (mix :red :blue :LAB 0.5))
   (example-color "Mix in HSI" (mix :red :blue :HSI 0.5)))

@@ -215,11 +215,12 @@
   See also [[valid-color?]]."
   {:metadoc/categories #{:pal}}
   [c]
-  (or (string? c)
-      (not (seqable? c))
-      (let [v (first c)]
-        (and (number? v)
-             (< (long v) 0x01000000)))))
+  (or (and (not (seqable? c))
+           (satisfies? pr/ColorProto c))
+      (and (seqable? c)
+           (let [v (first c)]
+             (and (number? v)
+                  (< (long v) 0x01000000))))))
 
 (defn possible-palette?
   "Check if given argument can be considered as palette.
@@ -423,7 +424,7 @@
   * 3 - sets r,g,b with alpha 255
   * 4 - sets r,g,b and alpha
   
-  See also [[awt-color]], [[awt-gray]]."
+  See also [[gray]]. [[awt-color]], [[awt-gray]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [c]
    (pr/to-color c))
@@ -602,7 +603,9 @@
 ;;
 
 (defn format-hex
-  "Convert color to hex string (css)."
+  "Convert color to hex string (css).
+
+  When alpha is lower than 255.0, #rgba is returned."
   {:metadoc/categories meta-ops}
   ^String [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2632,7 +2635,7 @@
   Code borrowed from thi.ng/color"
   ([c1 c2]
    (let [c1 (v/vec3 (pr/red c1) (pr/green c1) (pr/blue c1))
-         c2 (v/vec3 (pr/red c1) (pr/green c2) (pr/blue c2))
+         c2 (v/vec3 (pr/red c2) (pr/green c2) (pr/blue c2))
          amp (v/mult (v/sub c1 c2) 0.5)
          offset (v/sub c1 amp)]
      [(v/div offset 255.0)
@@ -3044,7 +3047,7 @@
 (defn lerp
   "Linear interpolation of two colors.
 
-  See also [[lerp+]] [[gradient]] and [[mix]]"
+  See also [[lerp+]], [[lerp-]], [[gradient]] and [[mix]]"
   {:metadoc/categories #{:interp}}
   ([c1 c2  colorspace ^double t]
    (let [[to from] (colorspaces colorspace)]
@@ -3056,12 +3059,24 @@
 (defn lerp+
   "Linear interpolation of two colors conserving luma of the first color.
 
-  Amount: strength of the blend (defaults to 0.25)"
+  Amount: strength of the blend (defaults to 0.25)
+
+  See also [[lerp-]]."
   {:metadoc/categories #{:interp}}
   ([c1 c2] (lerp+ c1 c2 0.25))
   ([c1 c2 ^double amount]
    (let [res (lerp c1 c2 amount)]
      (set-channel res :LAB 0 (ch0 (to-LAB c1))))))
+
+(defn lerp-
+  "Linear interpolation of two colors conserving luma of the second color.
+
+  Amount: strength of the blend (defaults to 0.25).
+
+  See also [[lerp+]]."
+  ([c1 c2] (lerp- c1 c2 0.25))
+  ([c1 c2 ^double amount]
+   (lerp+ c2 c1 (- 1.0 amount))))
 
 (defn- mix-interpolator
   ^double [^double a ^double b ^double t]
@@ -3090,7 +3105,7 @@
 (defn tinter
   "Creates fn to tint color using other color(s).
 
-  Tinter can be color, palette or gradient."
+  `tint-colors` can be color, palette or gradient."
   {:metadoc/categories #{:pal}}
   ([tint-colors] (tinter tint-colors {}))
   ([tint-colors gradient-params]
@@ -3132,7 +3147,11 @@
 ;; colors
 
 (defn brighten
-  "Change luma for givent color by given amount. Works in LAB color space. See [[darken]]."
+  "Change luma for givent color by given amount.
+
+  Works in LAB color space. Default amount is 1.0 and means change luma in LAB of 18.0.
+
+  See [[darken]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col] (brighten col 1.0))
   (^Vec4 [col ^double amt]
@@ -3140,7 +3159,11 @@
      (clamp (from-LAB (Vec4. (max 0.0 (+ (.x c) (* 18.0 amt))) (.y c) (.z c) (.w c)))))))
 
 (defn darken
-  "Change luma for givent color by given amount. Works in LAB color space. See [[brighten]]."
+  "Change luma for givent color by given amount.
+  
+  Works in LAB color space. Default amount is 1.0 and means change luma in LAB of -18.0.
+
+  See [[brighten]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col] (brighten col -1.0))
   (^Vec4 [col ^double amt] (brighten col (- amt))))
@@ -3312,7 +3335,8 @@
            g (correct-luma (gradient palette-or-gradient gradient-params))]
        (palette g n)))))
 
-(defonce ^{:doc "Ready to use gradients containing Inigo Quilez, Cubehelix sets and other.
+(defonce ^{:private true
+           :doc "Ready to use gradients containing Inigo Quilez, Cubehelix sets and other.
 
 Map with name (keyword) as key and gradient function as value.
 

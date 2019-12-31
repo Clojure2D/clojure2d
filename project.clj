@@ -1,4 +1,4 @@
-(defproject clojure2d "1.3.0-alpha1"
+(defproject clojure2d "1.3.0-alpha2"
   :description "Creative coding / glitch library backed by Java2D"
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"

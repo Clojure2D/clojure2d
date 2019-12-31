@@ -1,7 +1,18 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
-## 1.3.0-alpha1 (not released, in progress)
+## 1.3.0-alpha2
+
+### Added
+
+* `lerp-` color interpolator
+
+### Fixed
+
+* `possible-color?` catches gradient
+* `iq-gradient` wrong interpolation between two colors
+
+## 1.3.0-alpha1
 
 ### Added
 
