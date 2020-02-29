@@ -1,13 +1,11 @@
-(defproject clojure2d "1.3.0-alpha2"
+(defproject clojure2d "1.3.0"
   :description "Creative coding / glitch library backed by Java2D"
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.10.1"]
-                 [generateme/fastmath "1.5.0-alpha4"]
-                 [org.apache.xmlgraphics/batik-transcoder "1.11"] ;; SVG
-                 ;; [org.bytedeco/javacv-platform "1.4.1"]
-                 ]
+                 [generateme/fastmath "1.5.2"]
+                 [org.apache.xmlgraphics/batik-transcoder "1.12"]]
   :resource-path "resources/"
   :java-source-paths ["src"]
   :javac-options ["-target" "1.8" "-source" "1.8"]
