@@ -918,12 +918,12 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   ([canvas vect]
    (point canvas (vect 0) (vect 1))))
 
-(defn- draw-fill-or-stroke
+(defmacro ^:private draw-fill-or-stroke
   "Draw filled or outlined shape."
-  [^Graphics2D g ^Shape obj stroke?]
-  (if stroke?
-    (.draw g obj)
-    (.fill g obj)))
+  [g obj stroke?]
+  `(if ~stroke?
+     (.draw ~g ~obj)
+     (.fill ~g ~obj)))
 
 (defn rect
   "Draw rectangle with top-left corner at `(x,y)` position with width `w` and height `h`. Optionally you can set `stroke?` (default: `false`) to `true` if you don't want to fill rectangle and draw outline only.
@@ -933,7 +933,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   ([^Canvas canvas x y w h stroke?]
    (let [^Rectangle2D r (.rect-obj canvas)] 
      (.setFrame r x y w h)
-     (draw-fill-or-stroke (.graphics canvas) r stroke?))
+     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) r stroke?))
    canvas)
   ([canvas x y w h]
    (rect canvas x y w h false)))
@@ -955,7 +955,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   ([^Canvas canvas x1 y1 w h stroke?]
    (let [^Ellipse2D e (.ellipse-obj canvas)]
      (.setFrame e (- ^double x1 (* ^double w 0.5)) (- ^double y1 (* ^double h 0.5)) w h)
-     (draw-fill-or-stroke (.graphics canvas) e stroke?))
+     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) e stroke?))
    canvas)
   ([canvas x1 y1 w h]
    (ellipse canvas x1 y1 w h false)))
@@ -979,7 +979,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
                 :chord Arc2D/CHORD
                 :pie Arc2D/PIE
                 Arc2D/OPEN))
-     (draw-fill-or-stroke (.graphics canvas) e stroke?))
+     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) e stroke?))
    canvas)
   ([canvas x1 y1 w h start extent type]
    (arc canvas x1 y1 w h start extent type true))
@@ -1005,7 +1005,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
                         :chord Arc2D/CHORD
                         :pie Arc2D/PIE
                         Arc2D/OPEN))
-     (draw-fill-or-stroke (.graphics canvas) e stroke?))
+     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) e stroke?))
    canvas)
   ([canvas x1 y1 r start extent type]
    (rarc canvas x1 y1 r start extent type true))
@@ -1022,7 +1022,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
        (.lineTo x2 y2)
        (.lineTo x3 y3)
        (.closePath))
-     (draw-fill-or-stroke (.graphics canvas) p stroke?))
+     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?))
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3]
    (triangle canvas x1 y1 x2 y2 x3 y3 false)))
@@ -1084,7 +1084,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
        (doseq [v (next vs)]
          (.lineTo p (v 0) (v 1)))
        (when (or (not stroke?) close?) (.closePath p))
-       (draw-fill-or-stroke (.graphics canvas) p stroke?)))
+       (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?)))
    canvas)
   ([canvas vs close?] (path canvas vs close? true))
   ([canvas vs] (path canvas vs false true)))
@@ -1152,7 +1152,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
                  (.curveTo p (cp5 0) (cp5 1) (cp6 0) (cp6 1) (m1 0) (m1 1)))
                (let [[cp1 cp2] (calculate-bezier-control-points v1 v2 v3 v3)]
                  (.curveTo p (cp1 0) (cp1 1) (cp2 0) (cp2 1) (v3 0) (v3 1)))))))
-       (draw-fill-or-stroke (.graphics canvas) p stroke?)))
+       (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?)))
    canvas)
   ([canvas vs close?] (path-bezier canvas vs close? true))
   ([canvas vs] (path-bezier canvas vs false true)))
@@ -1165,7 +1165,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
      (doto p
        (.moveTo x1 y1)
        (.curveTo x2 y2 x3 y3 x4 y4))
-     (draw-fill-or-stroke (.graphics canvas) p stroke?)))
+     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?)))
   ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
    (bezier canvas x1 y1 x2 y2 x3 y3 x4 y4 true)))
 
@@ -1177,7 +1177,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
      (doto p
        (.moveTo x1 y1)
        (.quadTo x2 y2 x3 y3))
-     (draw-fill-or-stroke (.graphics canvas) p stroke?)))
+     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?)))
   ([canvas x1 y1 x2 y2 x3 y3]
    (curve canvas x1 y1 x2 y2 x3 y3 true)))
 
@@ -1192,7 +1192,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
        (.lineTo x3 y3)
        (.lineTo x4 y4)
        (.closePath))
-     (draw-fill-or-stroke (.graphics canvas) p stroke?))
+     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?))
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
    (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false)))
@@ -1313,20 +1313,19 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 ;; ### Color
 
-(defn- set-color-with-fn
-  "Set color for primitive or background via passed function. You can use:
-
-  * java.awt.Color object
-  * clojure2d.math.vector.Vec4 or Vec3 object
-  * individual r, g, b (and optional alpha) as integers from 0-255. They are converted to integer and clamped if necessary."
-  ([f canvas c]
-   (f canvas (c/awt-color c)))
-  ([f canvas c a]
-   (f canvas (c/awt-color c a)))
-  ([f canvas r g b a]
-   (f canvas (c/awt-color r g b a)))
-  ([f canvas r g b]
-   (f canvas (c/awt-color r g b))))
+(defmacro ^:private make-set-color-fn
+  [doc n f]
+  `(defn ~n
+     ~doc
+     {:metadoc/categories #{:draw}}
+     ([~'canvas ~'c]
+      (~f ~'canvas (c/awt-color ~'c)))
+     ([~'canvas ~'c ~'a]
+      (~f ~'canvas (c/awt-color ~'c ~'a)))
+     ([~'canvas ~'r ~'g ~'b ~'a]
+      (~f ~'canvas (c/awt-color ~'r ~'g ~'b ~'a)))
+     ([~'canvas ~'r ~'g ~'b]
+      (~f ~'canvas (c/awt-color ~'r ~'g ~'b)))))
 
 (defn set-awt-color
   "Set color with valid java `Color` object. Use it when you're sure you pass `java.awt.Color` object."
@@ -1343,7 +1342,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
          ^Color currc (.getColor g)]
      (push-matrix canvas)
      (reset-matrix canvas)
-     (set-color-with-fn set-awt-color canvas c)
+     (.setColor g (c/awt-color c))
      (doto g
        (.fillRect 0 0 (.w canvas) (.h canvas))
        (.setColor currc))
@@ -1359,6 +1358,33 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   (let [^Graphics2D g (.graphics canvas)]
     (.setXORMode g c))
   canvas)
+
+;; Set color for primitive
+(make-set-color-fn
+ "Sets current color. Color can be:
+
+* [[vec3]], [[vec4]] with rgb values.
+* java.awt.Color object
+* keyword with name from 140 HTML color names
+* Integer
+* r, g, b and optional alpha
+
+See [[clojure2d.color]] namespace for more color functions."
+ set-color set-awt-color)
+
+;; Set background color
+(make-set-color-fn
+ "Sets background with given color.
+
+Background can be set with alpha.
+
+See [[set-color]]."
+ set-background set-awt-background)
+
+;; Set XOR mode
+(make-set-color-fn
+ "Set XOR painting mode with given color."
+ xor-mode awt-xor-mode)
 
 (defn paint-mode
   "Set normal paint mode.
@@ -1384,34 +1410,6 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    (.setComposite ^Graphics2D (.graphics canvas) composite)
    canvas)
   ([^Canvas canvas] (set-composite canvas java.awt.AlphaComposite/SrcOver)))
-
-;; Set color for primitive
-(def ^{:doc "Sets current color. Color can be:
-
-* [[vec3]], [[vec4]] with rgb values.
-* java.awt.Color object
-* keyword with name from 140 HTML color names
-* Integer
-* r, g, b and optional alpha
-
-See [[clojure2d.color]] namespace for more color functions."
-       :metadoc/categories #{:draw}} 
-  set-color (partial set-color-with-fn set-awt-color))
-
-;; Set background color
-(def ^{:doc "Sets background with given color.
-
-Background can be set with alpha.
-
-See [[set-color]]."
-       :metadoc/categories #{:draw}}
-  set-background (partial set-color-with-fn set-awt-background))
-
-;; Set XOR mode
-(def
-  ^{:doc "Set XOR painting mode."
-    :metadoc/categories #{:draw}}
-  xor-mode (partial set-color-with-fn awt-xor-mode))
 
 ;;;
 

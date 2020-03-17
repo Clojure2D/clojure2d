@@ -3021,7 +3021,8 @@
   "Find nearest color from a set. Input: distance function (default euclidean), list of target colors and source color."
   {:metadoc/categories #{:dist}}
   ([pal c dist-fn]
-   (let [s (count pal)]
+   (let [s (count pal)
+         c (pr/to-color c)]
      (loop [i (int 0)
             currc c
             currdist Double/MAX_VALUE]
