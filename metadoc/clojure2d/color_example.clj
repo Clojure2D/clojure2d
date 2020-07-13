@@ -8,7 +8,6 @@
             [fastmath.vector :as v]
             [fastmath.core :as m]
             [fastmath.random :as r]
-            [fastmath.easings :as e]
             [fastmath.interpolation :as i]
             [fastmath.kernel :as rbf]))
 
@@ -323,7 +322,7 @@
                                                                                          :interpolation :loess}))
   (example-palette "Sampled from gradient" (palette (gradient :cyan-magenta)))
   (example-palette "Sampled from gradient with number of colors" (palette (gradient :cyan-magenta) 10))
-  (example "List of named palettes" (list (palette))))
+  (example-palette "Random predefined palette" (palette)))
 
 (add-examples iq-gradient
   (example-gradient "Create gradient from 4 coeffs"
@@ -437,7 +436,7 @@
 ;; ----
 
 (add-examples gradient
-  (example-gradient "Named gradient" (gradient :rainbow-m))
+  (example-gradient "Named gradient" (gradient :rainbow2))
   (example-gradient "Linear, RGB" (gradient (palette 5)))
   (example-gradient "Linear, HSL" (gradient (palette 5) {:colorspace :HSL}))
   (example-gradient "Linear, Yxy" (gradient (palette 5) {:colorspace :Yxy}))
@@ -451,7 +450,7 @@
                                                                                                  :colorspace :HSL}))
   (example-palette "Easy way to create palette from gradient" (palette (gradient [:blue :green] {:colorspace :HSL
                                                                                                  :interpolation :cubic-spline}) 10))
-  (example "List of ready to use gradients" (sort (gradient))))
+  (example-gradient "Random predefined gradient" (gradient)))
 
 (add-examples gradient-cubehelix
   (example-gradient "Cubehelix gradient" (gradient-cubehelix [[300 0.2 0.2] [200 0.8 0.9]])))

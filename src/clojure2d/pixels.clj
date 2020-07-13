@@ -131,7 +131,7 @@
             [fastmath.vector :as v]
             [clojure2d.protocols :as pr])
   (:import [clojure2d.core Canvas Window]
-           [fastmath.vector Vec2 Vec4]
+           [fastmath.vector Vec4]
            [java.awt.image BufferedImage Raster WritableRaster]
            [java.awt Composite CompositeContext]
            [clojure.lang Counted Seqable Sequential]))
@@ -404,7 +404,7 @@
          ch1 (future (when f1 (f1 1 target p)))
          ch2 (future (when f2 (f2 2 target p)))]
      (when f3 (f3 3 target p))
-     (do @ch0 @ch1 @ch2)
+     @ch0 @ch1 @ch2
      target))
   ([f p]
    (filter-channels f f f nil p))
@@ -449,7 +449,7 @@
          ch1 (future (when f1 (f1 1 target p1 p2)))
          ch2 (future (when f2 (f2 2 target p1 p2)))]
      (when f3 (f3 3 target p1 p2))
-     (do @ch0 @ch1 @ch2)
+     @ch0 @ch1 @ch2
      target))
   ([f p1 p2]
    (blend-channels f f f nil p1 p2))
@@ -460,36 +460,44 @@
 
 ;; ## Compose channels filter
 
-(defn- make-compose-f
+(defn- make-blend-fn
+  [n]
+  (if (keyword? n) (b/blends n) n))
+
+(defn- make-compose
   "Create compose blending function"
   [n]
-  (cond 
-    (keyword? n) (partial blend-channel (b/blends n))
-    (nil? n) nil
-    :else (partial blend-channel n)))
+  (when n (->> n make-blend-fn (partial blend-channel))))
 
-(def ^:private make-compose (memoize make-compose-f))
+(defn- blend-colors-xy
+  ([f1 f2 f3 back source x y]
+   (let [cb (pr/get-color back x y)
+         cs (pr/get-color source x y)]
+     (b/blend-colors f1 f2 f3 cb cs)))
+  ([f back source x y]
+   (let [cb (pr/get-color back x y)
+         cs (pr/get-color source x y)]
+     (b/blend-colors f cb cs))))
 
 (defn compose-channels
   "Compose channels with blending functions.
 
-  You can give blending method name as keyword defined in [[blends-names]]. Or it can be blending function which accepts 2 doubles from 0.0 to 1.0 and returns double (0.0 - 1.0). It's a wrapper for [[blend-channels]] function."
+  You can give blending method name as keyword defined in [[blends-names]]. Or it can be blending function which accepts 2 doubles from 0.0 to 1.0 and returns double (0.0 - 1.0).
+
+  When there is no processing function for alpha, W3C alpha blending is applied."
   {:metadoc/categories #{:filt}}
   ([n1 n2 n3 n4 p1 p2]
-   (blend-channels (make-compose n1) (make-compose n2) (make-compose n3)
-                   (or (make-compose n4) (blend-channel (fn [^double a ^double b] (min 255.0 (+ a b))))) p1 p2))
+   (if-not n4
+     (compose-channels n1 n2 n3 p1 p2)
+     (blend-channels (make-compose n1) (make-compose n2) (make-compose n3) (make-compose n4) p1 p2)))
+  ([n1 n2 n3 p1 p2]
+   (filter-colors-xy (partial blend-colors-xy (make-blend-fn n1) (make-blend-fn n2) (make-blend-fn n3) p1) p2))
   ([n p1 p2]
-   (compose-channels n n n nil p1 p2))
+   (compose-channels n n n p1 p2))
   ([n do-alpha? p1 p2]
    (if do-alpha?
      (compose-channels n n n n p1 p2)
-     (compose-channels n n n nil p1 p2))))
-
-(defn- blend-colors-xy
-  [f back source x y]
-  (let [cb (pr/get-color back x y)
-        cs (pr/get-color source x y)]
-    (b/blend-colors f cb cs)))
+     (compose-channels n n n p1 p2))))
 
 (defn composite
   "Create java.awt.Composite object which can be used in [[set-composite]].
@@ -512,7 +520,6 @@
 
 ;; ## Filters
 (defn- make-quantile
-  ""
   [no]
   (fn [ch ^Pixels target ^Pixels p]
     (clojure2d.java.filter.Quantile/process (.p p) (.p target) ch (.w p) (.h p) no)))
@@ -801,7 +808,7 @@
         ch1 (future (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 1))
         ch2 (future (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 2))]
     (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 3)
-    (do @ch0 @ch1 @ch2)
+    @ch0 @ch1 @ch2
     a))
 
 (defn merge-renderers

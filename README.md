@@ -17,6 +17,18 @@ Clojure2D is a library supporting generative coding or glitching. It's based on 
 
 [Documentation with examples](https://clojure2d.github.io/clojure2d/docs/codox/)
 
+### Color/Palettes/Gradients
+
+Library contains plenty named colors, palettes and gradients.
+
+There are various sources: [colourlovers](http://www.colourlovers.com/), [thi.ng](https://github.com/thi-ng/color/blob/master/src/presets.org), [paletteer](https://github.com/EmilHvitfeldt/paletteer), [inigo quilez](https://www.iquilezles.org/www/articles/palettes/palettes.htm), [cpt-city](http://soliton.vm.bytemark.co.uk/pub/cpt-city/)
+
+Lists:
+
+* [color names](https://clojure2d.github.io/clojure2d/docs/static/colors.html)
+* [named palettes](https://clojure2d.github.io/clojure2d/docs/static/palettes/index.html)
+* [named gradients](https://clojure2d.github.io/clojure2d/docs/static/gradients/index.html)
+
 ## Motivation
 
 This project is the answer to personal needs to optimize my own workflow for generative or glitch creations. I've been producing a lot of Processing code and started to suffer from limitations of working in 'write sketch and run' mode. Too much copy&paste between sketches, zillions of folders, zillions of processed images. And one day I fell in love with FP. This code is the answer.

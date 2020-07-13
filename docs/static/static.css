@@ -1,20 +1,48 @@
 pre.color {padding: 0px;}
-pre.pal {padding: 5px;}
-pre.grad {padding: 0px;}
 
 span.color {display:block;
-           padding:8px;}
+            padding:10px;}
 
-span.pal {border:1px solid;
-          margin-right:1px;
-          padding:6px;
-          border-radius:5px;}
+span.name {margin-right: 20px;}
 
-span.grad {width:1%;
-           display:inline-block;
-           height:20px;}
+body {background-image: linear-gradient(0deg, #f2f2f2 50%, #eaeaf2 100%);
+      background-size: 3px 3px;
+      color: #505152;}
 
-span.name {width: 15%;
-           display: inline-block;
-           padding-right: 10px;
-           text-align: right;}
+div.namelink {float: left;
+              width: 150px;}
+
+div.gs {float: left;
+        width: 250px;
+        height: 30px;
+        margin-top: 25px;
+        margin-right: 15px;}
+
+div.gg {position: relative;}
+div.gb {background-image: linear-gradient(45deg, #ccc 25%, transparent 25%),linear-gradient(-45deg, #ccc 25%, transparent 25%),linear-gradient(45deg, transparent 75%, #ccc 75%),linear-gradient(-45deg, transparent 75%, #ccc 75%);
+        background-size: 20px 20px;
+        background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index:-1;
+       }
+
+div.g {position:absolute;}
+
+
+div.list {padding-bottom: 30px;
+          font-size: 12px;
+          font-family: "Open Sans", Helvetica, Arial, Geneva, sans-serif;}
+
+#name {margin-top: 30px;}
+
+div.spacer {clear:both;
+            margin-top: 30px;
+            margin-bottom: 30px;}
+
+
+a:link {color: #404188;}
+a:visited {color: #808182;}

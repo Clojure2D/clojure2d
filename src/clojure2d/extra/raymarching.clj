@@ -5,7 +5,7 @@
   * http://mercury.sexy/hg_sdf/"
   (:require [fastmath.core :as m]
             [fastmath.vector :as v])
-  (:import [fastmath.vector Vec2 Vec3]))
+  (:import [fastmath.vector Vec3]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -47,7 +47,7 @@
 
 ;; signed distances
 
-(defmulti primitive (fn [n mat conf] n))
+(defmulti primitive (fn [n _ _] n))
 
 (defmethod primitive :sphere [_ mat conf]
   (let [^double s (:r conf)]

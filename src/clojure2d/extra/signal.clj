@@ -12,13 +12,8 @@
                         :sig "Signal"}}
   (:require [fastmath.core :as m]
             [clojure2d.pixels :as p]
-            [clojure.java.io :refer [file make-parents output-stream input-stream]]
-            [fastmath.vector :as v]
-            [fastmath.random :as r]
             [fastmath.signal :as s])
   (:import [clojure2d.pixels Pixels]
-           [fastmath.vector Vec2 Vec3]
-           [clojure.lang Counted IFn Seqable Sequential]
            [clojure2d.java.signal Converter]))
 
 (set! *warn-on-reflection* true)

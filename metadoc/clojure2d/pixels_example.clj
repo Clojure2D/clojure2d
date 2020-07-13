@@ -197,7 +197,7 @@
   (example-snippet "XOR two versions of the image" saver :image
     (fn [] (compose-channels :xor cockatoo (filter-channels solarize cockatoo))))
   (example-snippet "Use different blending method for every channel." saver :image
-    (fn [] (compose-channels :divide :multiply :mburn nil cockatoo (filter-channels solarize cockatoo))))
+    (fn [] (compose-channels :divide :multiply :mburn cockatoo (filter-channels solarize cockatoo))))
   (example-snippet "Use custom function" saver :image
     (fn [] (compose-channels (fn [^double v1 ^double v2] (* v1 (- 1.0 v2))) cockatoo (filter-channels solarize cockatoo)))))
 

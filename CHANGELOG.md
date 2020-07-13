@@ -1,6 +1,23 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 1.4.0
+
+### Added
+
+* Introduced cpt-city palettes and gradients
+* Introduced paletteer palettes and gradients
+
+### Changed
+
+* Updated fastmath and batik deps
+* Refactor to load gradients and palettes dynamically
+* [breaking] due to the number of palettes/gradients, `find-palette` and `find-gradient` should be used to find names.
+
+### Fixed
+
+* `compose-channels` applies alpha blending by default where alpha channel processing is turned off.
+
 ## 1.3.1
 
 ### Changed

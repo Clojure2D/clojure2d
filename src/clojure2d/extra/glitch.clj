@@ -29,6 +29,7 @@
             [clojure2d.color.blend :as b]
             [fastmath.fields :as var])
   (:import [clojure2d.pixels Pixels]
+           [clojure2d.java.glitch Segmentation]
            [fastmath.vector Vec2]))
 
 (set! *warn-on-reflection* true)
@@ -423,42 +424,30 @@
          in1-sel (if in1-to? first second)
          in2-sel (if in2-to? first second)
          out-sel (if out-to? first second)
-         result (p/compose-channels blend-ch1 blend-ch2 blend-ch3 nil
+         result (p/compose-channels blend-ch1 blend-ch2 blend-ch3
                                     (if in1-cs (p/filter-colors (in1-sel (in1-cs c/colorspaces*)) p1) p1)
                                     (if in2-cs (p/filter-colors (in2-sel (in2-cs c/colorspaces*)) p2) p2))]
      (if out-cs
        (p/filter-colors (out-sel (out-cs c/colorspaces*)) result)
        result))))
 
-;; find best matching pixels
+;; imgslicer
 
-#_(comment defn blend-images-filter
-           ""
-           [{:keys [names pixels mode distance cs]
-             :or {names [] pixels [] distance :euclid-sq mode :color cs :RGB}} ^Pixels p]
-           (let [images (concat pixels (map (comp (partial p/filter-colors (first (c/colorspaces* cs))) p/load-pixels) names))
-                 ^int w (width p)
-                 ^int h (height p)
-                 df (v/distances distance)]
-             (if (= mode :color)
-               (p/filter-colors-xy (fn [p ^long x ^long y]
-                                     (let [c (p/get-color p x y)]
-                                       (first (reduce (fn [curr img]
-                                                        (let [nx (unchecked-int (m/norm x 0 w 0 (width img)))
-                                                              ny (unchecked-int (m/norm y 0 h 0 (height img)))
-                                                              [currc ^double currd] curr
-                                                              nc (p/get-color img nx ny) 
-                                                              ^double nd (df c nc)] 
-                                                          (if (< nd currd) [nc nd] curr)))
-                                                      [c Double/MAX_VALUE] images)))) p)
-               (p/filter-channels (partial p/filter-channel-xy (fn [ch p ^long x ^long y]
-                                                                 (let [^int c (p/get-value p ch x y)]
-                                                                   (first (reduce (fn [curr img]
-                                                                                    (let [nx (unchecked-int (m/norm x 0 w 0 (width img)))
-                                                                                          ny (unchecked-int (m/norm y 0 h 0 (height img)))
-                                                                                          [currc ^double currd] curr
-                                                                                          ^int nc (p/get-value img ch nx ny) 
-                                                                                          nd (m/abs (- c nc))]
-                                                                                      (if (< nd currd) [nc nd] curr)))
-                                                                                  [c Double/MAX_VALUE] images))))) p))))
-
+;; TODO: finish
+(defn imgslicer
+  [^Pixels pixels {:keys [distance threshold min-size mode]
+                   :or {distance v/dist threshold 200 min-size 500 mode :color}
+                   :as options}]
+  (let [w (width pixels)
+        h (height pixels)
+        target (p/pixels w h)
+        segm (doto (Segmentation. (.p pixels) w h)
+               (.makeEdges distance)
+               (.calculateSegmentation threshold min-size))]
+    (reduce (fn [buff [x y]]
+              (let [id (.getSegment segm x y)
+                    segm-info (buff id)
+                    info (or segm-info {:color (p/get-color pixels x y)})]
+                (p/set-color! target x y (:color info))
+                (if segm-info buff (assoc buff id info)))) {} (for [x (range w) y (range h)] [x y]))
+    target))

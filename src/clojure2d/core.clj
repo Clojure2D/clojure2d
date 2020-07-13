@@ -186,7 +186,7 @@
             [fastmath.grid :as grid]
             [clojure.java.io :as io]
             [clojure2d.protocols :as pr])
-  (:import [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Shape Toolkit Transparency]
+  (:import [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Toolkit Transparency]
            [java.awt.event InputEvent ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
            [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double Arc2D Arc2D$Double]
            [java.awt.image BufferedImage BufferStrategy Kernel ConvolveOp]
@@ -1920,7 +1920,7 @@ See [[set-color]]."
 
 (defn- close-window-fn
   "Close window frame"
-  [^JFrame frame active? windowname]
+  [^JFrame frame active?]
   (reset! active? false)
   (.dispose frame))
 
@@ -1931,7 +1931,7 @@ See [[set-color]]."
   "Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event."
   [^JFrame frame ^java.awt.Canvas panel active? on-top? windowname width height]
   (let [closer (proxy [WindowAdapter] []
-                 (windowClosing [^WindowEvent e] (close-window-fn frame active? windowname)))]
+                 (windowClosing [^WindowEvent e] (close-window-fn frame active?)))]
     (doto frame
       (.setLayout (java.awt.BorderLayout.))
       (.setIconImages window-icons)
@@ -2034,8 +2034,6 @@ See [[set-color]]."
                    (System/nanoTime)
                    (if (pos? delay) (- (/ (- (System/nanoTime) at) 1.0e6) delay) 0.0))
             (clear-state! (.window-name window))))))))
-
-;;
 
 (defn replace-canvas
   "Replace canvas in window.
