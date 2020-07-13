@@ -82,7 +82,7 @@
             (p/html5
              (p/include-css "../static.css")
              [:div {:class "content"}
-              [:h2 (or group "/no namespace/")]
+              [:h2 (or group "witout namespace")]
               [:div {:class "list"}
                (for [k ks
                      :let [g (gradient-or-palette k)]]
