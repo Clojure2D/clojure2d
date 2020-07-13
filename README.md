@@ -61,6 +61,10 @@ Add following line as a dependency to your `project.clj`
 
 ![](https://clojars.org/clojure2d/latest-version.svg)
 
+Latest snapshot
+
+`[clojure2d "1.4.0-SNAPSHOT"]`
+
 ## Usage
 
 Since still no tutorials are available, see [documentation](https://clojure2d.github.io/clojure2d/docs/codox/). All namespaces are described below:
