@@ -462,7 +462,10 @@
 
 (defn- make-blend-fn
   [n]
-  (if (keyword? n) (b/blends n) n))
+  (cond
+    (nil? n) (b/blends :normal)
+    (keyword? n) (b/blends n)
+    :else n))
 
 (defn- make-compose
   "Create compose blending function"
