@@ -1,6 +1,12 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 1.4.1
+
+### Changed
+
+* deps updated
+
 ## 1.4.0
 
 ### Added
