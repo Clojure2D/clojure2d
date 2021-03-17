@@ -1,6 +1,12 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 1.4.2
+
+### Changed
+
+* deps updated
+
 ## 1.4.1
 
 ### Changed
@@ -22,7 +28,7 @@ All notable changes to this project will be documented in this file. This change
 
 ### Fixed
 
-* `compose-channels` applies alpha blending by default where alpha channel processing is turned off.
+* `compose-channels` applies alpha blending by default when alpha channel processing is turned off.
 
 ## 1.3.1
 

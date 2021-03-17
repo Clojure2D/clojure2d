@@ -1,10 +1,10 @@
-(defproject clojure2d "1.4.1"
+(defproject clojure2d "1.4.2"
   :description "Creative coding / glitch library backed by Java2D"
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
-  :dependencies [[org.clojure/clojure "1.10.1"]
-                 [generateme/fastmath "2.1.0"]
+  :dependencies [[org.clojure/clojure "1.10.3"]
+                 [generateme/fastmath "2.1.4"]
                  [org.apache.xmlgraphics/batik-transcoder "1.14"]]
   :resource-path "resources/"
   :java-source-paths ["src"]
