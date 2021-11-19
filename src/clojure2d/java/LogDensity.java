@@ -69,19 +69,21 @@ public final class LogDensity {
         int yy = (int)(y+0.5);
         if(xx>=0 && xx<w && yy>=0 && yy<h) {
             int off = yy*w+xx;
-            r[off] += c.x;
-            g[off] += c.y;
-            b[off] += c.z;
-            a[off]++;
+            double w = (c.w >= 255.0) ? 1.0 : (c.w / 255.0);
+            r[off] += w*c.x;
+            g[off] += w*c.y;
+            b[off] += w*c.z;
+            a[off] += w;
         }
     }
 
     public void set(int x, int y, Vec4 c, double weight) {
         int off = y*w+x;
-        r[off] += weight*c.x;
-        g[off] += weight*c.y;
-        b[off] += weight*c.z;
-        a[off] += weight;
+        double w = (c.w >= 255.0) ? weight : weight * (c.w / 255.0);
+        r[off] += w*c.x;
+        g[off] += w*c.y;
+        b[off] += w*c.z;
+        a[off] += w;
     }
 
 
