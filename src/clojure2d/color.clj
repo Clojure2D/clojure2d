@@ -3403,12 +3403,12 @@
      (or (keyword? p)
          (integer? p)) (get-palette p)
      (fn? p) (palette p 5)
-     :else p))
+     :else (vec p)))
   ([p number-of-colors] (palette p number-of-colors {}))
   ([p number-of-colors gradient-params]
-   (if (fn? p)
-     (m/sample p number-of-colors)
-     (m/sample (gradient (palette p) gradient-params) number-of-colors))))
+   (vec (if (fn? p)
+          (m/sample p number-of-colors)
+          (m/sample (gradient (palette p) gradient-params) number-of-colors)))))
 
 (defn- find-gradient-or-palette
   ([lst] (:seq @lst))

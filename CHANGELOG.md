@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file. This change
 ### Fixed
 
 * LDRednerer is aware of alpha channel now
+* `palette` shoud return a vector in every case
+* `path` points should be any seq (not vector only)
 
 ## 1.4.3
 

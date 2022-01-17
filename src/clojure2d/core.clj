@@ -1080,9 +1080,9 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    (when (seq vs)
      (let [^Path2D p (Path2D$Double.)
            m (first vs)]
-       (.moveTo p (m 0) (m 1))
+       (.moveTo p (first m) (second m))
        (doseq [v (next vs)]
-         (.lineTo p (v 0) (v 1)))
+         (.lineTo p (first v) (second v)))
        (when (or (not stroke?) close?) (.closePath p))
        (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?)))
    canvas)
