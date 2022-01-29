@@ -125,7 +125,8 @@
             [fastmath.clustering :as cl]
             [fastmath.easings :as e]
             [clojure2d.protocols :as pr]
-            [clojure.java.io :refer [input-stream resource]])
+            [clojure.java.io :refer [input-stream resource]]
+            [clojure2d.color :as c])
   (:import [fastmath.vector Vec2 Vec3 Vec4]           
            [java.awt Color]
            [clojure.lang APersistentVector ISeq]))
@@ -625,6 +626,23 @@
                           (<< (lclamp255 (pr/green c)) 8)
                           (lclamp255 (pr/blue c)))))
 
+(defn black?
+  "Check if color is black"
+  [c]
+  (let [^Vec4 v (pr/to-color c)]
+    (and (zero? (.x v))
+         (zero? (.y v))
+         (zero? (.z v)))))
+
+(defn not-black?
+  "Check if color is not black"
+  [c]
+  (let [^Vec4 v (pr/to-color c)]
+    (or (pos? (.x v))
+        (pos? (.y v))
+        (pos? (.z v)))))
+
+
 ;; ## Colorspace functions
 ;;
 ;; Conversion from RGB to specific color space always converts to range 0-255
@@ -763,7 +781,57 @@
             (.w c))))
 
 (def ^{:doc "RGB -> sRGB" :metadoc/categories meta-conv} to-sRGB* to-sRGB)
-(def ^{:doc "sRGB -> RGB" :metadoc/categories meta-conv}from-sRGB* from-sRGB)
+(def ^{:doc "sRGB -> RGB" :metadoc/categories meta-conv} from-sRGB* from-sRGB)
+
+;; ### Oklab
+
+(defn to-Oklab
+  "RGB -> Oklab
+
+  https://bottosson.github.io/posts/oklab/
+
+  * L: 0.0 - 1.0
+  * a: -0.234 - 0.276
+  * b: -0.312 - 0.199"
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)
+        l (m/cbrt (/ (+ (* 0.4122214708 (.x c)) (* 0.5363325363 (.y c)) (* 0.0514459929 (.z c))) 255.0))
+        m (m/cbrt (/ (+ (* 0.2119034982 (.x c)) (* 0.6806995451 (.y c)) (* 0.1073969566 (.z c))) 255.0))
+        s (m/cbrt (/ (+ (* 0.0883024619 (.x c)) (* 0.2817188376 (.y c)) (* 0.6299787005 (.z c))) 255.0))]
+    (Vec4. (+ (* 0.2104542553 l) (* 0.7936177850 m) (* -0.0040720468 s))
+           (+ (* 1.9779984951 l) (* -2.4285922050 m) (* 0.4505937099 s))
+           (+ (* 0.0259040371 l) (* 0.7827717662 m) (* -0.8086757660 s))
+           (.w c))))
+
+(defn to-Oklab*
+  "RGB -> Oklab, normalized"
+  ^Vec4 [c]
+  (let [^Vec4 c (to-Oklab c)]
+    (Vec4. (m/norm (.x c) 0.0 0.9999999934735462 0.0 255.0)
+           (m/norm (.y c) -0.23388757418790818 0.27621675349252356 0.0 255.0)
+           (m/norm (.z c) -0.3115281476783752  0.19856975465179516 0.0 255.0)
+           (.w c))))
+
+(defn from-Oklab
+  "Oklab -> RGB, see [[to-Oklab]]"
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)
+        l (m/cb (+ (.x c) (* 0.3963377774 (.y c)) (* 0.2158037573 (.z c))))
+        m (m/cb (+ (.x c) (* -0.1055613458 (.y c)) (* -0.0638541728 (.z c))))
+        s (m/cb (+ (.x c) (* -0.0894841775 (.y c)) (* -1.2914855480 (.z c))))]
+    (Vec4. (* 255.0 (+ (* 4.0767416621  l) (* -3.3077115913 m) (* 0.2309699292 s)))
+           (* 255.0 (+ (* -1.2684380046 l) (* 2.6097574011 m) (* -0.3413193965 s)))
+           (* 255.0 (+ (* -0.0041960863 l) (* -0.7034186147 m) (* 1.7076147010 s)))
+           (.w c))))
+
+(defn from-Oklab*
+  "RGB -> Oklab, normalized"
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)]
+    (from-Oklab (Vec4. (m/norm (.x c) 0.0 255.0 0.0 0.9999999934735462)
+                       (m/norm (.y c) 0.0 255.0 -0.23388757418790818 0.27621675349252356)
+                       (m/norm (.z c) 0.0 255.0 -0.3115281476783752  0.19856975465179516)
+                       (.w c)))))
 
 ;; ### XYZ
 
@@ -838,6 +906,68 @@
 (def ^:private ^:const ^double CIEK (/ 24389.0 27.0))
 (def ^:private ^:const ^double REF-U (/ (* 4.0 D65X) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
 (def ^:private ^:const ^double REF-V (/ (* 9.0 D65Y) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
+
+;; ### XYB, https://observablehq.com/@mattdesl/perceptually-smooth-multi-color-linear-gradients
+
+(defn- convert-mix
+  ^double [^double m]
+  (-> m (max 0.0) m/cbrt (+ -0.15595420054924863)))
+
+(defn to-XYB
+  "sRGB -> XYB
+
+  * X: -0.015386116472573375 - 0.02810008316127735
+  * Y: 0.0 - 0.8453085619621623
+  * Z: 0.0 - 0.8453085619621623"
+  ^Vec4 [c]
+  (let [^Vec4 c (-> (pr/to-color c)
+                    (from-sRGB))
+        r (convert-mix (m/muladd 0.001176470588235294 (.x c)
+                                 (m/muladd 0.00243921568627451 (.y c)
+                                           (m/muladd 3.0588235294117644E-4 (.z c)
+                                                     0.0037930732552754493))))
+        g (convert-mix (m/muladd 9.019607843137256E-4 (.x c)
+                                 (m/muladd 0.0027137254901960788 (.y c)
+                                           (m/muladd 3.0588235294117644E-4 (.z c)
+                                                     0.0037930732552754493))))
+        b (convert-mix (m/muladd 9.545987813548164E-4 (.x c)
+                                 (m/muladd 8.030095852743851E-4 (.y c)
+                                           (m/muladd 0.002163960260821779 (.z c)
+                                                     0.0037930732552754493))))]
+    (Vec4. (* 0.5 (- r g)) (* 0.5 (+ r g)) b (.w c))))
+
+(defn to-XYB*
+  "sRGB -> XYB, normalized"
+  ^Vec4 [c]
+  (let [^Vec4 c (to-XYB c)]
+    (Vec4. (m/norm (.x c) -0.015386116472573375 0.02810008316127735 0.0 255.0)
+           (m/norm (.y c) 0.0 0.8453085619621623 0.0 255.0)
+           (m/norm (.z c) 0.0 0.8453085619621623 0.0 255.0)
+           (.w c))))
+
+(defn from-XYB
+  "XYB -> sRGB"
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)
+        gamma-r (- (+ (.y c) (.x c)) -0.15595420054924863)
+        gamma-g (- (.y c) (.x c) -0.15595420054924863)
+        gamma-b (- (.z c) -0.15595420054924863)
+        mixed-r (m/muladd (* gamma-r gamma-r) gamma-r -0.0037930732552754493)
+        mixed-g (m/muladd (* gamma-g gamma-g) gamma-g -0.0037930732552754493)
+        mixed-b (m/muladd (* gamma-b gamma-b) gamma-b -0.0037930732552754493)
+        r (m/muladd -41.9788641 mixed-b (m/muladd -2516.0707 mixed-g (* 2813.04956 mixed-r)))
+        g (m/muladd -41.9788641 mixed-b (m/muladd 1126.78645 mixed-g (* -829.807582 mixed-r)))
+        b (m/muladd 496.211701 mixed-b (m/muladd 691.795377 mixed-g (* -933.007078 mixed-r)))]
+    (to-sRGB (Vec4. r g b (.w c)))))
+
+(defn from-XYB*
+  "XYB -> sRGB, normalized"
+  ^Vec4 [c]
+  (let [^Vec4 c (c/to-color c)]
+    (from-XYB (Vec4. (m/norm (.x c) 0.0 255.0 -0.015386116472573375 0.02810008316127735)
+                     (m/norm (.y c) 0.0 255.0 0.0 0.8453085619621623)
+                     (m/norm (.z c) 0.0 255.0 0.0 0.8453085619621623)
+                     (.w c)))))
 
 ;; ### LAB
 
@@ -2416,15 +2546,17 @@
 
 * key - name as keyword
 * value - vector with functions containing to-XXX and from-XXX converters."
-       :metadoc/categories meta-conv}
+     :metadoc/categories meta-conv}
   colorspaces {:CMY   [to-CMY from-CMY]
                :OHTA  [to-OHTA from-OHTA]
                :XYZ   [to-XYZ from-XYZ]
+               :XYB   [to-XYB from-XYB]
                :Yxy   [to-Yxy from-Yxy]
                :LMS   [to-LMS from-LMS]
                :IPT   [to-IPT from-IPT]
                :LUV   [to-LUV from-LUV]
                :LAB   [to-LAB from-LAB]
+               :Oklab [to-Oklab from-Oklab]
                :JAB   [to-JAB from-JAB]
                :HunterLAB  [to-HunterLAB from-HunterLAB]
                :LCH   [to-LCH from-LCH]
@@ -2452,15 +2584,17 @@
 
 * key - name as keyword
 * value - vector with functions containing to-XXX* and from-XXX* converters."
-       :metadoc/categories meta-conv}
+     :metadoc/categories meta-conv}
   colorspaces* {:CMY   [to-CMY* from-CMY*]
                 :OHTA  [to-OHTA* from-OHTA*]
                 :XYZ   [to-XYZ* from-XYZ*]
+                :XYB   [to-XYB* from-XYB*]
                 :Yxy   [to-Yxy* from-Yxy*]
                 :LMS   [to-LMS* from-LMS*]
                 :IPT   [to-IPT* from-IPT*]
                 :LUV   [to-LUV* from-LUV*]
                 :LAB   [to-LAB* from-LAB*]
+                :Oklab [to-Oklab* from-Oklab*]
                 :JAB   [to-JAB* from-JAB*]
                 :HunterLAB  [to-HunterLAB* from-HunterLAB*]
                 :LCH   [to-LCH* from-LCH*]
@@ -2772,17 +2906,17 @@
      0.0
      (let [f (max r g b)
            p (min r g b)
-           [^double l ^double i] (if (== f r)
-                                   (if (== p b)
-                                     [g (:fi (paletton-base-data 119.0))]
-                                     [b (:fi (paletton-base-data 359.0))])
-                                   (if (== f g)
-                                     (if (== p r)
-                                       [b (:fi (paletton-base-data 209.0))]
-                                       [r (:fi (paletton-base-data 179.0))])
-                                     (if (== p r)
-                                       [g (:fi (paletton-base-data 254.0))]
-                                       [r (:fi (paletton-base-data 314.0))])))
+           [^double l i] (if (== f r)
+                           (if (== p b)
+                             [g (:fi (paletton-base-data 119.0))]
+                             [b (:fi (paletton-base-data 359.0))])
+                           (if (== f g)
+                             (if (== p r)
+                               [b (:fi (paletton-base-data 209.0))]
+                               [r (:fi (paletton-base-data 179.0))])
+                             (if (== p r)
+                               [g (:fi (paletton-base-data 254.0))]
+                               [r (:fi (paletton-base-data 314.0))])))
            ;; d (/ (- f p) f) ;; saturation
            ;; v (/ f 255.0)   ;; value
            s (i (if (== l p) -1.0

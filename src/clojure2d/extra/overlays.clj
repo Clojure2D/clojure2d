@@ -49,8 +49,8 @@
        (line canvas 0 y++ w y++))))
   canvas)
 
-(def ^:private tinter1 (partial p/filter-channels (p/tint (c/color 245 130 16))))
-(def ^:private tinter2 (partial p/filter-channels (p/tint (c/color 36 130 225))))
+(def ^:private tinter1 (partial p/filter-channels (p/tint (c/color 245.0 130.0 16.0))))
+(def ^:private tinter2 (partial p/filter-channels (p/tint (c/color 36.0 130.0 225.0))))
 
 (defn render-rgb-scanlines
   "Blurs and renders rgb stripes on the image, returns new image.

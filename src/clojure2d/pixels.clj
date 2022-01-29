@@ -283,13 +283,14 @@
 
 (extend BufferedImage
   pr/PixelsProto
-  {:to-pixels (fn [^BufferedImage i] (get-image-pixels i))
+  {:to-pixels (fn (^Pixels [^BufferedImage i] (get-image-pixels i))
+                (^Pixels [^BufferedImage i x y w h] (get-image-pixels i x y w h)))
    :get-color (fn ^Vec4 [^BufferedImage i ^long x ^long y]
                 (if (or (< x 0)
                         (< y 0)
                         (>= x (.getWidth i))
                         (>= y (.getHeight i)))
-                  (c/color 0 0 0)
+                  (c/color 0.0 0.0 0.0)
                   (let [b (int-array 1)
                         ^java.awt.image.Raster raster (.getRaster i)]
                     (.getDataElements raster x y b)
@@ -311,13 +312,15 @@
 
 (extend Canvas
   pr/PixelsProto
-  {:to-pixels (fn ^Pixels [^Canvas c] (get-canvas-pixels c))
+  {:to-pixels (fn (^Pixels [^Canvas c] (get-canvas-pixels c))
+                (^Pixels [^Canvas c x y w h] (get-canvas-pixels c x y w h)))
    :get-color (fn ^Vec4 [^Canvas c x y] (pr/get-color (.buffer c) x y))
    :get-value (fn ^long [^Canvas c ch x y] (pr/get-value (.buffer c) ch x y))})
 
 (extend Window
   pr/PixelsProto
-  {:to-pixels (fn ^Pixels [^Window w] (get-canvas-pixels @(.buffer w)))
+  {:to-pixels (fn (^Pixels [^Window wnd] (get-canvas-pixels @(.buffer wnd)))
+                (^Pixels [^Window wnd x y w h] (get-canvas-pixels @(.buffer wnd) x y w h)))
    :get-color (fn ^Vec4 [^Window w x y] (pr/get-color @(.buffer w) x y))
    :get-value (fn ^long [^Window w ch x y] (pr/get-value @(.buffer w) ch x y))})
 
@@ -538,7 +541,6 @@
 (def ^{:metadoc/categories #{:filt} :doc "Dilate filter. See: [[dilate-cross]]."} dilate (make-quantile 8))
 
 (defn- make-quantile-cross
-  ""
   [no]
   (fn [ch ^Pixels target ^Pixels p]
     (clojure2d.java.filter.Quantile/processCross (.p p) (.p target) ch (.w p) (.h p) no)))
@@ -728,7 +730,7 @@
   (set-color! [r x y c]
     (.addPixel buff x y (c/to-color c))
     r)
-  (get-color [r x y]
+  (get-color [_ x y]
     (let [x (unchecked-int x)
           y (unchecked-int y)
           a (fastmath.java.Array/get2d (.a buff) w x y)]
@@ -737,7 +739,7 @@
              (/ (fastmath.java.Array/get2d (.b buff) w x y) a)
              255.0)))
   (to-pixels [r] (pr/to-pixels r {}))
-  (to-pixels [r {:keys [background ^double gamma-alpha ^double gamma-color ^double vibrancy
+  (to-pixels [_ {:keys [background ^double gamma-alpha ^double gamma-color ^double vibrancy
                         ^double saturation ^double brightness ^double contrast]
                  :or {background :black
                       gamma-alpha 1.0
@@ -831,11 +833,11 @@
   (add-pixel! [r x y]
     (.addPixel buff x y)
     r)
-  (get-pixel [r x y]
+  (get-pixel [_ x y]
     (fastmath.java.Array/get2d (.cnt buff) w (unchecked-int x) (unchecked-int y)))
   pr/PixelsProto
   (to-pixels [r] (pr/to-pixels r {}))
-  (to-pixels [r {:keys [logarithmic? gradient]
+  (to-pixels [_ {:keys [logarithmic? gradient]
                  :or {logarithmic? false gradient (c/gradient (c/palette :glitterboy))}}]
     (let [size (* w h)
           arr (int-array (* 4 size))
@@ -870,9 +872,10 @@
   
   This is mutating function. Data from list of renderers is added to the target."
   {:metadoc/categories #{:ld}}
-  ^GradientRenderer [^GradientRenderer target & renderers]
-  (reduce #(.merge ^clojure2d.java.GradientDensity (.buff target)
-                   ^clojure2d.java.GradientDensity (.buff ^GradientRenderer %)) target renderers))
+  ^GradientRenderer [target & renderers]
+  (reduce (fn [^GradientRenderer t ^GradientRenderer in]
+            (.merge ^clojure2d.java.GradientDensity (.buff ^GradientRenderer t)
+                    ^clojure2d.java.GradientDensity (.buff ^GradientRenderer in))) target renderers))
 
 ;;
 
@@ -914,6 +917,7 @@
   "Convert to Pixels. For low density rendering provide configuration. Works with Image/Canvas/Window and low density renderer."
   {:metadoc/categories #{:pix :ld}}
   (^Pixels [pixels] (pr/to-pixels pixels))
+  (^Pixels [pixels x y w h] (pr/to-pixels pixels x y w h))
   (^Pixels [pixels cfg] (pr/to-pixels pixels cfg)))
 
 (defn add-pixel!

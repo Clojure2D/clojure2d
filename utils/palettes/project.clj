@@ -5,4 +5,5 @@
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [generateme/fastmath "2.0.0-alpha1"]
-                 [scicloj/clojisr "1.0.0-BETA14"]])
+                 [scicloj/clojisr "1.0.0-BETA14"]
+                 [org.clojure/data.json "2.4.0"]])

@@ -186,19 +186,16 @@
             [fastmath.grid :as grid]
             [clojure.java.io :as io]
             [clojure2d.protocols :as pr])
-  (:import [java.awt BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Toolkit Transparency]
+  (:import [java.awt Font Shape BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Toolkit Transparency]
            [java.awt.event InputEvent ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
-           [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double Arc2D Arc2D$Double]
+           [java.awt.geom PathIterator Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double Arc2D Arc2D$Double]
+           [java.awt.font GlyphVector]
            [java.awt.image BufferedImage BufferStrategy Kernel ConvolveOp]
            [java.util Iterator Calendar]
            [javax.imageio IIOImage ImageIO ImageWriteParam ImageWriter]
            [javax.swing ImageIcon JFrame SwingUtilities]
            [org.apache.batik.transcoder.image ImageTranscoder]
            [org.apache.batik.transcoder TranscoderInput]
-           [org.w3c.dom Document]
-           [org.apache.batik.util SVGConstants XMLResourceDescriptor ]
-           [org.apache.batik.dom.util SAXDocumentFactory]
-           [org.apache.batik.anim.dom SVGDOMImplementation]
            [fastmath.vector Vec2]))
 
 (set! *warn-on-reflection* true)
@@ -231,25 +228,27 @@
     (.flush img)
     bimg))
 
+
 (defn load-image 
   "Load Image from file.
 
-  * Input: Image filename with absolute or relative path (relative to your project folder)
+  * Input: Image filename with absolute or relative path (relative to your project folder) or url.
   * Returns BufferedImage object or nil when Image can't be loaded.
 
   For supported formats check [[img-reader-formats]]."
   {:metadoc/categories #{:image}}
-  [^String filename]
+  [^String filename-or-url]
   (try
-    (force-argb-image (.getImage (ImageIcon. filename)))
-    (catch Exception e (println "Can't load image: " filename " " (.getMessage e)))))
+    (force-argb-image (ImageIO/read (io/input-stream filename-or-url)))
+    (catch Exception e (println "Can't load image: " filename-or-url " " (.getMessage e)))))
 
 (defn load-url-image
-  "Load image from given URL"
+  "Load image from given URL, see [[load-image]]."
   [^String url]
-  (try
-    (force-argb-image (ImageIO/read (io/as-url url)))
-    (catch Exception e (println "Can't load image from URL: " url " " (.getMessage e)))))
+  {:metadoc/categories #{:image}
+   :deprecated "Use `load-image`."}
+  (load-image url))
+
 
 ;; ### Save image
 
@@ -498,6 +497,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
                          [RenderingHints/KEY_TEXT_ANTIALIASING   RenderingHints/VALUE_TEXT_ANTIALIAS_ON]]
                    :high [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_ON]
                           [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_BICUBIC]
+
                           [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY]
                           [RenderingHints/KEY_COLOR_RENDERING     RenderingHints/VALUE_COLOR_RENDER_QUALITY]
                           [RenderingHints/KEY_RENDERING           RenderingHints/VALUE_RENDER_QUALITY]
@@ -627,7 +627,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
                          (get-rendering-hints hint)
                          width height
                          nil
-                         (when font (java.awt.Font/decode font)))]
+                         (when font (Font/decode font)))]
      (with-canvas [c result]
        (.setComposite ^Graphics2D (.graphics ^Canvas c) java.awt.AlphaComposite/Src)
        (set-background c Color/black 0))
@@ -811,16 +811,111 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
      (orient-canvas ~orientation c#)
      (-> c# ~@body)))
 
+;; shape
+
+(defn- rectangle2d->box
+  [^Rectangle2D box]
+  [(.getX box) (.getY box)
+   (.getWidth box) (.getHeight box)])
+
+(extend-type Shape
+  pr/ShapeProto
+  (bounding-box [shape]
+    (rectangle2d->box (.getBounds2D ^Shape shape)))
+  (contains-point? [shape x y]
+    (.contains ^Shape shape ^double x ^double y))
+  (contains-rectangle? [shape x y w h]
+    (.contains ^Shape shape ^double x ^double y ^double w ^double h))
+  (intersects-rectangle? [shape x y w h]
+    (.intersects ^Shape shape ^double x ^double y ^double w ^double h)))
+
+(defn bounding-box
+  "Returns `[x,y,width,height]` of shape's bounding box."
+  [shape] (pr/bounding-box shape))
+
+(defn contains-point?
+  "Returns `true` if given point is inside a shape."
+  ([shape ^double x ^double y] (pr/contains-point? shape x y))
+  ([shape point] (pr/contains-point? shape (first point) (second point))))
+
+(defn contains-rectangle?
+  "Returns `true` if given rectangle is inside a shape."
+  ([shape x y w h] (pr/contains-rectangle? shape x y w h))
+  ([shape [^double x ^double y ^double w ^double h]] (pr/contains-rectangle? shape x y w h)))
+
+(defn intersects-rectangle?
+  "Returns `true` if given rectangle is inside a shape."
+  ([shape x y w h] (pr/intersects-rectangle? shape x y w h))
+  ([shape [^double x ^double y ^double w ^double h]] (pr/intersects-rectangle? shape x y w h)))
+
+;; shape - path
+
+(def ^:private segment-types->keywords {PathIterator/SEG_CLOSE :close
+                                      PathIterator/SEG_LINETO :line
+                                      PathIterator/SEG_MOVETO :move
+                                      PathIterator/SEG_QUADTO :quad
+                                      PathIterator/SEG_CUBICTO :cubic})
+
+(defn- shape->path-seq
+  ([iterator] (shape->path-seq iterator (double-array 6)))
+  ([^PathIterator iterator ^doubles buff]
+   (lazy-seq
+    (when-not (.isDone iterator)
+      (let [t (segment-types->keywords (.currentSegment iterator buff) :unknown)
+            pair [t (case t
+                      :close nil
+                      :line (vec (take 2 buff))
+                      :move (vec (take 2 buff))
+                      :quad (vec (take 4 buff))
+                      :cubic (vec buff)
+                      :unknown)]]
+        (.next iterator)
+        (cons pair (shape->path-seq iterator buff)))))))
+
+(defn shape->path-def
+  "Create path definition, sequence of pairs of [command coords]:
+
+  * `[:move [x y]]` - move to a position
+  * `[:line [x y]]` - line to a position
+  * `[:quad [x1 y1 x2 y2]` - curved line to a position
+  * `[:cubic [x1 y1 x2 y2 x3 y3]]` - bezier line to a position
+  * `[:close]` - close path
+
+  See [[path-def->shape]]"
+  [^Shape shape]
+  (shape->path-seq (.getPathIterator shape nil)))
+
+(defn- seg-moveto [^Path2D p [x1 y1]] (.moveTo p x1 y1))
+(defn- seg-lineto [^Path2D p [x1 y1]] (.lineTo p x1 y1))
+(defn- seg-quadto [^Path2D p [x1 y1 x2 y2]] (.quadTo p x1 y1 x2 y2))
+(defn- seg-cubicto [^Path2D p [x1 y1 x2 y2 x3 y3]] (.curveTo p x1 y1 x2 y2 x3 y3))
+
+(defn path-def->shape
+  "Create a shape from path definition, see [[shape->path-def]]"
+  [path-def]
+  (let [^Path2D p (Path2D$Double.)]
+    (doseq [[t v] path-def]
+      (case t
+        :close (.closePath p)
+        :line (seg-lineto p v)
+        :quad (seg-quadto p v)
+        :cubic (seg-cubicto p v)
+        :move (seg-moveto p v)))
+    p))
+
 ;; clip
 
 (defn clip
-  "Clip drawing to specified rectangle.
+  "Clip drawing to specified rectangle or shape.
 
   See also [[reset-clip]]."
   {:metadoc/categories #{:canvas}}
-  [^Canvas canvas x y w h] 
-  (.setClip ^Graphics2D (.graphics canvas) x y w h)
-  canvas)
+  ([^Canvas canvas x y w h] 
+   (.setClip ^Graphics2D (.graphics canvas) x y w h)
+   canvas)
+  ([^Canvas canvas ^Shape shape] 
+   (.setClip ^Graphics2D (.graphics canvas) shape)
+   canvas))
 
 (defn reset-clip
   "Resets current clipping.
@@ -918,12 +1013,22 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   ([canvas vect]
    (point canvas (vect 0) (vect 1))))
 
-(defmacro ^:private draw-fill-or-stroke
-  "Draw filled or outlined shape."
-  [g obj stroke?]
-  `(if ~stroke?
-     (.draw ~g ~obj)
-     (.fill ~g ~obj)))
+(defn shape
+  "Draw Java2D shape object"
+  {:metadoc/categories #{:draw}}
+  ([^Canvas canvas sh stroke?]
+   (if stroke?
+     (.draw ^Graphics2D (.graphics canvas) sh)
+     (.fill ^Graphics2D (.graphics canvas) sh))
+   canvas)
+  ([canvas sh] (shape canvas sh false)))
+
+(defn rect-shape
+  ([^Rectangle2D r x y w h]
+   (.setFrame r x y w h)
+   r)
+  ([x y w h]
+   (rect-shape (Rectangle2D$Double.) x y w h)))
 
 (defn rect
   "Draw rectangle with top-left corner at `(x,y)` position with width `w` and height `h`. Optionally you can set `stroke?` (default: `false`) to `true` if you don't want to fill rectangle and draw outline only.
@@ -931,34 +1036,58 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   See also: [[crect]]."
   {:metadoc/categories #{:draw}}
   ([^Canvas canvas x y w h stroke?]
-   (let [^Rectangle2D r (.rect-obj canvas)] 
-     (.setFrame r x y w h)
-     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) r stroke?))
+   (shape canvas (rect-shape (.rect-obj canvas) x y w h) stroke?)
    canvas)
   ([canvas x y w h]
    (rect canvas x y w h false)))
 
+(defn crect-shape
+  ([^Rectangle2D r x y w h]
+   (let [w2 (* 0.5 ^double w)
+         h2 (* 0.5 ^double h)]
+     (.setFrame r (- ^double x w2) (- ^double y h2) w h)
+     r))
+  ([x y w h]
+   (crect-shape (Rectangle2D$Double.) x y w h)))
+
 (defn crect
   "Centered version of [[rect]]."
   {:metadoc/categories #{:draw}}
-  ([canvas x y w h stroke?]
-   (let [w2 (* 0.5 ^double w)
-         h2 (* 0.5 ^double h)]
-     (rect canvas (- ^double x w2) (- ^double y h2) w h stroke?))
+  ([^Canvas canvas x y w h stroke?]
+   (shape canvas (crect-shape (.rect-obj canvas) x y w h) stroke?)
    canvas)
   ([canvas x y w h]
    (crect canvas x y w h false)))
+
+(defn ellipse-shape
+  ([^Ellipse2D e x y w h]
+   (.setFrame e (- ^double x (* ^double w 0.5)) (- ^double y (* ^double h 0.5)) w h)
+   e)
+  ([x y w h]
+   (ellipse-shape (Ellipse2D$Double.) x y w h)))
 
 (defn ellipse
   "Draw ellipse with middle at `(x,y)` position with width `w` and height `h`."
   {:metadoc/categories #{:draw}}
   ([^Canvas canvas x1 y1 w h stroke?]
-   (let [^Ellipse2D e (.ellipse-obj canvas)]
-     (.setFrame e (- ^double x1 (* ^double w 0.5)) (- ^double y1 (* ^double h 0.5)) w h)
-     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) e stroke?))
+   (shape canvas (ellipse-shape (.ellipse_obj canvas) x1 y1 w h) stroke?)
    canvas)
   ([canvas x1 y1 w h]
    (ellipse canvas x1 y1 w h false)))
+
+(defn arc-shape
+  ([^Arc2D a x1 y1 w h start extent type]
+   (.setArc a (- ^double x1 (* ^double w 0.5)) (- ^double y1 (* ^double h 0.5)) w h
+            (m/degrees start) (- (m/degrees extent))
+            (case type
+              :chord Arc2D/CHORD
+              :pie Arc2D/PIE
+              Arc2D/OPEN))
+   a)
+  ([x1 y1 w h start extent type]
+   (arc-shape (Arc2D$Double.) x1 y1 w h start extent type))
+  ([x1 y1 w h start extent]
+   (arc-shape x1 y1 w h start extent :open)))
 
 (defn arc
   "Draw arc with middle at `(x,y)` position with width `w` and height `h`.
@@ -967,24 +1096,31 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
   Type is one of the:
 
-  * `:open`
+  * `:open` - default
   * `:pie`
   * `:chord`"
   {:metadoc/categories #{:draw}}
   ([^Canvas canvas x1 y1 w h start extent type stroke?]
-   (let [^Arc2D e (.arc-obj canvas)]
-     (.setArc e (- ^double x1 (* ^double w 0.5)) (- ^double y1 (* ^double h 0.5)) w h
-              (m/degrees start) (- (m/degrees extent))
-              (case type
-                :chord Arc2D/CHORD
-                :pie Arc2D/PIE
-                Arc2D/OPEN))
-     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) e stroke?))
+   (shape canvas (arc-shape (.arc-obj canvas) x1 y1 w h start extent type) stroke?)
    canvas)
   ([canvas x1 y1 w h start extent type]
    (arc canvas x1 y1 w h start extent type true))
   ([canvas x1 y1 w h start extent]
    (arc canvas x1 y1 w h start extent :open true)))
+
+(defn rarc-shape
+  ([^Arc2D a x1 y1 r start extent type]
+   (.setArcByCenter a x1 y1 r
+                    (m/degrees start) (- (m/degrees extent))
+                    (case type
+                      :chord Arc2D/CHORD
+                      :pie Arc2D/PIE
+                      Arc2D/OPEN))
+   a)
+  ([x1 y1 r start extent type]
+   (rarc-shape (Arc2D$Double.) x1 y1 r start extent type))
+  ([x1 y1 r start extent]
+   (rarc-shape x1 y1 r start extent :open)))
 
 (defn rarc
   "Draw arc with middle at `(x,y)` with radius `r`.
@@ -998,31 +1134,28 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   * `:chord`"
   {:metadoc/categories #{:draw}}
   ([^Canvas canvas x1 y1 r start extent type stroke?]
-   (let [^Arc2D e (.arc-obj canvas)]
-     (.setArcByCenter e x1 y1 r
-                      (m/degrees start) (- (m/degrees extent))
-                      (case type
-                        :chord Arc2D/CHORD
-                        :pie Arc2D/PIE
-                        Arc2D/OPEN))
-     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) e stroke?))
+   (shape canvas (rarc-shape (.arc-obj canvas) x1 y1 r start extent type) stroke?)
    canvas)
   ([canvas x1 y1 r start extent type]
    (rarc canvas x1 y1 r start extent type true))
   ([canvas x1 y1 r start extent]
    (rarc canvas x1 y1 r start extent :open true)))
 
+(defn triangle-shape
+  [x1 y1 x2 y2 x3 y3]
+  (let [^Path2D p (Path2D$Double.)]
+    (doto p
+      (.moveTo x1 y1)
+      (.lineTo x2 y2)
+      (.lineTo x3 y3)
+      (.closePath))
+    p))
+
 (defn triangle
   "Draw triangle with corners at 3 positions."
   {:metadoc/categories #{:draw}}
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 stroke?]
-   (let [^Path2D p (Path2D$Double.)]
-     (doto p
-       (.moveTo x1 y1)
-       (.lineTo x2 y2)
-       (.lineTo x3 y3)
-       (.closePath))
-     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?))
+   (shape (triangle-shape x1 y1 x2 y2 x3 y3) stroke?)
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3]
    (triangle canvas x1 y1 x2 y2 x3 y3 false)))
@@ -1041,7 +1174,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
             vss (nnext vs)]
        (when vss
          (let [v3 (first vss)]
-           (triangle canvas (v2 0) (v2 1) (v3 0) (v3 1) (v1 0) (v1 1) stroke?)
+           (triangle canvas (first v2) (second v2) (first v3) (second v3) (first v1) (second v1) stroke?)
            (recur v2 v3 (next vss))))))
    canvas)
   ([canvas vs]
@@ -1063,11 +1196,24 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
               vss (nnext vs)]
          (when vss
            (let [v3 (first vss)]
-             (triangle canvas (v1 0) (v1 1) (v2 0) (v2 1) (v3 0) (v3 1) stroke?)
+             (triangle canvas (first v1) (second v1) (first v2) (second v2) (first v3) (second v3) stroke?)
              (recur v3 (next vss)))))))
    canvas)
   ([canvas vs]
    (triangle-strip canvas vs false)))
+
+(defn path-shape
+  "Create shape object out of path."
+  (^Path2D [vs] (path-shape vs true))
+  (^Path2D [vs close?]
+   (when (seq vs)
+     (let [^Path2D p (Path2D$Double.)
+           m (first vs)]
+       (.moveTo p (first m) (second m))
+       (doseq [v (next vs)]
+         (.lineTo p (first v) (second v)))
+       (when close? (.closePath p))
+       p))))
 
 (defn path
   "Draw path from lines.
@@ -1077,14 +1223,8 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   See also [[path-bezier]]."
   {:metadoc/categories #{:draw}}
   ([^Canvas canvas vs close? stroke?]
-   (when (seq vs)
-     (let [^Path2D p (Path2D$Double.)
-           m (first vs)]
-       (.moveTo p (first m) (second m))
-       (doseq [v (next vs)]
-         (.lineTo p (first v) (second v)))
-       (when (or (not stroke?) close?) (.closePath p))
-       (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?)))
+   (when-let [^Path2D p (path-shape vs (or (not stroke?) close?))]
+     (shape canvas p stroke?))
    canvas)
   ([canvas vs close?] (path canvas vs close? true))
   ([canvas vs] (path canvas vs false true)))
@@ -1114,25 +1254,19 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
                 (v/sub m2))]
     [cp1 cp2]))
 
-(defn path-bezier
-  "Draw path from quad curves.
-
-  Input: list of points as vectors, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).
-
-  See also [[path]]."
-  {:metadoc/categories #{:draw}}  
-  ([^Canvas canvas vs close? stroke?]
+(defn path-bezier-shape
+  ([vs] (path-bezier-shape vs false))
+  ([vs close?]
    (when (> (count vs) 3)
-     (let [cl? (or (not stroke?) close?)
-           ^Path2D p (Path2D$Double.)
+     (let [^Path2D p (Path2D$Double.)
            m0 (first vs)
            m1 (second vs)
            m2 (nth vs 2) 
-           f0 (if cl? m0 m0)
-           f1 (if cl? m1 m0)
-           f2 (if cl? m2 m1)
-           f3 (if cl? (nth vs 3) m2)
-           vs (if cl? (next vs) vs)]
+           f0 (if close? m0 m0)
+           f1 (if close? m1 m0)
+           f2 (if close? m2 m1)
+           f3 (if close? (nth vs 3) m2)
+           vs (if close? (next vs) vs)]
        (.moveTo p (f1 0) (f1 1))
        (loop [v0 f0
               v1 f1
@@ -1143,7 +1277,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
            (.curveTo p (cp1 0) (cp1 1) (cp2 0) (cp2 1) (v2 0) (v2 1))
            (if-not (empty? nvs)
              (recur v1 v2 v3 (first nvs) (next nvs))
-             (if cl?
+             (if close?
                (let [[cp1 cp2] (calculate-bezier-control-points v1 v2 v3 m0)
                      [cp3 cp4] (calculate-bezier-control-points v2 v3 m0 m1)
                      [cp5 cp6] (calculate-bezier-control-points v3 m0 m1 m2)]
@@ -1152,80 +1286,117 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
                  (.curveTo p (cp5 0) (cp5 1) (cp6 0) (cp6 1) (m1 0) (m1 1)))
                (let [[cp1 cp2] (calculate-bezier-control-points v1 v2 v3 v3)]
                  (.curveTo p (cp1 0) (cp1 1) (cp2 0) (cp2 1) (v3 0) (v3 1)))))))
-       (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?)))
+       p))))
+
+(defn path-bezier
+  "Draw path from quad curves.
+
+  Input: list of points as vectors, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).
+
+  See also [[path]]."
+  {:metadoc/categories #{:draw}}  
+  ([^Canvas canvas vs close? stroke?]
+   (when-let [p (path-bezier-shape vs (or (not stroke?) close?))]
+     (shape canvas p stroke?))
    canvas)
   ([canvas vs close?] (path-bezier canvas vs close? true))
   ([canvas vs] (path-bezier canvas vs false true)))
+
+(defn bezier-shape
+  [x1 y1 x2 y2 x3 y3 x4 y4]
+  (let [^Path2D p (Path2D$Double.)]
+    (doto p
+      (.moveTo x1 y1)
+      (.curveTo x2 y2 x3 y3 x4 y4))
+    p))
 
 (defn bezier
   "Draw bezier curve with 4 sets of coordinates."
   {:metadoc/categories #{:draw}}  
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
-   (let [^Path2D p (Path2D$Double.)]
-     (doto p
-       (.moveTo x1 y1)
-       (.curveTo x2 y2 x3 y3 x4 y4))
-     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?)))
+   (shape canvas (bezier-shape x1 y1 x2 y2 x3 y3 x4 y4) stroke?))
   ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
    (bezier canvas x1 y1 x2 y2 x3 y3 x4 y4 true)))
+
+(defn curve-shape
+  [x1 y1 x2 y2 x3 y3]
+  (let [^Path2D p (Path2D$Double.)]
+    (doto p
+      (.moveTo x1 y1)
+      (.quadTo x2 y2 x3 y3))
+    p))
 
 (defn curve
   "Draw quadratic curve with 3 sets of coordinates."
   {:metadoc/categories #{:draw}}  
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 stroke?]
-   (let [^Path2D p (Path2D$Double.)]
-     (doto p
-       (.moveTo x1 y1)
-       (.quadTo x2 y2 x3 y3))
-     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?)))
+   (shape canvas (curve-shape x1 y1 x2 y2 x3 y3) stroke?))
   ([canvas x1 y1 x2 y2 x3 y3]
    (curve canvas x1 y1 x2 y2 x3 y3 true)))
+
+(defn quad-shape
+  [x1 y1 x2 y2 x3 y3 x4 y4]
+  (let [^Path2D p (Path2D$Double.)]
+    (doto p
+      (.moveTo x1 y1)
+      (.lineTo x2 y2)
+      (.lineTo x3 y3)
+      (.lineTo x4 y4)
+      (.closePath))
+    p))
 
 (defn quad
   "Draw quad with corners at 4 positions."
   {:metadoc/categories #{:draw}}
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
-   (let [^Path2D p (Path2D$Double.)]
-     (doto p
-       (.moveTo x1 y1)
-       (.lineTo x2 y2)
-       (.lineTo x3 y3)
-       (.lineTo x4 y4)
-       (.closePath))
-     (draw-fill-or-stroke ^Graphics2D (.graphics canvas) p stroke?))
+   (shape canvas (quad-shape x1 y1 x2 y2 x3 y3 x4 y4) stroke?)
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
    (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false)))
 
 ;; hex
 
+(defn pointy-hex-shape
+  [x y size]
+  (path-shape (grid/pointy-hex-corners size x y) true))
+
 (defn pointy-hex
   "Draw pointy topped hex."
   {:metadoc/categories #{:draw}}
   ([canvas x y size stroke?]
-   (path canvas (grid/pointy-hex-corners size x y) true stroke?))
+   (shape canvas (pointy-hex-shape x y size) stroke?))
   ([canvas x y size]
    (pointy-hex canvas x y size false)))
+
+(defn flat-hex-shape
+  [x y size]
+  (path-shape (grid/flat-hex-corners size x y) true))
 
 (defn flat-hex
   "Draw flat topped hex."
   {:metadoc/categories #{:draw}}
   ([canvas x y size stroke?]
-   (path canvas (grid/flat-hex-corners size x y) true stroke?))
+   (shape canvas (flat-hex-shape x y size) stroke?))
   ([canvas x y size]
    (flat-hex canvas x y size false)))
 
 ;; grid
 
+(defn grid-cell-shape
+  ([grid x y]
+   (path-shape (grid/corners grid [x y]) true))
+  ([grid x y scale]
+   (path-shape (grid/corners grid [x y] scale) true)))
+
 (defn grid-cell
   "Draw grid cell for given grid."
   {:metadoc/categories #{:draw}}
   ([canvas grid x y stroke?]
-   (path canvas (grid/corners grid [x y]) true stroke?))
+   (shape canvas (grid-cell-shape grid x y) stroke?))
   ([canvas grid x y]
    (grid-cell canvas grid x y false))
   ([canvas grid x y scale stroke?]
-   (path canvas (grid/corners grid [x y] scale) true stroke?)))
+   (shape canvas (grid-cell-shape grid x y scale) stroke?)))
 
 ;;
 
@@ -1235,11 +1406,17 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
     (into [] (.getAvailableFontFamilyNames (java.awt.GraphicsEnvironment/getLocalGraphicsEnvironment)))
     (catch Exception _ []))) ;; in headless mode function call fails
 
-(defn set-font
-  "Set font by name."
+(defn load-font
+  "Load font from file or url. Only TrueType and OpenTrueType fonts are supported."
   {:metadoc/categories #{:write}}
-  [^Canvas canvas ^String fontname]
-  (let [f (java.awt.Font/decode fontname)]
+  [font-file-or-url]
+  (Font/createFont Font/TRUETYPE_FONT (io/input-stream font-file-or-url)))
+
+(defn set-font
+  "Set font by name or actual font."
+  {:metadoc/categories #{:write}}
+  [^Canvas canvas font-or-fontname]
+  (let [f (if (string? font-or-fontname) (Font/decode font-or-fontname) font-or-fontname)]
     (.setFont ^Graphics2D (.graphics canvas) f)
     canvas))
 
@@ -1250,11 +1427,11 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   {:metadoc/categories #{:write}}
   ([^Canvas canvas ^double size style]
    (let [s (or (style {:bold 1 :italic 2 :bold-italic 3}) 0)
-         f (.deriveFont ^java.awt.Font (.getFont ^Graphics2D (.graphics canvas)) (int s) (float size))]
+         f (.deriveFont ^Font (.getFont ^Graphics2D (.graphics canvas)) (int s) (float size))]
      (.setFont ^Graphics2D (.graphics canvas) f)
      canvas))
   ([^Canvas canvas ^double size]
-   (let [f (.deriveFont ^java.awt.Font (.getFont ^Graphics2D (.graphics canvas)) (float size))]
+   (let [f (.deriveFont ^Font (.getFont ^Graphics2D (.graphics canvas)) (float size))]
      (.setFont ^Graphics2D (.graphics canvas) f)
      canvas)))
 
@@ -1286,10 +1463,8 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   "Returns bounding box [x,y,w,h] for given text. `[x,y]` position is relative to base line."
   {:metadoc/categories #{:write}}
   [^Canvas canvas txt]
-  (let [^Graphics2D g (.graphics canvas)
-        ^Rectangle2D b (.getStringBounds (.getFontMetrics g) (str txt) g)]
-    [(.getX b) (.getY b)
-     (.getWidth b) (.getHeight b)]))
+  (let [^Graphics2D g (.graphics canvas)]
+    (rectangle2d->box (.getStringBounds (.getFontMetrics g) (str txt) g))))
 
 (defn text
   "Draw text for given position and alignment.
@@ -1310,6 +1485,19 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    canvas)
   ([canvas s x y]
    (text canvas s x y :left)))
+
+(defn- get-glyph-vector
+  ^GlyphVector [^Canvas canvas ^String txt]
+  (let [^Graphics2D g (.graphics canvas)]
+    (.createGlyphVector (.getFont g) (.getFontRenderContext g) txt)))
+
+(defn text-shape
+  "Returns shape for given text. Should be called withing context."
+  {:metadoc/categories #{:write}}
+  ([^Canvas canvas txt]
+   (.getOutline (get-glyph-vector canvas txt)))
+  ([^Canvas canvas txt x y]
+   (.getOutline (get-glyph-vector canvas txt) (float x) (float y))))
 
 ;; ### Color
 
@@ -1484,14 +1672,9 @@ See [[set-color]]."
 (defn load-svg
   "Load image into Batik Document. See [[transcode-svg]]."
   {:metadoc/categories #{:image}}
-  ^TranscoderInput  [svg-filename]
-  (TranscoderInput. ^Document (.createDocument (SAXDocumentFactory.
-                                                (SVGDOMImplementation/getDOMImplementation)
-                                                (XMLResourceDescriptor/getXMLParserClassName))
-                                               SVGConstants/SVG_NAMESPACE_URI
-                                               SVGConstants/SVG_SVG_TAG
-                                               (str "file:///" svg-filename)
-                                               (io/input-stream (io/file svg-filename)))))
+  ^TranscoderInput  [^String filename-or-url]
+  (TranscoderInput. filename-or-url))
+
 
 (defn transcode-svg
   "Convert transcoder input into BufferedImage. See [[load-svg]]."
@@ -1608,7 +1791,7 @@ See [[set-color]]."
   (width [_] w)
   (height [_] h)
   (save [w n] (save-image (pr/get-image @buffer) n) w)
-  (convolve [w n] (pr/convolve @buffer n))
+  (convolve [_ n] (pr/convolve @buffer n))
   (subimage [_ x y w h] (get-subimage @buffer x y w h))
   pr/PressedProto
   (key-pressed? [_] (:key-pressed? @events))
@@ -2178,9 +2361,9 @@ See [[set-color]]."
 ;; ## Load bytes
 
 (defn load-bytes
-  "Load file and return byte array."
-  [file]
-  (with-open [in (clojure.java.io/input-stream file)
+  "Load file or http and return byte array."
+  [file-or-url]
+  (with-open [in (io/input-stream file-or-url)
               out (java.io.ByteArrayOutputStream.)]
     (clojure.java.io/copy in out)
     (.toByteArray out)))
@@ -2339,6 +2522,11 @@ See [[set-color]]."
 
 (defn get-image
   "Return BufferedImage"
+  {:metadoc/categories #{:image :canvas :window}}
+  [i] (pr/get-image i))
+
+(defn to-image
+  "Return BufferedImage, alias for `get-image`"
   {:metadoc/categories #{:image :canvas :window}}
   [i] (pr/get-image i))
 

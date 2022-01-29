@@ -3,11 +3,25 @@ All notable changes to this project will be documented in this file. This change
 
 ## 1.4.4-SNAPSHOT
 
+### Added
+
+* `shape` introduced (all primitives have additiona shape version) + functions: `bounding-box`, `intersects-rectangle?`, `contains-point?` and `contains-rectangle?`
+* `shape->path-def` and `path-def->shape` to construct path from a definition and back
+* `text-shape` returns shape of the text
+* `load-font` loads fonts from a file
+* `load-image`, `load-svg` and `load-bytes` can load from http URLs now
+* XYB and Oklab color spaces
+* Dictionary of Colour Combinations - colors and palettes (prefix `:docc`) - https://github.com/mattdesl/dictionary-of-colour-combinations
+
 ### Fixed
 
 * LDRednerer is aware of alpha channel now
-* `palette` shoud return a vector in every case
+* `palette` should return a vector in every case
 * `path` points should be any seq (not vector only)
+
+### Deprecated
+
+* `load-url-image` - use `load-image`
 
 ## 1.4.3
 

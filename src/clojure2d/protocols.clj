@@ -62,8 +62,14 @@
   (set-color! [pixels x y v] [pixels idx v] "Set color value by index or position.")
   (get-channel [pixels ch] "Return whole `ints` array with chosen channel")
   (set-channel! [pixels ch v] "Set whole channel (as `ints` array)")
-  (to-pixels [pixels] [pixels cfg] "Convert to Pixels. For low density rendering provide configuration. Works with Image/Canvas/Window and low density renderer."))
+  (to-pixels [pixels] [pixels cfg] [pixels x y w h] "Convert to Pixels. For low density rendering provide configuration. Works with Image/Canvas/Window and low density renderer."))
 
 (defprotocol RendererProto
   (add-pixel! [r x y] [r x y c])
   (get-pixel [r x y]))
+
+(defprotocol ShapeProto
+  (bounding-box [shape])
+  (contains-point? [shape x y])
+  (contains-rectangle? [shape x y w h])
+  (intersects-rectangle? [shape x y w h]))

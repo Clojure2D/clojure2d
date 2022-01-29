@@ -17,4 +17,7 @@ _site
 /results/ex16/*.raw
 /results/ex18/*.raw
 /log
-
+utils/palettes/.nrepl-port
+utils/palettes/target
+.clj-kondo
+.lsp

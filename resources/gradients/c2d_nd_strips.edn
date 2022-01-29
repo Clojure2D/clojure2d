@@ -1,1 +1,1 @@
-#:nd_strips{:Banded_FGT_BGT {:c ("000000" "808080" "ffffff" "808080" "000000"), :p (0.0 0.25 0.5 0.75 1.0)}, :Banded_FGW_BGW {:c ("000000" "808080" "ffffff" "ffffff" "ffffff"), :p (0.0 0.25 0.5 0.75 1.0)}}
+#:nd_strips{:Banded_FGW_BGW {:c ("000000" "808080" "ffffff" "ffffff" "ffffff"), :p (0.0 0.25 0.5 0.75 1.0)}, :Banded_FGT_BGT {:c ("000000" "808080" "ffffff" "808080" "000000"), :p (0.0 0.25 0.5 0.75 1.0)}}

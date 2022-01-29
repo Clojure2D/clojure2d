@@ -1,7 +1,8 @@
 (ns palettes.core
   (:require [clojure.string :as s]
             [clojure.java.io :as io]
-            [clojure.xml :as xml]))
+            [clojure.xml :as xml]
+            [clojure.data.json :as json]))
 
 (require '[clojisr.v1.r :as r]
          '[tech.ml.dataset :as ds])
@@ -17,6 +18,11 @@
     (if (number-set (first s))
       (str "_" s)
       s)))
+
+(defn str->int
+  [s]
+  (Integer/parseInt (if (s/starts-with? s "#")
+                      (subs s 1) s) 16))
 
 (def all-palettes (atom {}))
 (def all-gradients (atom {}))
@@ -175,9 +181,61 @@
 
 ;; the old one
 
-(let [pals (into {} (map identity (read-gz-edn "palette_presets.edn.gz")))]
+(let [pals (read-gz-edn "palette_presets.edn.gz")]
   (swap! all-palettes merge pals)
   (spit "resources/palettes/c2d_.edn" (with-out-str (pr pals))))
+
+;; Dictionary of Colour Combinations
+;; https://github.com/mattdesl/dictionary-of-colour-combinations
+
+(def docc-data
+  (json/read (io/reader "https://raw.githubusercontent.com/mattdesl/dictionary-of-colour-combinations/master/colors.json") :key-fn keyword))
+
+(first docc-data)
+;; => {:name "Hermosa Pink",
+;;     :combinations [176 227 273],
+;;     :swatch 0,
+;;     :cmyk [0 30 6 0],
+;;     :lab [83.42717631799802 22.136186770428026 1.6381322957198563],
+;;     :rgb [249 193 206],
+;;     :hex "#f9c1ce"}
+
+(def docc-name->keyword (comp (partial keyword "docc") #(s/replace % #"[^a-z]" "-") s/lower-case))
+
+(def docc-colors
+  (into {} (map (fn [{:keys [name hex]}]
+                  [(docc-name->keyword name) (str->int hex)]) docc-data)))
+
+;; save colors
+(spit "resources/color_presets.edn" (with-out-str (pr (merge docc-colors (read-gz-edn "pre_color_presets.edn.gz")))))
+
+;; docc palettes
+
+(defn- luma
+  "Local luma conversion function"
+  ^double [[^double r ^double g ^double b]]
+  (+ (* 0.212671 r)
+     (* 0.715160 g)
+     (* 0.072169 b)))
+
+;; prepare palettes
+
+(defn rgb->int
+  [[^long r ^long g ^long b]]
+  (bit-or (bit-shift-left (bit-and 0xff r) 16)
+          (bit-shift-left (bit-and 0xff g) 8)
+          (bit-and 0xff b)))
+
+(let [pals (->> docc-data
+                (reduce (fn [m {:keys [combinations rgb]}]
+                          (reduce (fn [m pal-id]
+                                    (update m pal-id conj rgb)) m combinations)) {})
+                (map (fn [[k v]]
+                       (let [sv (sort-by luma v)]
+                         [(keyword "docc" (str "docc-" k)) (mapv rgb->int sv)])))
+                (into {}))]
+  (swap! all-palettes merge pals)
+  (spit "resources/palettes/c2d_docc.edn" (with-out-str (pr pals))))
 
 ;;
 
@@ -195,3 +253,5 @@
       (keys @all-palettes))
 (spit "resources/gradients/all-gradients.edn"
       (keys @all-gradients))
+
+(r/discard-all-sessions)

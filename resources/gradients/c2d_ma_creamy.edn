@@ -1,1 +1,1 @@
-#:ma_creamy{:buttercream {:c ("b0baaa" "f0ebd2"), :p (0.0 1.0)}, :pink_green {:c ("c7a08c" "afb9aa"), :p (0.0 1.0)}, :pinkgreenlt {:c ("c8a08c" "d8dfcd"), :p (0.0 1.0)}, :strawberrycream {:c ("c8a08c" "f0ebd2"), :p (0.0 1.0)}}
+#:ma_creamy{:pinkgreenlt {:c ("c8a08c" "d8dfcd"), :p (0.0 1.0)}, :strawberrycream {:c ("c8a08c" "f0ebd2"), :p (0.0 1.0)}, :buttercream {:c ("b0baaa" "f0ebd2"), :p (0.0 1.0)}, :pink_green {:c ("c7a08c" "afb9aa"), :p (0.0 1.0)}}
