@@ -10,14 +10,18 @@ All notable changes to this project will be documented in this file. This change
 * `text-shape` returns shape of the text
 * `load-font` loads fonts from a file
 * `load-image`, `load-svg` and `load-bytes` can load from http URLs now
-* XYB and Oklab color spaces
+* RYB, XYB and Oklab color spaces
 * Dictionary of Colour Combinations - colors and palettes (prefix `:docc`) - https://github.com/mattdesl/dictionary-of-colour-combinations
+* Color Vision Deficiency `cvd-lens` function (a filter)
+* `mixsub` subtactive mixing
 
 ### Fixed
 
 * LDRednerer is aware of alpha channel now
 * `palette` should return a vector in every case
 * `path` points should be any seq (not vector only)
+* `possible-color?` should recognize String as a valid color
+* `random-color` selects also from predefined colors and palettes
 
 ### Deprecated
 

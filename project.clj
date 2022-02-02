@@ -14,6 +14,7 @@
         ::url "https://github.com/Clojure2D/clojure2d.git"}
   :repl-options {:timeout 120000}
   :target-path "target/%s"
-  :profiles {:dev-codox {:codox {:source-uri "https://github.com/Clojure2D/clojure2d/blob/master/{filepath}#L{line}"
+  :profiles {:dev {:source-paths ["dev"]}
+             :dev-codox {:codox {:source-uri "https://github.com/Clojure2D/clojure2d/blob/master/{filepath}#L{line}"
                                  :output-path "docs/codox/"}}
              :uberjar {:aot :all}})

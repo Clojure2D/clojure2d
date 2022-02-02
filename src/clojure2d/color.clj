@@ -125,8 +125,7 @@
             [fastmath.clustering :as cl]
             [fastmath.easings :as e]
             [clojure2d.protocols :as pr]
-            [clojure.java.io :refer [input-stream resource]]
-            [clojure2d.color :as c])
+            [clojure.java.io :refer [input-stream resource]])
   (:import [fastmath.vector Vec2 Vec3 Vec4]           
            [java.awt Color]
            [clojure.lang APersistentVector ISeq]))
@@ -213,7 +212,8 @@
   See also [[valid-color?]]."
   {:metadoc/categories #{:pal}}
   [c]
-  (or (and (not (seqable? c))
+  (or (string? c)
+      (and (not (seqable? c))
            (satisfies? pr/ColorProto c))
       (and (seqable? c)
            (let [v (first c)]
@@ -620,11 +620,11 @@
 (defn pack
   "Pack color to ARGB 32bit integer."
   {:metadoc/categories meta-ops}
-  ^long [c]
-  (unchecked-long (bit-or (<< (lclamp255 (pr/alpha c)) 24)
-                          (<< (lclamp255 (pr/red c)) 16)
-                          (<< (lclamp255 (pr/green c)) 8)
-                          (lclamp255 (pr/blue c)))))
+  [c]
+  (unchecked-int (bit-or (<< (lclamp255 (pr/alpha c)) 24)
+                         (<< (lclamp255 (pr/red c)) 16)
+                         (<< (lclamp255 (pr/green c)) 8)
+                         (lclamp255 (pr/blue c)))))
 
 (defn black?
   "Check if color is black"
@@ -807,9 +807,9 @@
   "RGB -> Oklab, normalized"
   ^Vec4 [c]
   (let [^Vec4 c (to-Oklab c)]
-    (Vec4. (m/norm (.x c) 0.0 0.9999999934735462 0.0 255.0)
-           (m/norm (.y c) -0.23388757418790818 0.27621675349252356 0.0 255.0)
-           (m/norm (.z c) -0.3115281476783752  0.19856975465179516 0.0 255.0)
+    (Vec4. (m/mnorm (.x c) 0.0 0.9999999934735462 0.0 255.0)
+           (m/mnorm (.y c) -0.23388757418790818 0.27621675349252356 0.0 255.0)
+           (m/mnorm (.z c) -0.3115281476783752  0.19856975465179516 0.0 255.0)
            (.w c))))
 
 (defn from-Oklab
@@ -828,9 +828,9 @@
   "RGB -> Oklab, normalized"
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
-    (from-Oklab (Vec4. (m/norm (.x c) 0.0 255.0 0.0 0.9999999934735462)
-                       (m/norm (.y c) 0.0 255.0 -0.23388757418790818 0.27621675349252356)
-                       (m/norm (.z c) 0.0 255.0 -0.3115281476783752  0.19856975465179516)
+    (from-Oklab (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 0.9999999934735462)
+                       (m/mnorm (.y c) 0.0 255.0 -0.23388757418790818 0.27621675349252356)
+                       (m/mnorm (.z c) 0.0 255.0 -0.3115281476783752  0.19856975465179516)
                        (.w c)))))
 
 ;; ### XYZ
@@ -940,9 +940,9 @@
   "sRGB -> XYB, normalized"
   ^Vec4 [c]
   (let [^Vec4 c (to-XYB c)]
-    (Vec4. (m/norm (.x c) -0.015386116472573375 0.02810008316127735 0.0 255.0)
-           (m/norm (.y c) 0.0 0.8453085619621623 0.0 255.0)
-           (m/norm (.z c) 0.0 0.8453085619621623 0.0 255.0)
+    (Vec4. (m/mnorm (.x c) -0.015386116472573375 0.02810008316127735 0.0 255.0)
+           (m/mnorm (.y c) 0.0 0.8453085619621623 0.0 255.0)
+           (m/mnorm (.z c) 0.0 0.8453085619621623 0.0 255.0)
            (.w c))))
 
 (defn from-XYB
@@ -963,11 +963,68 @@
 (defn from-XYB*
   "XYB -> sRGB, normalized"
   ^Vec4 [c]
-  (let [^Vec4 c (c/to-color c)]
-    (from-XYB (Vec4. (m/norm (.x c) 0.0 255.0 -0.015386116472573375 0.02810008316127735)
-                     (m/norm (.y c) 0.0 255.0 0.0 0.8453085619621623)
-                     (m/norm (.z c) 0.0 255.0 0.0 0.8453085619621623)
+  (let [^Vec4 c (pr/to-color c)]
+    (from-XYB (Vec4. (m/mnorm (.x c) 0.0 255.0 -0.015386116472573375 0.02810008316127735)
+                     (m/mnorm (.y c) 0.0 255.0 0.0 0.8453085619621623)
+                     (m/mnorm (.z c) 0.0 255.0 0.0 0.8453085619621623)
                      (.w c)))))
+
+;; ### RYB
+;; https://web.archive.org/web/20120302090118/http://www.insanit.net/tag/rgb-to-ryb/
+
+(defn to-RYB
+  "RGB -> RYB"
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)
+        w (min (.x c) (.y c) (.z c))
+        r (- (.x c) w)
+        g (- (.y c) w)
+        b (- (.z c) w)
+        mg (max r g b)
+        y (min r g)
+        r (- r y)
+        g (- g y)
+        nz? (and (not (zero? b))
+                 (not (zero? g)))
+        g (if nz? (/ g 2.0) g)
+        b (if nz? (/ b 2.0) b)
+        y (+ y g)
+        b (+ b g)
+        my (max r y b)
+        n (if-not (zero? my) (/ mg my) 1.0)]
+    (Vec4. (m/muladd r n w)
+           (m/muladd y n w)
+           (m/muladd b n w)
+           (.w c))))
+
+(def ^{:doc "RGB -> RYB, normalized" :metadoc/categories meta-conv} to-RYB* to-RYB)
+
+(defn from-RYB
+  "RYB -> RGB"
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)
+        w (min (.x c) (.y c) (.z c))
+        r (- (.x c) w)
+        y (- (.y c) w)
+        b (- (.z c) w)
+        my (max r y b)
+        g (min y b)
+        y (- y g)
+        b (- b g)
+        nz? (and (not (zero? b))
+                 (not (zero? g)))
+        b (if nz? (* 2.0 b) b)
+        g (if nz? (* 2.0 g) g)
+        r (+ r y)
+        g (+ g y)
+        mg (max r g b)
+        n (if-not (zero? mg) (/ my mg) 1.0)]
+    (Vec4. (m/muladd r n w)
+           (m/muladd g n w)
+           (m/muladd b n w)
+           (.w c))))
+
+(def ^{:doc "RYB -> RGB, normalized" :metadoc/categories meta-conv} from-RYB* from-RYB)
 
 ;; ### LAB
 
@@ -2551,6 +2608,7 @@
                :OHTA  [to-OHTA from-OHTA]
                :XYZ   [to-XYZ from-XYZ]
                :XYB   [to-XYB from-XYB]
+               :RYB   [to-RYB from-RYB]
                :Yxy   [to-Yxy from-Yxy]
                :LMS   [to-LMS from-LMS]
                :IPT   [to-IPT from-IPT]
@@ -2589,6 +2647,7 @@
                 :OHTA  [to-OHTA* from-OHTA*]
                 :XYZ   [to-XYZ* from-XYZ*]
                 :XYB   [to-XYB* from-XYB*]
+                :RYB   [to-RYB* from-RYB*]
                 :Yxy   [to-Yxy* from-Yxy*]
                 :LMS   [to-LMS* from-LMS*]
                 :IPT   [to-IPT* from-IPT*]
@@ -3225,7 +3284,7 @@
   chroma.js way"
   {:metadoc/categories #{:interp}}
   (^Vec4 [c1 c2 colorspace ^double t]
-   (let [[to from] (colorspaces colorspace)]
+   (let [[to from] (colorspaces* colorspace)]
      (from (mix (to c1) (to c2) t))))
   (^Vec4 [c1 c2] (mix c1 c2 0.5))
   (^Vec4 [c1 c2 ^double t]
@@ -3235,6 +3294,36 @@
             (mix-interpolator (.y c1) (.y c2) t)
             (mix-interpolator (.z c1) (.z c2) t)
             (m/mlerp (.w c1) (.w c2) t)))))
+
+(defn negate
+  "Negate color (subract from 255.0)"
+  (^Vec4 [c] (negate c false))
+  (^Vec4 [c alpha?]
+   (let [^Vec4 c (pr/to-color c)]
+     (Vec4. (- 255.0 (.x c))
+            (- 255.0 (.y c))
+            (- 255.0 (.z c))
+            (if alpha? (- 255.0 (.w c)) (.w c))))))
+
+;; https://github.com/ProfJski/ArtColors/blob/master/RYB.cpp#L230
+(defn mixsub
+  "Subtractive color mix in given optional `colorspace` (default: `:RGB`) and optional ratio (default: 0.5)"
+  {:metadoc/categories #{:interp}}
+  (^Vec4 [c1 c2 colorspace ^double t]
+   (let [[to from] (colorspaces colorspace)]
+     (from (mixsub (to c1) (to c2) t))))
+  (^Vec4 [c1 c2] (mixsub c1 c2 0.5))
+  (^Vec4 [c1 c2 ^double t]
+   (let [c1 (pr/to-color c1)
+         c2 (pr/to-color c2)
+         mixed (lerp c1 c2 t)
+         
+         c (negate c1)
+         d (negate c2)
+         ^Vec4 f (set-alpha (v/clamp (v/sub (v/sub (Vec4. 255.0 255.0 255.0 255.0) c) d) 0.0 255.0) (alpha mixed))
+         ;; normalized distance: opaque white - transparent black
+         cd (* 4.0 t (- 1.0 t) (/ (v/dist c1 c2) 510.0))]
+     (lerp mixed f cd))))
 
 (declare gradient)
 
@@ -3631,4 +3720,43 @@
   "Generate random color"
   {:metadoc/categories #{:pal}}
   ([alpha] (set-alpha (random-color) alpha))
-  ([] (Vec4. (r/drand 255.0) (r/drand 255.0) (r/drand 255.0) 255.0)))
+  ([] (r/randval 0.2 (rand-nth (named-colors-list))
+                 (r/randval 0.5
+                            (rand-nth (random-palette))
+                            (Vec4. (r/drand 255.0) (r/drand 255.0) (r/drand 255.0) 255.0)))))
+
+;; Color Vision Deficiency
+;; https://github.com/chromelens/chromelens/blob/master/lenses/filters/
+
+(defmacro gen-cvd-multiplication-fn
+  [r1 r2 r3 r4 r5
+   g1 g2 g3 g4 g5
+   b1 b2 b3 b4 b5]
+  (let [c (with-meta (symbol "c") {:tag `Vec4})]
+    `(fn [c#]
+       (let [~c (from-sRGB c#)]
+         (to-sRGB (Vec4. (+ (* ~r1 (.x ~c)) (* ~r2 (.y ~c)) (* ~r3 (.z ~c)) (* ~r4 (.w ~c)) ~r5)
+                         (+ (* ~g1 (.x ~c)) (* ~g2 (.y ~c)) (* ~g3 (.z ~c)) (* ~g4 (.w ~c)) ~g5)
+                         (+ (* ~b1 (.x ~c)) (* ~b2 (.y ~c)) (* ~b3 (.z ~c)) (* ~b4 (.w ~c)) ~b5)
+                         (.w ~c)))))))
+
+(def ^:private cvd-converters
+  {:achromatomaly (gen-cvd-multiplication-fn 0.618,0.320,0.062,0,0,0.163,0.775,0.062,0,0,0.163,0.320,0.516,0,0)
+   :achromatopsia (gen-cvd-multiplication-fn 0.299,0.587,0.114,0,0,0.299,0.587,0.114,0,0,0.299,0.587,0.114,0,0)
+   :deuteranomaly (gen-cvd-multiplication-fn 0.8,0.2,0,0,0,0.258,0.742,0,0,0,0,0.142,0.858,0,0)
+   :deuteranopia  (gen-cvd-multiplication-fn 0.625,0.375,0,0,0,0.7,0.3,0,0,0,0,0.3,0.7,0,0)
+   :protanomaly   (gen-cvd-multiplication-fn 0.817,0.183,0,0,0,0.333,0.667,0,0,0,0,0.125,0.875,0,0)
+   :protanopia    (gen-cvd-multiplication-fn 0.567,0.433,0,0,0,0.558,0.442,0,0,0,0,0.242,0.758,0,0)
+   :tritanomaly   (gen-cvd-multiplication-fn 0.967,0.033,0,0,0,0,0.733,0.267,0,0,0,0.183,0.817,0,0)
+   :tritanopia    (gen-cvd-multiplication-fn 0.95,0.05,0,0,0,0,0.433,0.567,0,0,0,0.475,0.525,0,0)})
+
+(def cvd-list (sort (keys cvd-converters)))
+
+(defn cvd-lens
+  ^Vec4 [c cvd-kind]
+  (let [f (get cvd-converters cvd-kind identity)]
+    (if-let [c (valid-color? c)]
+      (f c)
+      (if (fn? c)
+        (comp f c)
+        (mapv f c)))))

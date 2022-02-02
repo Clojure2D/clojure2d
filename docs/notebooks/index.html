@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html><head><title>Clerk</title><meta charset="UTF-8"><meta content="width=device-width, initial-scale=1" name="viewport"><script src="https://cdn.tailwindcss.com?plugins=typography" type="text/javascript"></script><script>tailwind.config = {
+  content: ["./public/build/index.html", "./public/build/**/*.html", "./build/viewer.js"],
+  theme: {
+    extend: {},
+    fontFamily: {
+      sans: ["Fira Sans", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+      serif: ["PT Serif", "serif"],
+      mono: ["Fira Mono", "monospace"]
+    }
+  },
+  variants: {
+    extend: {},
+  },
+  plugins: [],
+}
+</script><style type="text/tailwindcss">@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-size: 18px;
+  }
+  @media (max-width: 600px) {
+    html {
+      font-size: 16px;
+    }
+  }
+  .font-condensed { font-family: "Fira Sans Condensed", sans-serif; }
+  .font-inter     { font-family: "Inter", sans-serif; }
+  body {
+    @apply font-serif antialiased text-gray-900 sm:overscroll-y-none;
+  }
+  code, .code {
+    @apply font-mono text-sm text-gray-900 bg-slate-50 px-0.5 py-px rounded;
+  }
+  code::before, code::after { @apply content-none !important; }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-condensed font-bold mt-8 first:mt-0;
+  }
+  h1 { @apply text-4xl; }
+  h2 { @apply text-3xl; }
+  h3 { @apply text-2xl; }
+  h4 { @apply text-xl; }
+  h5 { @apply text-lg; }
+  h6 { @apply text-base; }
+
+  button { @apply focus:outline-none; }
+  strong { @apply font-bold; }
+  em     { @apply italic; }
+  pre    { @apply m-0 font-mono; }
+}
+
+/* Compatibility */
+/* --------------------------------------------------------------- */
+/* TODO: Verify which colors are in use and replace with Tailwind
+   colors accordingly. Move Nj-specific styles out of here. */
+
+:root {
+  --teal-color: #31afd0;
+  --dark-teal-color: #095960;
+  --near-black-color: #2e2e2c;
+  --red-color: #d64242;
+  --dark-blue-color: #1f2937;
+  --dark-blue-60-color: rgba(28, 42, 56, 0.6);
+  --gray-panel-color: rgba(239, 241, 245, 1.000);
+  --brand-color: var(--dark-blue-color);
+  --link-color: #5046e4;
+  --command-bar-selected-color: var(--teal-color);
+}
+
+.serif      { @apply font-serif; }
+.sans-serif { @apply font-sans; }
+.monospace  { @apply font-mono; }
+.inter      { @apply font-inter; }
+
+.border-color-teal { border-color: var(--dark-teal-color); }
+.teal { color: var(--teal-color); }
+.bg-dark-blue { background: var(--dark-blue-color); }
+.bg-dark-blue-60 { background: rgba(28, 42, 56, 0.6); }
+.bg-gray-panel { background: var(--gray-panel-color); }
+.text-dark-blue  { color: var(--dark-blue-color); }
+.text-dark-blue-60 { color: var(--dark-blue-60-color); }
+.border-dark-blue-30 { border-color: rgba(28, 42, 56, 0.6); }
+.text-brand { color: var(--dark-blue-color); }
+.bg-brand { background: var(--dark-blue-color); }
+.text-selected { color: white; }
+.red { color: var(--red-color); }
+
+/* Disclose Button */
+/* --------------------------------------------------------------- */
+
+.disclose {
+  @apply content-none border-solid cursor-pointer inline-block relative mr-[3px] top-[-2px] transition-all;
+  border-color: var(--near-black-color) transparent;
+  border-width: 6px 4px 0;
+}
+.disclose:hover {
+  border-color: var(--near-black-color) transparent;
+}
+.disclose.collapsed {
+  @apply rotate-[-90deg];
+}
+
+/* Layout */
+/* --------------------------------------------------------------- */
+
+.page {
+  @apply max-w-5xl mx-auto px-12 box-border flex-shrink-0;
+}
+.toc-content {
+  @apply translate-x-[-110%] opacity-0;
+}
+.toc:hover .toc-content,
+.toc.pinned .toc-content {
+  @apply translate-x-0 opacity-100;
+}
+.max-w-prose { @apply max-w-[46rem] !important; }
+.max-w-wide  { @apply max-w-3xl !important; }
+
+/* List Styles */
+/* --------------------------------------------------------------- */
+
+.task-list-item + .task-list-item,
+.viewer-markdown ul .task-list-item ul {
+  @apply mt-1;
+}
+
+/* Code Viewer */
+/* --------------------------------------------------------------- */
+
+.viewer-code {
+  @apply font-mono bg-slate-100 rounded-sm py-4 px-8 text-sm mt-4 overflow-x-auto;
+}
+@media (min-width: 960px){
+  .viewer-notebook .viewer-code {
+    @apply py-4 pl-12;
+  }
+}
+/* Don’t show focus outline when double-clicking cell in Safari */
+.cm-scroller { @apply focus:outline-none; }
+
+/* Data Viewer */
+/* --------------------------------------------------------------- */
+
+.inspected-value { @apply text-xs font-mono; }
+
+.syntax-tag, .cm-number, .syntax-number, .cm-string, .syntax-string,
+.cm-atom, .syntax-keyword, .cm-builtin, .cm-keyword, .syntax-symbol,
+.syntax-bool, .syntax-nil, .syntax-untyped, .syntax-key, .syntax-index {
+  @apply font-mono;
+}
+
+.syntax-tag     { @apply text-pink-900 !important; }
+.cm-number      { @apply text-sky-900 !important; }
+.syntax-number  { @apply text-sky-900 !important; }
+.cm-string      { @apply text-teal-700 !important; }
+.syntax-string  { @apply text-teal-700 !important; }
+.cm-atom        { @apply text-sky-900 !important; }
+.syntax-keyword { @apply text-sky-900 !important; }
+.cm-builtin     { @apply text-pink-900 !important; }
+.cm-keyword     { @apply text-pink-900 !important; }
+.syntax-symbol  { @apply text-pink-900 !important; }
+.syntax-bool    { @apply text-sky-900 !important; }
+.syntax-nil     { @apply text-sky-900 !important; }
+.syntax-untyped { @apply text-rose-500 !important; }
+.syntax-key     { @apply text-fuchsia-900 !important; }
+.syntax-index   { @apply text-fuchsia-900 !important; }
+
+.syntax-untyped { @apply whitespace-nowrap; }
+
+.result-data {
+  @apply font-mono text-sm overflow-x-auto whitespace-nowrap leading-normal;
+}
+.result-data::-webkit-scrollbar, .path-nav::-webkit-scrollbar {
+  @apply h-0;
+}
+.result-data-collapsed {
+  @apply whitespace-nowrap;
+}
+.result-data-field {
+  @apply ml-4 whitespace-nowrap;
+}
+.result-data-field-link{
+  @apply ml-4 whitespace-nowrap cursor-pointer;
+}
+.result-data-field-link:hover {
+  @apply text-black bg-black/5;
+}
+.result-text-empty {
+  color: rgba(0,0,0,.3);
+}
+.browsify-button:hover {
+  box-shadow: -2px 0 0 2px #edf2f7;
+}
+
+/* Prose */
+/* --------------------------------------------------------------- */
+
+.viewer-notebook,
+.viewer-markdown {
+  @apply prose
+    prose-a:text-indigo-600 prose-a:font-medium prose-a:no-underline hover:prose-a:underline
+    prose-p:mt-4 prose-p:leading-snug
+    prose-ol:mt-4 prose-ol:mb-6 prose-ol:leading-snug
+    prose-ul:mt-4 prose-ul:mb-6 prose-ul:leading-snug
+    prose-blockquote:mt-4 prose-blockquote:leading-snug
+    prose-hr:mt-6 prose-hr:border-t-2 prose-hr:border-solid prose-hr:border-slate-200
+    prose-figure:mt-4
+    prose-figcaption:mt-2 prose-figcaption:text-xs
+    prose-headings:mb-6
+    prose-th:mb-0
+    prose-img:mb-0
+    max-w-none;
+}
+.viewer-markdown li > p {
+  @apply inline;
+}
+
+/* Todo Lists */
+/* --------------------------------------------------------------- */
+
+.contains-task-list {
+  @apply pl-6 list-none;
+}
+.contains-task-list li p {
+  @apply inline m-0;
+}
+.contains-task-list input[type="checkbox"] {
+  @apply appearance-none h-4 w-4 rounded border border-slate-200 relative mr-[0.3rem] ml-[-1.5rem] top-[0.15rem];
+}
+.contains-task-list input[type="checkbox"]:checked {
+  @apply border-indigo-600 bg-indigo-600 bg-no-repeat bg-contain;
+  background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
+}
+
+/* Markdown TOC */
+/* --------------------------------------------------------------- */
+
+.viewer-markdown .toc      { @apply mt-4; }
+.viewer-markdown h1 + .toc { @apply mt-8; }
+
+.viewer-markdown .toc h1,
+.viewer-markdown .toc h2,
+.viewer-markdown .toc h3,
+.viewer-markdown .toc h4,
+.viewer-markdown .toc h5,
+.viewer-markdown .toc h6 {
+  @apply text-base text-indigo-600 font-sans my-0;
+}
+.viewer-markdown .toc a {
+  @apply text-indigo-600 font-normal no-underline hover:underline;
+}
+.viewer-markdown .toc li    { @apply m-0; }
+.viewer-markdown .toc ul ul { @apply pl-4; }
+
+/* Notebook Spacing */
+/* --------------------------------------------------------------- */
+
+.viewer-notebook { @apply py-16; }
+.viewer-markdown *:first-child:not(.viewer-code) { @apply mt-0; }
+.viewer + .viewer { @apply mt-6; }
+.viewer-markdown + .viewer { @apply mt-3; }
+.viewer-markdown + .viewer-markdown { @apply mt-0; }
+
+/* Sidenotes */
+/* --------------------------------------------------------------- */
+
+.sidenote-ref {
+  @apply top-[-3px] inline-flex justify-center items-center w-[18px] h-[18px]
+    rounded-full bg-slate-100 border border-slate-300 hover:bg-slate-200 hover:border-slate-300
+    m-0 ml-[4px] cursor-pointer;
+}
+.sidenote {
+  @apply hidden float-left clear-both mx-[2.5%] my-4 text-xs relative w-[95%];
+}
+.sidenote-ref.expanded + .sidenote {
+  @apply block;
+}
+@media (min-width: 860px) {
+  .sidenote-ref {
+    @apply top-[-0.5em] w-auto h-auto inline border-0 bg-transparent m-0 pointer-events-none;
+  }
+  .sidenote sup { @apply inline; }
+  .viewer-markdown .contains-sidenotes p { @apply max-w-[65%]; }
+  .viewer-markdown p .sidenote {
+    @apply mr-[-54%] mt-[0.2rem] w-1/2 float-right clear-right relative block;
+  }
+}
+.viewer-code + .viewer:not(.viewer-markdown):not(.viewer-code):not(.viewer-code-folded),
+.viewer-code-folded + .viewer:not(.viewer-markdown):not(.viewer-code):not(.viewer-code-folded),
+.viewer-result + .viewer-result {
+  @apply mt-2;
+}
+@media (min-width: 768px) {
+  .devcard-desc > div {
+    @apply max-w-full m-0;
+  }
+}
+
+/* Command Palette */
+/* --------------------------------------------------------------- */
+
+.nj-commands-input {
+  @apply bg-transparent text-white;
+}
+.nj-context-menu-item:hover:not([disabled]) {
+  @apply cursor-pointer;
+  background-color: rgba(255,255,255,.14);
+}
+
+/* Devdocs */
+/* --------------------------------------------------------------- */
+
+.collapsed-sidebar:not(.mobile-sidebar) .sidebar-content {
+  @apply transition-all duration-200 ml-[-360px] opacity-0;
+}
+.collapsed-sidebar:hover:not(.mobile-sidebar) .sidebar-content {
+  @apply ml-0 opacity-100;
+}
+.logo, .logo-white {
+  @apply block indent-[-999em];
+  background: url(/images/nextjournal-logo.svg) center center no-repeat;
+}
+.devdocs-body {
+  @apply font-inter;
+}
+
+/* Workarounds */
+/* --------------------------------------------------------------- */
+
+/* Fixes vega viewer resizing into infinity */
+.vega-embed .chart-wrapper { @apply h-auto !important; }
+/* fixes fraction separators being overridden by tw’s border-color */
+.katex * { @apply border-black; }
+</style><script src="https://storage.googleapis.com/nextjournal-cas-eu/data/8VtrAyT1tkNwAPZyFu4amwY7s9rMteumpHLJUHWj4hhaAn7NxQnM1u9C5r9p37ZaEJ656h6Dh7NxGgHU6ztkNqEsnQ" type="text/javascript"></script><link href="https://cdn.jsdelivr.net/npm/katex@0.13.13/dist/katex.min.css" rel="stylesheet" type="text/css"><link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&amp;family=Fira+Mono:wght@400;700&amp;family=Fira+Sans+Condensed:ital,wght@0,700;1,700&amp;family=Fira+Sans:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&amp;family=PT+Serif:ital,wght@0,400;0,700;1,400;1,700&amp;display=swap" rel="stylesheet" type="text/css"></head><body><div id="clerk-static-app"></div><script>let viewer = nextjournal.clerk.sci_viewer
+let app = nextjournal.clerk.static_app
+let opts = viewer.read_string("{:browse? false, :paths [\"notebooks/color.clj\"], :out-path \"docs/notebooks/\", :bundle? true, :path->doc {\"notebooks/color.clj\" {:nextjournal/value {:blocks [{:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:style \\\".checkerboard {background-image: linear-gradient(45deg, #ddd 25%, transparent 25%),linear-gradient(-45deg, #ddd 25%, transparent 25%),linear-gradient(45deg, transparent 75%, #ddd 75%),linear-gradient(-45deg, transparent 75%, #ddd 75%);\\\\n                              background-size: 20px 20px;\\\\n                              background-position: 0 0, 0 10px, 10px -10px, -10px 0px;:z-index -1;}\\\\n           .gs {float: left; width: 100%; height: 30px;}\\\\n           .gsfull {top: 0; left: 0; width: 100%; heigth: 100%; position: relative;}\\\\n           .csfnt {font-family: monospace; font-size: 12px; padding: 0px;}\\\\n           span.csblk {display: block; padding: 5.2px;}\\\\n           .viewer-code {margin-top: 10px;}\\\"], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" # clojure2d.color namespace\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" `clojure2d.color` namespace for Clojure is a rich collection of functions for various color, palettes and grandents manipulations. Including:\\n\\n * various color representations\\n * color spaces coversions\\n * palettes and gradients\\n * distances\\n * blending\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" I use `🎨` internal function to render given color, palette or gradient.\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" # Color\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" At the beginning let's start with a `color`. A color is always a vector containing 3 coordinates from given color space plus one additional to describe opacity, ie. alpha channel. So we need 4 numbers to describe a color.\\n\\n By default Java and WWW apps interpret a color as a *sRGB*. In `clojure2d.color` value of each channel in *sRGB* color space is from `[0.0-255.0]` range. Other color spaces defined here can operate on different ranges. More about this later.\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" ## Color representation\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" Internally a color is represented as `fastmath.vector.Vec4` type but we can use any other representation which eventually is coerced to a `Vec4`. Let's look at all of the possible options. \\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" ### Named color\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" The quickest option is to use a keyword as a color name, there are two groups of colors.\\n\\n Full list of names can be seen [here](https://clojure2d.github.io/clojure2d/docs/static/colors.html) or retrieved by calling:\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(sort (c/named-colors-list))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [{:path [0], :nextjournal/value :alice-blue, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [1], :nextjournal/value :aliceblue, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [2], :nextjournal/value :amber, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [3], :nextjournal/value :antique-white, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [4], :nextjournal/value :antiquewhite, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [5], :nextjournal/value :aqua, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [6], :nextjournal/value :aquamarine, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [7], :nextjournal/value :azure, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [8], :nextjournal/value :beige, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [9], :nextjournal/value :bisque, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [10], :nextjournal/value :black, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [11], :nextjournal/value :blanched-almond, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [12], :nextjournal/value :blanchedalmond, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [13], :nextjournal/value :blue, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [14], :nextjournal/value :blue-violet, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [15], :nextjournal/value :blueviolet, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [16], :nextjournal/value :brown, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [17], :nextjournal/value :burly-wood, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [18], :nextjournal/value :burlywood, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:path [19], :nextjournal/value :cadet-blue, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-keyword.inspected-value (str x)]))}} {:nextjournal/value {:count 392, :offset 20, :path [], :remaining 372}, :nextjournal/viewer {:name :elision, :render-fn #viewer-fn v/elision-viewer}}], :nextjournal/viewer {:render-fn #viewer-fn v/coll-viewer, :opening-paren \\\"(\\\", :closing-paren (\\\")\\\"), :fetch-opts {:n 20}}}\"}, :path []} {:nextjournal/value \" #### HTML color names\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" All basic and extended colors used by modern browsers as a lower-case keyword. Note that some colors can have two similar names. For example `:darkblue` and `:dark-blue` represent the same color.\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 :darkblue)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#00008b\\\", :color \\\"white\\\"}} \\\"[#00008b] :darkblue\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 :dark-blue)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#00008b\\\", :color \\\"white\\\"}} \\\"[#00008b] :dark-blue\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" #### Dictionary of Colour Combinations\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" This is the list of colors compiled in the book [\\\"A Dictionary of Colour Combinations\\\"](https://en.seigensha.com/books/978-4-86152-247-5/) by Sanzo Wada, digitalized by [Dain M. Blodorn Kim](https://github.com/dblodorn/sanzo-wada/) and eventually correctend and published by [Matt DesLauriers](https://github.com/mattdesl/dictionary-of-colour-combinations).\\n\\n Colors from this resource are prefixed by a `:docc/` namespace.\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 :docc/burnt-sienna)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#ae5224\\\", :color \\\"white\\\"}} \\\"[#ae5224] :docc/burnt-sienna\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 :docc/peacock-blue)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#00939b\\\", :color \\\"white\\\"}} \\\"[#00939b] :docc/peacock-blue\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" ### CSS string\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" The other representation can be based on CSS. A hexadecimal string in one of the following forms: `#X`, `#XX`, `#RGB`, `#RRGGBB` or `#RRGGBBAA`. Where `X` (`[0-F]`) or `XX` (`[00-FF]`) are the grey values. The hash character is optional, lower case also can be used.\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 \\\"#7\\\")\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#777777\\\", :color \\\"white\\\"}} \\\"[#777777] #7\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 \\\"#4a\\\")\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#4a4a4a\\\", :color \\\"white\\\"}} \\\"[#4a4a4a] #4a\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 \\\"#FA3\\\")\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#ffaa33\\\", :color \\\"black\\\"}} \\\"[#ffaa33] #FA3\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 \\\"#FFAA33AA\\\")\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#ffaa33aa\\\", :color \\\"black\\\"}} \\\"[#ffaa33aa] #FFAA33AA\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 \\\"f1a130\\\")\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#f1a130\\\", :color \\\"black\\\"}} \\\"[#f1a130] f1a130\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" To convert any color to CSS representation we can call\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(c/format-hex :red)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value \\\"#ff0000\\\", :nextjournal/viewer {:render-fn #viewer-fn v/quoted-string-viewer, :fetch-opts {:n 100}}}\"}, :path []} {:nextjournal/value \"(c/format-hex 0xaa112299)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value \\\"#112299aa\\\", :nextjournal/viewer {:render-fn #viewer-fn v/quoted-string-viewer, :fetch-opts {:n 100}}}\"}, :path []} {:nextjournal/value \" ### Integer\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" Any integer (32bit number) is interpreted as a color, where 8 most significant bits represent alpha channel, next 8 bits, first channel, and so on: `0xAARRGGBB`\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 0x91aa0000)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#aa000091\\\", :color \\\"white\\\"}} \\\"[#aa000091] -1851129856\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 255)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#0000ff\\\", :color \\\"white\\\"}} \\\"[#0000ff] 255\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" ### Any `Sequable`\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" Any Clojure `Sequable` is coerced to a color with the following rules. Color channel value can be any number type (int or double). Numbers are rounded to the nearest integer and clamped to have [0-255] range.\\n\\n 1-element sequence is a `grey`:\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 [129])\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#818181\\\", :color \\\"black\\\"}} \\\"[#818181] [129]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" 2-element sequence is a `gray` with `alpha`:\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 (list 140.11 255/3))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#8c8c8c55\\\", :color \\\"black\\\"}} \\\"[#8c8c8c55] (140.11 85)\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" 3-element sequence is read as *RGB* values:\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 (seq (java.util.ArrayList. [240 220 20])))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#f0dc14\\\", :color \\\"black\\\"}} \\\"[#f0dc14] clojure.lang.LazySeq@41407\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" Finally, 4-element sequence is treated as *RGBA*, any additional sequence elements are ignored:\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 [129 190 222 230 1 2 3 4])\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#81bedee6\\\", :color \\\"black\\\"}} \\\"[#81bedee6] [129 190 222 230 1 2 3 4]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" ### Fastmath vectors\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" Fastmath vectors `Vec2`, `Vec3` and `Vec4` are treated as a `Sequable`\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 (v/vec2 12 200))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#0c0c0cc8\\\", :color \\\"white\\\"}} \\\"[#0c0c0cc8] #vec2 [12.0, 200.0]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (v/vec3 12 99 200))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#0c63c8\\\", :color \\\"white\\\"}} \\\"[#0c63c8] #vec3 [12.0, 99.0, 200.0]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (v/vec4 12 99 122 200))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#0c637ac8\\\", :color \\\"white\\\"}} \\\"[#0c637ac8] #vec4 [12.0, 99.0, 122.0, 200.0]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" ### AWT Color\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" For interoperability we can use also AWT color (`java.awt.Color` class).\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 (java.awt.Color. 120 33 99))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#782163\\\", :color \\\"white\\\"}} \\\"[#782163] java.awt.Color[r=120,g=33,b=99]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (java.awt.Color. 0.9 0.2 0.4))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#e63366\\\", :color \\\"white\\\"}} \\\"[#e63366] java.awt.Color[r=230,g=51,b=102]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (java.awt.Color/PINK))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#ffafaf\\\", :color \\\"black\\\"}} \\\"[#ffafaf] java.awt.Color[r=255,g=175,b=175]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" ### Coercions\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" Any color representation is implicitely coerced to a `fastmath.vector.Vec4` type. You can make explicit coercion with `to-color` and `color` function. The latter can construct a color from channel values. Additionally `gray` function returns gray color (with optional alpha)\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(class (c/to-color :green))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value \\\"fastmath.vector.Vec4\\\", :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.inspected-value.whitespace-nowrap.text-gray-700 x]))}}\"}, :path []} {:nextjournal/value \"(map c/to-color [:red 0xffaa33 \\\"fa4\\\" [1 2 3 4]])\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [{:path [0], :nextjournal/value [{:path [0 0], :nextjournal/value 255.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [0 1], :nextjournal/value 0.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [0 2], :nextjournal/value 0.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [0 3], :nextjournal/value 255.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}}], :nextjournal/viewer {:render-fn #viewer-fn v/coll-viewer, :opening-paren \\\"[\\\", :closing-paren (\\\"]\\\"), :fetch-opts {:n 20}}} {:path [1], :nextjournal/value [{:path [1 0], :nextjournal/value 255.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [1 1], :nextjournal/value 170.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [1 2], :nextjournal/value 51.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [1 3], :nextjournal/value 255.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}}], :nextjournal/viewer {:render-fn #viewer-fn v/coll-viewer, :opening-paren \\\"[\\\", :closing-paren (\\\"]\\\"), :fetch-opts {:n 20}}} {:path [2], :nextjournal/value [{:path [2 0], :nextjournal/value 255.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [2 1], :nextjournal/value 170.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [2 2], :nextjournal/value 68.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [2 3], :nextjournal/value 255.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}}], :nextjournal/viewer {:render-fn #viewer-fn v/coll-viewer, :opening-paren \\\"[\\\", :closing-paren (\\\"]\\\"), :fetch-opts {:n 20}}} {:path [3], :nextjournal/value [{:path [3 0], :nextjournal/value 1.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [3 1], :nextjournal/value 2.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [3 2], :nextjournal/value 3.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [3 3], :nextjournal/value 4.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}}], :nextjournal/viewer {:render-fn #viewer-fn v/coll-viewer, :opening-paren \\\"[\\\", :closing-paren (\\\"]\\\" \\\")\\\"), :fetch-opts {:n 20}}}], :nextjournal/viewer {:render-fn #viewer-fn v/coll-viewer, :opening-paren \\\"(\\\", :fetch-opts {:n 20}}}\"}, :path []} {:nextjournal/value \"(🎨 (c/color :red 200))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#ff0000c8\\\", :color \\\"white\\\"}} \\\"[#ff0000c8] #vec4 [255.0, 0.0, 0.0, 200.0]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/color 12 33 99))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#0c2163\\\", :color \\\"white\\\"}} \\\"[#0c2163] #vec4 [12.0, 33.0, 99.0, 255.0]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/gray 99))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#636363\\\", :color \\\"white\\\"}} \\\"[#636363] #vec4 [99.0, 99.0, 99.0, 255.0]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" You can also convert to AWT Color, integer and - as previously mentioned - to a CSS Color\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(c/awt-color :pink)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value \\\"#object[java.awt.Color 0xcf80076 \\\\\\\"java.awt.Color[r=255,g=192,b=203]\\\\\\\"]\\\", :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.inspected-value.whitespace-nowrap.text-gray-700 x]))}}\"}, :path []} {:nextjournal/value \"(c/awt-gray 123)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value \\\"#object[java.awt.Color 0x6856f722 \\\\\\\"java.awt.Color[r=123,g=123,b=123]\\\\\\\"]\\\", :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.inspected-value.whitespace-nowrap.text-gray-700 x]))}}\"}, :path []} {:nextjournal/value \"(c/format-hex :pink)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value \\\"#ffc0cb\\\", :nextjournal/viewer {:render-fn #viewer-fn v/quoted-string-viewer, :fetch-opts {:n 100}}}\"}, :path []} {:nextjournal/value \"(c/pack :pink)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value -16181, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}}\"}, :path []} {:nextjournal/value \" ### Color validation\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" To check if color is valid or invalid. You can use two functions: `possible-color?` and `valid-color?`. Former function uses some logic to determine if the imput is color or not, Latter one, just tries to coerce to a color and catches exception when it's not (returning `false` in such case).\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"[(c/possible-color? [11 22 33]) (c/valid-color? [11 22 33])]\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [{:path [0], :nextjournal/value true, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-bool.inspected-value (str x)]))}} {:path [1], :nextjournal/value [{:path [1 0], :nextjournal/value 11.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [1 1], :nextjournal/value 22.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [1 2], :nextjournal/value 33.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [1 3], :nextjournal/value 255.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}}], :nextjournal/viewer {:render-fn #viewer-fn v/coll-viewer, :opening-paren \\\"[\\\", :closing-paren (\\\"]\\\" \\\"]\\\"), :fetch-opts {:n 20}}}], :nextjournal/viewer {:render-fn #viewer-fn v/coll-viewer, :opening-paren \\\"[\\\", :fetch-opts {:n 20}}}\"}, :path []} {:nextjournal/value \"[(c/possible-color? [:a]) (c/valid-color? [:a])]\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [{:path [0], :nextjournal/value false, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-bool.inspected-value (str x)]))}} {:path [1], :nextjournal/value false, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-bool.inspected-value (str x)]))}}], :nextjournal/viewer {:render-fn #viewer-fn v/coll-viewer, :opening-paren \\\"[\\\", :closing-paren (\\\"]\\\"), :fetch-opts {:n 20}}}\"}, :path []} {:nextjournal/value \" There are also tests if color is black or not\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(c/black? :black)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value true, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-bool.inspected-value (str x)]))}}\"}, :path []} {:nextjournal/value \"(c/not-black? :black)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value false, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-bool.inspected-value (str x)]))}}\"}, :path []} {:nextjournal/value \" ## Getting and setting channels\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" ### Setting channels\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" To modify given channel of the color use one of the following:\\n\\n * `set-red` or `set-ch0` - to modify first channel\\n * `set-green` or `set-ch1`- to modify second channel\\n * `set-blue` or `set-ch2` - to modify third one\\n * `set-alpha` or call `(color any-color alpha)` - to modify alpha channel\\n * `set-channel` - sets selected channel (optionally for given color space)\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 (c/set-green :red 200))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#ffc800\\\", :color \\\"black\\\"}} \\\"[#ffc800] #vec4 [255.0, 200.0, 0.0, 255.0]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/set-alpha :red 200))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#ff0000c8\\\", :color \\\"white\\\"}} \\\"[#ff0000c8] #vec4 [255.0, 0.0, 0.0, 200.0]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/color :red 200))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#ff0000c8\\\", :color \\\"white\\\"}} \\\"[#ff0000c8] #vec4 [255.0, 0.0, 0.0, 200.0]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/set-channel :red :HSL 0 300))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#ff00ff\\\", :color \\\"white\\\"}} \\\"[#ff00ff] #vec4 [255.0, 0.0, 255.0, 255.0]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" Additionally you can multiply selected channel by given value with `modulate` function. It can also operate within selected colorspace (more about this later).\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 (c/modulate :red 0 0.5))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#800000\\\", :color \\\"white\\\"}} \\\"[#800000] #vec4 [127.5, 0.0, 0.0, 255.0]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" Divide saturation by 2\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 (c/modulate :red :HSL 1 0.5))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#bf4040\\\", :color \\\"white\\\"}} \\\"[#bf4040] #vec4 [191.25, 63.75, 63.75, 255.0]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" ### Getting channels\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" To access given channel call:\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" * `red` or `ch0` - to get first channel\\n * `green` or `ch1` - to get second channel\\n * `blue` or `ch2` - to get third channel\\n * `alpha` - to get alpha channel\\n * `get-channel` - to get selected channel (optionally for given color space)\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 :docc/fawn)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#d1b0a7\\\", :color \\\"black\\\"}} \\\"[#d1b0a7] :docc/fawn\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"((juxt c/red c/green c/blue c/alpha) :docc/fawn)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [{:path [0], :nextjournal/value 209.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [1], :nextjournal/value 176.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [2], :nextjournal/value 167.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [3], :nextjournal/value 255.0, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}}], :nextjournal/viewer {:render-fn #viewer-fn v/coll-viewer, :opening-paren \\\"[\\\", :closing-paren (\\\"]\\\"), :fetch-opts {:n 20}}}\"}, :path []} {:nextjournal/value \" Get luma channel from HSL color space for `:red` color.\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(c/get-channel :red :HSL 2)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value 0.5, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}}\"}, :path []} {:nextjournal/value \" #### Getting Luma and Hue\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" There is a set of functions returning additional color information, these are:\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" * `luma` - information about luma (brightness) of the color, `[0.0-255.0]`\\n * `relative-luma` - luma from linear RGB, `[0.0-255.0]`\\n * `hue` - hue value, hexagon projection, `[0.0-360.0]`\\n * `hue-polar` - hue value, polar projection, `[0.0-360.0]`,\\n * `hue-paletton` - hue value, as it is used in [paletton](https://paletton.com/), `[0.0-360.0]`\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 :docc/buffy-citrine)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#96874d\\\", :color \\\"black\\\"}} \\\"[#96874d] :docc/buffy-citrine\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"((juxt c/luma c/relative-luma c/hue c/hue-polar c/hue-paletton) :docc/buffy-citrine)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [{:path [0], :nextjournal/value 134.004263, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [1], :nextjournal/value 62.089349125509756, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [2], :nextjournal/value 47.671232876712324, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [3], :nextjournal/value 48.78229769937873, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}} {:path [4], :nextjournal/value 83.53349895990682, :nextjournal/viewer {:render-fn #viewer-fn (fn [x] (v/html [:span.syntax-number.inspected-value (if (js/Number.isNaN x) \\\"NaN\\\" (str x))]))}}], :nextjournal/viewer {:render-fn #viewer-fn v/coll-viewer, :opening-paren \\\"[\\\", :closing-paren (\\\"]\\\"), :fetch-opts {:n 20}}}\"}, :path []} {:nextjournal/value \" #### Clamping\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" To ensure our *sRGB* color is within the range we can use `clamp` which constrains values to a `[0.0-255.0]` range and `lclamp` which also round channel values to the nearest integer.\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 (c/clamp [-23.3 123.033 293.33]))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#007bff\\\", :color \\\"white\\\"}} \\\"[#007bff] #vec4 [0.0, 123.033, 255.0, 255.0]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/lclamp [-23.3 123.033 293.33]))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#007bff\\\", :color \\\"white\\\"}} \\\"[#007bff] #vec4 [0.0, 123.0, 255.0, 255.0]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" ## Alterations\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" ## Mixing and blending\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" ## Color comparison and distances\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" ## Color space conversions\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" ## Palettes\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" ### Paletton\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" ## Gradients\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" ### Inigo Quilez gradient generator\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" ## Color Vision Deficiency \\n\", :nextjournal/viewer :markdown} {:nextjournal/value \" To simulate how color, palette or gradient looks with given color blidness you can call `cvd-lens` function. There are 8 defined CVDs. Let's simulate CVD with a `rainbow` grandient.\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(def rainbow (c/gradient :grDevices/rainbow))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value \\\"clojure2d.color/interpolated-gradient/fn--69570\\\", :nextjournal/viewer {:name :fn, :render-fn #viewer-fn (fn [x] (v/html [:span.inspected-value [:span.syntax-tag \\\"#function\\\"] \\\"[\\\" x \\\"]\\\"]))}}\", :nextjournal/viewer {:name :fn}}, :path []} {:nextjournal/value \"(🎨 rainbow)\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.gs.gsfull [:span.gs {:style {:background-image \\\"linear-gradient(90deg,#ff0000 0.0%,#ff3500 3.448%,#ff6900 6.896%,#ff9d00 10.344%,#ffd100 13.793%,#f8ff00 17.241%,#c4ff00 20.689%,#8fff00 24.137%,#5cff00 27.586%,#27ff00 31.034%,#00ff0e 34.482%,#00ff42 37.931%,#00ff77 41.379%,#00ffaa 44.827%,#00ffdf 48.275%,#00ebff 51.724%,#00b6ff 55.172%,#0082ff 58.62%,#004eff 62.068%,#001aff 65.517%,#1b00ff 68.965%,#5000ff 72.413%,#8400ff 75.862%,#b800ff 79.31%,#ec00ff 82.758%,#ff00dd 86.206%,#ff00a9 89.655%,#ff0075 93.103%,#ff0041 96.551%,#ff000c 100.0%)\\\"}}]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/cvd-lens rainbow :achromatomaly))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.gs.gsfull [:span.gs {:style {:background-image \\\"linear-gradient(90deg,#ce7070 0.0%,#d07974 3.448%,#d58f7e 6.896%,#ddae8e 10.344%,#ead4a3 13.793%,#f3f6b7 17.241%,#d4efab 20.689%,#baeaa3 24.137%,#a7e69d 27.586%,#9ce49a 31.034%,#99e49a 34.482%,#9ae49f 37.931%,#9ce5ac 41.379%,#9fe7c0 44.827%,#a3eada 48.275%,#9bdae5 51.724%,#7faed5 55.172%,#6685ca 58.62%,#5362c2 62.068%,#484bbf 65.517%,#4a47be 68.965%,#5e4dc0 72.413%,#7d59c4 75.862%,#a168ca 79.31%,#c97bd3 82.758%,#d57ec2 86.206%,#d278a3 89.655%,#d0748a 93.103%,#cf7179 96.551%,#ce7071 100.0%)\\\"}}]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/cvd-lens rainbow :achromatopsia))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.gs.gsfull [:span.gs {:style {:background-image \\\"linear-gradient(90deg,#959595 0.0%,#999999 3.448%,#a6a6a6 6.896%,#bbbbbb 10.344%,#d6d6d6 13.793%,#efefef 17.241%,#e1e1e1 20.689%,#d6d6d6 24.137%,#cecece 27.586%,#cacaca 31.034%,#cacaca 34.482%,#cacaca 37.931%,#cdcdcd 41.379%,#d0d0d0 44.827%,#d6d6d6 48.275%,#cbcbcb 51.724%,#a8a8a8 55.172%,#888888 58.62%,#6f6f6f 62.068%,#616161 65.517%,#606060 68.965%,#686868 72.413%,#767676 75.862%,#8b8b8b 79.31%,#a3a3a3 82.758%,#a6a6a6 86.206%,#9e9e9e 89.655%,#999999 93.103%,#969696 96.551%,#959595 100.0%)\\\"}}]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/cvd-lens rainbow :deuteranomaly))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.gs.gsfull [:span.gs {:style {:background-image \\\"linear-gradient(90deg,#e78b00 0.0%,#e8910f 3.448%,#eba227 6.896%,#efbd3e 10.344%,#f7de55 13.793%,#f9fd69 17.241%,#d1f269 20.689%,#ade969 24.137%,#91e369 27.586%,#80e069 31.034%,#7ce06b 34.482%,#7ce078 37.931%,#7ce095 41.379%,#7ce0b9 44.827%,#7ce0e4 48.275%,#71cefc 51.724%,#569ff6 55.172%,#3c71f2 58.62%,#2143f0 62.068%,#0715ef 65.517%,#1709ee 68.965%,#4727ee 72.413%,#7745ee 75.862%,#a662ee 79.31%,#d680ee 82.758%,#e78bcf 86.206%,#e78b9d 89.655%,#e78b6d 93.103%,#e78b3c 96.551%,#e78b0a 100.0%)\\\"}}]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/cvd-lens rainbow :deuteranopia))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.gs.gsfull [:span.gs {:style {:background-image \\\"linear-gradient(90deg,#cfda00 0.0%,#d1db1a 3.448%,#d7e03a 6.896%,#e1e759 10.344%,#eff279 13.793%,#fafa95 17.241%,#dcd895 20.689%,#c3ba95 24.137%,#b1a595 27.586%,#a79895 31.034%,#a59596 34.482%,#a5959d 37.931%,#a595af 41.379%,#a595c9 44.827%,#a595e9 48.275%,#9789f9 51.724%,#7469ec 55.172%,#5249e3 58.62%,#2f2add 62.068%,#0c0ada 65.517%,#1415da 68.965%,#3f43da 72.413%,#6a70da 75.862%,#959cda 79.31%,#c0cada 82.758%,#cfdabd 86.206%,#cfda8f 89.655%,#cfda63 93.103%,#cfda36 96.551%,#cfda08 100.0%)\\\"}}]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/cvd-lens rainbow :protanomaly))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.gs.gsfull [:span.gs {:style {:background-image \\\"linear-gradient(90deg,#e99c00 0.0%,#eaa10e 3.448%,#edaf24 6.896%,#f1c53a 10.344%,#f7e250 13.793%,#f9fc63 17.241%,#d0ed63 20.689%,#abe263 24.137%,#8eda63 27.586%,#7bd663 31.034%,#77d564 34.482%,#77d573 37.931%,#77d592 41.379%,#77d5b8 44.827%,#77d5e3 48.275%,#6dc4fd 51.724%,#5398f7 55.172%,#396cf4 58.62%,#1f40f2 62.068%,#0613f1 65.517%,#180cf0 68.965%,#482df0 72.413%,#784ef0 75.862%,#a86ff0 79.31%,#d890f0 82.758%,#e99cd0 86.206%,#e99c9f 89.655%,#e99c6e 93.103%,#e99c3c 96.551%,#e99c0b 100.0%)\\\"}}]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/cvd-lens rainbow :protanopia))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.gs.gsfull [:span.gs {:style {:background-image \\\"linear-gradient(90deg,#c6c500 0.0%,#c9c717 3.448%,#d0ce34 6.896%,#dcdb50 10.344%,#edec6e 13.793%,#fbfb87 17.241%,#e0e087 20.689%,#cacb87 24.137%,#babc87 27.586%,#b2b387 31.034%,#b0b188 34.482%,#b0b191 37.931%,#b0b1a6 41.379%,#b0b1c3 44.827%,#b0b1e7 48.275%,#a1a3fa 51.724%,#7c7ef0 55.172%,#5859e9 58.62%,#3334e4 62.068%,#0e0ee2 65.517%,#1212e2 68.965%,#3c3be2 72.413%,#6564e2 75.862%,#8e8de2 79.31%,#b8b6e2 82.758%,#c6c5c4 86.206%,#c6c595 89.655%,#c6c567 93.103%,#c6c538 96.551%,#c6c509 100.0%)\\\"}}]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/cvd-lens rainbow :tritanomaly))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.gs.gsfull [:span.gs {:style {:background-image \\\"linear-gradient(90deg,#fb0000 0.0%,#fb2c13 3.448%,#fc5b2d 6.896%,#fd8846 10.344%,#feb660 13.793%,#f8de76 17.241%,#c6de77 20.689%,#95de77 24.137%,#67de77 27.586%,#41de77 31.034%,#33de78 34.482%,#33e083 37.931%,#33e59c 41.379%,#33ecbe 44.827%,#33f7e5 48.275%,#2ef0fb 51.724%,#21cdf4 55.172%,#15afee 58.62%,#089aeb 62.068%,#018fea 65.517%,#1a8de9 68.965%,#4e8de9 72.413%,#828de9 75.862%,#b58de9 79.31%,#e98de9 82.758%,#fb7aca 86.206%,#fb5b9a 89.655%,#fb3e6b 93.103%,#fb1f3a 96.551%,#fb030a 100.0%)\\\"}}]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/cvd-lens rainbow :tritanopia))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.gs.gsfull [:span.gs {:style {:background-image \\\"linear-gradient(90deg,#f90000 0.0%,#fa2123 3.448%,#fa4649 6.896%,#fb6a6f 10.344%,#fd8f96 13.793%,#f8afb7 17.241%,#c7b0b7 20.689%,#97b0b7 24.137%,#6cb0b7 27.586%,#4ab0b7 31.034%,#3fb0b8 34.482%,#3fb5bc 37.931%,#3fc2c7 41.379%,#3fd4d8 44.827%,#3fedef 48.275%,#39f6f6 51.724%,#2ae3e0 55.172%,#1bd5d0 58.62%,#0ccbc5 62.068%,#02c7c0 65.517%,#1ac6c0 68.965%,#4ec6c0 72.413%,#81c6c0 75.862%,#b4c6c0 79.31%,#e7c6c0 82.758%,#f9aca6 86.206%,#f9827e 89.655%,#f95956 93.103%,#f9302e 96.551%,#f90706 100.0%)\\\"}}]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \" ## Random generators\\n\", :nextjournal/viewer :markdown} {:nextjournal/value \"(🎨 (c/random-color))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.csfnt [:span.csblk {:style {:background-color \\\"#14c8da\\\", :color \\\"black\\\"}} \\\"[#14c8da] #vec4 [20.193040416409765, 200.46267892897936, 218.2298121470321, 255.0]\\\"]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/random-palette))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.gs.gsfull [:span.gs {:style {:background-image \\\"linear-gradient(90deg,#0d3263 0.0%,#0d3263 6.666%,#0e4a9a 6.666%,#0e4a9a 13.333%,#113e7a 13.333%,#113e7a 20.0%,#062145 20.0%,#062145 26.666%,#031329 26.666%,#031329 33.333%,#978708 33.333%,#978708 40.0%,#ebd102 40.0%,#ebd102 46.666%,#baa70b 46.666%,#baa70b 53.333%,#695e00 53.333%,#695e00 60.0%,#3e3700 60.0%,#3e3700 66.666%,#971608 66.666%,#971608 73.333%,#eb1802 73.333%,#eb1802 80.0%,#ba1c0b 80.0%,#ba1c0b 86.666%,#690a00 86.666%,#690a00 93.333%,#3e0600 93.333%,#3e0600 100.0%)\\\"}}]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []} {:nextjournal/value \"(🎨 (c/random-gradient))\", :nextjournal/viewer :code} {:nextjournal/viewer :clerk/result, :nextjournal/value {:nextjournal/edn \"{:path [], :nextjournal/value [:div.checkerboard.gs.gsfull [:span.gs {:style {:background-image \\\"linear-gradient(90deg,#f04155 0.0%,#f24a51 3.448%,#f4534e 6.896%,#f65c4a 10.344%,#f86546 13.793%,#fa6e42 17.241%,#fc773f 20.689%,#fe803b 24.137%,#fe8e3f 27.586%,#fc9d47 31.034%,#faac4e 34.482%,#f8bc55 37.931%,#f6cb5d 41.379%,#f5db64 44.827%,#f3ea6b 48.275%,#f3f274 51.724%,#f5f37f 55.172%,#f6f48a 58.62%,#f8f495 62.068%,#faf59f 65.517%,#fcf6aa 68.965%,#fef6b5 72.413%,#fbf6bd 75.862%,#edf0bc 79.31%,#deebbb 82.758%,#cfe5ba 86.206%,#c1e0b9 89.655%,#b2dab9 93.103%,#a4d5b8 96.551%,#95cfb7 100.0%)\\\"}}]], :nextjournal/viewer {:name :html, :render-fn #viewer-fn v/html}}\", :nextjournal/viewer {:name :html}}, :path []}], :title \"clojure2d.color namespace\"}, :nextjournal/viewer :clerk/notebook, :scope {:namespace :notebooks.color}}}, :path->url {\"notebooks/color.clj\" \"notebooks/color.clj\"}}")
+app.init(opts)
+</script></body></html>

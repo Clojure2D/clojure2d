@@ -21,3 +21,5 @@ utils/palettes/.nrepl-port
 utils/palettes/target
 .clj-kondo
 .lsp
+/playground
+/.clerk
