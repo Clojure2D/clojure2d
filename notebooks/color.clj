@@ -3,7 +3,8 @@
   (:require [nextjournal.clerk :as clerk]
             [clojure2d.color :as c]
             [clerk.styles :refer [🎨 color-styles]]
-            [fastmath.vector :as v]))
+            [fastmath.vector :as v]
+            [fastmath.core :as m]))
 
 ^{::clerk/viewer :html ::clerk/visibility :hide} color-styles
 
@@ -157,12 +158,6 @@
 (🎨 (c/color :red 200))
 (🎨 (c/set-channel :red :HSL 0 300))
 
-;; Additionally you can multiply selected channel by given value with `modulate` function. It can also operate within selected colorspace (more about this later).
-
-(🎨 (c/modulate :red 0 0.5))
-;; Divide saturation by 2
-(🎨 (c/modulate :red :HSL 1 0.5))
-
 ;; ### Getting channels
 
 ;; To access given channel call:
@@ -199,6 +194,111 @@
 (🎨 (c/lclamp [-23.3 123.033 293.33]))
 
 ;; ## Alterations
+
+;; There is a collection of functions which help to alter color characteristics like brightness, saturation, hue, etc. We can also change temperature or tint with other color.
+
+;; ### Modulation / adjustment
+
+;; First option is to use `modulate` function, which multiplies selected channel by a value. Additionally you can choose color space to operate in.
+
+;; Divide red channel by 2
+(🎨 (c/modulate :red 0 0.5))
+;; Make `:maroon` brighter and less saturated
+(🎨 :maroon)
+(🎨 (-> :maroon
+        (c/modulate :HSL 2 2.0) ; change L channel
+        (c/modulate :HSL 1 0.5) ; change S channel
+        )) 
+
+;; Similarly works `adjust`, the only difference is that it add a value to a channel.
+
+(🎨 (c/adjust :red 1 127.0))
+;; Rotate hue 60deg in *HSV* color space
+(🎨 (c/adjust :red :HSV 0 60.0))
+
+;; ### Saturation and brightness
+
+;; Another group of function changes saturation and brightness directly, use:
+
+;; * `saturate` and `desaturate` to change color saturation (it's done in *LCH* color space)
+;; * `brighten` and `darken` to change luma (it's done in *LAB* color space)
+
+;; Saturation / desaturation
+
+(🎨 :lightblue)
+(🎨 (c/saturate :lightblue))
+(🎨 (c/saturate :lightblue 2.0))
+(🎨 (c/desaturate :lightblue 0.5))
+(🎨 (c/desaturate :lightblue))
+
+;; Brighten / darken
+
+(🎨 (c/brighten :lightblue))
+(🎨 (c/brighten :lightblue 2.0))
+(🎨 (c/darken :lightblue))
+(🎨 (c/darken :lightblue 2.0))
+
+;; ### Temperature
+
+;; Adjusting a temperature can make a color warmer or cooler. You can use a temperature name or actual temperature in Kelvins. Additionally we can specify an amount (default: 0.35) of adjustment.
+;; Named temperatures are:
+
+c/temperature-names
+
+;; `temperature` function returns a color connected to a given temperature.
+(🎨 (c/temperature 10000))
+
+;; Let's see how temperature gradient looks like (from 0K to 30000K):
+
+(🎨 (comp c/temperature (partial * 30000.0)))
+
+;; and finally let's adjust color
+
+(🎨 (c/adjust-temperature :pink :candle))
+(🎨 (c/adjust-temperature :pink :candle 0.75))
+
+(🎨 (c/adjust-temperature :pink :cool))
+(🎨 (c/adjust-temperature :pink :cool 0.75))
+
+(🎨 (c/adjust-temperature :pink 3800))
+
+;; ### Tinting
+
+;; We can also change a color towards the value of other color (or palette/gradient). To make it create a `tinter` which is a function changing color to a selected one. It works by multiplying color values, so works well for lighter colors. Let's make tinter which makes colors greener and more yellowish.
+
+(def greener (c/tinter [50 255 50]))
+(def yellowish (c/tinter [255 255 50]))
+
+(🎨 (c/color :lightblue))
+(🎨 (greener :lightblue))
+(🎨 (yellowish :lightblue))
+
+;; Dark, or colors with channels near to zero, are more problematic. Next chapter (about mixing) can help to find better way for tinting.
+
+(🎨 (greener :red))
+(🎨 (yellowish :red))
+
+;; `tinter` can also tint by using a gradient or palette. It works this way: for every channel, value from the target color is a selector for a value from gradient. The gradient below (`some-gradient`) has:
+
+;; * red channel in range `[50 100]`
+;; * green channel in range `[100 30]`
+;; * blue channel in range `[12 100]`
+
+(def some-gradient (c/gradient [[50 100 12]
+                              [255 30 100]]))
+(🎨 some-gradient)
+(def gradient-tinter (c/tinter some-gradient))
+
+;; Now, a target color, say `[127.5 255 0]`, is treated as a gradient selector (where `255.0` is a `1.0`, see how gradients work below). So:
+
+;; * red channel selects red channel from `(some-gradient 0.5)`, ie. mid value from `[50 255]` -> `152.5`
+;; * green channel selects green channel from `(some-gradient 1.0)`, last value from `[100 30]` -> `30` 
+;; * blue channel selects blue channel from `(some-gradient 0.0)`, first value from `[12 100]` -> `12`
+
+;; Resulting color is equal `[152.5 30 12]`
+
+(🎨 [127.5 255 0])
+(🎨 (gradient-tinter [127.5 255 0]))
 
 ;; ## Mixing and blending
 

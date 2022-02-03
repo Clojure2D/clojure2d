@@ -780,8 +780,8 @@
                 (v/mult 255.0))
             (.w c))))
 
-(def ^{:doc "RGB -> sRGB" :metadoc/categories meta-conv} to-sRGB* to-sRGB)
-(def ^{:doc "sRGB -> RGB" :metadoc/categories meta-conv} from-sRGB* from-sRGB)
+(def ^{:doc "linear RGB -> sRGB" :metadoc/categories meta-conv} to-sRGB* to-sRGB)
+(def ^{:doc "sRGB -> linear RGB" :metadoc/categories meta-conv} from-sRGB* from-sRGB)
 
 ;; ### Oklab
 
@@ -920,8 +920,7 @@
   * Y: 0.0 - 0.8453085619621623
   * Z: 0.0 - 0.8453085619621623"
   ^Vec4 [c]
-  (let [^Vec4 c (-> (pr/to-color c)
-                    (from-sRGB))
+  (let [^Vec4 c (from-sRGB c)
         r (convert-mix (m/muladd 0.001176470588235294 (.x c)
                                  (m/muladd 0.00243921568627451 (.y c)
                                            (m/muladd 3.0588235294117644E-4 (.z c)
@@ -2780,23 +2779,22 @@
                                                      (m/exp (* eek -4.221279555918655)))
                                                   (* 1.6550275798913296 lnk)))) 0.0 255.0))))
 
-(defn- temperature-name-to-K
-  ^double [t]
-  (case t
-    :candle 1800.0
-    :sunrise 2500.0
-    :sunset 2500.0
-    :lightbulb 2900.0
-    :morning 3500.0
-    :moonlight 4000.0
-    :midday 5500.0
-    :cloudy-sky 6500.0
-    :blue-sky 10000.0
-    :warm 2900.0
-    :white 4250.0
-    :sunlight 4800.0
-    :cool 7250.0
-    t))
+(def ^:private temperature-name-to-K
+  {:candle 1800.0
+   :sunrise 2500.0
+   :sunset 2500.0
+   :lightbulb 2900.0
+   :morning 3500.0
+   :moonlight 4000.0
+   :midday 5500.0
+   :cloudy-sky 6500.0
+   :blue-sky 10000.0
+   :warm 2900.0
+   :white 4250.0
+   :sunlight 4800.0
+   :cool 7250.0})
+
+(def temperature-names (sort (keys temperature-name-to-K)))
 
 (defn temperature
   "Color representing given black body temperature `t` in Kelvins (or name as keyword).
@@ -2808,7 +2806,7 @@
   Possible temperature names: `:candle`, `:sunrise`, `:sunset`, `:lightbulb`, `:morning`, `:moonlight`, `:midday`, `:cloudy-sky`, `:blue-sky`, `:warm`, `:cool`, `:white`, `:sunlight`"
   {:metadoc/categories #{:pal}}
   ^Vec4 [t]
-  (let [k (* 0.0001 (temperature-name-to-K t))
+  (let [k (* 0.0001 ^double (get temperature-name-to-K t t))
         lnk (m/ln k)]
     (Vec4. (kelvin-red k lnk)
            (kelvin-green k lnk)
@@ -3327,6 +3325,7 @@
 
 (declare gradient)
 
+(def ^:private vec4-one (Vec4. 1.0 1.0 1.0 1.0))
 (defn tinter
   "Creates fn to tint color using other color(s).
 
@@ -3334,19 +3333,20 @@
   {:metadoc/categories #{:pal}}
   ([tint-colors] (tinter tint-colors {}))
   ([tint-colors gradient-params]
-   (if (possible-color? tint-colors)
-     (let [tint (v/add (pr/to-color tint-colors) (Vec4. 1.0 1.0 1.0 1.0))]
+   (if-let [tc (valid-color? tint-colors)]
+     (let [tint (v/add tc vec4-one)]
        (fn [c]
-         (let [c (pr/to-color c)]
-           (v/div (v/econstrain (v/emult c tint) 0.0 65535.0) 256.0))))
+         (let [c (v/add (pr/to-color c) vec4-one)]
+           (clamp (v/mult (v/sqrt (v/div (v/emult c tint) 65536.0)) 255.0)))))
      (let [g (if (fn? tint-colors)
                tint-colors
                (gradient tint-colors gradient-params))]
        (fn [c]
-         (let [^Vec4 c (v/div (pr/to-color c) 255.0)]
-           (Vec4. (pr/red (g (.x c)))
-                  (pr/green (g (.y c)))
-                  (pr/blue (g (.z c)))
+         (let [^Vec4 c (pr/to-color c)
+               ^Vec4 cc (v/div c 255.0)]
+           (Vec4. (pr/red (g (.x cc)))
+                  (pr/green (g (.y cc)))
+                  (pr/blue (g (.z cc)))
                   (.w c))))))))
 
 ;; color reduction using x-means
@@ -3407,6 +3407,27 @@
   {:metadoc/categories meta-ops}
   (^Vec4 [col] (saturate col -1.0))
   (^Vec4 [col ^double amt] (saturate col (- amt))))
+
+(defn adjust
+  "Adjust (add) given value to a chosen channel. Works with any color space."
+  {:metadoc/categories meta-ops}
+  (^Vec4 [col colorspace ^long channel ^double value]
+   (let [[to from] (colorspaces colorspace)
+         ^Vec4 c (to col)]
+     (clamp (from (case channel
+                    0 (Vec4. (+ value (.x c)) (.y c) (.z c) (.w c))
+                    1 (Vec4. (.x c) (+ value (.y c)) (.z c) (.w c))
+                    2 (Vec4. (.x c) (.y c) (+ value (.z c)) (.w c))
+                    3 (Vec4. (.x c) (.y c) (.z c) (+ value (.w c)))
+                    c)))))
+  (^Vec4 [col ^long channel ^double value]
+   (let [^Vec4 c (pr/to-color col)]
+     (clamp (case channel
+              0 (Vec4. (+ value (.x c)) (.y c) (.z c) (.w c))
+              1 (Vec4. (.x c) (+ value (.y c)) (.z c) (.w c))
+              2 (Vec4. (.x c) (.y c) (+ value (.z c)) (.w c))
+              3 (Vec4. (.x c) (.y c) (.z c) (+ value (.w c)))
+              c)))))
 
 (defn modulate
   "Modulate (multiply) chosen channel by given amount. Works with any color space."

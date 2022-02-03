@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file. This change
 * Dictionary of Colour Combinations - colors and palettes (prefix `:docc`) - https://github.com/mattdesl/dictionary-of-colour-combinations
 * Color Vision Deficiency `cvd-lens` function (a filter)
 * `mixsub` subtactive mixing
+* `adjust` adds a value to color channel
 
 ### Fixed
 
