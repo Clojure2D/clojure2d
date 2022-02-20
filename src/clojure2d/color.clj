@@ -104,7 +104,7 @@
   
   ## Distances
 
-  Several functions to calculate distance between colors (`euclidean`, `delta-xxx` etc.).
+  Several functions to calculate difference between colors, `delta-E*-xxx` etc.
 
   ## References
 
@@ -125,7 +125,8 @@
             [fastmath.clustering :as cl]
             [fastmath.easings :as e]
             [clojure2d.protocols :as pr]
-            [clojure.java.io :refer [input-stream resource]])
+            [clojure.java.io :refer [input-stream resource]]
+            [clojure2d.color :as c])
   (:import [fastmath.vector Vec2 Vec3 Vec4]           
            [java.awt Color]
            [clojure.lang APersistentVector ISeq]))
@@ -629,7 +630,7 @@
 (defn black?
   "Check if color is black"
   [c]
-  (let [^Vec4 v (pr/to-color c)]
+  (let [^Vec4 v (clamp c)]
     (and (zero? (.x v))
          (zero? (.y v))
          (zero? (.z v)))))
@@ -637,7 +638,7 @@
 (defn not-black?
   "Check if color is not black"
   [c]
-  (let [^Vec4 v (pr/to-color c)]
+  (let [^Vec4 v (clamp c)]
     (or (pos? (.x v))
         (pos? (.y v))
         (pos? (.z v)))))
@@ -738,6 +739,7 @@
   ^Vec4 [c]
   (from-OHTA (v/sub c ohta-s)))
 
+
 ;; ### sRGB
 
 (def ^:private ^:const ^double gamma-factor (/ 2.4))
@@ -833,6 +835,52 @@
                        (m/mnorm (.z c) 0.0 255.0 -0.3115281476783752  0.19856975465179516)
                        (.w c)))))
 
+;;
+
+(defn- to-lch
+  ^Vec4 [to c]
+  (let [^Vec4 cc (to c)
+        H (m/atan2 (.z cc) (.y cc))
+        Hd (m/degrees (if (neg? H) (+ H m/TWO_PI) H))
+        C (m/hypot-sqrt (.y cc) (.z cc))]
+    (Vec4. (.x cc) C Hd (.w cc))))
+
+(defn- from-lch
+  ^Vec4 [from c]
+  (let [^Vec4 c (pr/to-color c)
+        h (m/radians (.z c))]
+    (from (Vec4. (.x c) (* (.y c) (m/cos h)) (* (.y c) (m/sin h)) (.w c)))))
+
+;;
+
+(defn to-Oklch
+  "RGB -> Oklch"
+  ^Vec4 [c]
+  (to-lch to-Oklab c))
+
+(defn to-Oklch*
+  "RGB -> Oklch, normalized"
+  ^Vec4 [c]
+  (let [^Vec4 c (to-Oklch c)]
+    (Vec4. (m/mnorm (.x c) 0.0 0.9999999934735462 0.0 255.0)
+           (m/mnorm (.y c) 0.0 0.32249096477516426 0.0 255.0)
+           (m/mnorm (.z c) 0.0 359.99988541074447 0.0 255.0)
+           (.w c))))
+
+(defn from-Oklch
+  "Oklch -> RGB"
+  ^Vec4 [c]
+  (from-lch from-Oklab c))
+
+(defn from-Oklch*
+  "Oklch -> RGB, normalized"
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)]
+    (from-Oklch (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 0.9999999934735462)
+                       (m/mnorm (.y c) 0.0 255.0 0.0 0.32249096477516426)
+                       (m/mnorm (.z c) 0.0 255.0 0.0 359.99988541074447)
+                       (.w c)))))
+
 ;; ### XYZ
 
 (def ^:private ^:const ^double D65X 95.047)
@@ -842,9 +890,9 @@
 (defn- to-XYZ-
   "Pure RGB->XYZ conversion without corrections."
   ^Vec3 [^Vec3 c]
-  (Vec3. (+ (* (.x c) 0.4124) (* (.y c) 0.3576) (* (.z c) 0.1805))
-         (+ (* (.x c) 0.2126) (* (.y c) 0.7152) (* (.z c) 0.0722))
-         (+ (* (.x c) 0.0193) (* (.y c) 0.1192) (* (.z c) 0.9505))))
+  (Vec3. (+ (* (.x c) 0.4124564390896921) (* (.y c) 0.357576077643909) (* (.z c) 0.18043748326639894))
+         (+ (* (.x c) 0.21267285140562248) (* (.y c) 0.715152155287818) (* (.z c) 0.07217499330655958))
+         (+ (* (.x c) 0.019333895582329317) (* (.y c) 0.119192025881303) (* (.z c) 0.9503040785363677))))
 
 (defn to-XYZ
   "RGB -> XYZ
@@ -876,9 +924,9 @@
 (defn- from-XYZ-
   "Pure XYZ->RGB conversion."
   ^Vec3 [^Vec3 v]
-  (Vec3. (+ (* (.x v)  3.2406) (* (.y v) -1.5372) (* (.z v) -0.4986))
-         (+ (* (.x v) -0.9689) (* (.y v)  1.8758) (* (.z v)  0.0415))
-         (+ (* (.x v)  0.0557) (* (.y v) -0.2040) (* (.z v)  1.0570))))
+  (Vec3. (+ (* (.x v) 3.2404541621141054) (* (.y v) -1.5371385127977166) (* (.z v) -0.4985314095560162))
+         (+ (* (.x v) -0.9692660305051868) (* (.y v)  1.8760108454466942) (* (.z v)  0.04155601753034984))
+         (+ (* (.x v)  0.05564343095911469) (* (.y v) -0.20402591351675387) (* (.z v) 1.0572251882231791))))
 
 (defn from-XYZ
   "XYZ -> RGB
@@ -901,11 +949,6 @@
     (from-XYZ (Vec4. x y z (.w c)))))
 
 ;;
-
-(def ^:private ^:const ^double CIEEpsilon (/ 216.0 24389.0))
-(def ^:private ^:const ^double CIEK (/ 24389.0 27.0))
-(def ^:private ^:const ^double REF-U (/ (* 4.0 D65X) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
-(def ^:private ^:const ^double REF-V (/ (* 9.0 D65Y) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
 
 ;; ### XYB, https://observablehq.com/@mattdesl/perceptually-smooth-multi-color-linear-gradients
 
@@ -1027,6 +1070,11 @@
 
 ;; ### LAB
 
+(def ^:private ^:const ^double CIEEpsilon (/ 216.0 24389.0))
+(def ^:private ^:const ^double CIEK (/ 24389.0 27.0))
+(def ^:private ^:const ^double REF-U (/ (* 4.0 D65X) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
+(def ^:private ^:const ^double REF-V (/ (* 9.0 D65Y) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
+
 (defn- to-lab-correct
   "LAB correction"
   ^double [^double v]
@@ -1092,7 +1140,6 @@
                      (m/mnorm (.y c) 0.0 255.0 -86.18463649762525 98.25421868616108)
                      (m/mnorm (.z c) 0.0 255.0 -107.86368104495168 94.48248544644461)
                      (.w c)))))
-
 
 ;;
 
@@ -1224,6 +1271,8 @@
 
 ;;
 
+;;
+
 (defn to-LCH
   "RGB -> LCH
 
@@ -1234,13 +1283,7 @@
   * H: 0.0 - 360.0"
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
-  (let [cc (to-LAB c)
-        H (m/atan2 (.z cc) (.y cc))
-        Hd (if (pos? H)
-             (m/degrees H)
-             (- 360.0 (m/degrees (m/abs H))))
-        C (m/hypot-sqrt (.y cc) (.z cc))]
-    (Vec4. (.x cc) C Hd (.w cc))))
+  (to-lch to-LAB c))
 
 (defn to-LCH*
   "RGB -> LCH, normalized"
@@ -1248,8 +1291,8 @@
   ^Vec4 [c]
   (let [cc (to-LCH c)]
     (Vec4. (m/mnorm (.x cc) 0.0 100.0 0.0 255.0)
-           (m/mnorm (.y cc) 0.0 133.81586201619496 0.0 255.0)
-           (m/mnorm (.z cc) 2.1135333225536313E-5  360.0 0.0 255.0)
+           (m/mnorm (.y cc) 0.0 133.81586201619493 0.0 255.0)
+           (m/mnorm (.z cc) 0.0 359.99994682530985 0.0 255.0)
            (.w cc))))
 
 (defn from-LCH
@@ -1258,11 +1301,7 @@
   For ranges, see [[to-LCH]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
-  (let [^Vec4 c (pr/to-color c)
-        h (m/radians (.z c))
-        a (* (.y c) (m/cos h))
-        b (* (.y c) (m/sin h))]
-    (from-LAB (Vec4. (.x c) a b (.w c)))))
+  (from-lch from-LAB c))
 
 (defn from-LCH*
   "LCH -> RGB, normalized"
@@ -1270,8 +1309,8 @@
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-LCH (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.0)
-                     (m/mnorm (.y c) 0.0 255.0 0.0 133.81586201619496)
-                     (m/mnorm (.z c) 0.0 255.0 2.1135333225536313E-5 360.0)
+                     (m/mnorm (.y c) 0.0 255.0 0.0 133.81586201619493)
+                     (m/mnorm (.z c) 0.0 255.0 0.0 359.99994682530985)
                      (.w c)))))
 
 ;; ### Yxy (xyY)
@@ -1556,13 +1595,7 @@
   * H: 0.0 - 360.0"
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
-  (let [cc (to-JAB c)
-        H (m/atan2 (.z cc) (.y cc))
-        Hd (if (pos? H)
-             (m/degrees H)
-             (- 360.0 (m/degrees (m/abs H))))
-        C (m/hypot-sqrt (.y cc) (.z cc))]
-    (Vec4. (.x cc) C Hd (.w cc))))
+  (to-lch to-JAB c))
 
 (defn to-JCH*
   "RGB -> JCH, normalized"
@@ -1580,11 +1613,7 @@
   For ranges, see [[to-JCH]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
-  (let [^Vec4 c (pr/to-color c)
-        h (m/radians (.z c))
-        a (* (.y c) (m/cos h))
-        b (* (.y c) (m/sin h))]
-    (from-JAB (Vec4. (.x c) a b (.w c)))))
+  (from-lch from-JAB c))
 
 (defn from-JCH*
   "JCH -> RGB, normalized"
@@ -1625,8 +1654,8 @@
     (<= 4.0 h 5.0) (Vec3. x 0.0 c)
     :else (Vec3. c 0.0 x)))
 
-(def ^:private ^:const ^double n360->255 (/ 255.0 359.7647058823529))
-(def ^:private ^:const ^double n255->360 (/ 359.7647058823529 255.0))
+(def ^:private ^:const ^double n360->255 (/ 255.0 360.0))
+(def ^:private ^:const ^double n255->360 (/ 360.0 255.0))
 
 (defn- normalize-HSx
   "Make output range 0-255"
@@ -1647,10 +1676,7 @@
 (defn- wrap-hue 
   "Wrap hue to enable interpolations"
   ^double [^double h]
-  (cond
-    (neg? h) (+ h 360.0)
-    (> h 360.0) (- h 360.0)
-    :else h))
+  (m/wrap 0.0 360.0 h))
 
 ;; HSI
 
@@ -1734,7 +1760,39 @@
 (def ^{:metadoc/categories meta-conv :doc "RGB -> HSB(V) (see [[to-HSV*]])"} to-HSB* to-HSV*)
 (def ^{:metadoc/categories meta-conv :doc "HSB(V) -> RGB (see [[from-HSV*]])"} from-HSB* from-HSV*)
 
+;; paletton HSV
+
+(declare paletton-hsv-to-rgb)
+(declare paletton-rgb-to-hsv)
+
+(defn to-PalettonHSV
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)]
+    (paletton-rgb-to-hsv (.x c) (.y c) (.z c) (.w c))))
+
+(defn to-PalettonHSV*
+  ^Vec4 [c]
+  (let [^Vec4 c (to-PalettonHSV c)]
+    (Vec4. (* n360->255 (.x c))
+           (* 127.5 (.y c))
+           (* 127.5 (.z c))
+           (.w c))))
+
+(defn from-PalettonHSV
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)]
+    (paletton-hsv-to-rgb (.x c) (.y c) (.z c) (.w c))))
+
+(defn from-PalettonHSV*
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)]
+    (from-PalettonHSV (Vec4. (* n255->360 (.x c))
+                             (/ (.y c) 127.5)
+                             (/ (.z c) 127.5)
+                             (.w c)))))
+
 ;; HSL
+
 
 (defn to-HSL
   "RGB -> HSL
@@ -1815,7 +1873,7 @@
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        H (m/constrain (.x c) -179.8496181535773 180.0)
+        H (m/wrap -180.0 180.0 (.x c))
         C (* 3.0 (.y c))
         L (* 4.0 (.z c))
         Q (* 2.0 (m/exp (* 0.03 (- 1.0 (/ C L)))))
@@ -1873,30 +1931,8 @@
   * B: 0.0 - 1.0"
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
-  (let [^Vec4 c (pr/to-color c)
-        w (min (.x c) (.y c) (.z c))
-        v (max (.x c) (.y c) (.z c))
-        h (if (== w v) 0
-              (let [^double f (condp m/eq w
-                                (.x c) (- (.y c) (.z c))
-                                (.y c) (- (.z c) (.x c))
-                                (.z c) (- (.x c) (.y c)))
-                    ^double p (condp m/eq w
-                                (.x c) 3.0
-                                (.y c) 5.0
-                                (.z c) 1.0)]
-                (* 60.0 (- p (/ f (- v w))))))]
-    (Vec4. h (/ w 255.0) (- 1.0 (/ v 255.0)) (.w c))))
-
-(defn to-HWB*
-  "RGB - HWB, normalized"
-  {:metadoc/categories meta-conv}
-  ^Vec4 [c]
-  (let [cc (to-HWB c)]
-    (Vec4. (* 255.0 (/ (.x cc) 360.0))
-           (* 255.0 (.y cc))
-           (* 255.0 (.z cc))
-           (.w cc))))
+  (let [^Vec4 c (to-HSV c)]
+    (Vec4. (.x c) (* (- 1.0 (.y c)) (.z c)) (- 1.0 (.z c)) (.w c))))
 
 (defn from-HWB
   "HWB -> RGB
@@ -1904,36 +1940,17 @@
   For ranges, see [[to-HWB]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
-  (let [^Vec4 c (pr/to-color c)]
-    (if (zero? (.x c)) 
-      (let [v (* 255.0 (- 1.0 (.z c)))]
-        (Vec4. v v v (.w c)))
-      (let [h (/ (.x c) 60.0)
-            v (- 1.0 (.z c))
-            w (.y c)
-            i (unchecked-int (m/floor h))
-            f (- h i)
-            f (if (odd? (int i)) (- 1.0 f) f)
-            n (+ w (* f (- v w)))
-            rgb (case i
-                  0 (Vec3. v n w)
-                  1 (Vec3. n v w)
-                  2 (Vec3. w v n)
-                  3 (Vec3. w n v)
-                  4 (Vec3. n w v)
-                  5 (Vec3. v w n)
-                  6 (Vec3. v n w))]
-        (v/vec4 (v/mult rgb 255.0) (.w c))))))
+  (let [^Vec4 c (pr/to-color c)
+        w (.y c)
+        b (.z c)
+        w+b (+ w b)
+        w (if (> w+b 1.0) (/ w w+b) w)
+        b- (if (> w+b 1.0) (- 1.0 (/ b w+b)) (- 1.0 b))]
+    (from-HSV (Vec4. (.x c) (if (zero? w) 1.0 (- 1.0 (/ w b-))) b- (.w c)))))
 
-(defn from-HWB*
-  "HWB -> RGB, normalized"
-  {:metadoc/categories meta-conv}
-  ^Vec4 [c]
-  (let [^Vec4 c (pr/to-color c)]
-    (from-HWB (Vec4. (* 360.0 (/ (.x c) 255.0))
-                     (/ (.y c) 255.0)
-                     (/ (.z c) 255.0)
-                     (.w c)))))
+(def ^{:metadoc/categories meta-conv :doc "RGB -> HWB, normalized"} to-HWB* (comp normalize-HSx to-HWB))
+(def ^{:metadoc/categories meta-conv :doc "HWB -> RGB, normalized"} from-HWB* (comp from-HWB denormalize-HSx pr/to-color))
+
 
 ;; ### GLHS
 ;;
@@ -2597,6 +2614,11 @@
 (def ^{:doc "Alias for [[to-color]]" :metadoc/categories meta-conv} to-RGB* pr/to-color)
 (def ^{:doc "Alias for [[to-color]]" :metadoc/categories meta-conv} from-RGB* pr/to-color)
 
+(def ^{:doc "sRGB -> linearRGB" :metadoc/categories meta-conv} to-linearRGB from-sRGB)
+(def ^{:doc "linearRGB -> sRGB" :metadoc/categories meta-conv} from-linearRGB to-sRGB)
+(def ^{:doc "sRGB -> linearRGB" :metadoc/categories meta-conv} to-linearRGB* from-sRGB)
+(def ^{:doc "linearRGB -> sRGB" :metadoc/categories meta-conv} from-linearRGB* to-sRGB)
+
 ;; List of all color spaces with functions
 (def ^{:doc "Map of all color spaces functions.
 
@@ -2614,6 +2636,7 @@
                :LUV   [to-LUV from-LUV]
                :LAB   [to-LAB from-LAB]
                :Oklab [to-Oklab from-Oklab]
+               :Oklch [to-Oklch from-Oklch]
                :JAB   [to-JAB from-JAB]
                :HunterLAB  [to-HunterLAB from-HunterLAB]
                :LCH   [to-LCH from-LCH]
@@ -2623,6 +2646,7 @@
                :HSI   [to-HSI from-HSI]
                :HSL   [to-HSL from-HSL]
                :HSV   [to-HSV from-HSV]
+               :PalettonHSV   [to-PalettonHSV from-PalettonHSV]
                :HWB   [to-HWB from-HWB]
                :GLHS  [to-GLHS from-GLHS]
                :YPbPr [to-YPbPr from-YPbPr]
@@ -2633,6 +2657,7 @@
                :YIQ   [to-YIQ from-YIQ]
                :Gray  [to-Gray from-Gray]
                :sRGB  [to-sRGB from-sRGB]
+               :linearRGB [from-sRGB to-sRGB]
                :Cubehelix [to-Cubehelix from-Cubehelix]
                :OSA [to-OSA from-OSA]
                :RGB   [to-color to-color]})
@@ -2653,6 +2678,7 @@
                 :LUV   [to-LUV* from-LUV*]
                 :LAB   [to-LAB* from-LAB*]
                 :Oklab [to-Oklab* from-Oklab*]
+                :Oklch [to-Oklch* from-Oklch*]
                 :JAB   [to-JAB* from-JAB*]
                 :HunterLAB  [to-HunterLAB* from-HunterLAB*]
                 :LCH   [to-LCH* from-LCH*]
@@ -2662,6 +2688,7 @@
                 :HSI   [to-HSI* from-HSI*]
                 :HSL   [to-HSL* from-HSL*]
                 :HSV   [to-HSV* from-HSV*]
+                :PalettonHSV   [to-PalettonHSV* from-PalettonHSV*]
                 :HWB   [to-HWB* from-HWB*]
                 :GLHS  [to-GLHS* from-GLHS*]
                 :YPbPr [to-YPbPr* from-YPbPr*]
@@ -2672,12 +2699,41 @@
                 :YIQ   [to-YIQ* from-YIQ*]
                 :Gray  [to-Gray from-Gray]
                 :sRGB  [to-sRGB* from-sRGB*]
+                :linearRGB [from-sRGB* to-sRGB*]
                 :Cubehelix [to-Cubehelix* from-Cubehelix*]
                 :OSA [to-OSA* from-OSA*]
                 :RGB   [to-color to-color]})
 
 ;; List of color spaces names
 (def ^{:doc "List of all color space names." :metadoc/categories meta-conv} colorspaces-list (sort (keys colorspaces)))
+
+(defn complementary
+  "Create complementary color. Possible colorspaces are:
+
+  * `:PalettonHSV` (default)
+  * `:HSB`, `:HSV`, `:HSL` or `:HWB`
+  * `:GLHS`"
+  (^Vec4 [c] (complementary c :PalettonHSV))
+  (^Vec4 [c colorspace]
+   (let [[to from] (colorspaces colorspace)
+         ^Vec4 c (to c)]
+     (from (if (= colorspace :GLHS)
+             (Vec4. (+ 180.0 (.x c)) (.y c) (.z c) (.w c))
+             (Vec4. (.x c) (+ 180.0 (.y c)) (.z c) (.w c)))))))
+
+(defn- test-reversibility
+  ([colorspace]
+   (let [[to from] (colorspaces colorspace)]
+     (test-reversibility to from)))
+  ([to from]
+   (for [r (range 256)
+         g (range 256)
+         b (range 256)
+         :let [in (Vec4. r g b 255.0)
+               cs (to in)
+               rgb (from cs)]
+         :when (not= in (lclamp rgb))]
+     [r g b cs (lclamp rgb) (v/dist in rgb)])))
 
 (defn set-channel
   "Set chosen channel with given value. Works with any color space."
@@ -2813,6 +2869,26 @@
            (kelvin-blue k lnk)
            255.0)))
 
+;; https://en.wikipedia.org/wiki/CIE_1931_color_space#Analytical_approximation
+
+(defn- piecewise-gaussian
+  ^double [^double x ^double mi ^double s1 ^double s2]
+  (if (< x mi)
+    (m/exp (* -0.5 (/ (m/sq (- x mi)) (* s1 s1))))
+    (m/exp (* -0.5 (/ (m/sq (- x mi)) (* s2 s2))))))
+
+(defn wavelength
+  "Returns color from given wavelength in nm"
+  ^Vec4 [^double lambda]
+  (clamp (from-XYZ (Vec4. (* D65X (+ (*  1.056 (piecewise-gaussian lambda 599.8 37.9 31.0))
+                                     (*  0.362 (piecewise-gaussian lambda 442.0 16.0 26.7))
+                                     (* -0.065 (piecewise-gaussian lambda 501.1 20.4 26.2))))
+                          (* D65Y (+ (*  0.821 (piecewise-gaussian lambda 568.8 46.9 40.5))
+                                     (*  0.286 (piecewise-gaussian lambda 530.9 16.3 31.1))))
+                          (* D65Z (+ (*  1.217 (piecewise-gaussian lambda 437.0 11.8 36.0))
+                                     (*  0.681 (piecewise-gaussian lambda 459.0 26.0 13.8))))
+                          255.0))))
+
 ;; http://iquilezles.org/www/articles/palettes/palettes.htm
 
 (defn- cosine-coefficients
@@ -2860,9 +2936,9 @@
 
 (defonce ^:private paletton-base-data
   (let [s (fn ^double [^double e ^double t ^double n] (if (== n -1.0) e
-                                                          (+ e (/ (- t e) (inc n)))))
+                                                         (+ e (/ (- t e) (inc n)))))
         i (fn ^double [^double e ^double t ^double n] (if (== n -1.0) t
-                                                          (+ t (/ (- e t) (inc n)))))
+                                                         (+ t (/ (- e t) (inc n)))))
         d120 {:a [1.0 1.0]
               :b [1.0 1.0]
               :f (fn ^double [^double e]
@@ -2872,7 +2948,7 @@
                     (if (== e -1.0) 0.0
                         (- 120.0 (* 2.0 (/ (* (m/atan (/ e 0.5)) 120.0) m/PI)))))
               :g s
-              :rgb (fn [e n r] (Vec4. e n r 255.0))}
+              :rgb (fn [e n r a] (Vec4. e n r a))}
         d180 {:a [1.0 1.0]
               :b [1.0 0.8]
               :f (fn ^double [^double e]
@@ -2882,7 +2958,7 @@
                     (if (== e -1.0) 180.0
                         (+ 120.0 (* 2.0 (/ (* (m/atan (/ e 0.5)) 60.0) m/PI)))))
               :g i
-              :rgb (fn [e n r] (Vec4. n e r 255.0))}
+              :rgb (fn [e n r a] (Vec4. n e r a))}
         d210 {:a [1.0 0.8]
               :b [1.0 0.6]
               :f (fn ^double [^double e]
@@ -2892,7 +2968,7 @@
                     (if (== e -1.0) 180.0
                         (- 210.0 (* 2.0 (/ (* (m/atan (/ e 0.75)) 30.0) m/PI)))))
               :g s
-              :rgb (fn [e n r] (Vec4. r e n 255.0))}
+              :rgb (fn [e n r a] (Vec4. r e n a))}
         d255 {:a [1.0 0.6]
               :b [0.85 0.7]
               :f (fn ^double [^double e]
@@ -2902,7 +2978,7 @@
                     (if (== e -1.0) 255.0
                         (+ 210.0 (* 2.0 (/ (* (m/atan (/ e 1.33)) 45.0) m/PI)))))
               :g i
-              :rgb (fn [e n r] (Vec4. r n e 255.0))}
+              :rgb (fn [e n r a] (Vec4. r n e a))}
         d315 {:a [0.85 0.7]
               :b [1.0 0.65]
               :f (fn ^double [^double e]
@@ -2912,7 +2988,7 @@
                     (if (== e -1.0) 255.0
                         (- 315.0 (* 2.0 (/ (* (m/atan (/ e 1.33)) 60.0) m/PI)))))
               :g s
-              :rgb (fn [e n r] (Vec4. n r e 255.0))}
+              :rgb (fn [e n r a] (Vec4. n r e a))}
         d360 {:a [1.0 0.65]
               :b [1.0 1.0]
               :f (fn ^double [^double e]
@@ -2922,7 +2998,7 @@
                     (if (== e -1.0) 0.0
                         (+ 315.0 (* 2.0 (/ (* (m/atan (/ e 1.33)) 45.0) m/PI)))))
               :g i
-              :rgb (fn [e n r] (Vec4. e r n 255.0))}]
+              :rgb (fn [e n r a] (Vec4. e r n a))}]
     (fn [^double h]
       (condp clojure.core/> h
         120.0 d120
@@ -2932,28 +3008,32 @@
         315.0 d315
         360.0 d360))))
 
+(defn- adjust-s-v-rev
+  ^double [^double e ^double t] (if (<= t 1.0)
+                                  (* e t)
+                                  (+ e (* (- 1.0 e) (dec t)))))
+
 (defn- paletton-hsv-to-rgb
   "Paletton version of HSV to RGB converter"
-  [^double hue ^double ks ^double kv]
-  (let [ks (m/constrain ks 0.0 2.0)
-        kv (m/constrain kv 0.0 2.0)
-        h (mod hue 360.0)
-        upd (fn ^double [^double e ^double t] (if (<= t 1.0)
-                                                (* e t)
-                                                (+ e (* (- 1.0 e) (dec t)))))
-        {:keys [a b f g rgb]} (paletton-base-data h)
-        av (second a)
-        bv (second b)
-        as (first a)
-        bs (first b)
-        ^double n (f h)
-        ^double v (upd (g av bv n) kv)
-        ^double s (upd (g as bs n) ks)
-        r (* 255.0 v)
-        b (* r (- 1.0 s))
-        g (if (== n -1.0) b
-              (/ (+ r (* n b)) (inc n)))]
-    (rgb r g b)))
+  (^Vec4 [^double hue ^double ks ^double kv ^double alpha]
+   (let [ks (m/constrain ks 0.0 2.0)
+         kv (m/constrain kv 0.0 2.0)
+         h (wrap-hue hue)
+         {:keys [a b f g rgb]} (paletton-base-data h)
+         av (second a)
+         bv (second b)
+         as (first a)
+         bs (first b)
+         ^double n (f h)
+         v (adjust-s-v-rev (g av bv n) kv)
+         s (adjust-s-v-rev (g as bs n) ks)
+         r (* 255.0 v)
+         b (* r (- 1.0 s))
+         g (if (== n -1.0) b
+               (/ (+ r (* n b)) (inc n)))]
+     (rgb r g b alpha)))
+  (^Vec4 [^double hue ^double ks ^double kv]
+   (paletton-hsv-to-rgb hue ks kv 255.0)))
 
 (defn hue-paletton
   "Convert color to paletton HUE (which is different than hexagon or polar conversion)."
@@ -2974,13 +3054,45 @@
                              (if (== p r)
                                [g (:fi (paletton-base-data 254.0))]
                                [r (:fi (paletton-base-data 314.0))])))
-           ;; d (/ (- f p) f) ;; saturation
-           ;; v (/ f 255.0)   ;; value
            s (i (if (== l p) -1.0
                     (/ (- f l) (- l p))))]
        s)))
   ([c] (let [cc (to-color c)]
          (hue-paletton (.x cc) (.y cc) (.z cc)))))
+
+(defn- get-s-v
+  [^double h]
+  (let [{:keys [a b f g]} (paletton-base-data h)
+        av (second a)
+        bv (second b)
+        as (first a)
+        bs (first b)
+        r (f h)
+        s (g av bv r)
+        i (g as bs r)]
+    [i s]))
+
+(defn- adjust-s-v
+  ^double [^double e ^double t]
+  (if (zero? e)
+    0.0
+    (if (<= t e)
+      (/ t e)
+      (inc (/ (- t e) (- 1.0 e))))))
+
+(defn- paletton-rgb-to-hsv
+  (^Vec4 [^double r ^double g ^double b ^double alpha]
+   (if (== r g b)
+     (Vec4. 0.0 0.0 (/ (+ (* 0.299 r) (* 0.587 g) (* 0.114 b)) 255.0) 255.0)
+     (let [f (max r g b)
+           p (min r g b)
+           h (hue-paletton r g b)
+           [s v] (get-s-v h)
+           n (adjust-s-v s (/ (- f p) f))
+           r (adjust-s-v v (/ f 255.0))]
+       (Vec4. h n r alpha))))
+  (^Vec4 [^double r ^double g ^double b]
+   (paletton-rgb-to-hsv r g b 255.0)))
 
 ;; List of paletton presets
 (defonce ^:private paletton-presets
@@ -3011,7 +3123,7 @@
 
 ;; List of preset names
 (def ^{:doc "Paletton presets names"
-       :metadoc/categories #{:pal}}
+     :metadoc/categories #{:pal}}
   paletton-presets-list (keys paletton-presets))
 
 (defn- paletton-monochromatic-palette
@@ -3075,51 +3187,124 @@
     (vec (concat p1 p2))))
 
 ;; ## Additional functions
+;; https://www.imatest.com/docs/colorcheck_ref/
 
-(defn delta-c
-  "Delta C* distance"
-  {:metadoc/categories #{:dist}}
-  [c1 c2]
+(defn delta-E*
+  "ΔE*_ab difference, CIE 1976"
+  ^double [c1 c2]
   (let [^Vec4 c1 (to-LAB c1)
         ^Vec4 c2 (to-LAB c2)]
-    (- (m/hypot-sqrt (.y c2) (.z c2))
-       (m/hypot-sqrt (.y c1) (.z c1)))))
+    (m/hypot-sqrt (- (.x c2) (.x c1))
+                  (- (.y c2) (.y c1))
+                  (- (.z c2) (.z c1)))))
 
-(defn delta-h
-  "Delta H* distance"
+(defn- delta-ab
+  ^double [^Vec4 c1 ^Vec4 c2]
+  (- (m/hypot-sqrt (.y c1) (.z c1))
+     (m/hypot-sqrt (.y c2) (.z c2))))
+
+(defn delta-C*
+  "ΔC*_ab difference, chroma difference in LAB color space, CIE 1976"
   {:metadoc/categories #{:dist}}
+  ^double [c1 c2]
+  (delta-ab (to-LAB c1) (to-LAB c2)))
+
+(def ^{:deprecated "Use delta-C*"} delta-c delta-C*)
+
+(defn delta-H*
+  "ΔH* difference, hue difference in LAB, CIE 1976"
+  {:metadoc/categories #{:dist}}
+  ^double [c1 c2]
+  (let [^Vec4 c1 (to-LAB c1)
+        ^Vec4 c2 (to-LAB c2)]
+    (m/safe-sqrt (- (+ (m/sq (- (.y c2) (.y c1)))
+                       (m/sq (- (.z c2) (.z c1))))
+                    (m/sq (delta-ab c1 c2))))))
+
+(def ^{:deprecated "Use delta-H*"} delta-h delta-H*)
+
+(defn delta-E-HyAB
+  "ΔE_HyAB difference"
   [c1 c2]
-  (let [c1 (to-LAB c1)
-        c2 (to-LAB c2)
-        xde (- (m/hypot-sqrt (.y c2) (.z c2))
-               (m/hypot-sqrt (.y c1) (.z c1)))]
-    (m/safe-sqrt (- (+ (m/sq (- (.y c1) (.y c2)))
-                       (m/sq (- (.z c1) (.z c2))))
-                    (* xde xde)))))
+  ^double (let [^Vec4 c1 (to-LAB c1)
+                ^Vec4 c2 (to-LAB c2)]
+            (+ (m/hypot-sqrt (- (.y c2) (.y c1))
+                             (- (.z c2) (.z c1)))
+               (m/abs (- (.x c2) (.x c1))))))
 
-(defn- euclidean-
-  "Euclidean distance between colors"
+(defn delta-E*-94
+  "ΔE* difference, CIE 1994"
   {:metadoc/categories #{:dist}}
-  (^double [cs-conv c1 c2]
-   (v/dist (cs-conv (pr/to-color c1))
-           (cs-conv (pr/to-color c2))))
-  (^double [c1 c2]
-   (v/dist (pr/to-color c1) (pr/to-color c2))))
+  ^double [c1 c2]
+  (let [^Vec4 c1 (to-LAB c1)
+        ^Vec4 c2 (to-LAB c2)
+        C* (m/sqrt (* (m/hypot-sqrt (.y c1) (.z c1))
+                      (m/hypot-sqrt (.y c2) (.z c2))))
+        Sc (inc (* 0.045 C*))
+        Sh (inc (* 0.015 C*))
+        dab (delta-ab c1 c2)]
+    (m/sqrt (+ (m/sq (- (.x c2) (.x c1)))
+               (m/sq (/ dab Sc))
+               (m/sq (/ (m/safe-sqrt (- (+ (m/sq (- (.y c2) (.y c1)))
+                                           (m/sq (- (.z c2) (.z c1))))
+                                        (m/sq dab))) Sh))))))
 
-(def ^{:metadoc/categories #{:dist}
-       :doc "Delta E CIE distance (euclidean in LAB colorspace."}
-  delta-e-cie (partial euclidean- to-LAB))
+(def ^{:metadoc/categories #{:dist} :deprecated "Use delta-E*"
+     :doc "Delta E CIE distance (euclidean in LAB colorspace."}
+  delta-e-cie delta-E*)
 
-(def ^{:metadoc/categories #{:dist}
-       :doc "Euclidean distance in RGB"}
-  euclidean euclidean-)
+(defn delta-E*-euclidean
+  ^{:metadoc/categories #{:dist}
+    :doc "Euclidean distance in given colorspace (default Oklab)."}
+  (^double [c1 c2] (delta-E*-euclidean c1 c2 :Oklab))
+  (^double [c1 c2 colorspace]
+   (let [to (first (colorspaces colorspace))
+         ^Vec4 c1 (to c1)
+         ^Vec4 c2 (to c2)]
+     (m/hypot-sqrt (- (.x c2) (.x c1))
+                   (- (.y c2) (.y c1))
+                   (- (.z c2) (.z c1))))))
 
-(defn delta-e-cmc
-  "Delta E CMC distance.
+(defn delta-C-RGB
+  "ΔC in RGB color space"
+  ^double [c1 c2]
+  (let [^Vec4 c1 (pr/to-color c1)
+        ^Vec4 c2 (pr/to-color c2)
+        dR (- (.x c2) (.x c1))
+        dG (- (.y c2) (.y c1))
+        dB (- (.z c2) (.z c1))
+        r (* 0.5 (+ (.x c1) (.x c2)))]
+    (m/sqrt (+ (* (+ 2.0 (/ r 256.0)) dR dR)
+               (* 4.0 dG dG)
+               (* (+ 2.0 (/ (- 255.0 r) 256.0)) dB dB)))))
+
+(defn- diff-H
+  ^double [^double h1 ^double h2]
+  (if (pos? (* h1 h2))
+    (m/abs (- h1 h2))
+    (min (+ (m/abs h1) (m/abs h2))
+         (+ (- 180.0 (m/abs h1)) (- 180.0 (m/abs h2))))))
+
+;; http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.125.3833&rep=rep1&type=pdf
+(defn delta-D-HCL
+  "Color difference in HCL (Sarifuddin and Missaou) color space"
+  ^double [c1 c2]
+  (let [^Vec4 c1 (to-HCL c1)
+        ^Vec4 c2 (to-HCL c2)
+        dH (diff-H (.x c2) (.x c1))
+        dL (- (.z c2) (.z c1))]
+    (m/sqrt (+ (m/sq (* 1.4456 dL))
+               (* (+ dH 0.16)
+                  (+ (m/sq (.y c1))
+                     (m/sq (.y c2))
+                     (* -2.0 (.y c1) (.y c2) (m/cos (m/radians dH)))))))))
+
+(defn delta-E*-CMC
+  "ΔE* CMC difference
 
   Parameters `l` and `c` defaults to 1.0. Other common settings is `l=2.0` and `c=1.0`."
   {:metadoc/categories #{:dist}}
-  (^double [c1 c2] (delta-e-cmc c1 c2 1.0 1.0))
+  (^double [c1 c2] (delta-E*-CMC c1 c2 1.0 1.0))
   (^double [c1 c2 ^double l ^double c ]
    (let [^Vec4 c1 (to-LAB c1)
          ^Vec4 c2 (to-LAB c2)
@@ -3153,10 +3338,12 @@
          SH (* SC (inc (* F (dec T))))]
      (m/sqrt (+ (m/sq (/ dL (* l SL))) (m/sq (/ dC (* c SC))) (/ dH (m/sq SH)))))))
 
-(defn delta-e-jab
-  "Delta e calculated in JAB color space."
+(def ^{:deprecated "Use delta-E*-CMC"} delta-e-cmc delta-E*-CMC)
+
+(defn delta-E-z
+  "ΔE* calculated in JAB color space."
   {:metadoc/categories #{:dist}}
-  [c1 c2]
+  ^double [c1 c2]
   (let [^Vec4 c1 (to-JAB c1)
         ^Vec4 c2 (to-JAB c2)
         J1 (.x c1)
@@ -3167,18 +3354,91 @@
         b2 (.z c2)
         C1 (m/hypot-sqrt a1 b1)
         C2 (m/hypot-sqrt a2 b2)
-        h1 (m/atan (/ b1 a1))
-        h2 (m/atan (/ b2 a2))]
+        h1 (m/atan2 b1 a1)
+        h2 (m/atan2 b2 a2)]
     (m/hypot-sqrt (- J2 J1)
                   (- C2 C1)
                   (* 2.0 (m/sqrt (* C1 C2)) (m/sin (* 0.5 (- h2 h1)))))))
+
+(def ^{:deprecated "Use delta-e-jab"} delta-e-jab delta-E-z)
+
+(def ^:const ^long p25_7 (* 25 25 25 25 25 25 25))
+(def ^:const ^double r30 (m/radians 30.0))
+(def ^:const ^double r6 (m/radians 6.0))
+(def ^:const ^double r63 (m/radians 63.0))
+
+(defn- de2000p7
+  ^double [^double v]
+  (let [v2 (* v v)
+        v4 (* v2 v2)
+        v7 (* v4 v2 v)]
+    (m/sqrt (/ v7 (+ v7 p25_7)))))
+
+(defn delta-E*-2000
+  "ΔE* color difference, CIE 2000
+
+  http://www2.ece.rochester.edu/~gsharma/ciede2000/ciede2000noteCRNA.pdf"
+  (^double [c1 c2] (delta-E*-2000 c1 c2 1.0 1.0 1.0))
+  ([c1 c2 l c h]
+   (let [^Vec4 c1 (to-LAB c1)
+         ^Vec4 c2 (to-LAB c2)
+         C1* (m/hypot-sqrt (.y c1) (.z c1))
+         C2* (m/hypot-sqrt (.y c2) (.z c2))
+         Cm* (* 0.5 (+ C1* C2*))
+         G+ (inc (* 0.5 (- 1.0 (de2000p7 Cm*))))
+         a1' (* G+ (.y c1))
+         a2' (* G+ (.y c2))
+         C1' (m/hypot-sqrt a1' (.z c1))
+         C2' (m/hypot-sqrt a2' (.z c2))
+         h1' (m/degrees (m/atan2 (.z c1) a1'))
+         h1' (if (neg? h1') (+ h1' 360.0) h1')
+         h2' (m/degrees (m/atan2 (.z c2) a2'))
+         h2' (if (neg? h2') (+ h2' 360.0) h2')
+         dL' (- (.x c2) (.x c1))
+         dC' (- C2' C1')
+         diffh' (- h2' h1')
+         adiffh' (m/abs diffh')
+         C1'C2' (* C1' C2')
+         dh' (m/radians (cond
+                          (zero? C1'C2') 0.0
+                          (<= adiffh' 180.0) diffh'
+                          (> diffh' 180.0) (- diffh' 360.0)
+                          :else (+ diffh' 360.0)))
+         dH' (* 2.0 (m/sqrt C1'C2') (m/sin (* 0.5 dh')))
+         Lm' (* 0.5 (+ (.x c1) (.x c2)))
+         Cm' (* 0.5 (+ C1' C2'))
+         h1'+h2' (+ h1' h2')
+         ^double hm' (cond
+                       (zero? C1'C2') h1'+h2'
+                       (<= adiffh' 180.0) (* 0.5 h1'+h2')
+                       (< h1'+h2' 360.0) (* 0.5 (+ h1'+h2' 360.0))
+                       :else (* 0.5 (- h1'+h2' 360.0)))
+         hm'r (m/radians hm')
+         T (+ 1.0
+              (* -0.17 (m/cos (- hm'r r30)))
+              (* 0.24 (m/cos (* 2.0 hm'r)))
+              (* 0.32 (m/cos (+ (* 3.0 hm'r) r6)))
+              (* -0.2 (m/cos (- (* 4.0 hm'r) r63))))
+         dtheta (* r30 (m/exp (- (m/sq (/ (- hm' 275.0) 25.0)))))
+         Rc (* 2.0 (de2000p7 Cm'))
+         Lm'-50sq (m/sq (- Lm' 50.0))
+         Sl (inc (/ (* 0.015 Lm'-50sq)
+                    (m/sqrt (+ 20.0 Lm'-50sq))))
+         Sc (inc (* 0.045 Cm'))
+         Sh (inc (* 0.015 Cm' T))
+         Rt (- (* (m/sin (* 2.0 dtheta)) Rc))
+         l' (/ dL' (* (double l) Sl))
+         c' (/ dC' (* (double c) Sc))
+         h' (/ dH' (* (double h) Sh))]
+     (m/sqrt (+ (m/sq l') (m/sq c') (m/sq h')
+                (* Rt c' h'))))))
 
 (defn contrast-ratio
   "WCAG contrast ratio.
 
   Based on YUV luma."
   {:metadoc/categories #{:dist}}
-  [c1 c2]
+  ^double [c1 c2]
   (let [l1 (/ (relative-luma c1) 255.0)
         l2 (/ (relative-luma c2) 255.0)]
     (if (> l1 l2)
@@ -3225,11 +3485,11 @@
                   (if (< dist currdist) c1 currc)
                   (if (< dist currdist) dist currdist)))
          currc))))
-  ([pal c] (nearest-color pal c euclidean))
+  ([pal c] (nearest-color pal c v/dist))
   ([pal] (partial nearest-color pal)))
 
 (defn average
-  "Average colors in given `colorspace` (default: `:RGB`)"
+  "Average colors in given `colorspace` (default: `:sRGB`)"
   {:metadoc/categories #{:interp}}
   ([cs colorspace]
    (let [[to from] (colorspaces colorspace)]
@@ -3237,39 +3497,56 @@
   ([cs]
    (v/average-vectors (map pr/to-color cs))))
 
+(defn weighted-average
+  "Average colors with weights in given `colorspace` (default: `:sRGB`)"
+  {:metadoc/categories #{:interp}}
+  ([cs weights colorspace]
+   (let [[to from] (colorspaces colorspace)]
+     (from (v/div (reduce v/add (map #(v/mult (to %1) %2) cs weights)) (reduce m/fast+ weights)))))
+  ([cs weights]
+   (v/div (reduce v/add (map #(v/mult (pr/to-color %1) %2) cs weights)) (reduce m/fast+ weights))))
+
 (defn lerp
   "Linear interpolation of two colors.
 
   See also [[lerp+]], [[lerp-]], [[gradient]] and [[mix]]"
   {:metadoc/categories #{:interp}}
-  ([c1 c2  colorspace ^double t]
+  ([c1 c2 colorspace ^double t]
    (let [[to from] (colorspaces colorspace)]
      (from (lerp (to c1) (to c2) t))))
   ([c1 c2] (lerp c1 c2 0.5))
   ([c1 c2 ^double t]
    (v/interpolate (pr/to-color c1) (pr/to-color c2) t)))
 
-(defn lerp+
+(defn lerp-
   "Linear interpolation of two colors conserving luma of the first color.
 
-  Amount: strength of the blend (defaults to 0.25)
+  Amount: strength of the blend (defaults to 0.5)
 
-  See also [[lerp-]]."
+  See also [[lerp+]]."
   {:metadoc/categories #{:interp}}
-  ([c1 c2] (lerp+ c1 c2 0.25))
+  ([c1 c2 colorspace ^double amount]
+   (let [[to from] (colorspaces colorspace)
+         cc1 (to c1)
+         cc2 (to c2)
+         res (from (lerp cc1 cc2 amount))]
+     (set-channel res :LAB 0 (ch0 (to-LAB c1)))))
+  ([c1 c2] (lerp- c1 c2 0.5))
   ([c1 c2 ^double amount]
    (let [res (lerp c1 c2 amount)]
      (set-channel res :LAB 0 (ch0 (to-LAB c1))))))
 
-(defn lerp-
+(defn lerp+
   "Linear interpolation of two colors conserving luma of the second color.
 
-  Amount: strength of the blend (defaults to 0.25).
+  Amount: strength of the blend (defaults to 0.5).
 
-  See also [[lerp+]]."
-  ([c1 c2] (lerp- c1 c2 0.25))
+  See also [[lerp-]]."
+  ([c1 c2 colorspace ^double amount]
+   (lerp- c2 c1 colorspace (- 1.0 amount)))
+  ([c1 c2] (lerp- c1 c2 0.5))
   ([c1 c2 ^double amount]
-   (lerp+ c2 c1 (- 1.0 amount))))
+   (lerp- c2 c1 (- 1.0 amount))))
 
 (defn- mix-interpolator
   ^double [^double a ^double b ^double t]
@@ -3329,25 +3606,13 @@
 (defn tinter
   "Creates fn to tint color using other color(s).
 
-  `tint-colors` can be color, palette or gradient."
+  `tint-color`"
   {:metadoc/categories #{:pal}}
-  ([tint-colors] (tinter tint-colors {}))
-  ([tint-colors gradient-params]
-   (if-let [tc (valid-color? tint-colors)]
-     (let [tint (v/add tc vec4-one)]
-       (fn [c]
-         (let [c (v/add (pr/to-color c) vec4-one)]
-           (clamp (v/mult (v/sqrt (v/div (v/emult c tint) 65536.0)) 255.0)))))
-     (let [g (if (fn? tint-colors)
-               tint-colors
-               (gradient tint-colors gradient-params))]
-       (fn [c]
-         (let [^Vec4 c (pr/to-color c)
-               ^Vec4 cc (v/div c 255.0)]
-           (Vec4. (pr/red (g (.x cc)))
-                  (pr/green (g (.y cc)))
-                  (pr/blue (g (.z cc)))
-                  (.w c))))))))
+  ([tint-color]
+   (let [tint (v/add (pr/to-color tint-color) vec4-one)]
+     (fn [c]
+       (let [c (v/add (pr/to-color c) vec4-one)]
+         (clamp (v/mult (v/sqrt (v/div (v/emult c tint) 65536.0)) 255.0)))))))
 
 ;; color reduction using x-means
 
@@ -3451,20 +3716,16 @@
               c)))))
 
 (defn adjust-temperature
-  "Adjust temperature of color, palette or gradient.
+  "Adjust temperature of color.
 
   Default amount: 0.35
   
   See [[temperature]] and [[lerp+]]."
   {:metadoc/categories meta-ops}
-  ([in temp] (adjust-temperature in temp 0.35))
-  ([in temp amount]
-   (let [t (temperature temp)
-         l #(lerp+ % t amount)]
-     (cond
-       (fn? in) (comp l in) ;; gradient
-       (not (possible-color? in)) (mapv l in) ;; palette
-       :else (l in)))))
+  ([c temp] (adjust-temperature c temp 0.35))
+  ([c temp amount]
+   (let [t (temperature temp)]
+     (lerp+ (pr/to-color c) t amount))))
 
 ;;
 
@@ -3737,47 +3998,161 @@
                                     {:preset (rand-nth paletton-presets-list)})) gpars)
       (gradient))))
 
+(defonce ^:private thing-presets
+  ;; L range and C range
+  {:intense-light [[204.0 255.0] [229.5 255.0]]
+   :intense-dark  [[51.0 89.25]  [229.5 255.0]]
+   :light         [[229.5 255.0] [76.5 178.5]]
+   :dark          [[38.25 102.0] [178.5 255.0]]
+   :bright        [[204.0 255.0] [191.25 242.25]]
+   :weak          [[178.5 255.0] [38.25 76.5]]
+   :neutral       [[76.5 178.5]  [63.75 89.25]]
+   :fresh         [[204.0 255.0] [102.0 204.0]]
+   :soft          [[153.0 229.5] [51.0 76.5]]
+   :hard          [[102.0 255.0] [216.75 242.25]]
+   :warm          [[102.0 229.5] [153.0 229.5]]
+   :cool          [[229.5 255.0] [12.75 51.0]]
+   :all           [[0.0 255.0]   [0.0 255.0]]
+   :gray-light    [[178.5 255.0] [0.0 0.0]]
+   :gray-dark     [[0.0 76.5]    [0.0 0.0]]
+   :gray          [[76.5 178.5]  [0.0 0.0]]})
+
+(defonce thing-presets-list (set (keys thing-presets)))
+(defonce color-profiles (sort (concat thing-presets-list paletton-presets-list)))
+
 (defn random-color
-  "Generate random color"
+  "Generate random color.
+
+  Optionally color profile or alpha can be provided.
+
+  List of possible color profiles is stored in `color-profiles` var. These are taken from thi.ng and paletton."
   {:metadoc/categories #{:pal}}
-  ([alpha] (set-alpha (random-color) alpha))
+  ([color-profile alpha]
+   (if (thing-presets-list color-profile)
+     (let [[[l1 l2] [c1 c2]] (thing-presets color-profile [[0.0 255.0] [0.0 255.0]])]
+       (from-LCH* [(r/drand l1 l2) (r/drand c1 c2) (r/drand 255.0) alpha]))
+     (set-alpha (rand-nth (paletton :monochromatic (r/drand 360.0) {:preset color-profile})) alpha)))
+  ([alpha-or-color-profile]
+   (if (keyword? alpha-or-color-profile)
+     (random-color alpha-or-color-profile 255.0)
+     (set-alpha (random-color) alpha-or-color-profile)))
   ([] (r/randval 0.2 (rand-nth (named-colors-list))
                  (r/randval 0.5
                             (rand-nth (random-palette))
                             (Vec4. (r/drand 255.0) (r/drand 255.0) (r/drand 255.0) 255.0)))))
 
+(defn fe-color-matrix
+  "Create a feColorMatrix operator."
+  [[^double r1 ^double r2 ^double r3 ^double r4 ^double r5
+    ^double g1 ^double g2 ^double g3 ^double g4 ^double g5
+    ^double b1 ^double b2 ^double b3 ^double b4 ^double b5
+    ^double a1 ^double a2 ^double a3 ^double a4 ^double a5]]
+  (fn [c]
+    (let [^Vec4 c (pr/to-color c)]
+      (clamp (Vec4. (+ (* r1 (.x c)) (* r2 (.y c)) (* r3 (.z c)) (* r4 (.w c)) r5)
+                    (+ (* g1 (.x c)) (* g2 (.y c)) (* g3 (.z c)) (* g4 (.w c)) g5)
+                    (+ (* b1 (.x c)) (* b2 (.y c)) (* b3 (.z c)) (* b4 (.w c)) b5)
+                    (+ (* a1 (.x c)) (* a2 (.y c)) (* a3 (.z c)) (* a4 (.w c)) a5))))))
+
+(defn sepia
+  ([^double amount]
+   (let [amount (- 1.0 amount)
+         a (+ 0.393 (* 0.607 amount)) b (- 0.769 (* 0.769 amount)) c (- 0.189 (* 0.189 amount))
+         d (- 0.349 (* 0.349 amount)) e (+ 0.686 (* 0.314 amount)) f (- 0.168 (* 0.168 amount))
+         g (- 0.272 (* 0.272 amount)) h (- 0.534 (* 0.534 amount)) i (+ 0.131 (* 0.869 amount))]
+     (fe-color-matrix [a b c 0.0 0.0
+                       d e f 0.0 0.0
+                       g h i 0.0 0.0
+                       0.0 0.0 0.0 1.0 0,0]))))
+
+(defn contrast
+  ([^double amount]
+   (let [intercept (* 127.5 (- 1.0 amount))]
+     (fe-color-matrix [amount 0.0 0.0 0.0 intercept
+                       0.0 amount 0.0 0.0 intercept
+                       0.0 0.0 amount 0.0 intercept
+                       0.0 0.0 0.0 1.0 0.0]))))
+
+(defn exposure
+  ([^double amount]
+   (fe-color-matrix [amount 0.0 0.0 0.0 0.0
+                     0.0 amount 0.0 0.0 0.0
+                     0.0 0.0 amount 0.0 0.0
+                     0.0 0.0 0.0 1.0 0.0])))
+
+(defn brightness
+  ([^double amount]
+   (let [amount (* 255.0 amount)]
+     (fe-color-matrix [1.0 0.0 0.0 0.0 amount
+                       0.0 1.0 0.0 0.0 amount
+                       0.0 0.0 1.0 0.0 amount
+                       0.0 0.0 0.0 1.0 0.0]))))
+
+
+(defn saturation
+  ([^double amount]
+   (let [r+ (+ 0.2126 (* 0.7874 amount))
+         r- (- 0.2126 (* 0.2126 amount))
+         g+ (+ 0.7152 (* 0.2848 amount))
+         g- (- 0.7152 (* 0.7152 amount))
+         b+ (+ 0.0722 (* 0.9278 amount))
+         b- (- 0.0722 (* 0.0722 amount))]
+     (fe-color-matrix [r+ g- b- 0.0 0.0
+                       r- g+ b- 0.0 0.0
+                       r- g- b+ 0.0 0.0
+                       0.0 0.0 0.0 1.0 0.0]))))
+
+(defn hue-rotate
+  ([^double angle-degrees]
+   (let [a (m/radians angle-degrees)
+         sa (m/sin a)
+         ca (m/cos a)
+         cr+ (+ 0.213 (* 0.787 ca))
+         cr- (+ 0.213 (* -0.213 ca))
+         cg+ (+ 0.715 (* 0.285 ca))
+         cg- (+ 0.715 (* -0.715 ca))
+         cb+ (+ 0.072 (* 0.928 ca))
+         cb- (+ 0.072 (* -0.072 ca))]
+     (fe-color-matrix [(+ cr+ (* -0.213 sa)) (+ cg- (* -0.715 sa)) (+ cb- (* 0.928 sa)) 0.0 0.0
+                       (+ cr- (* 0.143 sa)) (+ cg+ (* 0.140 sa)) (+ cb- (* -0.283 sa)) 0.0 0.0
+                       (+ cr- (* -0.787 sa)) (+ cg- (* 0.715 sa)) (+ cb+ (* 0.071 sa)) 0.0 0.0
+                       0.0 0.0 0.0 1.0 0.0]))))
+
+(defn grayscale
+  ([^double amount] (saturation (- 1.0 amount))))
+
 ;; Color Vision Deficiency
 ;; https://github.com/chromelens/chromelens/blob/master/lenses/filters/
 
-(defmacro gen-cvd-multiplication-fn
-  [r1 r2 r3 r4 r5
-   g1 g2 g3 g4 g5
-   b1 b2 b3 b4 b5]
-  (let [c (with-meta (symbol "c") {:tag `Vec4})]
-    `(fn [c#]
-       (let [~c (from-sRGB c#)]
-         (to-sRGB (Vec4. (+ (* ~r1 (.x ~c)) (* ~r2 (.y ~c)) (* ~r3 (.z ~c)) (* ~r4 (.w ~c)) ~r5)
-                         (+ (* ~g1 (.x ~c)) (* ~g2 (.y ~c)) (* ~g3 (.z ~c)) (* ~g4 (.w ~c)) ~g5)
-                         (+ (* ~b1 (.x ~c)) (* ~b2 (.y ~c)) (* ~b3 (.z ~c)) (* ~b4 (.w ~c)) ~b5)
-                         (.w ~c)))))))
-
-(def ^:private cvd-converters
-  {:achromatomaly (gen-cvd-multiplication-fn 0.618,0.320,0.062,0,0,0.163,0.775,0.062,0,0,0.163,0.320,0.516,0,0)
-   :achromatopsia (gen-cvd-multiplication-fn 0.299,0.587,0.114,0,0,0.299,0.587,0.114,0,0,0.299,0.587,0.114,0,0)
-   :deuteranomaly (gen-cvd-multiplication-fn 0.8,0.2,0,0,0,0.258,0.742,0,0,0,0,0.142,0.858,0,0)
-   :deuteranopia  (gen-cvd-multiplication-fn 0.625,0.375,0,0,0,0.7,0.3,0,0,0,0,0.3,0.7,0,0)
-   :protanomaly   (gen-cvd-multiplication-fn 0.817,0.183,0,0,0,0.333,0.667,0,0,0,0,0.125,0.875,0,0)
-   :protanopia    (gen-cvd-multiplication-fn 0.567,0.433,0,0,0,0.558,0.442,0,0,0,0,0.242,0.758,0,0)
-   :tritanomaly   (gen-cvd-multiplication-fn 0.967,0.033,0,0,0,0,0.733,0.267,0,0,0,0.183,0.817,0,0)
-   :tritanopia    (gen-cvd-multiplication-fn 0.95,0.05,0,0,0,0,0.433,0.567,0,0,0,0.475,0.525,0,0)})
-
-(def cvd-list (sort (keys cvd-converters)))
-
-(defn cvd-lens
-  ^Vec4 [c cvd-kind]
-  (let [f (get cvd-converters cvd-kind identity)]
-    (if-let [c (valid-color? c)]
-      (f c)
-      (if (fn? c)
-        (comp f c)
-        (mapv f c)))))
+(def achromatomaly (fe-color-matrix [0.618,0.320,0.062,0.0,0.0,
+                                   0.163,0.775,0.062,0.0,0.0,
+                                   0.163,0.320,0.516,0.0,0.0,
+                                   0.0,0.0,0.0,1.0,0.0]))
+(def achromatopsia (fe-color-matrix [0.299,0.587,0.114,0.0,0.0,
+                                   0.299,0.587,0.114,0.0,0.0,
+                                   0.299,0.587,0.114,0.0,0.0,
+                                   0.0,0.0,0.0,1.0,0.0]))
+(def deuteranomaly (fe-color-matrix [0.8,0.2,0.0,0.0,0.0,
+                                   0.258,0.742,0.0,0.0,0.0,
+                                   0.0,0.142,0.858,0.0,0.0,
+                                   0.0,0.0,0.0,1.0,0.0]))
+(def deuteranopia  (fe-color-matrix [0.625,0.375,0.0,0.0,0.0,
+                                   0.7,0.3,0.0,0.0,0.0,
+                                   0.0,0.3,0.7,0.0,0.0,
+                                   0.0,0.0,0.0,1.0,0.0]))
+(def protanomaly   (fe-color-matrix [0.817,0.183,0.0,0.0,0.0,
+                                   0.333,0.667,0.0,0.0,0.0,
+                                   0.0,0.125,0.875,0.0,0.0,
+                                   0.0,0.0,0.0,1.0,0.0]))
+(def protanopia    (fe-color-matrix [0.567,0.433,0.0,0.0,0.0,
+                                   0.558,0.442,0.0,0.0,0.0,
+                                   0.0,0.242,0.758,0.0,0.0,
+                                   0.0,0.0,0.0,1.0,0.0]))
+(def tritanomaly   (fe-color-matrix [0.967,0.033,0.0,0.0,0.0,
+                                   0.0,0.733,0.267,0.0,0.0,
+                                   0.0,0.183,0.817,0.0,0.0,
+                                   0.0,0.0,0.0,1.0,0.0]))
+(def tritanopia    (fe-color-matrix [0.95,0.05,0.0,0.0,0.0,
+                                   0.0,0.433,0.567,0.0,0.0,
+                                   0.0,0.475,0.525,0.0,0.0,
+                                   0.0,0.0,0.0,1.0,0.0]))

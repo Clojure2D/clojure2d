@@ -2,7 +2,8 @@
   (:require [clojure.string :as s]
             [clojure.java.io :as io]
             [clojure.xml :as xml]
-            [clojure.data.json :as json]))
+            [clojure.data.json :as json]
+            [clojure.string :as str]))
 
 (require '[clojisr.v1.r :as r]
          '[tech.ml.dataset :as ds])
@@ -154,6 +155,21 @@
       (slurp)
       (read-string)))
 
+;; thi.ng palettes
+
+(let [pals (-> (->> "https://raw.githubusercontent.com/thi-ng/umbrella/develop/packages/color-palettes/src/index.ts"
+                    io/reader
+                    line-seq
+                    rest
+                    (apply str "{"))
+               (str/replace #"\s+" "")
+               (str/replace #",\]" "]")
+               (str/replace #",\}" "}")
+               (json/read-str :key-fn (comp (partial keyword "thi.ng") #(subs % 2))))]
+  (swap! all-palettes merge pals)
+  (spit "resources/palettes/c2d_thi.ng.edn" (with-out-str (pr pals))))
+
+
 ;; mathematica
 
 (let [pals (into {} (map (fn [[n g]]
@@ -255,3 +271,11 @@
       (keys @all-gradients))
 
 (r/discard-all-sessions)
+
+(defn read-edn
+  [n]
+  (-> (io/resource n)
+      (io/input-stream)
+      (slurp)
+      (read-string)))
+

@@ -114,3 +114,4 @@
     (with-canvas-> c
       (image (get-image img)))
     (show-window {:canvas c})))
+

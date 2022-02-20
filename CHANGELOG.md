@@ -10,11 +10,16 @@ All notable changes to this project will be documented in this file. This change
 * `text-shape` returns shape of the text
 * `load-font` loads fonts from a file
 * `load-image`, `load-svg` and `load-bytes` can load from http URLs now
-* RYB, XYB and Oklab color spaces
+* PalettonHSV, RYB, XYB and Oklab color spaces
 * Dictionary of Colour Combinations - colors and palettes (prefix `:docc`) - https://github.com/mattdesl/dictionary-of-colour-combinations
 * Color Vision Deficiency `cvd-lens` function (a filter)
 * `mixsub` subtactive mixing
 * `adjust` adds a value to color channel
+* `complementary` to find complementary color
+* `random-color` can select from various presets, also selects colors from palettes and known colors
+* `wavelength` returns color from light wavelength in nm
+* `clojure2d.color.cssgram` set of instagram-like filters + `custom-filter` function
+* many more color difference functions
 
 ### Fixed
 
@@ -22,7 +27,11 @@ All notable changes to this project will be documented in this file. This change
 * `palette` should return a vector in every case
 * `path` points should be any seq (not vector only)
 * `possible-color?` should recognize String as a valid color
-* `random-color` selects also from predefined colors and palettes
+* `HWB` colorspaces fixed to ensure reversibility
+
+### Changed
+
+* color difference functions revisited and reorganized
 
 ### Deprecated
 

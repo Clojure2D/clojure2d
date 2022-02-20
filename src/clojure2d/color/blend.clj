@@ -14,7 +14,8 @@
   (:refer-clojure :exclude [or and])
   (:require [fastmath.core :as m]
             [fastmath.vector :as v]
-            [clojure2d.color :as c])
+            [clojure2d.color :as c]
+            [clojure.set :as set])
   (:import [fastmath.vector Vec4]))
 
 (set! *warn-on-reflection* true)
@@ -369,6 +370,19 @@
 
 (def ^{:doc "List of all blending functions."} blends-list (sort (keys blends)))
 
+(defn alpha-blending
+  [^Vec4 cb ^Vec4 cs ^Vec4 blend]
+  (let [ab (* r255 (.w cb))
+        as (* r255 (.w cs))
+        a1 (* as (- 1.0 ab))
+        a2 (* as ab)
+        a3 (* (- 1.0 as) ab)
+        a0 (+ as a3)]
+    (Vec4. (/ (+ (* a1 (.x cs)) (* a2 (.x blend)) (* a3 (.x cb))) a0)
+           (/ (+ (* a1 (.y cs)) (* a2 (.y blend)) (* a3 (.y cb))) a0)
+           (/ (+ (* a1 (.z cs)) (* a2 (.z blend)) (* a3 (.z cb))) a0)
+           (* 255.0 a0))))
+
 (defn blend-colors
   "Blend two colors using simple alpha composing.
 
@@ -379,22 +393,14 @@
   (^Vec4 [blend-fn1 blend-fn2 blend-fn3 cb cs]
    (let [cb (c/to-color cb)
          cs (c/to-color cs)
-         ^double br (blend-fn1 (.x cb) (.x cs))
-         ^double bg (blend-fn2 (.y cb) (.y cs))
-         ^double bb (blend-fn3 (.z cb) (.z cs))]
+         blend (Vec4. (blend-fn1 (.x cb) (.x cs))
+                      (blend-fn2 (.y cb) (.y cs))
+                      (blend-fn3 (.z cb) (.z cs))
+                      255.0)]
      (if (clojure.core/and (>= (.w cb) 255.0)
                            (>= (.w cs) 255.0))
-       (Vec4. br bg bb 255.0)
-       (let [ab (* r255 (.w cb))
-             as (* r255 (.w cs))
-             a1 (* as (- 1.0 ab))
-             a2 (* as ab)
-             a3 (* (- 1.0 as) ab)
-             a0 (+ as a3)]
-         (Vec4. (/ (+ (* a1 (.x cs)) (* a2 br) (* a3 (.x cb))) a0)
-                (/ (+ (* a1 (.y cs)) (* a2 bg) (* a3 (.y cb))) a0)
-                (/ (+ (* a1 (.z cs)) (* a2 bb) (* a3 (.z cb))) a0)
-                (* 255.0 a0)))))))
+       blend
+       (alpha-blending cb cs blend)))))
 
 (defn blend-palettes
   "Blend two palettes.
@@ -409,3 +415,16 @@
   Each channel can be blended using different function."
   ([blend-fn g1 g2] (blend-gradients blend-fn blend-fn blend-fn g1 g2))
   ([blend-fn1 blend-fn2 blend-fn3 g1 g2] (fn [^double t] (blend-colors blend-fn1 blend-fn2 blend-fn3 (g1 t) (g2 t)))))
+
+;;
+
+(defn- hsb-op
+  [cb cs ch]
+  (let [b (c/to-HSB cb)
+        s (c/to-HSB cs)]
+    (alpha-blending (c/to-color cb) (c/to-color cs) (c/from-HSB (c/set-channel b ch (c/get-channel s ch))))))
+
+(defn hue [cb cs] (hsb-op cb cs 0))
+(defn saturation [cb cs] (hsb-op cb cs 1))
+(defn luminocity [cb cs] (hsb-op cb cs 2))
+(defn color [cb cs] (hsb-op cs cb 2))
