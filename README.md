@@ -37,27 +37,27 @@ This project is the answer to personal needs to optimize my own workflow for gen
 
 ... quil, thi.ng, clisk, possibly other?
 
-No, rather no. The closest is quil, which is really great library (both Clojure and Clojurescript, great documentation and webpage, functional mode, 3d support etc.).
-`Clojure2d` emphasises math, color and pixels operations and adds a lot of ready to use effects/filters (see `extra` namespaces`).
+No, rather no. The closest is quil, which is a really great library (both Clojure and Clojurescript, great documentation and webpage, functional mode, 3d support etc.).
+`Clojure2d` emphasises math, color and pixel operations and adds a lot of ready to use effects/filters (see `extra` namespaces`).
 
 ### What's special in this library then?
 
 In points:
 
-* Almost decoupled display and canvas (decoupled drawing and refreshing) - you can have as many windows as you want, you can have as many canvases as you want. Display repaints selected canvas automaticaly in separate thread. This way you can operate on canvas in your pace.
-* Processing way is still possible (you can attach draw() function to your Display). However main benefit here: draw function keeps state between invocations, this way you can avoid global state (atoms etc.) and write more functional way. The same is for events, each Window has assigned state which is passed through event calls.
+* Almost decoupled display and canvas (decoupled drawing and refreshing) - you can have as many windows as you want, you can have as many canvases as you want. Display repaints selected canvas automaticaly in separate thread. This way you can operate on the canvas in your own pace.
+* It is still possible to code the Processing way (e.g. you can attach a draw() function to your Display), but draw function keeps state between invocations. This allows you to avoid global state (atoms etc.) and write more functional code. The same is true for events, each Window has an assigned state which is passed through event calls.
 * Easy live coding possible (Emacs/Cider/REPL)
 * FastMath as main math library
-* Main focus on higher level generative/glitch concepts (like sonification support, vector field functions, colorspace operations, things like slitscan etc. See my Processing sketches, link below)
+* Main focus on higher level generative/glitch concepts (like sonification support, vector field functions, colorspace operations, things like slitscan etc. See my [Processing sketches](https://github.com/tsulej/GenerateMe))
 
 ### What's odd?
 
-It's kind of personal library which supports my (probably not optimal, not convenient for others) way of creating stuff.
+It's kind of a personal library which supports my (probably not optimal, not convenient for others) way of creating stuff.
 There are still plenty of bugs and not idiomatic code. It may be slower than Processing. Eats a lot of memory (Pixels code is generally immutable). Still not stable API and architecture.
 
 ## Installation
 
-Add following line as a dependency to your `project.clj`
+Add the following line as a dependency to your `project.clj`
 
 ![](https://clojars.org/clojure2d/latest-version.svg)
 
@@ -67,11 +67,11 @@ Latest snapshot
 
 ## Usage
 
-Since still no tutorials are available, see [documentation](https://clojure2d.github.io/clojure2d/docs/codox/). All namespaces are described below:
+Since there are still no tutorials are available, see [documentation](https://clojure2d.github.io/clojure2d/docs/codox/). All namespaces are described below:
 
 ### clojure2d.core [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.core.html)
 
-This is main namespace with functions in three groups:
+This is the main namespace with functions in four groups:
 
 * image file oparations (load/save); jpg, png and bmp
 * canvas operations (wrapper for Java2D BufferedImage and Graphics2D)
@@ -99,7 +99,7 @@ Defines also:
 
 ### clojure2d.extra
 
-This is namespace for common generative/glitch specific libraries:
+This is the namespace for common generative/glitch specific libraries:
 
 * signal - signal processing, wave generators, effects and filters (for sonification process) [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.extra.signal.html)
 * overlays - postprocessing filters (like rgb/crt scanlines, etc.) [docs](https://clojure2d.github.io/clojure2d/docs/codox/clojure2d.extra.overlays.html)
