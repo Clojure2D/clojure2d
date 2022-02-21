@@ -206,6 +206,17 @@
   [c]
   (-> (cb/blend-colors cb/burn c c-x-pro2) sp03))
 
+(keys (ns-publics *ns*))
+;; => (maven nashville mayfair hudson y1977 valencia slumber brooklyn moon lofi reyes stinson earlybird toaster gingham aden kelvin willow lark custom-filter inkwell x-pro2 clarendon walden rise)
+
+(defmacro ^:private make-filters-list
+  []
+  `[~@(map #(vector (keyword %) %) (remove #{'custom-filter 'filters 'filters-list} (keys (ns-publics *ns*))))])
+
+(def filters (into {} (make-filters-list)))
+
+(def filters-list (sort (keys filters)))
+
 ;; custom filters
 
 (def ^:private color-operators {:sepia c/sepia
@@ -219,15 +230,20 @@
                               :temperature (fn [temp amount] (fn [c] (c/adjust-temperature c temp amount)))
                               :tint c/tinter})
 
-(def ^:private hsb-operators {:hue cb/hue
-                            :saturation cb/saturation
-                            :luminocity cb/luminocity
-                            :color cb/color})
+(def ^:private ch-operators {:hue cb/hue
+                           :saturation cb/saturation
+                           :luminocity cb/luminocity
+                           :color cb/color
+                           :ch0 cb/ch0
+                           :ch1 cb/ch1
+                           :ch2 cb/ch2})
 
 (defn- find-blend
-  [[op c2]]
-  (if-let [opf (hsb-operators op)]
-    (partial opf c2)
+  [[op c2 c3]]
+  (if-let [opf (ch-operators op)]
+    (if c3
+      (fn [c] (opf c2 c c3))
+      (fn [c] (opf c c2)))
     (let [opf (get cb/blends op (if (fn? op) op cb/normal))]
       (fn [c] (cb/blend-colors opf c c2)))))
 

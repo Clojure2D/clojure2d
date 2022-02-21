@@ -407,7 +407,7 @@
 
   Each channel can be blended using different function."
   ([blend-fn pal1 pal2] (blend-palettes blend-fn blend-fn blend-fn pal1 pal2))
-  ([blend-fn1 blend-fn2 blend-fn3 pal1 pal2] (mapv (partial blend-colors blend-fn1 blend-fn2 blend-fn3) pal1 pal2)))
+  ([blend-fn1 blend-fn2 blend-fn3 pal1 pal2] (mapv (partial blend-colors blend-fn1 blend-fn2 blend-fn3) (c/palette pal1) (c/palette pal2))))
 
 (defn blend-gradients
   "Blend two gradients.
@@ -418,13 +418,18 @@
 
 ;;
 
-(defn- hsb-op
-  [cb cs ch]
-  (let [b (c/to-HSB cb)
-        s (c/to-HSB cs)]
-    (alpha-blending (c/to-color cb) (c/to-color cs) (c/from-HSB (c/set-channel b ch (c/get-channel s ch))))))
+(defn- cs-op
+  [colorspace cb cs ch]
+  (let [[to from] (c/colorspaces colorspace)
+        b (to cb)
+        s (to cs)]
+    (alpha-blending (c/to-color cb) (c/to-color cs) (from (c/set-channel b ch (c/get-channel s ch))))))
 
-(defn hue [cb cs] (hsb-op cb cs 0))
-(defn saturation [cb cs] (hsb-op cb cs 1))
-(defn luminocity [cb cs] (hsb-op cb cs 2))
-(defn color [cb cs] (hsb-op cs cb 2))
+(defn hue [cb cs] (cs-op :HSB cb cs 0))
+(defn saturation [cb cs] (cs-op :HSB cb cs 1))
+(defn luminocity [cb cs] (cs-op :HSB cb cs 2))
+(defn color [cb cs] (cs-op :HSB cs cb 2))
+
+(defn ch0 ([colorspace cb cs] (cs-op colorspace cb cs 0)) ([cb cs] (ch0 :RGB cb cs)))
+(defn ch1 ([colorspace cb cs] (cs-op colorspace cb cs 1)) ([cb cs] (ch1 :RGB cb cs)))
+(defn ch2 ([colorspace cb cs] (cs-op colorspace cb cs 2)) ([cb cs] (ch2 :RGB cb cs)))

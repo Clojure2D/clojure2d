@@ -2,6 +2,7 @@
   (:require [clojure2d.color :as c]
             [nextjournal.clerk :as clerk]
             [nextjournal.clerk.viewer :as view]
+            [hiccup.util :as hutil]
             [clojure.string :as str]
             [fastmath.core :as m]))
 
@@ -9,10 +10,10 @@
   [:style ".checkerboard {background-image: linear-gradient(45deg, #ddd 25%, transparent 25%),linear-gradient(-45deg, #ddd 25%, transparent 25%),linear-gradient(45deg, transparent 75%, #ddd 75%),linear-gradient(-45deg, transparent 75%, #ddd 75%);
                               background-size: 20px 20px;
                               background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-                              z-index: -1;
+                              z-index: 0;
                               margin-bottom: 1px;}
            .gs {float: left; width: 100%; height: 30px;}
-           .gp {height: 30px; width: 50px; margin-right: 2px; float: left;}
+           .gp {height: 30px; width: 30px; margin-right: 2px; float: left;}
            .gsfull {top: 0; left: 0; width: 100%; height: 100%; position: relative;}
            .csfnt {font-family: monospace; font-size: 12px;}
            span.csblk {display: block; padding: 5.2px; border: 1px solid; border-radius: 3px;}
@@ -26,7 +27,9 @@
     [:div.checkerboard.csfnt
      [:span.csblk {:style {:background-color n
                            :border-color (c/format-hex (c/darken c))
-                           :color str-color}} (str "[" n "] " (if (int? c) (unchecked-int c) c))]]))
+                           :color str-color}} (str "[" (hutil/escape-html n) "] " (if (int? c) (unchecked-int c) c))]]))
+
+#_(hutil/escape-html n)
 
 (defn emit-css-gradient
   [lst]

@@ -129,7 +129,7 @@
             [clojure2d.color :as c])
   (:import [fastmath.vector Vec2 Vec3 Vec4]           
            [java.awt Color]
-           [clojure.lang APersistentVector ISeq]))
+           [clojure.lang APersistentVector ISeq Seqable]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -583,23 +583,76 @@
                         2 (gray (c 0) (c 1))
                         3 (Vec4. (c 0) (c 1) (c 2) 255.0)
                         (Vec4. (c 0) (c 1) (c 2) (c 3))))
-  (alpha ^double [c] (get c 3 255.0))
-  (red ^double [c] (c 0))
-  (green ^double [c] (c 1))
-  (blue ^double [c] (c 2))
+  (alpha ^double [c] (pr/alpha (pr/to-color c)))
+  (red ^double [c] (pr/red (pr/to-color c)))
+  (green ^double [c] (pr/green (pr/to-color c)))
+  (blue ^double [c] (pr/blue (pr/to-color c)))
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
   (luma ^double [c] (pr/luma (pr/to-color c)))
   ISeq
-  (to-color ^Vec4 [c] (case (count c)
+  (to-color ^Vec4 [c] (case (count (take 4 c))
                         0 (Vec4. 0.0 0.0 0.0 255.0)
                         1 (gray (first c))
                         2 (gray (first c) (second c))
                         3 (Vec4. (first c) (second c) (nth c 2) 255.0)
                         (Vec4. (first c) (second c) (nth c 2) (nth c 3 255.0))))
-  (alpha ^double [c] (nth c 3 255.0))
-  (red ^double [c] (first c))
-  (green ^double [c] (second c))
-  (blue ^double [c] (nth c 2))
+  (alpha ^double [c] (pr/alpha (pr/to-color c)))
+  (red ^double [c] (pr/red (pr/to-color c)))
+  (green ^double [c] (pr/green (pr/to-color c)))
+  (blue ^double [c] (pr/blue (pr/to-color c)))
+  (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
+  (luma [c] ^double (pr/luma (pr/to-color c)))
+  Seqable
+  (to-color ^Vec4 [c] (pr/to-color (seq c)))
+  (alpha ^double [c] (pr/alpha (seq c)))
+  (red ^double [c] (pr/red (seq c)))
+  (green ^double [c] (pr/green (seq c)))
+  (blue ^double [c] (pr/blue (seq c)))
+  (to-awt-color ^Color [c] (pr/to-awt-color (seq c)))
+  (luma [c] ^double (pr/luma (seq c))))
+
+(extend-type (Class/forName "[D")
+  pr/ColorProto
+  (to-color ^Vec4 [c] (case (alength ^doubles c)
+                        0 (Vec4. 0.0 0.0 0.0 255.0)
+                        1 (gray (aget ^doubles c 0))
+                        2 (gray (aget ^doubles c 0) (aget ^doubles c 1))
+                        3 (Vec4. (aget ^doubles c 0) (aget ^doubles c 1) (aget ^doubles c 2) 255.0)
+                        (Vec4. (aget ^doubles c 0) (aget ^doubles c 1) (aget ^doubles c 2) (aget ^doubles c 3))))
+  (alpha ^double [c] (pr/alpha (pr/to-color c)))
+  (red ^double [c] (pr/red (pr/to-color c)))
+  (green ^double [c] (pr/green (pr/to-color c)))
+  (blue ^double [c] (pr/blue (pr/to-color c)))
+  (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
+  (luma [c] ^double (pr/luma (pr/to-color c))))
+
+(extend-type (Class/forName "[I")
+  pr/ColorProto
+  (to-color ^Vec4 [c] (case (alength ^ints c)
+                        0 (Vec4. 0.0 0.0 0.0 255.0)
+                        1 (gray (aget ^ints c 0))
+                        2 (gray (aget ^ints c 0) (aget ^ints c 1))
+                        3 (Vec4. (aget ^ints c 0) (aget ^ints c 1) (aget ^ints c 2) 255.0)
+                        (Vec4. (aget ^ints c 0) (aget ^ints c 1) (aget ^ints c 2) (aget ^ints c 3))))
+  (alpha ^double [c] (pr/alpha (pr/to-color c)))
+  (red ^double [c] (pr/red (pr/to-color c)))
+  (green ^double [c] (pr/green (pr/to-color c)))
+  (blue ^double [c] (pr/blue (pr/to-color c)))
+  (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
+  (luma [c] ^double (pr/luma (pr/to-color c))))
+
+(extend-type (Class/forName "[J")
+  pr/ColorProto
+  (to-color ^Vec4 [c] (case (alength ^longs c)
+                        0 (Vec4. 0.0 0.0 0.0 255.0)
+                        1 (gray (aget ^longs c 0))
+                        2 (gray (aget ^longs c 0) (aget ^longs c 1))
+                        3 (Vec4. (aget ^longs c 0) (aget ^longs c 1) (aget ^longs c 2) 255.0)
+                        (Vec4. (aget ^longs c 0) (aget ^longs c 1) (aget ^longs c 2) (aget ^longs c 3))))
+  (alpha ^double [c] (pr/alpha (pr/to-color c)))
+  (red ^double [c] (pr/red (pr/to-color c)))
+  (green ^double [c] (pr/green (pr/to-color c)))
+  (blue ^double [c] (pr/blue (pr/to-color c)))
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
   (luma [c] ^double (pr/luma (pr/to-color c))))
 
@@ -626,6 +679,9 @@
                          (<< (lclamp255 (pr/red c)) 16)
                          (<< (lclamp255 (pr/green c)) 8)
                          (lclamp255 (pr/blue c)))))
+
+(def ^{:doc "Convert color to `quil` color type (ie. ARGB Integer). Alias to [[pack]]."
+     :metadoc/categories meta-ops} quil pack)
 
 (defn black?
   "Check if color is black"
@@ -2741,20 +2797,20 @@
   (^Vec4 [col colorspace ^long channel ^double val]
    (let [[to from] (colorspaces colorspace)
          ^Vec4 c (to col)]
-     (clamp (from (case channel
-                    0 (Vec4. val (.y c) (.z c) (.w c))
-                    1 (Vec4. (.x c) val (.z c) (.w c))
-                    2 (Vec4. (.x c) (.y c) val (.w c))
-                    3 (Vec4. (.x c) (.y c) (.z c) val)
-                    c)))))
+     (from (case channel
+             0 (Vec4. val (.y c) (.z c) (.w c))
+             1 (Vec4. (.x c) val (.z c) (.w c))
+             2 (Vec4. (.x c) (.y c) val (.w c))
+             3 (Vec4. (.x c) (.y c) (.z c) val)
+             c))))
   (^Vec4 [col ^long channel ^double val]
    (let [^Vec4 c (pr/to-color col)]
-     (clamp (case channel
-              0 (Vec4. val (.y c) (.z c) (.w c))
-              1 (Vec4. (.x c) val (.z c) (.w c))
-              2 (Vec4. (.x c) (.y c) val (.w c))
-              3 (Vec4. (.x c) (.y c) (.z c) val)
-              c)))))
+     (case channel
+       0 (Vec4. val (.y c) (.z c) (.w c))
+       1 (Vec4. (.x c) val (.z c) (.w c))
+       2 (Vec4. (.x c) (.y c) val (.w c))
+       3 (Vec4. (.x c) (.y c) (.z c) val)
+       c))))
 
 (defn get-channel
   "Get chosen channel. Works with any color space."
@@ -3098,26 +3154,26 @@
 (defonce ^:private paletton-presets
   {:pale-light          [[0.24649 1.78676] [0.09956 1.95603] [0.17209 1.88583] [0.32122 1.65929] [0.39549 1.50186]]
    :pastels-bright      [[0.65667 1.86024] [0.04738 1.99142] [0.39536 1.89478] [0.90297 1.85419] [1.86422 1.8314]]
-   :shiny               [[1.00926 2] [0.3587 2] [0.5609 2] [2 0.8502] [2 0.65438]]
+   :shiny               [[1.00926 2]       [0.3587 2]        [0.5609 2]        [2 0.8502] [2 0.65438]]
    :pastels-lightest    [[0.34088 1.09786] [0.13417 1.62645] [0.23137 1.38072] [0.45993 0.92696] [0.58431 0.81098]]
    :pastels-very-light  [[0.58181 1.32382] [0.27125 1.81913] [0.44103 1.59111] [0.70192 1.02722] [0.84207 0.91425]]
-   :full                [[1 1] [0.61056 1.24992] [0.77653 1.05996] [1.06489 0.77234] [1.25783 0.60685]]
+   :full                [[1 1]             [0.61056 1.24992] [0.77653 1.05996] [1.06489 0.77234] [1.25783 0.60685]]
    :pastels-light       [[0.37045 0.90707] [0.15557 1.28367] [0.25644 1.00735] [0.49686 0.809] [0.64701 0.69855]]
-   :pastels-med         [[0.66333 0.8267] [0.36107 1.30435] [0.52846 0.95991] [0.78722 0.70882] [0.91265 0.5616]]
+   :pastels-med         [[0.66333 0.8267]  [0.36107 1.30435] [0.52846 0.95991] [0.78722 0.70882] [0.91265 0.5616]]
    :darker              [[0.93741 0.68672] [0.68147 0.88956] [0.86714 0.82989] [1.12072 0.5673] [1.44641 0.42034]]
    :pastels-mid-pale    [[0.38302 0.68001] [0.15521 0.98457] [0.26994 0.81586] [0.46705 0.54194] [0.64065 0.44875]]
-   :pastels             [[0.66667 0.66667] [0.33333 1] [0.5 0.83333] [0.83333 0.5] [1 0.33333]]
-   :dark-neon           [[0.94645 0.59068] [0.99347 0.91968] [0.93954 0.7292] [1.01481 0.41313] [1.04535 0.24368]]
-   :pastels-dark        [[0.36687 0.39819] [0.25044 0.65561] [0.319 0.54623] [0.55984 0.37953] [0.70913 0.3436]]
+   :pastels             [[0.66667 0.66667] [0.33333 1]       [0.5 0.83333]     [0.83333 0.5] [1 0.33333]]
+   :dark-neon           [[0.94645 0.59068] [0.99347 0.91968] [0.93954 0.7292]  [1.01481 0.41313] [1.04535 0.24368]]
+   :pastels-dark        [[0.36687 0.39819] [0.25044 0.65561] [0.319 0.54623]   [0.55984 0.37953] [0.70913 0.3436]]
    :pastels-very-dark   [[0.60117 0.41845] [0.36899 0.59144] [0.42329 0.44436] [0.72826 0.35958] [0.88393 0.27004]]
-   :dark                [[1.31883 0.40212] [0.9768 0.25402] [1.27265 0.30941] [1.21289 0.60821] [1.29837 0.82751]]
+   :dark                [[1.31883 0.40212] [0.9768 0.25402]  [1.27265 0.30941] [1.21289 0.60821] [1.29837 0.82751]]
    :pastels-mid-dark    [[0.26952 0.22044] [0.23405 0.52735] [0.23104 0.37616] [0.42324 0.20502] [0.54424 0.18483]]
    :pastels-darkest     [[0.53019 0.23973] [0.48102 0.50306] [0.50001 0.36755] [0.6643 0.32778] [0.77714 0.3761]]
-   :darkest             [[1.46455 0.21042] [0.99797 0.16373] [0.96326 0.274] [1.56924 0.45022] [1.23016 0.66]]
+   :darkest             [[1.46455 0.21042] [0.99797 0.16373] [0.96326 0.274]   [1.56924 0.45022] [1.23016 0.66]]
    :almost-black        [[0.12194 0.15399] [0.34224 0.50742] [0.24211 0.34429] [0.31846 0.24986] [0.52251 0.33869]]
    :almost-gray-dark    [[0.10266 0.24053] [0.13577 0.39387] [0.11716 0.30603] [0.14993 0.22462] [0.29809 0.19255]]
-   :almost-gray-darker  [[0.07336 0.36815] [0.18061 0.50026] [0.09777 0.314] [0.12238 0.25831] [0.14388 0.1883]]
-   :almost-gray-mid     [[0.07291 0.59958] [0.19602 0.74092] [0.10876 0.5366] [0.15632 0.48229] [0.20323 0.42268]]
+   :almost-gray-darker  [[0.07336 0.36815] [0.18061 0.50026] [0.09777 0.314]   [0.12238 0.25831] [0.14388 0.1883]]
+   :almost-gray-mid     [[0.07291 0.59958] [0.19602 0.74092] [0.10876 0.5366]  [0.15632 0.48229] [0.20323 0.42268]]
    :almost-gray-lighter [[0.06074 0.82834] [0.14546 0.97794] [0.10798 0.76459] [0.15939 0.68697] [0.22171 0.62926]]
    :almost-gray-light   [[0.03501 1.59439] [0.23204 1.10483] [0.14935 1.33784] [0.07371 1.04897] [0.09635 0.91368]]})
 
@@ -3679,20 +3735,20 @@
   (^Vec4 [col colorspace ^long channel ^double value]
    (let [[to from] (colorspaces colorspace)
          ^Vec4 c (to col)]
-     (clamp (from (case channel
-                    0 (Vec4. (+ value (.x c)) (.y c) (.z c) (.w c))
-                    1 (Vec4. (.x c) (+ value (.y c)) (.z c) (.w c))
-                    2 (Vec4. (.x c) (.y c) (+ value (.z c)) (.w c))
-                    3 (Vec4. (.x c) (.y c) (.z c) (+ value (.w c)))
-                    c)))))
+     (from (case channel
+             0 (Vec4. (+ value (.x c)) (.y c) (.z c) (.w c))
+             1 (Vec4. (.x c) (+ value (.y c)) (.z c) (.w c))
+             2 (Vec4. (.x c) (.y c) (+ value (.z c)) (.w c))
+             3 (Vec4. (.x c) (.y c) (.z c) (+ value (.w c)))
+             c))))
   (^Vec4 [col ^long channel ^double value]
    (let [^Vec4 c (pr/to-color col)]
-     (clamp (case channel
-              0 (Vec4. (+ value (.x c)) (.y c) (.z c) (.w c))
-              1 (Vec4. (.x c) (+ value (.y c)) (.z c) (.w c))
-              2 (Vec4. (.x c) (.y c) (+ value (.z c)) (.w c))
-              3 (Vec4. (.x c) (.y c) (.z c) (+ value (.w c)))
-              c)))))
+     (case channel
+       0 (Vec4. (+ value (.x c)) (.y c) (.z c) (.w c))
+       1 (Vec4. (.x c) (+ value (.y c)) (.z c) (.w c))
+       2 (Vec4. (.x c) (.y c) (+ value (.z c)) (.w c))
+       3 (Vec4. (.x c) (.y c) (.z c) (+ value (.w c)))
+       c))))
 
 (defn modulate
   "Modulate (multiply) chosen channel by given amount. Works with any color space."
@@ -3700,20 +3756,20 @@
   (^Vec4 [col colorspace ^long channel ^double amount]
    (let [[to from] (colorspaces colorspace)
          ^Vec4 c (to col)]
-     (clamp (from (case channel
-                    0 (Vec4. (* amount (.x c)) (.y c) (.z c) (.w c))
-                    1 (Vec4. (.x c) (* amount (.y c)) (.z c) (.w c))
-                    2 (Vec4. (.x c) (.y c) (* amount (.z c)) (.w c))
-                    3 (Vec4. (.x c) (.y c) (.z c) (* amount (.w c)))
-                    c)))))
+     (from (case channel
+             0 (Vec4. (* amount (.x c)) (.y c) (.z c) (.w c))
+             1 (Vec4. (.x c) (* amount (.y c)) (.z c) (.w c))
+             2 (Vec4. (.x c) (.y c) (* amount (.z c)) (.w c))
+             3 (Vec4. (.x c) (.y c) (.z c) (* amount (.w c)))
+             c))))
   (^Vec4 [col ^long channel ^double amount]
    (let [^Vec4 c (pr/to-color col)]
-     (clamp (case channel
-              0 (Vec4. (* amount (.x c)) (.y c) (.z c) (.w c))
-              1 (Vec4. (.x c) (* amount (.y c)) (.z c) (.w c))
-              2 (Vec4. (.x c) (.y c) (* amount (.z c)) (.w c))
-              3 (Vec4. (.x c) (.y c) (.z c) (* amount (.w c)))
-              c)))))
+     (case channel
+       0 (Vec4. (* amount (.x c)) (.y c) (.z c) (.w c))
+       1 (Vec4. (.x c) (* amount (.y c)) (.z c) (.w c))
+       2 (Vec4. (.x c) (.y c) (* amount (.z c)) (.w c))
+       3 (Vec4. (.x c) (.y c) (.z c) (* amount (.w c)))
+       c))))
 
 (defn adjust-temperature
   "Adjust temperature of color.
@@ -3874,8 +3930,21 @@
   ([palette-or-gradient-name options]
    (cond (keyword? palette-or-gradient-name) (get-gradient palette-or-gradient-name)
          (and (= (:interpolation options) :iq)
-              (seq? palette-or-gradient-name)) (apply iq-gradient palette-or-gradient-name)       
+              (seqable? palette-or-gradient-name)
+              (every? valid-color? palette-or-gradient-name)) (apply iq-gradient palette-or-gradient-name)       
          :else (interpolated-gradient palette-or-gradient-name options))))
+
+(defn merge-gradients
+  "Combine two gradients, optionally select `midpoint` (0.5 by default).
+
+  Resulting gradient has colors from `g1` for values lower than `midpoint` and from `g2` for values higher than `midpoint`"
+  {:metadoc/categories #{:gr}}
+  ([g1 g2 ^double midpoint]
+   (fn [^double t]
+     (if (< t midpoint)
+       (g1 (m/norm t 0.0 midpoint))
+       (g2 (m/norm t midpoint 1.0)))))
+  ([g1 g2] (merge-gradients g1 g2 0.5)))
 
 ;;
 
@@ -3910,10 +3979,18 @@
      (fn? p) (palette p 5)
      :else (vec p)))
   ([p number-of-colors] (palette p number-of-colors {}))
-  ([p number-of-colors gradient-params]
+  ([p ^long number-of-colors gradient-params]
    (vec (if (fn? p)
-          (m/sample p number-of-colors)
-          (m/sample (gradient (palette p) gradient-params) number-of-colors)))))
+          (if (m/one? number-of-colors)
+            [(if-let [cs (:colorspace gradient-params)]
+               (average (m/sample p 100) cs)
+               (average (m/sample p 100)))]
+            (m/sample p number-of-colors))
+          (if (m/one? number-of-colors)
+            [(if-let [cs (:colorspace gradient-params)]
+               (average (palette p) cs)
+               (average (palette p)))]
+            (palette (gradient (palette p) gradient-params) number-of-colors))))))
 
 (defn- find-gradient-or-palette
   ([lst] (:seq @lst))
@@ -3943,14 +4020,13 @@
    (if (fn? palette-or-gradient) ;; gradient
      (let [l0 (ch0 (to-LAB (palette-or-gradient 0.0)))
            l1 (ch0 (to-LAB (palette-or-gradient 1.0)))
-           xs (range 0.0 1.005 0.005)
+           xs (m/slice-range 0.0 1.0 200)
            ls (map (fn [^double v] (ch0 (to-LAB (palette-or-gradient v)))) xs)
            i (i/linear-smile ls xs)]
        (fn ^Vec4 [^double t] (palette-or-gradient (i (m/lerp l0 l1 t)))))
      (let [n (count palette-or-gradient)
            g (correct-luma (gradient palette-or-gradient gradient-params))]
        (palette g n)))))
-
 
 ;;;
 
@@ -3965,7 +4041,7 @@
          d (v/generate-vec3 r/drand)]
      (iq-gradient a b c d))
    (let [pal (paletton :monochromatic (r/irand 360) {:compl true :preset (rand-nth [:pastels :pastels-med :full :shiny :dark :pastels-mid-dark :dark-neon :darker])})]
-     (iq-gradient (second pal) (first (drop 5 pal))))))
+     (iq-gradient (first pal) (first (drop 5 pal))))))
 
 (defn random-palette
   "Generate random palette from all collections defined in clojure2d.color namespace."
@@ -3994,8 +4070,8 @@
     (condp clojure.core/> (r/drand)
       0.1 (iq-random-gradient)
       0.6 (gradient (palette) gpars)
-      0.7 (gradient (rest (paletton :monochromatic (r/drand 360)
-                                    {:preset (rand-nth paletton-presets-list)})) gpars)
+      0.7 (gradient (sort-by luma (paletton :monochromatic (r/drand 360)
+                                            {:preset (rand-nth paletton-presets-list)})) gpars)
       (gradient))))
 
 (defonce ^:private thing-presets
@@ -4018,24 +4094,24 @@
    :gray          [[76.5 178.5]  [0.0 0.0]]})
 
 (defonce thing-presets-list (set (keys thing-presets)))
-(defonce color-profiles (sort (concat thing-presets-list paletton-presets-list)))
+(defonce color-themes (sort (concat thing-presets-list paletton-presets-list)))
 
 (defn random-color
   "Generate random color.
 
-  Optionally color profile or alpha can be provided.
+  Optionally color theme or alpha can be provided.
 
-  List of possible color profiles is stored in `color-profiles` var. These are taken from thi.ng and paletton."
+  List of possible color themes is stored in `color-themes` var. These are taken from thi.ng and paletton."
   {:metadoc/categories #{:pal}}
-  ([color-profile alpha]
-   (if (thing-presets-list color-profile)
-     (let [[[l1 l2] [c1 c2]] (thing-presets color-profile [[0.0 255.0] [0.0 255.0]])]
+  ([color-theme alpha]
+   (if (thing-presets-list color-theme)
+     (let [[[l1 l2] [c1 c2]] (thing-presets color-theme [[0.0 255.0] [0.0 255.0]])]
        (from-LCH* [(r/drand l1 l2) (r/drand c1 c2) (r/drand 255.0) alpha]))
-     (set-alpha (rand-nth (paletton :monochromatic (r/drand 360.0) {:preset color-profile})) alpha)))
-  ([alpha-or-color-profile]
-   (if (keyword? alpha-or-color-profile)
-     (random-color alpha-or-color-profile 255.0)
-     (set-alpha (random-color) alpha-or-color-profile)))
+     (set-alpha (rand-nth (paletton :monochromatic (r/drand 360.0) {:preset color-theme})) alpha)))
+  ([alpha-or-color-theme]
+   (if (keyword? alpha-or-color-theme)
+     (random-color alpha-or-color-theme 255.0)
+     (set-alpha (random-color) alpha-or-color-theme)))
   ([] (r/randval 0.2 (rand-nth (named-colors-list))
                  (r/randval 0.5
                             (rand-nth (random-palette))

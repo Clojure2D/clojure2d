@@ -1,16 +1,22 @@
 ^{:nextjournal.clerk/visibility :hide-ns}
-(ns ^:nextjournal.clerk/no-cache notebooks.color
+(ns notebooks.color
   (:require [nextjournal.clerk :as clerk]
             [clojure2d.color :as c]
+            [clojure2d.color.blend :as bl]
+            [clojure2d.core :as c2d]
+            [clojure2d.pixels :as pixels]
+            [clojure2d.color.cssgram :as cssgram]
             [clerk.styles :refer [🎨 color-styles]]
             [fastmath.vector :as v]
             [fastmath.core :as m]
             [fastmath.random :as r]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [clojure2d.color.blend :as b]
+            [clojure2d.color.blend :as cb]))
 
 ^{::clerk/viewer :html ::clerk/visibility :hide ::clerk/no-cache true} color-styles
-^{:nextjournal.clerk/visibility :hide
-  :nextjournal.clerk/viewer :hide-result}
+^{::clerk/visibility :hide
+  ::clerk/viewer :hide-result}
 (clerk/set-viewers! [{:name :block
                       :render-fn '#(v/html (into [:div.flex.flex-col] (v/inspect-children %2) %1))}])
 
@@ -160,6 +166,42 @@
  (c/format-hex :pink)
  (c/pack :pink)]
 
+;; For interop with `quil` just call `c/quil` (which is the same to `pack` and converts a color to a ARGB integer. RGB Color defined by `quil/color` will work in `Clojure2d` without any conversion.
+
+(c/quil :pink)
+
+;; ### All color representations in one place
+
+^{::clerk/visibility :hide}
+(clerk/table {:head [:input :output]
+              :rows [[:darkgreen (🎨 :darkgreen)]
+                     [:docc/green-blue (🎨 :docc/green-blue)]
+                     ['(c/color 127) (🎨 (c/color 127))]
+                     ['(c/color 127 100) (🎨 (c/color 127 100))]
+                     ['(c/color 33 44 55) (🎨 (c/color 33.0 44.0 55.0))]
+                     ['(c/color 33 44 55 200) (🎨 (c/color 33.0 44.0 55.0 200.0))]
+                     ['(c/gray 100) (🎨 (c/gray 100.0))]
+                     ['(c/gray 100 200) (🎨 (c/gray 100.0 200.0))]
+                     ["\"#a\"" (🎨 "#a")]
+                     ["\"ae\"" (🎨 "ae")]
+                     ["\"#3AF\"" (🎨 "#3AF")]
+                     ["\"34e9a3\"" (🎨 "34e9a3")]
+                     ["\"34A3e999\"" (🎨 "34A3e999")]
+                     ["0xa34556" (🎨 0xa34556)]
+                     ["0xAAa35645" (🎨 0xAAa35645)]
+                     [[127] (🎨 [127])]
+                     ['(127 200) (🎨 '(127 200))]
+                     ['(double-array [33 44 122]) (🎨 (double-array [33 44 122]))]
+                     ['(int-array [33 44 99 122]) (🎨 (int-array [33 44 99 122]))]
+                     ['(v/vec2 33 144) (🎨 (v/vec2 33 144))]
+                     ['(v/vec3 22 33 144) (🎨 (v/vec3 22 33 144))]
+                     ['(v/vec4 11 22 33 144) (🎨 (v/vec4 11 22 33 144))]
+                     ["java.awt.Color/PINK" (🎨 java.awt.Color/PINK)]
+                     ['(c/format-hex :pink) (🎨 (c/format-hex :pink))]
+                     ['(c/pack :pink) (🎨 (c/pack :pink))]
+                     ['(c/from-HSB [300 0.5 0.5]) (🎨 (c/from-HSB [300 0.5 0.5]))]
+                     ['(c/from-LAB [50 50 50]) (🎨 (c/from-LAB [50 50 50]))]]})
+
 ;; ### Color validation
 
 ;; To check if color is valid or invalid. You can use two functions: `possible-color?` and `valid-color?`. Former function uses some logic to determine if the imput is color or not, Latter one, just tries to coerce to a color and catches exception when it's not (returning `false` in such case).
@@ -239,6 +281,9 @@
 ;; * `delta-C-RGB` - ${\Delta}C$, difference in RGB color space ("redmean")
 ;; * `delta-D-HCL` - ${\Delta}D_{HCL}$, difference in HCL (Sarifuddin and Missaou) color space
 
+;; Difference between `:yellow` :and `:blue`
+
+^{::clerk/visibility :hide}
 (clerk/table
  {:head [:delta :value]
   :rows [[:delta-E*               (c/delta-E* :yellow :blue)]
@@ -335,7 +380,7 @@ c/colorspaces-list
 
 ;; ### Color space ranges
 
-^{:nextjournal.clerk/visibility :hide}
+^{::clerk/visibility :hide}
 (clerk/table
  {:head ["color space" "channel 1" "channel 2" "channel 3" "comment"]
   :rows [[:CMY [0.0 255.0] [0.0 255.0] [0.0 255.0] ""]
@@ -379,52 +424,413 @@ c/colorspaces-list
 (c/to-linearRGB [124.0 125.0 254.0])
 (c/from-linearRGB [51.4 52.3 252.7])
 
-;; ## Palettes
+;; ### Color converter
+
+;; You can build a color converter similar to `colorMode` in Processing/Quil. `color-converter` function returns a function which converts from given color space to `sRGB` using a channel values ranging from `0.0` to a scale (`255.0` by default) parameter. Possible options are:
+
+;; * `(color-converter :HSB)` - returns a function converting from `HSB` color space with all channels are set to range from `0.0` to `255.0`
+;; * `(color-converter :HSB 100.0)` - as above with input channels scaled between `0.0` to `100.0`
+;; * `(color-converter :HSB 10.0 20.0 30.0)` - each color channel is scaled respectively to a maximum: `10`, `20` and `30`. Alpha channel is scaled from `0.0` to `255.0`
+;; * `(color-converter :HSB 10 20 30 100)` - as above, with alpha scaled to a maximum `100`.
+
+;; Let's create converter from `HSB` color space which accepts all parameters from the range `[0.0 100.0]`.
+
+(def from-HSB-100 (c/color-converter :HSB 100.0))
+
+(🎨 (c/from-HSB [180.0 0.5 0.5])
+    (c/from-HSB* [127.5 127.5 127.5])
+    (from-HSB-100 [50.0 50.0 50.0]))
+
+;; Similarly, let's create converter from `LCH` where `L` channel is from the range `[0.0 1.0]`,`C` from the range `[0.0 2.0]`, `H` from the range `[0.0 3.0]` and alpha is from `0.0` to `100.0`.
+
+(def from-LCH-123 (c/color-converter :LCH 1 2 3 100))
+
+(🎨 (c/from-LCH [55 90 40 205])
+    (from-LCH-123 [0.55 1.345 1/3 80.4]))
+
+;; ## Random color generation
+
+;; To generate random color, call `random-color`. You can optionally select a color theme (thi.ng or paletton presets). List of color schemes: 
+
+c/color-themes
+
+(🎨 (sort-by c/hue (repeatedly 10 c/random-color))
+    (sort-by c/hue (repeatedly 10 #(c/random-color :warm (r/drand 100 255))))
+    (sort-by c/hue (repeatedly 10 #(c/random-color :pastels-dark))))
+
+;; # Palettes
+
+;; Palette is a vector of colors. It can be constructed by hand, by name, created from hue, gradient, image or from other palette.
+(🎨 [:maroon 0xaa334455 :docc/olive [112 33 200]])
+
+;; ## Names
+
+;; `clojure2d.color` defines plenty of ready to use palettes gathered from many sources and other libraries, Colourlovers palettes, thi.ng, dictionary of colour combinations, R Paletteer package (collection), cpt-city - an archive of colour gradients, ColorBrewer and so on.
+
+;; The full list of names can be found [here](https://clojure2d.github.io/clojure2d/docs/static/palettes/index.html). 
+
+;; To create palette from name, call `palette` function with a number or keyword as a name. Call without an argument to select random name and hence the palette.
+
+(🎨 (c/palette))
+
+;; Simple keywords as a names consist ColorBrewer, Wes Anderson, common charting, and some other basic palettes
+
+^{::clerk/visibility :hide}
+(clerk/table
+ [[:accent (🎨 (c/palette :accent))]
+  [:category10 (🎨 (c/palette :category10))]
+  [:microsoft-2 (🎨 (c/palette :microsoft-2))]
+  [:grand-budapest-1 (🎨 (c/palette :grand-budapest-1))]
+  [:oranges-5 (🎨 (c/palette :oranges-5))]])
 
 ;; ### [Colourlovers](https://www.colourlovers.com/palettes/most-loved/all-time/meta)
 
-(apply 🎨 (map c/palette (range 5)))
+;; The best 500 palettes. The name is an integer from `0` to `499`
+
+(🎨 (c/palette 0)
+    (c/palette 499))
+
+^{::clerk/visibility :hide}
+(clerk/table
+ [[1 (🎨 (c/palette 1))]
+  [10 (🎨 (c/palette 10))]
+  [50 (🎨 (c/palette 50))]
+  [100 (🎨 (c/palette 100))]
+  [200 (🎨 (c/palette 200))]
+  [400 (🎨 (c/palette 400))]])
 
 ;; ### [thi.ng](https://github.com/thi-ng/umbrella/tree/develop/packages/color-palettes)
 
-(apply 🎨 (map c/palette [:thi.ng/OkEXVdMQmQ1oQTp
-                          :thi.ng/QLj3F8heV6QT4YG
-                          :thi.ng/qAPJgQvoDkRkQTN
-                          :thi.ng/bYcivY8Jqx8nsiR
-                          :thi.ng/sz5Uxo4ByGDH6tQ]))
+;; Set of palettes defined in thi.ng umbrella, in `color-palettes` package.
+
+(🎨 (c/palette :thi.ng/ORLwKeosxtEeZxq))
+
+^{::clerk/visibility :hide}
+(clerk/table
+ [[:thi.ng/OkEXVdMQmQ1oQTp (🎨 (c/palette :thi.ng/OkEXVdMQmQ1oQTp))]
+  [:thi.ng/QLj3F8heV6QT4YG (🎨 (c/palette :thi.ng/QLj3F8heV6QT4YG))]
+  [:thi.ng/qAPJgQvoDkRkQTN (🎨 (c/palette :thi.ng/qAPJgQvoDkRkQTN))]
+  [:thi.ng/bYcivY8Jqx8nsiR (🎨 (c/palette :thi.ng/bYcivY8Jqx8nsiR))]
+  [:thi.ng/sz5Uxo4ByGDH6tQ (🎨 (c/palette :thi.ng/sz5Uxo4ByGDH6tQ))]])
 
 ;; ### [DOCC](https://github.com/mattdesl/dictionary-of-colour-combinations)
 
-(apply 🎨 (map c/palette [:docc/docc-1
-                          :docc/docc-10
-                          :docc/docc-100
-                          :docc/docc-200
-                          :docc/docc-300]))
+;; 348 palettes from dictionary of color combinations.
 
-;; #### [Paletteer](https://github.com/EmilHvitfeldt/paletteer)
+(🎨 (c/palette :docc/docc-1)
+    (c/palette :docc/docc-348))
 
-(apply 🎨 (map c/palette [:nord/frost
-                          :ghibli/TotoroLight
-                          :cartography/red.pal-9
-                          :dutchmasters/anatomy
-                          :palettetown/magmar]))
+^{::clerk/visibility :hide}
+(clerk/table
+ [[:docc/docc-1 (🎨 (c/palette :docc/docc-2))]
+  [:docc/docc-10 (🎨 (c/palette :docc/docc-10))]
+  [:docc/docc-100 (🎨 (c/palette :docc/docc-100))]
+  [:docc/docc-200 (🎨 (c/palette :docc/docc-200))]
+  [:docc/docc-300 (🎨 (c/palette :docc/docc-300))]])
 
-;; #### [CPT City](http://soliton.vm.bytemark.co.uk/pub/cpt-city/index.html)
+;; ### [Paletteer](https://github.com/EmilHvitfeldt/paletteer)
 
-(apply 🎨 (map c/palette [:arendal/temperature
-                          :cl/fs2010
-                          :os/os250k-metres
-                          :wkp_template/wiki-1.03
-                          :heine/GTS2012_periods]))
+;; Collection of palettes defined in various R packages.
+
+^{::clerk/visibility :hide}
+(clerk/table
+ [[:nord/frost            (🎨 (c/palette :nord/frost))            ]
+  [:ghibli/TotoroLight    (🎨 (c/palette :ghibli/TotoroLight))    ]
+  [:cartography/red.pal-9 (🎨 (c/palette :cartography/red.pal-9)) ]
+  [:dutchmasters/anatomy  (🎨 (c/palette :dutchmasters/anatomy))  ]
+  [:palettetown/abra      (🎨 (c/palette :palettetown/abra))    ]])
+
+;; ### [CPT City](http://soliton.vm.bytemark.co.uk/pub/cpt-city/index.html)
+
+;; Collection of palettes from CPT-City, c3g discrete files.
+
+^{::clerk/visibility :hide}
+(clerk/table
+ [[:arendal/temperature    (🎨 (c/palette :arendal/temperature))   ]
+  [:cl/fs2010              (🎨 (c/palette :cl/fs2010))             ]
+  [:os/os250k-metres       (🎨 (c/palette :os/os250k-metres))      ]
+  [:jjg_neo10_liht/frozen-in-time (🎨 (c/palette :jjg_neo10_liht/frozen-in-time))]
+  [:heine/Exxon88  (🎨 (c/palette :heine/Exxon88)) ]])
+
+;; ## [Paletton](https://paletton.com/)
+
+;; Paletton is a great web tool to generate palettes based on hue. `paletton` function recreates the method used on the web and returns a palette. Possible options are:
+
+;; * type of the palette: `:monochromatic`, `:triad` and `:tetrad`
+;; * hue, an angle from 0 to 360 degrees.
+;; * complementary color
+;; * adjacent colors angle
+;; * a color scheme
+
+;; To generate [these colors](https://paletton.com/#uid=60k0u0kwi++bu++hX++++rd++kX), you should call:
+
+(🎨 (c/paletton :triad 20 {:preset :shiny :compl true :adj true :angle 30}) )
+
+;; Other examples
+
+(🎨 (c/paletton :monochromatic 200 {:preset :pale-light :compl false})
+    (c/paletton :monochromatic 200 {:preset :pale-light :compl true})
+    ;; adjacent colors are taken from complementary color
+    (c/paletton :triad 200 {:preset :pale-light :compl false :adj false})
+    (c/paletton :triad 200 {:preset :pale-light :compl true :adj false})
+    ;; adjacent colors are taken from base color
+    (c/paletton :triad 200 {:preset :pale-light :compl false :adj true})
+    (c/paletton :triad 200 {:preset :pale-light :compl true :adj true})
+    (c/paletton :tetrad 200 {:preset :pale-light})
+    (c/paletton :tetrad 200 {:preset :pale-light :angle 120}))
+
+;; ## Resampling
+
+;; Palette can be resampled to get less or more colors. There are two methods one based on sampling gradient created out of palette, second based on k-means clustering.
+
+;; ### Gradient resampling
+
+;; For given palette provide requested number of colors and optionally gradient creation arguments.
+
+(🎨 (c/palette :moonrise-3))
+
+;; Resampled `:moonrise-3`
+
+(apply 🎨 (map (partial c/palette :moonrise-3)
+               [1 2 3 4 5 6 8 10 12 15]))
+
+;; We can resample in different color space and with monotonic interpolation
+
+(apply 🎨 (map #(c/palette :moonrise-3 %
+                           {:interpolation :monotone :colorspace :JCH})
+               [1 2 3 4 5 6 8 10 12 15]))
+
+;; We can also resample a gradient
+
+(🎨 (c/gradient :pals/kovesi.cyclic_mrybm_35_75_c68))
+
+(apply 🎨 (map #(c/palette (c/gradient :pals/kovesi.cyclic_mrybm_35_75_c68) %) [1 2 3 5 7 10]))
+
+;; ### k-Means
+
+;; In case you have very big palette or a sequence of colors (possibly an image), you can use `reduce-colors` to construct a smaller palette. The algorithm uses `x-means` and number of colors returned may be lower than requested.
+
+;; Let's start with very long palette
+
+(count (c/palette :viridis))
+
+(apply 🎨 (map (partial c/reduce-colors (c/palette :viridis)) [2 3 5 10 30]))
+
+;; Now let's load image
+
+(def cat-image
+  (c2d/load-image "https://live.staticflickr.com/3819/11717823153_7be7b26ede_w_d.jpg"))
+
+;; And let's get pixels as a sequence of colors
+
+(def cat-pixels (pixels/to-pixels cat-image))
+
+(apply 🎨 (map (partial c/reduce-colors cat-pixels) [2 3 5 10]))
+
+;; Reduce in `OSA` color space
+
+(apply 🎨 (map #(c/reduce-colors cat-pixels % :OSA) [2 3 5 10]))
+
+;; ## Random palette.
+
+;; When you call `random-palette` function you'll get random set of colors. These are selected randomly from preset palettes, gradients and paletton. There are no parameters.
+
+(apply 🎨 (repeatedly 5 c/random-palette))
+
+;; # Gradients
+
+;; Gradient is a continuous function which returns interpolated color, a parameter should be a number from `0.0` to `1.0`. Gradient can be created by name or from palette. Additionally there is a special case for cosinus method of creating gradients (described by Inigo Quilez ,see below).
+
+;; ## Presets
+
+;; There is a big collection of ready to use gradients gathered (similarly to palettes) from other libraries or sites. Full list is available [here](https://clojure2d.github.io/clojure2d/docs/static/gradients/index.html). Some examples:
+
+(🎨 (c/gradient :pals/kovesi.cyclic_mrybm_35_75_c68))
+
+^{::clerk/visibility :hide}
+(clerk/table
+ {:head [:name :gradient]
+  :rows [[:pals/ocean.thermal (🎨 (c/gradient :pals/ocean.thermal))]
+         [:grDevices/Inferno (🎨 (c/gradient :grDevices/Inferno))]
+         [:xkcd/xkcd-bath (🎨 (c/gradient :xkcd/xkcd-bath))]
+         [:ma_retro2/retro2_01 (🎨 (c/gradient :ma_retro2/retro2_01))]
+         [:neota_food/carrot (🎨 (c/gradient :neota_food/carrot))]
+         [:pd_art/art-nouveau-01 (🎨 (c/gradient :pd_art/art-nouveau-01))]
+         [:es_emerald_dragon/es_emerald_dragon_08 (🎨 (c/gradient :es_emerald_dragon/es_emerald_dragon_08))]]})
+
+;; ## Gradient from palette
+
+;; In case you want to create own gradient out of custom palette, you can use several options how to interpolate between colors.
+;; You can select color space conversion, interpolation method and color distribution.
+
+(🎨 (c/gradient (c/palette :prl-6)))
+
+;; Let's play with the following gradient. By default interpolation is linear with evenly distributed colors in RGB color space. List of possible interpolations with documentation is [here](https://generateme.github.io/fastmath/fastmath.interpolation.html)
+
+(🎨 (c/gradient [:white :red :yellow (c/color :blue 160) :lime :black]
+                {:domain [0.0 0.2 0.4 0.6 0.8 1.0]
+                 :interpolation :linear-smile
+                 :colorspace :RGB}))
+
+;; Let's create custom `loess` interpolator
+(defn loess [xs ys] (fastmath.interpolation/loess 0.7 2 xs ys))
+
+^{::clerk/visibility :hide}
+(clerk/table
+ {:head [:options :result]
+  :rows (map (juxt identity #(🎨 (c/gradient [:white :red :yellow (c/color :blue 160) :lime :black] %)))
+             [{} {:interpolation :monotone}
+              {:interpolation :cubic-spline}
+              {:interpolation :shepard}
+              {:interpolation loess}
+              {:colorspace :LAB}
+              {:colorspace :Oklab}
+              {:colorspace :JCH}
+              {:domain [0.0 0.1 0.2 0.7 0.8 1.0]}
+              {:domain [0.0 0.45 0.47 0.53 0.55 1.0]}])})
+
+;; ## Inigo Quilez gradient generator
+
+;; [Inigo Quilez cosinus method](https://iquilezles.org/www/articles/palettes/palettes.htm) is the way of creating gradients from the following formula:
+
+;; $$c_i(t)=a_i+b_i\cos{[2\pi(c_it+d_i)]}$$
+;; $$t\in[0.0,1.0], i\in\{R,G,B\}$$
+
+;; To create a gradient, call `gradient` with `:iq` interpolation. As the first argument you have to provide a,b,c and d coefficient triplets.
+
+(🎨 (let [a-coeffs [0.5 0.5 0.5]
+          b-coeffs [0.5 0.5 0.5]
+          c-coeffs [1 0.5 -1]
+          d-coeffs [0.2 0.3 0.4]]
+      (c/gradient [a-coeffs b-coeffs c-coeffs d-coeffs] {:interpolation :iq})))
+
+;; All gradients from the aforementioned article are predefined:
+
+^{::clerk/visibility :hide}
+(clerk/table
+ {:head [:name :gradient]
+  :rows (map (juxt identity #(🎨 (c/gradient %))) (map #(keyword (str "iq-" %)) (range 1 8)))})
+
+;; There is also an option to create gradient from two colors using cosine interpolation. Coefficients are calculated automatically basing on [thi.ng algorithm](https://github.com/thi-ng/color/blob/master/src/gradients.org#gradient-coefficient-calculation).
+
+(🎨
+ ;; compare two interpolation methods, default and cosine
+ (c/gradient [:red :green])
+ (c/gradient [:red :green] {:interpolation :iq})
+ ;; yellow-blue
+ (c/gradient [:yellow :blue])
+ (c/gradient [:yellow :blue] {:interpolation :iq}))
+
+;; ## Easings
+
+;; Another way of interpolating between two colors is by using easing functions. They are defined and documented [here](https://generateme.github.io/fastmath/fastmath.easings.html).
+
+(🎨 (c/gradient [:red :green] {:interpolation :back-in-out})
+    (c/gradient [:red :green] {:interpolation :bounce-in-out})
+    (c/gradient [:red :green] {:interpolation :poly-in-out})
+    (c/gradient [:red :green] {:interpolation :circle-in})
+    (c/gradient [:red :green] {:interpolation :circle-out}))
+
+;; ## Merging gradients
+
+;; Two gradients can be merged. The midpoint argument selects the point (default 0.5) where two gradients joins.
+
+(let [g1 (c/gradient [:darkred :deeppink :light-yellow])
+      g2 (c/gradient [:light-yellow :lightgreen :teal])]
+  (🎨 g1 g2
+      (c/merge-gradients g1 g2)
+      (c/merge-gradients g1 g2 0.7)))
+
+;; ## Random gradient
+
+;; Random gradient can be generated by calling `random-gradient`.
+
+(apply 🎨 (repeatedly 5 c/random-gradient))
+
+;; # Fixing luma
+
+;; If you want to correct luma to be linear, call `correct-luma`. Please be sure you palette is sorted by luma (ascending or descending) before calling.
+
+;; The method is similar to one used in `chroma.js` and described [here](https://www.vis4.net/blog/2013/09/mastering-multi-hued-color-scales/#combining-bezier-interpolation-and-lightness-correction). The example showin in article is recreated below:
+
+(let [pal [:lightyellow :orangered :deeppink :darkred]]
+  (🎨 (-> (c/gradient pal {:colorspace :LAB}) (c/palette 9))
+      (-> (c/gradient pal {:colorspace :LAB
+                           :interpolation :b-spline}) (c/palette 9))
+      (-> (c/gradient pal {:colorspace :LAB}) c/correct-luma (c/palette 9))
+      (-> (c/gradient pal {:colorspace :LAB
+                           :interpolation :b-spline}) c/correct-luma (c/palette 9))))
+
+;; Let's see other examples with luma profiles.
+
+(🎨 (sort-by c/luma (c/palette :guell))
+    (c/correct-luma (sort-by c/luma (c/palette :guell))))
+
+;; Since it's done in `LAB` color space, some colors can vanish.
+
+;; `correct-luma` works also for gradients (should be monotonic).
+
+(🎨 (c/gradient [:black :docc/deep-slate-green :orangered :aquamarine :white])
+    (c/correct-luma (c/gradient [:black :docc/deep-slate-green :orangered :aquamarine :white])))
+
+(defn get-luma-from-gradient
+  [gradient]
+  (let [cgradient (c/correct-luma gradient)
+        xs (m/slice-range 0.0 1.0 50)]
+    (map (partial zipmap [:t :luma :corrected?])
+         (concat (map (juxt identity
+                            (comp first c/to-LAB gradient)
+                            (constantly "no")) xs)                 
+                 (map (juxt identity
+                            (comp first c/to-LAB cgradient)
+                            (constantly "yes")) xs)))))
+
+(clerk/vl {:data {:values (get-luma-from-gradient (c/gradient [:black :docc/deep-slate-green :orangered :aquamarine :white]))}
+           :width 600
+           :height 300
+           :title "Luma from LAB color space"
+           :mark {:type :line}
+           :encoding {:x {:field :t :type :quantitative}
+                      :y {:field :luma :type :quantitative}
+                      :color {:field :corrected? :type :nominal}}})
+
+(🎨 (c/gradient [:white :lightcyan :palegreen :navy :black])
+    (c/correct-luma (c/gradient [:white :lightcyan :palegreen :navy :black])))
+
+(clerk/vl {:data {:values (get-luma-from-gradient (c/gradient [:white :lightcyan :palegreen :navy :black]))}
+           :width 600
+           :height 300
+           :title "Luma from LAB color space"
+           :mark {:type :line}
+           :encoding {:x {:field :t :type :quantitative}
+                      :y {:field :luma :type :quantitative}
+                      :color {:field :corrected? :type :nominal}}})
+
+;; Let's create diverging multi-hue color palette as desribed in [this chapter](https://www.vis4.net/blog/2013/09/mastering-multi-hued-color-scales/#update-diverging-multi-hue-color-palettes).
+
+(let [opts {:interpolation :b-spline :colorspace :LAB}
+      g1 (-> (c/gradient [:darkred :deeppink :light-yellow] opts) c/correct-luma)
+      g2 (-> (c/gradient [:light-yellow :lightgreen :teal] opts) c/correct-luma)]
+  (🎨 (c/palette (c/merge-gradients g1 g2) 13)))
+
+^{::clerk/visibility :hide}
+(let [opts {:interpolation :b-spline :colorspace :LAB}
+      g (c/merge-gradients
+         (-> (c/gradient [:darkred :deeppink :light-yellow] opts) c/correct-luma)
+         (-> (c/gradient [:light-yellow :lightgreen :teal] opts) c/correct-luma))]
+  (clerk/vl {:data {:values (map #(zipmap [:t :luma]
+                                          [% (first (c/to-LAB (g %)))]) (m/slice-range 0.0 1.0 100))}
+             :width 600
+             :height 300
+             :title "Luma from LAB color space"
+             :mark {:type :line}
+             :encoding {:x {:field :t :type :quantitative}
+                        :y {:field :luma :type :quantitative}}}))
 
 
-;; ### Paletton
+;; # Mixing and blending
 
-;; ## Gradients
-
-;; ### Inigo Quilez gradient generator
-
-;; ## Mixing and blending
+;; ## Mixing
 
 ;; Colors can be mixed and blended in various ways. Let's start with linear interpoation. By default `lerp` finds mid colour. 
 
@@ -433,40 +839,40 @@ c/colorspaces-list
 ;; But we can decide about the amount of interpolation
 
 (🎨 (c/lerp :orange :blue 0.25)
-    (c/lerp :orange :blue 0.75))
+(c/lerp :orange :blue 0.75))
 
 ;; Another two functions `lerp+` and `lerp-` are trying to conserve brightness of the right or left color.
 
 (🎨 (c/lerp- :orange :blue 0.3)
-    (c/lerp+ :orange :blue 0.7))
+(c/lerp+ :orange :blue 0.7))
 
 ;; Brightness (Luma) is taken from the first channel of *LAB* color space.
 
 ^{::clerk/viewer :block}
 [(c/get-channel :blue :LAB 0)
- (c/get-channel (c/lerp+ :orange :blue 0.7) :LAB 0)
- (c/get-channel :orange :LAB 0)
- (c/get-channel (c/lerp- :orange :blue 0.3) :LAB 0)]
+(c/get-channel (c/lerp+ :orange :blue 0.7) :LAB 0)
+(c/get-channel :orange :LAB 0)
+(c/get-channel (c/lerp- :orange :blue 0.3) :LAB 0)]
 
 ;; There also two other methods of mixing: `mix` and `mixsub`. The former one mixes squared values (and takes square root after all), the latter perform subtractive mixing.
 
 (🎨 (c/mix :orange :blue)
-    (c/mixsub :orange :blue))
+(c/mixsub :orange :blue))
 
 ;; We can also lerp and mix in different color spaces
 (🎨 (c/lerp :orange :blue :Oklab 0.5)
-    (c/mix :orange :blue :Oklab 0.5))
+(c/mix :orange :blue :Oklab 0.5))
 
 ;; To compare above methods let's check gradients generated by them:
 
 (🎨 (partial c/lerp :orange :blue)
-    (partial c/lerp :orange :blue :Oklab)
-    (partial c/lerp- :orange :blue)
-    (partial c/lerp+ :orange :blue)
-    (partial c/mix :orange :blue)
-    (partial c/mix :orange :blue :Oklab)
-    (partial c/mixsub :orange :blue)
-    (partial c/mixsub :orange :blue :Oklab))
+(partial c/lerp :orange :blue :Oklab)
+(partial c/lerp- :orange :blue)
+(partial c/lerp+ :orange :blue)
+(partial c/mix :orange :blue)
+(partial c/mix :orange :blue :Oklab)
+(partial c/mixsub :orange :blue)
+(partial c/mixsub :orange :blue :Oklab))
 
 ;; Last method calculates average colors.
 
@@ -479,56 +885,117 @@ c/colorspaces-list
 ;; Additionally we can average in different color spaces:
 
 (🎨 (c/average [:orange :blue :green :yellow] :LAB)
-    (c/weighted-average [:orange :blue :green :yellow] [1 0.5 1 5] :LUV))
+(c/weighted-average [:orange :blue :green :yellow] [1 0.5 1 5] :LUV))
 
-;; ## Alterations
+;; ## Blending
+
+;; Two colors/palettes/gradients can be combined in various ways known from graphics editors. Bleding functions are defined in `clojure2d.color.blend`.
+
+;; You can select one blending method for all channels or for each channel separately. Algorithms and alpha blending are described [here](https://www.w3.org/TR/compositing-1/#blending) (simple alpha compositing is used in the library).
+
+(🎨 (bl/blend-colors bl/add [12 33 55] [55 66 77])
+(bl/blend-colors bl/add [12 33 55 120] [55 66 77 200])
+(bl/blend-colors bl/subtract b/multiply bl/screen [12 33 55] [55 66 77]))
+
+;; List of all blending methods
+
+bl/blends-list
+
+;; Below table shows the result after blending two following colors.
+
+(🎨 :docc/yellow-ocher :docc/rosolanc-purple)
+
+^{::clerk/visibility :hide}
+(clerk/table
+{:head [:method :result]
+ :rows (mapv (juxt identity #(🎨 (bl/blend-colors (bl/blends %) :docc/yellow-ocher :docc/rosolanc-purple))) bl/blends-list)})
+
+;; Above methods work also for palettes and gradients
+
+(🎨 (c/palette :spectral-9)
+(c/palette :reds-9)
+(bl/blend-palettes bl/subtract (c/palette :spectral-9) (c/palette :reds-9))
+(bl/blend-palettes bl/darken (c/palette :spectral-9) (c/palette :reds-9))
+(bl/blend-palettes bl/screen (c/palette :spectral-9) (c/palette :reds-9)))
+
+(🎨 (c/gradient :yellow-purple-magenta)
+(c/gradient :cubehelix)
+(bl/blend-gradients bl/subtract
+                    (c/gradient :yellow-purple-magenta) (c/gradient :cubehelix))
+(bl/blend-gradients bl/darken
+                    (c/gradient :yellow-purple-magenta) (c/gradient :cubehelix))
+(bl/blend-gradients bl/screen
+                    (c/gradient :yellow-purple-magenta) (c/gradient :cubehelix)))
+
+
+
+;; ### Channel copying
+
+;; You can also copy channels between colors in HSB or any color space.
+
+(🎨 (cb/hue :docc/yellow-ocher :docc/rosolanc-purple)
+(cb/hue :docc/rosolanc-purple :docc/yellow-ocher)
+(cb/saturation :docc/yellow-ocher :docc/rosolanc-purple)
+(cb/saturation :docc/rosolanc-purple :docc/yellow-ocher)
+(cb/luminocity :docc/yellow-ocher :docc/rosolanc-purple)
+(cb/luminocity :docc/rosolanc-purple :docc/yellow-ocher)
+(cb/color :docc/yellow-ocher :docc/rosolanc-purple)
+(cb/color :docc/rosolanc-purple :docc/yellow-ocher)
+(cb/ch0 :RGB :docc/yellow-ocher :docc/rosolanc-purple)
+(cb/ch0 :RGB :docc/rosolanc-purple :docc/yellow-ocher)
+(cb/ch1 :RGB :docc/yellow-ocher :docc/rosolanc-purple)
+(cb/ch1 :RGB :docc/rosolanc-purple :docc/yellow-ocher)
+(cb/ch2 :RGB :docc/yellow-ocher :docc/rosolanc-purple)
+(cb/ch2 :RGB :docc/rosolanc-purple :docc/yellow-ocher))
+
+;; # Alterations
 
 ;; There is a collection of functions which help to alter color characteristics like brightness, saturation, hue, etc. We can also change temperature or tint with other color. We can also build and use `feColorMatrix`.
 
 ;; Alterations can be used to alter palettes and gradients.
 
-;; ### Modulation / adjustment
+;; ## Modulation / adjustment
 
 ;; Multiplicative or additive operations on channels
 
-;; #### Modulate
+;; ### Modulate
 
 ;; First option is to use `modulate` function, which multiplies selected channel by a value. Additionally you can choose color space to operate in.
 
 (🎨 (c/modulate :red 0 0.5) ;; Divide red channel by 2
-    :maroon ;; Make `:maroon` brighter and less saturated
-    (-> :maroon
-        (c/modulate :HSL 2 2.0) ; change L channel
-        (c/modulate :HSL 1 0.5) ; change S channel
-        )) 
+:maroon ;; Make `:maroon` brighter and less saturated
+(-> :maroon
+    (c/modulate :HSL 2 2.0) ; change L channel
+    (c/modulate :HSL 1 0.5) ; change S channel
+    ))
 
 ;; Let's modulate a palette and gradient
 
 (🎨 (c/palette :category10)
-    ;; darken by changing L channel in LAB color space
-    (mapv #(c/modulate % :LAB 0 0.5) (c/palette :category10)))
+;; darken by changing L channel in LAB color space
+(mapv #(c/modulate % :LAB 0 0.5) (c/palette :category10)))
 
 (🎨 (c/gradient :warm)
-    ;; saturate in LCH color space
-    (comp #(c/modulate % :LCH 1 2.0) (c/gradient :warm)))
+;; saturate in LCH color space
+(comp #(c/modulate % :LCH 1 2.0) (c/gradient :warm)))
 
-;; #### Adjust
+;; ### Adjust
 
 ;; Similarly works `adjust`, the only difference is that it adds a value to a channel.
 
 (🎨 (c/adjust :red 1 127.0)
-    ;; Rotate hue 60deg in *HSV* color space
-    (c/adjust :red :HSV 0 60.0))
+;; Rotate hue 60deg in *HSV* color space
+(c/adjust :red :HSV 0 60.0))
 
 ;; The same for palette and gradient
 
 (🎨 (c/palette :category10)
-    ;; darken by changing a blackness in HWB color space
-    (mapv #(c/adjust % :HWB 2 0.5) (c/palette :category10)))
+;; darken by changing a blackness in HWB color space
+(mapv #(c/adjust % :HWB 2 0.5) (c/palette :category10)))
 
 (🎨 (c/gradient :warm)
-    ;; rotate hue 60deg
-    (comp #(c/adjust % :HSB 0 60.0) (c/gradient :warm)))
+;; rotate hue 60deg
+(comp #(c/adjust % :HSB 0 60.0) (c/gradient :warm)))
 
 ;; ### Saturation and brightness
 
@@ -537,37 +1004,37 @@ c/colorspaces-list
 ;; * `saturate` and `desaturate` to change color saturation (it's done in *LCH* color space)
 ;; * `brighten` and `darken` to change luma (it's done in *LAB* color space)
 
-;; ##### Saturation / desaturation
+;; #### Saturation / desaturation
 
 (🎨 :lightblue
-    (c/saturate :lightblue)
-    (c/saturate :lightblue 2.0)
-    (c/desaturate :lightblue 0.5)
-    (c/desaturate :lightblue))
+(c/saturate :lightblue)
+(c/saturate :lightblue 2.0)
+(c/desaturate :lightblue 0.5)
+(c/desaturate :lightblue))
 
 (🎨 (c/palette :purple-gray-6)
-    (mapv c/saturate (c/palette :purple-gray-6))
-    (mapv c/desaturate (c/palette :purple-gray-6)))
+(mapv c/saturate (c/palette :purple-gray-6))
+(mapv c/desaturate (c/palette :purple-gray-6)))
 
 (🎨 (c/gradient :cool)
-    (comp c/saturate (c/gradient :cool))
-    (comp c/desaturate (c/gradient :cool)))
+(comp c/saturate (c/gradient :cool))
+(comp c/desaturate (c/gradient :cool)))
 
-;; ##### Brighten / darken
+;; #### Brighten / darken
 
 (🎨 :lightblue
-    (c/brighten :lightblue)
-    (c/brighten :lightblue 2.0)
-    (c/darken :lightblue)
-    (c/darken :lightblue 2.0))
+(c/brighten :lightblue)
+(c/brighten :lightblue 2.0)
+(c/darken :lightblue)
+(c/darken :lightblue 2.0))
 
 (🎨 (c/palette :purple-gray-6)
-    (mapv c/brighten (c/palette :purple-gray-6))
-    (mapv c/darken (c/palette :purple-gray-6)))
+(mapv c/brighten (c/palette :purple-gray-6))
+(mapv c/darken (c/palette :purple-gray-6)))
 
 (🎨 (c/gradient :cool)
-    (comp c/brighten (c/gradient :cool))
-    (comp c/darken (c/gradient :cool)))
+(comp c/brighten (c/gradient :cool))
+(comp c/darken (c/gradient :cool)))
 
 ;; ### Temperature
 
@@ -586,23 +1053,23 @@ c/temperature-names
 ;; and finally let's adjust color,
 
 (🎨 :pink
-    (c/adjust-temperature :pink :candle)
-    (c/adjust-temperature :pink :candle 0.75)
-    (c/adjust-temperature :pink :cool)
-    (c/adjust-temperature :pink :cool 0.75)
-    (c/adjust-temperature :pink 3800))
+(c/adjust-temperature :pink :candle)
+(c/adjust-temperature :pink :candle 0.75)
+(c/adjust-temperature :pink :cool)
+(c/adjust-temperature :pink :cool 0.75)
+(c/adjust-temperature :pink 3800))
 
 ;; palette,
 
 (🎨 (c/palette :summer)
-    (mapv #(c/adjust-temperature % 1000) (c/palette :summer))
-    (mapv #(c/adjust-temperature % 30000) (c/palette :summer)))
+(mapv #(c/adjust-temperature % 1000) (c/palette :summer))
+(mapv #(c/adjust-temperature % 30000) (c/palette :summer)))
 
 ;; and gradient
 
 (🎨 (c/gradient :cw_2/cw2-079)
-    (comp #(c/adjust-temperature % 1000) (c/gradient :cw_2/cw2-079))
-    (comp #(c/adjust-temperature % 30000) (c/gradient :cw_2/cw2-079)))
+(comp #(c/adjust-temperature % 1000) (c/gradient :cw_2/cw2-079))
+(comp #(c/adjust-temperature % 30000) (c/gradient :cw_2/cw2-079)))
 
 ;; ### Tinting
 
@@ -613,51 +1080,51 @@ c/temperature-names
 (def reddish (c/tinter [200 50 60]))
 
 (🎨 (c/color :lightblue)
-    (greener :lightblue)
-    (yellowish :lightblue)
-    (reddish :lightblue)
-    (greener :gray)
-    (yellowish :gray)
-    (reddish :gray))
+(greener :lightblue)
+(yellowish :lightblue)
+(reddish :lightblue)
+(greener :gray)
+(yellowish :gray)
+(reddish :gray))
 
 ;; Dark, or colors with channels near to zero, are more problematic. Next chapter (about mixing) can help to find better way for tinting.
 
 (🎨 (greener :red)
-    (yellowish :red)
-    (reddish :red))
+(yellowish :red)
+(reddish :red))
 
 (🎨 (c/palette :beyonce/X47)
-    (mapv yellowish (c/palette :beyonce/X47))
-    (mapv greener (c/palette :beyonce/X47))
-    (mapv reddish (c/palette :beyonce/X47)))
+(mapv yellowish (c/palette :beyonce/X47))
+(mapv greener (c/palette :beyonce/X47))
+(mapv reddish (c/palette :beyonce/X47)))
 
 (🎨 (c/gradient :ma_xmas/xmas_01)
-    (comp yellowish (c/gradient :ma_xmas/xmas_01))
-    (comp greener (c/gradient :ma_xmas/xmas_01))
-    (comp reddish (c/gradient :ma_xmas/xmas_01)))
+(comp yellowish (c/gradient :ma_xmas/xmas_01))
+(comp greener (c/gradient :ma_xmas/xmas_01))
+(comp reddish (c/gradient :ma_xmas/xmas_01)))
 
-;; ### Matrix operations
+;; ## Matrix operations
 
 ;; SVG's [feColorMatrix](https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feColorMatrix) allows another way to alter a color. We can use several predefined and commonly used operators. Matrices operate on `sRGB` color space.
 
-;; #### Contrast
+;; ### Contrast
 
 (def contrast-15 (c/contrast 1.5))
 (def contrast-075 (c/contrast 0.75))
 
 (🎨 :orange
-    (contrast-15 :orange)
-    (contrast-075 :orange))
+(contrast-15 :orange)
+(contrast-075 :orange))
 
 (🎨 (c/palette :njgs/njaquif)
-    (mapv contrast-15 (c/palette :njgs/njaquif))
-    (mapv contrast-075 (c/palette :njgs/njaquif)))
+(mapv contrast-15 (c/palette :njgs/njaquif))
+(mapv contrast-075 (c/palette :njgs/njaquif)))
 
 (🎨 (c/gradient :ggthemes/Green-Gold)
-    (comp contrast-15 (c/gradient :ggthemes/Green-Gold))
-    (comp contrast-075 (c/gradient :ggthemes/Green-Gold)))
+(comp contrast-15 (c/gradient :ggthemes/Green-Gold))
+(comp contrast-075 (c/gradient :ggthemes/Green-Gold)))
 
-;; #### Exposure
+;; ### Exposure
 
 ;; Multiplicative adjustment of the channel values. This is the same as CSS `brightness`.
 
@@ -676,7 +1143,7 @@ c/temperature-names
     (comp exposure-125 (c/gradient :ggthemes/Green-Gold))
     (comp exposure-075 (c/gradient :ggthemes/Green-Gold)))
 
-;; #### Brightness
+;; ### Brightness
 
 ;; Additive adjustment of the channel values. Argument `0` means no change. `1.0` adds `255`, `-1.0` subracts `255`.
 
@@ -695,7 +1162,7 @@ c/temperature-names
     (comp brightness-+02 (c/gradient :ggthemes/Green-Gold))
     (comp brightness--02 (c/gradient :ggthemes/Green-Gold)))
 
-;; #### Saturation
+;; ### Saturation
 
 (def saturation-15 (c/saturation 1.5))
 (def saturation-075 (c/saturation 0.75))
@@ -712,7 +1179,7 @@ c/temperature-names
     (comp saturation-15 (c/gradient :ggthemes/Green-Gold))
     (comp saturation-075 (c/gradient :ggthemes/Green-Gold)))
 
-;; #### Grayscale
+;; ### Grayscale
 
 ;; Desaturates a color, `(grayscale 1.0)` creates grays
 
@@ -731,7 +1198,7 @@ c/temperature-names
     (comp grayscale-05 (c/gradient :ggthemes/Green-Gold))
     (comp grayscale-1 (c/gradient :ggthemes/Green-Gold)))
 
-;; #### Sepia
+;; ### Sepia
 
 (def sepia-05 (c/sepia 0.5))
 (def sepia-1 (c/sepia 1.0))
@@ -748,7 +1215,7 @@ c/temperature-names
     (comp sepia-05 (c/gradient :ggthemes/Green-Gold))
     (comp sepia-1 (c/gradient :ggthemes/Green-Gold)))
 
-;; #### Rotate hue
+;; ### Rotate hue
 
 ;; Rotates hue with given argument in degrees. Argument can be negative.
 
@@ -767,7 +1234,7 @@ c/temperature-names
     (comp hue-rotate--60 (c/gradient :ggthemes/Green-Gold))
     (comp hue-rotate-+60 (c/gradient :ggthemes/Green-Gold)))
 
-;; #### Custom matrix
+;; ### Custom matrix
 
 ;; We can create a custom color matrix as described in [this article](https://alistapart.com/article/finessing-fecolormatrix/).
 ;; To construct a matrix operator, call `fe-color-matrix` with a vector of 20 values (row-wise).
@@ -783,7 +1250,7 @@ c/temperature-names
 (🎨 (c/gradient :ggthemes/Green-Gold)
     (comp blue-magenta (c/gradient :ggthemes/Green-Gold)))
 
-;; ## Color Vision Deficiency 
+;; # Color Vision Deficiency 
 
 ;; To simulate how color, palette or gradient looks with given color blidness you can call `cvd-lens` function. There are 8 defined CVDs. Let's simulate CVD with a `rainbow` grandient.
 
@@ -799,23 +1266,52 @@ c/temperature-names
     (comp c/tritanomaly rainbow)
     (comp c/tritanopia rainbow))
 
-;; ## Random generators
+;; # CSSGram
 
-(🎨 (sort-by c/hue (repeatedly 10 #(c/set-alpha (c/random-color :warm) (r/drand 255))))
-    (sort-by c/hue (repeatedly 10 #(c/random-color :pastels-dark))))
+;; [CSSGram](https://github.com/una/CSSgram) filters
 
-(🎨 (c/random-color)
-    (c/random-palette)
-    (c/random-gradient)
-    )
+^{::clerk/visibility :hide
+  ::clerk/viewer :hide-result}
+(def css-jewel-p #(🎨 (map % (c/palette :rdylgn-7))))
 
+^{::clerk/visibility :hide
+  ::clerk/viewer :hide-result}
+(def css-jewel-g #(🎨 (comp % (c/gradient :rainbow))))
 
+^{::clerk/visibility :hide}
+(clerk/table
+ {:head [:filter :palette :gradient]
+  :rows (conj
+         (map (juxt name #(css-jewel-p (cssgram/filters %)) #(css-jewel-g (cssgram/filters %))) cssgram/filters-list)
+         ["input palette and gradient" (🎨 (c/palette :rdylgn-7)) (🎨 (c/gradient :rainbow))])})
 
-^{:nextjournal.clerk/visibility :hide
-  :nextjournal.clerk/viewer :hide-result}
+;; Let's create a helper function which allows us to filter image
+
+(def filter-cat #(->> cat-pixels (pixels/filter-colors %) c2d/to-image))
+
+(clerk/table
+ [["1997" "aden"]
+  [(filter-cat cssgram/y1977) (filter-cat cssgram/aden)]
+  ["moon" "walden"]
+  [(filter-cat cssgram/moon) (filter-cat cssgram/walden)]])
+
+;; You can create your own filter using small DSL 
+
+(def more-blue-filter (cssgram/custom-filter [:blend :add 0x221122aa]
+                                           [:blend :divide 0x33aaaa22]
+                                           [:saturation 1.4]
+                                           [:contrast 1.3]
+                                           [:blend :hue 0x880044ff]
+                                           [:exposure 0.9]))
+
+(filter-cat more-blue-filter)
+
+^{::clerk/visibility :hide
+  ::clerk/viewer :hide-result}
 (comment
   (require '[nextjournal.clerk :as clerk])
   (clerk/serve! {:browse? false :watch-paths ["notebooks"]})
   (clerk/show! "notebooks/color.clj")
   (clerk/build-static-app! {:browse? false :paths ["notebooks/color.clj"] :out-path "docs/notebooks/"})
+  (clerk/clear-cache!)
   (clerk/halt!))
