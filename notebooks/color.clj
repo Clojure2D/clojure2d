@@ -6,13 +6,11 @@
             [clojure2d.core :as c2d]
             [clojure2d.pixels :as pixels]
             [clojure2d.color.cssgram :as cssgram]
+            [clojure2d.extra.utils :as utils]
             [clerk.styles :refer [🎨 color-styles]]
             [fastmath.vector :as v]
             [fastmath.core :as m]
-            [fastmath.random :as r]
-            [clojure.string :as str]
-            [clojure2d.color.blend :as b]
-            [clojure2d.color.blend :as cb]))
+            [fastmath.random :as r]))
 
 ^{::clerk/viewer :html ::clerk/visibility :hide ::clerk/no-cache true} color-styles
 ^{::clerk/visibility :hide
@@ -323,6 +321,7 @@
                                   (get-series :yellowgreen))}
            :width 600
            :height 300
+           :usermeta {:embedOptions {:renderer "svg"}}
            :mark {:type :line
                   :tooltip {:field :contrast-ratio}}
            :encoding {:x {:field :gray :type :quantitative}
@@ -789,6 +788,7 @@ c/color-themes
            :width 600
            :height 300
            :title "Luma from LAB color space"
+           :usermeta {:embedOptions {:renderer "svg"}}
            :mark {:type :line}
            :encoding {:x {:field :t :type :quantitative}
                       :y {:field :luma :type :quantitative}
@@ -801,6 +801,7 @@ c/color-themes
            :width 600
            :height 300
            :title "Luma from LAB color space"
+           :usermeta {:embedOptions {:renderer "svg"}}
            :mark {:type :line}
            :encoding {:x {:field :t :type :quantitative}
                       :y {:field :luma :type :quantitative}
@@ -822,6 +823,7 @@ c/color-themes
                                           [% (first (c/to-LAB (g %)))]) (m/slice-range 0.0 1.0 100))}
              :width 600
              :height 300
+             :usermeta {:embedOptions {:renderer "svg"}}
              :title "Luma from LAB color space"
              :mark {:type :line}
              :encoding {:x {:field :t :type :quantitative}
@@ -894,8 +896,8 @@ c/color-themes
 ;; You can select one blending method for all channels or for each channel separately. Algorithms and alpha blending are described [here](https://www.w3.org/TR/compositing-1/#blending) (simple alpha compositing is used in the library).
 
 (🎨 (bl/blend-colors bl/add [12 33 55] [55 66 77])
-(bl/blend-colors bl/add [12 33 55 120] [55 66 77 200])
-(bl/blend-colors bl/subtract b/multiply bl/screen [12 33 55] [55 66 77]))
+    (bl/blend-colors bl/add [12 33 55 120] [55 66 77 200])
+    (bl/blend-colors bl/subtract bl/multiply bl/screen [12 33 55] [55 66 77]))
 
 ;; List of all blending methods
 
@@ -933,20 +935,20 @@ bl/blends-list
 
 ;; You can also copy channels between colors in HSB or any color space.
 
-(🎨 (cb/hue :docc/yellow-ocher :docc/rosolanc-purple)
-(cb/hue :docc/rosolanc-purple :docc/yellow-ocher)
-(cb/saturation :docc/yellow-ocher :docc/rosolanc-purple)
-(cb/saturation :docc/rosolanc-purple :docc/yellow-ocher)
-(cb/luminocity :docc/yellow-ocher :docc/rosolanc-purple)
-(cb/luminocity :docc/rosolanc-purple :docc/yellow-ocher)
-(cb/color :docc/yellow-ocher :docc/rosolanc-purple)
-(cb/color :docc/rosolanc-purple :docc/yellow-ocher)
-(cb/ch0 :RGB :docc/yellow-ocher :docc/rosolanc-purple)
-(cb/ch0 :RGB :docc/rosolanc-purple :docc/yellow-ocher)
-(cb/ch1 :RGB :docc/yellow-ocher :docc/rosolanc-purple)
-(cb/ch1 :RGB :docc/rosolanc-purple :docc/yellow-ocher)
-(cb/ch2 :RGB :docc/yellow-ocher :docc/rosolanc-purple)
-(cb/ch2 :RGB :docc/rosolanc-purple :docc/yellow-ocher))
+(🎨 (bl/hue :docc/yellow-ocher :docc/rosolanc-purple)
+    (bl/hue :docc/rosolanc-purple :docc/yellow-ocher)
+    (bl/saturation :docc/yellow-ocher :docc/rosolanc-purple)
+    (bl/saturation :docc/rosolanc-purple :docc/yellow-ocher)
+    (bl/luminocity :docc/yellow-ocher :docc/rosolanc-purple)
+    (bl/luminocity :docc/rosolanc-purple :docc/yellow-ocher)
+    (bl/color :docc/yellow-ocher :docc/rosolanc-purple)
+    (bl/color :docc/rosolanc-purple :docc/yellow-ocher)
+    (bl/ch0 :RGB :docc/yellow-ocher :docc/rosolanc-purple)
+    (bl/ch0 :RGB :docc/rosolanc-purple :docc/yellow-ocher)
+    (bl/ch1 :RGB :docc/yellow-ocher :docc/rosolanc-purple)
+    (bl/ch1 :RGB :docc/rosolanc-purple :docc/yellow-ocher)
+    (bl/ch2 :RGB :docc/yellow-ocher :docc/rosolanc-purple)
+    (bl/ch2 :RGB :docc/rosolanc-purple :docc/yellow-ocher))
 
 ;; # Alterations
 
@@ -1290,10 +1292,12 @@ c/temperature-names
 (def filter-cat #(->> cat-pixels (pixels/filter-colors %) c2d/to-image))
 
 (clerk/table
- [["1997" "aden"]
-  [(filter-cat cssgram/y1977) (filter-cat cssgram/aden)]
-  ["moon" "walden"]
-  [(filter-cat cssgram/moon) (filter-cat cssgram/walden)]])
+ [["1997" "aden" "brooklyn"]
+  [(filter-cat cssgram/y1977) (filter-cat cssgram/aden) (filter-cat cssgram/brooklyn)]
+  ["moon" "walden" "x-pro2"]
+  [(filter-cat cssgram/moon) (filter-cat cssgram/walden) (filter-cat cssgram/x-pro2)]
+  ["lofi" "hudson" "reyes"]
+  [(filter-cat cssgram/lofi) (filter-cat cssgram/hudson) (filter-cat cssgram/reyes)]])
 
 ;; You can create your own filter using small DSL 
 
@@ -1305,6 +1309,19 @@ c/temperature-names
                                            [:exposure 0.9]))
 
 (filter-cat more-blue-filter)
+
+;; # Utils
+
+;; `clojure2d.extra.utils` defines some visualization functions: `show-color`, `show-palette` and `show-gradient`. Functions display a window showing color, palette and gradient. Alternatively, you can use `color->image`, `palette->image` and `gradient->image` to get an image without showing a window.
+
+(utils/color->image :docc/light-glaucous-blue)
+(utils/palette->image :ylgnbu-9)
+(utils/gradient->image :rainbow)
+
+;; Palette and gradient images can be rendered with luma line as well:
+
+(utils/palette->image :ylgnbu-9 true)
+(utils/gradient->image :rainbow true)
 
 ^{::clerk/visibility :hide
   ::clerk/viewer :hide-result}

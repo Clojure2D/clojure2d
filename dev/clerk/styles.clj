@@ -88,3 +88,4 @@
   (if (= 1 (count c))
     (clerk/html (get-divs (first c)))
     (clerk/html (into [:div.flex.flex-col] (map get-divs c)))))
+
