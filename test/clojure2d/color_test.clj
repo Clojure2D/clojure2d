@@ -162,16 +162,16 @@
   (is 1.72 (m/approx (contrast-ratio :pink :hotpink)))
   (is 6.12 (m/approx (contrast-ratio :pink :purple))))
 
-(deftest chroma-distance
-  (is 96.96 (m/approx (delta-e-cie "fff" "ff0")))
-  (is 122.18 (m/approx (delta-e-cie "fff" "f0f")))
-  (is 255.0 (m/approx (euclidean "fff" "ff0")))
-  (is 255.0 (m/approx (euclidean "fff" "f0f")))
-  (is 1.64 (m/approx (delta-e-cmc 0xededee 0xedeeed)))
-  (is 3.15 (m/approx (delta-e-cmc 0xececee 0xeceeec)))
-  (is 7.36 (m/approx (delta-e-cmc 0xe9e9ee 0xe9eee9)))
-  (is 14.85 (m/approx (delta-e-cmc 0xe4e4ee 0xe4eee4)))
-  (is 21.33 (m/approx (delta-e-cmc 0xe0e0ee 0xe0eee0))))
+#_(deftest chroma-distance
+    (is 96.96 (m/approx (delta-e-cie "fff" "ff0")))
+    (is 122.18 (m/approx (delta-e-cie "fff" "f0f")))
+    (is 255.0 (m/approx (euclidean "fff" "ff0")))
+    (is 255.0 (m/approx (euclidean "fff" "f0f")))
+    (is 1.64 (m/approx (delta-e-cmc 0xededee 0xedeeed)))
+    (is 3.15 (m/approx (delta-e-cmc 0xececee 0xeceeec)))
+    (is 7.36 (m/approx (delta-e-cmc 0xe9e9ee 0xe9eee9)))
+    (is 14.85 (m/approx (delta-e-cmc 0xe4e4ee 0xe4eee4)))
+    (is 21.33 (m/approx (delta-e-cmc 0xe0e0ee 0xe0eee0))))
 
 (deftest chroma-color
   (is "#ff000080" (format-hex (set-alpha :red 128)))

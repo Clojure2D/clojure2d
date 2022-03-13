@@ -192,7 +192,7 @@
 (add-examples tinter
   (example-palette "Input palette" (palette [:red :yellow] 10))
   (example-palette "Make any color red" (map (tinter [255 55 55]) (palette [:red :yellow] 10)))
-  (example-palette "Tint using gradient" (map (tinter (gradient [:red :yellow :blue])) (palette [:red :yellow] 10))))
+  #_(example-palette "Tint using gradient" (map (tinter (gradient [:red :yellow :blue])) (palette [:red :yellow] 10))))
 
 ;; --
 
@@ -347,38 +347,38 @@
     (hue-paletton 22 33 123)))
 
 (add-examples paletton
-  (example-palette "Monochromatic dark-neon palette" (paletton :monochromatic 140 {:preset :dark-neon}))
-  (example-palette "Monochromatic full (default) palette" (paletton :monochromatic 140))
-  (example-palette "Monochromatic shiny palette with complementary color" (paletton :monochromatic 300 {:preset :shiny :compl true}))
-  (example-palette "Triad full palette, angle 30" (paletton :triad 120))
-  (example-palette "Triad palette, angle 10 with complementary" (paletton :triad 120 {:preset :pastels-dark :angle 10 :compl true}))
-  (example-palette "Triad palette, angle 10 with complementary, not adjacent version" (paletton :triad 120 {:adj false :preset :pastels-dark :angle 10 :compl true}))
-  (example-palette "Tetrad palette" (paletton :tetrad 20 {:preset :pastels-darkest}))
-  (example-palette "Tetrad palette, bigger angle " (paletton :tetrad 20 {:angle 100 :preset :pastels-darkest})))
+              (example-palette "Monochromatic dark-neon palette" (paletton :monochromatic 140 {:preset :dark-neon}))
+              (example-palette "Monochromatic full (default) palette" (paletton :monochromatic 140))
+              (example-palette "Monochromatic shiny palette with complementary color" (paletton :monochromatic 300 {:preset :shiny :compl true}))
+              (example-palette "Triad full palette, angle 30" (paletton :triad 120))
+              (example-palette "Triad palette, angle 10 with complementary" (paletton :triad 120 {:preset :pastels-dark :angle 10 :compl true}))
+              (example-palette "Triad palette, angle 10 with complementary, not adjacent version" (paletton :triad 120 {:adj false :preset :pastels-dark :angle 10 :compl true}))
+              (example-palette "Tetrad palette" (paletton :tetrad 20 {:preset :pastels-darkest}))
+              (example-palette "Tetrad palette, bigger angle " (paletton :tetrad 20 {:angle 100 :preset :pastels-darkest})))
 
 ;; ----
 
-(add-examples delta-c
-  (example "Distance between colors" (delta-c :maroon :amber)))
+#_(add-examples delta-c
+                (example "Distance between colors" (delta-c :maroon :amber)))
 
-(add-examples delta-h
-  (example "Distance between colors" (delta-h :maroon :amber)))
+#_(add-examples delta-h
+                (example "Distance between colors" (delta-h :maroon :amber)))
 
-(add-examples delta-e-cie
-  (example "Distance between colors" (delta-e-cie :maroon :amber)))
+#_(add-examples delta-e-cie
+                (example "Distance between colors" (delta-e-cie :maroon :amber)))
 
-(add-examples delta-e-jab
-  (example "Distance between colors" (delta-e-jab :maroon :amber)))
+#_(add-examples delta-e-jab
+                (example "Distance between colors" (delta-e-jab :maroon :amber)))
 
-(add-examples delta-e-cmc
-  (example "Distance between colors" (delta-e-cmc :maroon :amber)))
+#_(add-examples delta-e-cmc
+                (example "Distance between colors" (delta-e-cmc :maroon :amber)))
 
-(add-examples euclidean
-  (example "Distance between colors" (euclidean :maroon :amber)))
+#_(add-examples euclidean
+                (example "Distance between colors" (euclidean :maroon :amber)))
 
 (add-examples contrast-ratio
-  (example "Contrast ratio" (contrast-ratio :pink :hotpink))
-  (example "Contrast ratio" (contrast-ratio :pink :purple)))
+              (example "Contrast ratio" (contrast-ratio :pink :hotpink))
+              (example "Contrast ratio" (contrast-ratio :pink :purple)))
 
 (add-examples noticable-different?
   (example "Contrast ratio" (noticable-different? :pink :hotpink))
@@ -485,11 +485,11 @@
 
 (add-examples adjust-temperature
   (example-palette "Without adjustment" (palette 0))
-  (example-palette "Cool" (adjust-temperature (palette 0) :cool 0.5))
-  (example-palette "Warm" (adjust-temperature (palette 0) :warm 0.5))
+  (example-palette "Cool" (mapv #(adjust-temperature % :cool 0.5) (palette 0)))
+  (example-palette "Warm" (mapv #(adjust-temperature % :warm 0.5) (palette 0)))
   (example-gradient "Without adjustment" (gradient [:white :black]))
-  (example-gradient "Cold" (adjust-temperature (gradient [:white :black]) 10000))
-  (example-gradient "Hot" (adjust-temperature (gradient [:white :black]) 1000))
+  (example-gradient "Cold" (comp #(adjust-temperature % 10000) (gradient [:white :black])))
+  (example-gradient "Hot" (comp #(adjust-temperature % 1000) (gradient [:white :black])))
   (example-color "Adjust color" (adjust-temperature :red 30000)))
 
 ;;

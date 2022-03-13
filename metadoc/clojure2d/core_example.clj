@@ -276,7 +276,6 @@
           (set-stroke 10 :square :miter 25.0)
           (triangle 70 150 170 150 170 170 true)))))
 
-
 (add-examples set-stroke-custom
   (example-snippet "Custom strokes" drawing-snippet :image
     (fn [canvas]

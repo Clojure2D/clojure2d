@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file. This change
 * `wavelength` returns color from light wavelength in nm
 * `clojure2d.color.cssgram` set of instagram-like filters + `custom-filter` function
 * many more color difference functions
+* `:retina` hint added to support high density displays (first attempt, things might not work well)
 
 ### Fixed
 
@@ -28,6 +29,7 @@ All notable changes to this project will be documented in this file. This change
 * `path` points should be any seq (not vector only)
 * `possible-color?` should recognize String as a valid color
 * `HWB` colorspaces fixed to ensure reversibility
+* canvas orientation shift
 
 ### Changed
 

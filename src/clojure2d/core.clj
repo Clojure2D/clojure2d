@@ -37,6 +37,9 @@
   * `:mid` - antialiasing, speed optimized rendering
   * `:high` - antialiasing, quality optimized rendering (default)
   * `:highest` - as `:high` plus `PURE_STROKE` hint, which can give strange results in some cases.
+  * `:retina` - retina display with `:high` quality
+
+  Hints can be provided as a set in case if you want to combine `:retina` with different quality than `:high`
 
   To draw on Canvas you have to create graphical context. Wrap your code into one of two functions:
 
@@ -46,6 +49,11 @@
   Each function in this macro has to accept Canvas as first parameter and return Canvas.
 
   Canvas bound to Window and accessed via callback drawing function (a'ka Processing `draw()`) has graphical context created automatically.
+
+  ### Retina / High density displays
+
+  When quality hint for canvas is set to `:retina` (to allow proper window / canvas scaling) internal ImageBuffer is doubled in size and drawing is done with `scale` set to 2.0 by default.
+  When image is retrieved (via `get-image`, `save` or during window display), resulting image is an internal ImageBuffer scaled down.
   
   ## Events
 
@@ -91,7 +99,7 @@
   * You can replace canvas attached to window with [[replace-canvas]] function.
   * Window itself acts as event object (implements all event protocols)
   * Canvas and window can have different sizes. Display refreshing functions will scale up/down in such case.
-  * Events and refreshment are not synchronized. Try to avoid drawing inside event multimethods.
+  * Events and refreshment are not synchronized. Synchonization can be done explicitely by wrapping functions with `locking` macro.
   * You can create as many windows as you want.
   * You can check if window is visible or not with [[window-active?]] function.
   * If you provide both `:draw-state` and `:setup`. Value returned by `:setup` has a precedence unless is `nil` or `false`.
@@ -117,7 +125,7 @@
   * `:draw-state` - initial local (drawing) state. If `setup` is provided, value returned by it will be used instead.
   * `:hint` - display quality hint. Use it when window and canvas have different sizes
   * `:refresher` - when create graphical context for draw: `:fast` for once or `:safe` for each call (default).
-
+  
   ## States
 
   There are two states managed by library: global state connected to window and draw state connected to callback drawing function.
@@ -462,9 +470,10 @@
             ^long w
             ^long h
             transform-stack
-            font]
+            font
+            retina?]
   pr/ImageProto
-  (get-image [_] buffer)
+  (get-image [_] (if retina? (pr/resize buffer w h) buffer))
   (width [_] w)
   (height [_] h)
   (save [c n] (save-image buffer n) c)
@@ -515,10 +524,10 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 (defn- get-rendering-hints
   "Return rendering hints for a key or return default (or :high).
   This function is made to protect against user errors."
-  ([hint default]
-   (rendering-hints (or (some #{hint} (keys rendering-hints)) default)))
-  ([hint]
-   (get-rendering-hints hint :high)))
+  ([hint-pred default]
+   (rendering-hints (or (some hint-pred (keys rendering-hints)) default)))
+  ([hint-pred]
+   (get-rendering-hints hint-pred :high)))
 
 (defn- set-rendering-hints
   "Sets rendering hints for graphics context."
@@ -551,6 +560,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   (let [^Graphics2D ng (.createGraphics ^BufferedImage (.buffer canvas))]
     (set-rendering-hints ng (or (.hints canvas) (rendering-hints :high)))
     (when-let [f (.font canvas)] (.setFont ng f))
+    (when (.retina? canvas) (.scale ng 2.0 2.0))
     (Canvas. ng
              (.buffer canvas)
              (.line-obj canvas)
@@ -561,7 +571,8 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
              (.w canvas)
              (.h canvas)
              (atom [])
-             (.font canvas))))
+             (.font canvas)
+             (.retina? canvas))))
 
 (defmacro with-canvas->
   "Threading macro which takes care to create and destroy `Graphics2D` object for drawings on canvas. Macro returns result of last call.
@@ -597,10 +608,23 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 (declare set-color)
 (declare image)
 
-(defn canvas
-  "Create and return Canvas with `width`, `height` and optionally quality hint name (keyword) and font name.
+(defn- resolve-canvas-options
+  [options]
+  (cond
+    (keyword? options) [(get-rendering-hints #{options}) (= :retina options)]
+    (set? options) [(get-rendering-hints options) (options :retina)]
+    (map? options) ((juxt (comp get-rendering-hints set :hint) :retina?) options)
+    :else options))
 
-  Default hint is `:high`. Default font is system one.
+(defn canvas
+  "Create and return Canvas with `width`, `height` and optionally quality hints and font (name or Font object).
+
+  Default hint is `:high`.
+  Possible options are: `:low`, `:mid`, `:high`, `:highest` and `:retina`. When `:retina` is selected, rendering hint is set to `:high`. To select other rendering hint you can provide a set, eg. `#{:low :retina}`.
+
+  When `:retina` is set, created canvas is doubled and transform matrix is set for scaling 2.0
+  
+  Default font is system one.
 
   Canvas is an object which keeps everything needed to draw Java2d primitives on it. As a drawing buffer `BufferedImage` is used. To draw on Canvas directly wrap your functions with [[with-canvas]] or [[with-canvas->]] macros to create graphical context.
   
@@ -610,32 +634,38 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
   Font you set while creating canvas will be default font. You can set another font in the code with [[set-font]] and [[set-font-attributes]] functions. However these set font temporary."
   {:metadoc/categories #{:canvas}}
-  ([^long width ^long height hint ^String font]
-   (let [^BufferedImage buffer (try (.. GraphicsEnvironment 
+  ([^long width ^long height hints font]
+   (let [[hint retina?] (resolve-canvas-options hints)
+         w (if retina? (* 2 width) width)
+         h (if retina? (* 2 height) height)
+         ^BufferedImage buffer (try (.. GraphicsEnvironment 
                                         (getLocalGraphicsEnvironment)
                                         (getDefaultScreenDevice)
                                         (getDefaultConfiguration)
-                                        (createCompatibleImage width height Transparency/TRANSLUCENT))
+                                        (createCompatibleImage w h Transparency/TRANSLUCENT))
                                     (catch java.awt.HeadlessException _
-                                      (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)))
+                                      (BufferedImage. w h BufferedImage/TYPE_INT_ARGB)))
          result (Canvas. nil
                          buffer
                          (Line2D$Double.)
                          (Rectangle2D$Double.)
                          (Ellipse2D$Double.)
                          (Arc2D$Double.)
-                         (get-rendering-hints hint)
+                         hint
                          width height
                          nil
-                         (when font (Font/decode font)))]
+                         (cond
+                           (string? font) (Font/decode font)
+                           (instance? Font font) font)
+                         retina?)]
      (with-canvas [c result]
        (.setComposite ^Graphics2D (.graphics ^Canvas c) java.awt.AlphaComposite/Src)
        (set-background c Color/black 0))
      result))
   ([width height]
    (canvas width height :high nil))
-  ([width height hint]
-   (canvas width height hint nil)))
+  ([width height hints]
+   (canvas width height hints nil)))
 
 (defn black-canvas
   "Create [[canvas]] with black, opaque background."
@@ -646,7 +676,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 (defn- resize-canvas
   "Resize canvas to new dimensions. Creates and returns new canvas."
   [^Canvas c width height]
-  (let [ncanvas (canvas width height (.hints c))]
+  (let [ncanvas (canvas width height [(.hints c) (.retina? c)] (.font c))]
     (with-canvas-> ncanvas
       (image (pr/get-image c)))))
 
@@ -740,6 +770,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   {:metadoc/categories #{:transform :canvas}}
   [^Canvas canvas]
   (.setTransform ^Graphics2D (.graphics canvas) (java.awt.geom.AffineTransform.))
+  (when (.retina? canvas) (.scale ^Graphics2D (.graphics canvas) 2.0 2.0))
   canvas)
 
 ;; canvas orientation
@@ -1155,7 +1186,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   "Draw triangle with corners at 3 positions."
   {:metadoc/categories #{:draw}}
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 stroke?]
-   (shape (triangle-shape x1 y1 x2 y2 x3 y3) stroke?)
+   (shape canvas (triangle-shape x1 y1 x2 y2 x3 y3) stroke?)
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3]
    (triangle canvas x1 y1 x2 y2 x3 y3 false)))
@@ -1426,7 +1457,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   Attributes are: `:bold`, `:italic`, `:bold-italic`."
   {:metadoc/categories #{:write}}
   ([^Canvas canvas ^double size style]
-   (let [s (or (style {:bold 1 :italic 2 :bold-italic 3}) 0)
+   (let [s (case style :bold 1 :italic 2 :bold-italic 3 0)
          f (.deriveFont ^Font (.getFont ^Graphics2D (.graphics canvas)) (int s) (float size))]
      (.setFont ^Graphics2D (.graphics canvas) f)
      canvas))
@@ -1651,7 +1682,6 @@ See [[set-color]]."
      (.setPaint g texture)
      canvas)))
 
-
 ;; ### Image
 
 (defn image
@@ -1692,18 +1722,18 @@ See [[set-color]]."
 ;; Display window
 
 ;; Extract all keycodes from `KeyEvent` object and pack it to the map
-(def ^:private keycodes-map (->> KeyEvent
-                                 (ref/reflect)
-                                 (:members)
-                                 (filter #(instance? clojure.reflect.Field %))
-                                 (map #(str (:name %)))
-                                 (filter #(re-matches #"VK_.*" %))
-                                 (reduce #(assoc %1
-                                                 (clojure.lang.Reflector/getStaticField "java.awt.event.KeyEvent" ^String %2)
-                                                 (-> %2
-                                                     (subs 3)
-                                                     (clojure.string/lower-case)
-                                                     (keyword))) {})))
+(defonce ^:private keycodes-map (->> KeyEvent
+                                     (ref/reflect)
+                                     (:members)
+                                     (filter #(instance? clojure.reflect.Field %))
+                                     (map #(str (:name %)))
+                                     (filter #(re-matches #"VK_.*" %))
+                                     (reduce #(assoc %1
+                                                     (clojure.lang.Reflector/getStaticField "java.awt.event.KeyEvent" ^String %2)
+                                                     (-> %2
+                                                         (subs 3)
+                                                         (clojure.string/lower-case)
+                                                         (keyword))) {})))
 
 (defn mouse-x
   "Mouse horizontal position within window. 0 - left side. -1 outside window."
@@ -2132,7 +2162,7 @@ See [[set-color]]."
       (.setLocationRelativeTo nil)
       (.setVisible true)
       (.toFront)
-      (.setAlwaysOnTop on-top?))
+      (.setAlwaysOnTop (if on-top? true false)))
     (doto panel
       (.requestFocus)
       (.createBufferStrategy 2))))
@@ -2288,13 +2318,6 @@ See [[set-color]]."
      :or {canvas (canvas 200 200)
           window-name (str "Clojure2D - " (to-hex (rand-int (Integer/MAX_VALUE)) 8))
           fps 60
-          draw-fn nil
-          state nil
-          draw-state nil
-          setup nil
-          hint nil
-          refresher nil
-          always-on-top? false
           background :white}}]
    (let [w (or w (pr/width canvas))
          h (or h (pr/height canvas))
@@ -2317,11 +2340,12 @@ See [[set-color]]."
                                    (setup window))) 
          refresh-screen-task (if (= refresher :fast)
                                refresh-screen-task-speed
-                               refresh-screen-task-safety)]
+                               refresh-screen-task-safety)
+         draw-fn (when draw-fn #(draw-fn %1 %2 %3 %4))]
      (SwingUtilities/invokeAndWait #(build-frame frame panel active? always-on-top? window-name w h))
      (add-events-state-processors window)
      (change-state! window-name state)
-     (future (refresh-screen-task window draw-fn (or setup-state draw-state) (when hint (get-rendering-hints hint :mid))))
+     (future (refresh-screen-task window draw-fn (or setup-state draw-state) (when hint (get-rendering-hints #{hint} :mid))))
      window))
   ([] (show-window {})))
 

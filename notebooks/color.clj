@@ -1,6 +1,7 @@
 ^{:nextjournal.clerk/visibility :hide-ns}
 (ns notebooks.color
   (:require [nextjournal.clerk :as clerk]
+            [nextjournal.clerk.viewer :as viewer]
             [clojure2d.color :as c]
             [clojure2d.color.blend :as bl]
             [clojure2d.core :as c2d]
@@ -15,8 +16,11 @@
 ^{::clerk/viewer :html ::clerk/visibility :hide ::clerk/no-cache true} color-styles
 ^{::clerk/visibility :hide
   ::clerk/viewer :hide-result}
-(clerk/set-viewers! [{:name :block
-                      :render-fn '#(v/html (into [:div.flex.flex-col] (v/inspect-children %2) %1))}])
+(clerk/set-viewers!
+ (conj
+  (mapv #(cond-> % (contains? % :fetch-opts) (assoc-in [:fetch-opts :n] 500)) viewer/default-viewers)
+  {:name :block
+   :render-fn '#(v/html (into [:div.flex.flex-col] (v/inspect-children %2) %1))}))
 
 ;; # clojure2d.color namespace
 
@@ -194,7 +198,7 @@
                      ['(v/vec2 33 144) (🎨 (v/vec2 33 144))]
                      ['(v/vec3 22 33 144) (🎨 (v/vec3 22 33 144))]
                      ['(v/vec4 11 22 33 144) (🎨 (v/vec4 11 22 33 144))]
-                     ["java.awt.Color/PINK" (🎨 java.awt.Color/PINK)]
+                     ['java.awt.Color/PINK (🎨 java.awt.Color/PINK)]
                      ['(c/format-hex :pink) (🎨 (c/format-hex :pink))]
                      ['(c/pack :pink) (🎨 (c/pack :pink))]
                      ['(c/from-HSB [300 0.5 0.5]) (🎨 (c/from-HSB [300 0.5 0.5]))]
@@ -284,20 +288,20 @@
 ^{::clerk/visibility :hide}
 (clerk/table
  {:head [:delta :value]
-  :rows [[:delta-E*               (c/delta-E* :yellow :blue)]
-         [:delta-C*               (c/delta-C* :yellow :blue)]
-         [:delta-H*               (c/delta-H* :yellow :blue)]
-         [:delta-E*-94            (c/delta-E*-94 :yellow :blue)]
-         [:delta-E*-2000          (c/delta-E*-2000 :yellow :blue)]
-         [:delta-E*-2000-2:1:1    (c/delta-E*-2000 :yellow :blue 2.0 1.0 1.0)]
-         [:delta-E*-CMC           (c/delta-E*-CMC :yellow :blue)]
-         [:delta-E*-CMC-2:1       (c/delta-E*-CMC :yellow :blue 2.0 1.0)]
-         [:delta-E-z              (c/delta-E-z :yellow :blue)]
-         [:delta-E-HyAB           (c/delta-E-HyAB :yellow :blue)]
-         [:delta-E*-euclidean     (c/delta-E*-euclidean :yellow :blue)]
-         [:delta-E*-euclidean-YUV (c/delta-E*-euclidean :yellow :blue :YUV)]
-         [:delta-C-RGB            (c/delta-C-RGB :yellow :blue)]
-         [:delta-D-HCL            (c/delta-D-HCL :yellow :blue)]]})
+  :rows [['(c/delta-E* :yellow :blue)                      (c/delta-E* :yellow :blue)]
+         ['(c/delta-C* :yellow :blue)                      (c/delta-C* :yellow :blue)]
+         ['(c/delta-H* :yellow :blue)                      (c/delta-H* :yellow :blue)]
+         ['(c/delta-E*-94 :yellow :blue)                   (c/delta-E*-94 :yellow :blue)]
+         ['(c/delta-E*-2000 :yellow :blue)                 (c/delta-E*-2000 :yellow :blue)]
+         ['(c/delta-E*-2000 :yellow :blue 2.0 1.0 1.0)     (c/delta-E*-2000 :yellow :blue 2.0 1.0 1.0)]
+         ['(c/delta-E*-CMC :yellow :blue)                  (c/delta-E*-CMC :yellow :blue)]
+         ['(c/delta-E*-CMC :yellow :blue 2.0 1.0)          (c/delta-E*-CMC :yellow :blue 2.0 1.0)]
+         ['(c/delta-E-z :yellow :blue)                     (c/delta-E-z :yellow :blue)]
+         ['(c/delta-E-HyAB :yellow :blue)                  (c/delta-E-HyAB :yellow :blue)]
+         ['(c/delta-E*-euclidean :yellow :blue)            (c/delta-E*-euclidean :yellow :blue)]
+         ['(c/delta-E*-euclidean :yellow :blue :YUV)       (c/delta-E*-euclidean :yellow :blue :YUV)]
+         ['(c/delta-C-RGB :yellow :blue)                   (c/delta-C-RGB :yellow :blue)]
+         ['(c/delta-D-HCL :yellow :blue)                   (c/delta-D-HCL :yellow :blue)]]})
 
 ;; There are two more measures: `contrast-ratio` from WCAG (the value below 3.0 means that contrast is too low) and `noticable-different?` to check if colors are visually different, as described in this [paper](https://research.tableau.com/sites/default/files/2014CIC_48_Stone_v3.pdf).
 
@@ -533,11 +537,11 @@ c/color-themes
 
 ^{::clerk/visibility :hide}
 (clerk/table
- [[:nord/frost            (🎨 (c/palette :nord/frost))            ]
-  [:ghibli/TotoroLight    (🎨 (c/palette :ghibli/TotoroLight))    ]
-  [:cartography/red.pal-9 (🎨 (c/palette :cartography/red.pal-9)) ]
-  [:dutchmasters/anatomy  (🎨 (c/palette :dutchmasters/anatomy))  ]
-  [:palettetown/abra      (🎨 (c/palette :palettetown/abra))    ]])
+ [[:nord/frost            (🎨 (c/palette :nord/frost))]
+  [:ghibli/TotoroLight    (🎨 (c/palette :ghibli/TotoroLight))]
+  [:cartography/red.pal-9 (🎨 (c/palette :cartography/red.pal-9))]
+  [:dutchmasters/anatomy  (🎨 (c/palette :dutchmasters/anatomy))]
+  [:palettetown/abra      (🎨 (c/palette :palettetown/abra))]])
 
 ;; ### [CPT City](http://soliton.vm.bytemark.co.uk/pub/cpt-city/index.html)
 
@@ -545,11 +549,11 @@ c/color-themes
 
 ^{::clerk/visibility :hide}
 (clerk/table
- [[:arendal/temperature    (🎨 (c/palette :arendal/temperature))   ]
-  [:cl/fs2010              (🎨 (c/palette :cl/fs2010))             ]
-  [:os/os250k-metres       (🎨 (c/palette :os/os250k-metres))      ]
+ [[:arendal/temperature    (🎨 (c/palette :arendal/temperature))]
+  [:cl/fs2010              (🎨 (c/palette :cl/fs2010))]
+  [:os/os250k-metres       (🎨 (c/palette :os/os250k-metres))]
   [:jjg_neo10_liht/frozen-in-time (🎨 (c/palette :jjg_neo10_liht/frozen-in-time))]
-  [:heine/Exxon88  (🎨 (c/palette :heine/Exxon88)) ]])
+  [:heine/Exxon88  (🎨 (c/palette :heine/Exxon88))]])
 
 ;; ## [Paletton](https://paletton.com/)
 
@@ -563,7 +567,7 @@ c/color-themes
 
 ;; To generate [these colors](https://paletton.com/#uid=60k0u0kwi++bu++hX++++rd++kX), you should call:
 
-(🎨 (c/paletton :triad 20 {:preset :shiny :compl true :adj true :angle 30}) )
+(🎨 (c/paletton :triad 20 {:preset :shiny :compl true :adj true :angle 30}))
 
 ;; Other examples
 
@@ -779,7 +783,7 @@ c/color-themes
     (map (partial zipmap [:t :luma :corrected?])
          (concat (map (juxt identity
                             (comp first c/to-LAB gradient)
-                            (constantly "no")) xs)                 
+                            (constantly "no")) xs)
                  (map (juxt identity
                             (comp first c/to-LAB cgradient)
                             (constantly "yes")) xs)))))
@@ -829,7 +833,6 @@ c/color-themes
              :encoding {:x {:field :t :type :quantitative}
                         :y {:field :luma :type :quantitative}}}))
 
-
 ;; # Mixing and blending
 
 ;; ## Mixing
@@ -841,40 +844,40 @@ c/color-themes
 ;; But we can decide about the amount of interpolation
 
 (🎨 (c/lerp :orange :blue 0.25)
-(c/lerp :orange :blue 0.75))
+    (c/lerp :orange :blue 0.75))
 
 ;; Another two functions `lerp+` and `lerp-` are trying to conserve brightness of the right or left color.
 
 (🎨 (c/lerp- :orange :blue 0.3)
-(c/lerp+ :orange :blue 0.7))
+    (c/lerp+ :orange :blue 0.7))
 
 ;; Brightness (Luma) is taken from the first channel of *LAB* color space.
 
 ^{::clerk/viewer :block}
 [(c/get-channel :blue :LAB 0)
-(c/get-channel (c/lerp+ :orange :blue 0.7) :LAB 0)
-(c/get-channel :orange :LAB 0)
-(c/get-channel (c/lerp- :orange :blue 0.3) :LAB 0)]
+ (c/get-channel (c/lerp+ :orange :blue 0.7) :LAB 0)
+ (c/get-channel :orange :LAB 0)
+ (c/get-channel (c/lerp- :orange :blue 0.3) :LAB 0)]
 
 ;; There also two other methods of mixing: `mix` and `mixsub`. The former one mixes squared values (and takes square root after all), the latter perform subtractive mixing.
 
 (🎨 (c/mix :orange :blue)
-(c/mixsub :orange :blue))
+    (c/mixsub :orange :blue))
 
 ;; We can also lerp and mix in different color spaces
 (🎨 (c/lerp :orange :blue :Oklab 0.5)
-(c/mix :orange :blue :Oklab 0.5))
+    (c/mix :orange :blue :Oklab 0.5))
 
 ;; To compare above methods let's check gradients generated by them:
 
 (🎨 (partial c/lerp :orange :blue)
-(partial c/lerp :orange :blue :Oklab)
-(partial c/lerp- :orange :blue)
-(partial c/lerp+ :orange :blue)
-(partial c/mix :orange :blue)
-(partial c/mix :orange :blue :Oklab)
-(partial c/mixsub :orange :blue)
-(partial c/mixsub :orange :blue :Oklab))
+    (partial c/lerp :orange :blue :Oklab)
+    (partial c/lerp- :orange :blue)
+    (partial c/lerp+ :orange :blue)
+    (partial c/mix :orange :blue)
+    (partial c/mix :orange :blue :Oklab)
+    (partial c/mixsub :orange :blue)
+    (partial c/mixsub :orange :blue :Oklab))
 
 ;; Last method calculates average colors.
 
@@ -887,7 +890,7 @@ c/color-themes
 ;; Additionally we can average in different color spaces:
 
 (🎨 (c/average [:orange :blue :green :yellow] :LAB)
-(c/weighted-average [:orange :blue :green :yellow] [1 0.5 1 5] :LUV))
+    (c/weighted-average [:orange :blue :green :yellow] [1 0.5 1 5] :LUV))
 
 ;; ## Blending
 
@@ -909,27 +912,25 @@ bl/blends-list
 
 ^{::clerk/visibility :hide}
 (clerk/table
-{:head [:method :result]
- :rows (mapv (juxt identity #(🎨 (bl/blend-colors (bl/blends %) :docc/yellow-ocher :docc/rosolanc-purple))) bl/blends-list)})
+ {:head [:method :result]
+  :rows (mapv (juxt identity #(🎨 (bl/blend-colors (bl/blends %) :docc/yellow-ocher :docc/rosolanc-purple))) bl/blends-list)})
 
 ;; Above methods work also for palettes and gradients
 
 (🎨 (c/palette :spectral-9)
-(c/palette :reds-9)
-(bl/blend-palettes bl/subtract (c/palette :spectral-9) (c/palette :reds-9))
-(bl/blend-palettes bl/darken (c/palette :spectral-9) (c/palette :reds-9))
-(bl/blend-palettes bl/screen (c/palette :spectral-9) (c/palette :reds-9)))
+    (c/palette :reds-9)
+    (bl/blend-palettes bl/subtract (c/palette :spectral-9) (c/palette :reds-9))
+    (bl/blend-palettes bl/darken (c/palette :spectral-9) (c/palette :reds-9))
+    (bl/blend-palettes bl/screen (c/palette :spectral-9) (c/palette :reds-9)))
 
 (🎨 (c/gradient :yellow-purple-magenta)
-(c/gradient :cubehelix)
-(bl/blend-gradients bl/subtract
-                    (c/gradient :yellow-purple-magenta) (c/gradient :cubehelix))
-(bl/blend-gradients bl/darken
-                    (c/gradient :yellow-purple-magenta) (c/gradient :cubehelix))
-(bl/blend-gradients bl/screen
-                    (c/gradient :yellow-purple-magenta) (c/gradient :cubehelix)))
-
-
+    (c/gradient :cubehelix)
+    (bl/blend-gradients bl/subtract
+                        (c/gradient :yellow-purple-magenta) (c/gradient :cubehelix))
+    (bl/blend-gradients bl/darken
+                        (c/gradient :yellow-purple-magenta) (c/gradient :cubehelix))
+    (bl/blend-gradients bl/screen
+                        (c/gradient :yellow-purple-magenta) (c/gradient :cubehelix)))
 
 ;; ### Channel copying
 
@@ -965,39 +966,39 @@ bl/blends-list
 ;; First option is to use `modulate` function, which multiplies selected channel by a value. Additionally you can choose color space to operate in.
 
 (🎨 (c/modulate :red 0 0.5) ;; Divide red channel by 2
-:maroon ;; Make `:maroon` brighter and less saturated
-(-> :maroon
-    (c/modulate :HSL 2 2.0) ; change L channel
-    (c/modulate :HSL 1 0.5) ; change S channel
-    ))
+    :maroon ;; Make `:maroon` brighter and less saturated
+    (-> :maroon
+        (c/modulate :HSL 2 2.0) ; change L channel
+        (c/modulate :HSL 1 0.5) ; change S channel
+        ))
 
 ;; Let's modulate a palette and gradient
 
 (🎨 (c/palette :category10)
-;; darken by changing L channel in LAB color space
-(mapv #(c/modulate % :LAB 0 0.5) (c/palette :category10)))
+    ;; darken by changing L channel in LAB color space
+    (mapv #(c/modulate % :LAB 0 0.5) (c/palette :category10)))
 
 (🎨 (c/gradient :warm)
-;; saturate in LCH color space
-(comp #(c/modulate % :LCH 1 2.0) (c/gradient :warm)))
+    ;; saturate in LCH color space
+    (comp #(c/modulate % :LCH 1 2.0) (c/gradient :warm)))
 
 ;; ### Adjust
 
 ;; Similarly works `adjust`, the only difference is that it adds a value to a channel.
 
 (🎨 (c/adjust :red 1 127.0)
-;; Rotate hue 60deg in *HSV* color space
-(c/adjust :red :HSV 0 60.0))
+    ;; Rotate hue 60deg in *HSV* color space
+    (c/adjust :red :HSV 0 60.0))
 
 ;; The same for palette and gradient
 
 (🎨 (c/palette :category10)
-;; darken by changing a blackness in HWB color space
-(mapv #(c/adjust % :HWB 2 0.5) (c/palette :category10)))
+    ;; darken by changing a blackness in HWB color space
+    (mapv #(c/adjust % :HWB 2 0.5) (c/palette :category10)))
 
 (🎨 (c/gradient :warm)
-;; rotate hue 60deg
-(comp #(c/adjust % :HSB 0 60.0) (c/gradient :warm)))
+    ;; rotate hue 60deg
+    (comp #(c/adjust % :HSB 0 60.0) (c/gradient :warm)))
 
 ;; ### Saturation and brightness
 
@@ -1009,34 +1010,34 @@ bl/blends-list
 ;; #### Saturation / desaturation
 
 (🎨 :lightblue
-(c/saturate :lightblue)
-(c/saturate :lightblue 2.0)
-(c/desaturate :lightblue 0.5)
-(c/desaturate :lightblue))
+    (c/saturate :lightblue)
+    (c/saturate :lightblue 2.0)
+    (c/desaturate :lightblue 0.5)
+    (c/desaturate :lightblue))
 
 (🎨 (c/palette :purple-gray-6)
-(mapv c/saturate (c/palette :purple-gray-6))
-(mapv c/desaturate (c/palette :purple-gray-6)))
+    (mapv c/saturate (c/palette :purple-gray-6))
+    (mapv c/desaturate (c/palette :purple-gray-6)))
 
 (🎨 (c/gradient :cool)
-(comp c/saturate (c/gradient :cool))
-(comp c/desaturate (c/gradient :cool)))
+    (comp c/saturate (c/gradient :cool))
+    (comp c/desaturate (c/gradient :cool)))
 
 ;; #### Brighten / darken
 
 (🎨 :lightblue
-(c/brighten :lightblue)
-(c/brighten :lightblue 2.0)
-(c/darken :lightblue)
-(c/darken :lightblue 2.0))
+    (c/brighten :lightblue)
+    (c/brighten :lightblue 2.0)
+    (c/darken :lightblue)
+    (c/darken :lightblue 2.0))
 
 (🎨 (c/palette :purple-gray-6)
-(mapv c/brighten (c/palette :purple-gray-6))
-(mapv c/darken (c/palette :purple-gray-6)))
+    (mapv c/brighten (c/palette :purple-gray-6))
+    (mapv c/darken (c/palette :purple-gray-6)))
 
 (🎨 (c/gradient :cool)
-(comp c/brighten (c/gradient :cool))
-(comp c/darken (c/gradient :cool)))
+    (comp c/brighten (c/gradient :cool))
+    (comp c/darken (c/gradient :cool)))
 
 ;; ### Temperature
 
@@ -1055,23 +1056,23 @@ c/temperature-names
 ;; and finally let's adjust color,
 
 (🎨 :pink
-(c/adjust-temperature :pink :candle)
-(c/adjust-temperature :pink :candle 0.75)
-(c/adjust-temperature :pink :cool)
-(c/adjust-temperature :pink :cool 0.75)
-(c/adjust-temperature :pink 3800))
+    (c/adjust-temperature :pink :candle)
+    (c/adjust-temperature :pink :candle 0.75)
+    (c/adjust-temperature :pink :cool)
+    (c/adjust-temperature :pink :cool 0.75)
+    (c/adjust-temperature :pink 3800))
 
 ;; palette,
 
 (🎨 (c/palette :summer)
-(mapv #(c/adjust-temperature % 1000) (c/palette :summer))
-(mapv #(c/adjust-temperature % 30000) (c/palette :summer)))
+    (mapv #(c/adjust-temperature % 1000) (c/palette :summer))
+    (mapv #(c/adjust-temperature % 30000) (c/palette :summer)))
 
 ;; and gradient
 
 (🎨 (c/gradient :cw_2/cw2-079)
-(comp #(c/adjust-temperature % 1000) (c/gradient :cw_2/cw2-079))
-(comp #(c/adjust-temperature % 30000) (c/gradient :cw_2/cw2-079)))
+    (comp #(c/adjust-temperature % 1000) (c/gradient :cw_2/cw2-079))
+    (comp #(c/adjust-temperature % 30000) (c/gradient :cw_2/cw2-079)))
 
 ;; ### Tinting
 
@@ -1082,28 +1083,28 @@ c/temperature-names
 (def reddish (c/tinter [200 50 60]))
 
 (🎨 (c/color :lightblue)
-(greener :lightblue)
-(yellowish :lightblue)
-(reddish :lightblue)
-(greener :gray)
-(yellowish :gray)
-(reddish :gray))
+    (greener :lightblue)
+    (yellowish :lightblue)
+    (reddish :lightblue)
+    (greener :gray)
+    (yellowish :gray)
+    (reddish :gray))
 
 ;; Dark, or colors with channels near to zero, are more problematic. Next chapter (about mixing) can help to find better way for tinting.
 
 (🎨 (greener :red)
-(yellowish :red)
-(reddish :red))
+    (yellowish :red)
+    (reddish :red))
 
 (🎨 (c/palette :beyonce/X47)
-(mapv yellowish (c/palette :beyonce/X47))
-(mapv greener (c/palette :beyonce/X47))
-(mapv reddish (c/palette :beyonce/X47)))
+    (mapv yellowish (c/palette :beyonce/X47))
+    (mapv greener (c/palette :beyonce/X47))
+    (mapv reddish (c/palette :beyonce/X47)))
 
 (🎨 (c/gradient :ma_xmas/xmas_01)
-(comp yellowish (c/gradient :ma_xmas/xmas_01))
-(comp greener (c/gradient :ma_xmas/xmas_01))
-(comp reddish (c/gradient :ma_xmas/xmas_01)))
+    (comp yellowish (c/gradient :ma_xmas/xmas_01))
+    (comp greener (c/gradient :ma_xmas/xmas_01))
+    (comp reddish (c/gradient :ma_xmas/xmas_01)))
 
 ;; ## Matrix operations
 
@@ -1115,16 +1116,16 @@ c/temperature-names
 (def contrast-075 (c/contrast 0.75))
 
 (🎨 :orange
-(contrast-15 :orange)
-(contrast-075 :orange))
+    (contrast-15 :orange)
+    (contrast-075 :orange))
 
 (🎨 (c/palette :njgs/njaquif)
-(mapv contrast-15 (c/palette :njgs/njaquif))
-(mapv contrast-075 (c/palette :njgs/njaquif)))
+    (mapv contrast-15 (c/palette :njgs/njaquif))
+    (mapv contrast-075 (c/palette :njgs/njaquif)))
 
 (🎨 (c/gradient :ggthemes/Green-Gold)
-(comp contrast-15 (c/gradient :ggthemes/Green-Gold))
-(comp contrast-075 (c/gradient :ggthemes/Green-Gold)))
+    (comp contrast-15 (c/gradient :ggthemes/Green-Gold))
+    (comp contrast-075 (c/gradient :ggthemes/Green-Gold)))
 
 ;; ### Exposure
 
@@ -1302,11 +1303,11 @@ c/temperature-names
 ;; You can create your own filter using small DSL 
 
 (def more-blue-filter (cssgram/custom-filter [:blend :add 0x221122aa]
-                                           [:blend :divide 0x33aaaa22]
-                                           [:saturation 1.4]
-                                           [:contrast 1.3]
-                                           [:blend :hue 0x880044ff]
-                                           [:exposure 0.9]))
+                                             [:blend :divide 0x33aaaa22]
+                                             [:saturation 1.4]
+                                             [:contrast 1.3]
+                                             [:blend :hue 0x880044ff]
+                                             [:exposure 0.9]))
 
 (filter-cat more-blue-filter)
 
@@ -1326,7 +1327,6 @@ c/temperature-names
 ^{::clerk/visibility :hide
   ::clerk/viewer :hide-result}
 (comment
-  (require '[nextjournal.clerk :as clerk])
   (clerk/serve! {:browse? false :watch-paths ["notebooks"]})
   (clerk/show! "notebooks/color.clj")
   (clerk/build-static-app! {:browse? false :paths ["notebooks/color.clj"] :out-path "docs/notebooks/"})
