@@ -63,14 +63,14 @@
              ...)</code></pre><img src="../images/glitch/384318c996924ddfe85b5aa81b23a551.jpg" /></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/glitch.clj#L401">view source</a></div></div><div class="public anchor" id="var-blend-machine-random-config"><h3>blend-machine-random-config</h3><div class="usage"><code>(blend-machine-random-config)</code></div><div class="doc"><div class="markdown"><p>Random configuration for blend machine.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Usage</p>
 </blockquote><pre><code class="hljs clojure">(blend-machine-random-config)
-;;=&gt; {:blend-ch1 :dodge,
+;;=&gt; {:blend-ch1 :msoftburn,
 ;;=&gt;  :blend-ch2 nil,
-;;=&gt;  :blend-ch3 :minverseburn,
-;;=&gt;  :in1-cs :PalettonHSV,
+;;=&gt;  :blend-ch3 :msoftdodge,
+;;=&gt;  :in1-cs :HSL,
 ;;=&gt;  :in1-to? false,
-;;=&gt;  :in2-cs :PalettonHSV,
+;;=&gt;  :in2-cs :HSL,
 ;;=&gt;  :in2-to? true,
-;;=&gt;  :out-cs :PalettonHSV,
+;;=&gt;  :out-cs :HSL,
 ;;=&gt;  :out-to? true,
 ;;=&gt;  :switch? false}</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/glitch.clj#L381">view source</a></div></div><div class="public anchor" id="var-fold"><h3>fold</h3><div class="usage"><code>(fold {:keys [fields r]})</code><code>(fold)</code></div><div class="doc"><div class="markdown"><p>Folding filter based on vector fields.</p>
 <p>Parameters:</p>
@@ -121,68 +121,69 @@
 </ul>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Usage</p>
 </blockquote><pre><code class="hljs clojure">(fold-random-config)
-;;=&gt; {:fields {:amount 1.103807291245414,
-;;=&gt;           :name :add,
-;;=&gt;           :type :operation,
-;;=&gt;           :var1 {:amount 0.0463827441920901,
-;;=&gt;                  :name :add,
-;;=&gt;                  :type :operation,
-;;=&gt;                  :var1 {:amount -1.9904087655437817,
-;;=&gt;                         :config {:beta 5.398305340788788},
-;;=&gt;                         :name :escher,
-;;=&gt;                         :type :variation},
-;;=&gt;                  :var2 {:amount -1.4639068317030866,
-;;=&gt;                         :config {:r-add 1.0189743123474069,
-;;=&gt;                                  :r-mult -0.02195850686027976,
-;;=&gt;                                  :r-power 0.15574374007695674,
-;;=&gt;                                  :sin-add -2.4462862099239295,
-;;=&gt;                                  :x-add 2.835839098170119,
-;;=&gt;                                  :x-mult 1.8432874683968714,
-;;=&gt;                                  :x2y2-power 3.8661568141980145,
-;;=&gt;                                  :xy2-add -1.474448318353846,
-;;=&gt;                                  :xy2-mult 0.17766324741992343,
-;;=&gt;                                  :y-mult -1.8810919814430895,
-;;=&gt;                                  :yx-add -0.019159358820075023,
-;;=&gt;                                  :yx-div 1.3272060307716775,
-;;=&gt;                                  :yy-add 0.16451834877341942,
-;;=&gt;                                  :yy-div 0.6417859318024746},
-;;=&gt;                         :name :atan2spirals,
-;;=&gt;                         :type :variation}},
-;;=&gt;           :var2 {:amount -0.8595724963025715,
-;;=&gt;                  :config {:a 1.295636005684977,
-;;=&gt;                           :b 1.420993494441234,
-;;=&gt;                           :k 1.5869267928198043},
-;;=&gt;                  :name :anamorphcyl,
-;;=&gt;                  :type :variation}},
+;;=&gt; {:fields
+;;=&gt;  {:amount 1.0,
+;;=&gt;   :name :comp,
+;;=&gt;   :type :operation,
+;;=&gt;   :var1 {:amount 1.0,
+;;=&gt;          :name :angles,
+;;=&gt;          :type :operation,
+;;=&gt;          :var1 {:amount 1.0,
+;;=&gt;                 :name :mult,
+;;=&gt;                 :type :operation,
+;;=&gt;                 :var1 {:amount 1.994807108419033,
+;;=&gt;                        :config {:x -1.0930931305868103,
+;;=&gt;                                 :y 0.09637690706290414},
+;;=&gt;                        :name :splits,
+;;=&gt;                        :type :variation},
+;;=&gt;                 :var2 {:amount 1.978943598591333,
+;;=&gt;                        :config {:x -0.06684164745938337,
+;;=&gt;                                 :y -0.3600621883071937},
+;;=&gt;                        :name :fan2,
+;;=&gt;                        :type :variation}},
+;;=&gt;          :var2 {:amount 1.0,
+;;=&gt;                 :config {:a -1.5311916698334942,
+;;=&gt;                          :b -0.16166341468398837,
+;;=&gt;                          :c -1.7081273916502395,
+;;=&gt;                          :d -0.19988858887393945},
+;;=&gt;                 :name :clifford,
+;;=&gt;                 :type :variation}},
+;;=&gt;   :var2 {:amount 1.0,
+;;=&gt;          :config {:a 1.5759366931892895, :num -18.015473073925385},
+;;=&gt;          :name :bcollide,
+;;=&gt;          :type :variation}},
 ;;=&gt;  :r 2.0}
 (fold-random-config 3.1234)
 ;;=&gt; {:fields
 ;;=&gt;  {:amount 1.0,
 ;;=&gt;   :name :angles,
 ;;=&gt;   :type :operation,
-;;=&gt;   :var1
-;;=&gt;   {:amount 1.0,
-;;=&gt;    :name :comp,
-;;=&gt;    :type :operation,
-;;=&gt;    :var1
-;;=&gt;    {:amount 1.0,
-;;=&gt;     :name :comp,
-;;=&gt;     :type :operation,
-;;=&gt;     :var1 {:amount 1.0,
-;;=&gt;            :config {:x -2.4946504585871923, :y -2.476308599976023},
-;;=&gt;            :name :ovoid,
-;;=&gt;            :type :variation},
-;;=&gt;     :var2 {:amount 1.0, :config {}, :name :rays1, :type :variation}},
-;;=&gt;    :var2
-;;=&gt;    {:amount 1.0, :config {}, :name :exponential, :type :variation}},
-;;=&gt;   :var2 {:amount 1.0,
-;;=&gt;          :config {:angle -1.8974874112750921,
-;;=&gt;                   :dist -2.2153147540090643},
-;;=&gt;          :name :perspective,
-;;=&gt;          :type :variation}},
+;;=&gt;   :var1 {:amount 1.0,
+;;=&gt;          :name :mult,
+;;=&gt;          :type :operation,
+;;=&gt;          :var1 {:amount -0.7312174503861786,
+;;=&gt;                 :name :add,
+;;=&gt;                 :type :operation,
+;;=&gt;                 :var1 {:amount -0.7786770850538627,
+;;=&gt;                        :config {},
+;;=&gt;                        :name :miller,
+;;=&gt;                        :type :variation},
+;;=&gt;                 :var2 {:amount 0.5841929762512099,
+;;=&gt;                        :config {:angle 0.190107150522401,
+;;=&gt;                                 :dist 2.908353923622596},
+;;=&gt;                        :name :perspective,
+;;=&gt;                        :type :variation}},
+;;=&gt;          :var2 {:amount 0.7423811002169027,
+;;=&gt;                 :config {:x 0.8890461197937332, :y 0.31932483758918906},
+;;=&gt;                 :name :bsplit,
+;;=&gt;                 :type :variation}},
+;;=&gt;   :var2 {:amount 1.0, :config {}, :name :bubble, :type :variation}},
 ;;=&gt;  :r 3.1234}
 (fold-random-config 3.1234 0)
-;;=&gt; {:fields {:amount 1.0, :config {}, :name :polar2, :type :variation},
+;;=&gt; {:fields {:amount 1.0,
+;;=&gt;           :config {:mode 2, :stretch -1.1384959708783273},
+;;=&gt;           :name :atan,
+;;=&gt;           :type :variation},
 ;;=&gt;  :r 3.1234}</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/glitch.clj#L170">view source</a></div></div><div class="public anchor" id="var-imgslicer"><h3>imgslicer</h3><div class="usage"><code>(imgslicer pixels {:keys [distance threshold min-size mode], :or {distance v/dist, threshold 200, min-size 500, mode :color}, :as options})</code></div><div class="doc"><div class="markdown"></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/glitch.clj#L437">view source</a></div></div><div class="public anchor" id="var-mirror"><h3>mirror</h3><div class="usage"><code>(mirror t)</code><code>(mirror)</code></div><div class="doc"><div class="markdown"><p>Mirror image for given (or random) mirroring functions.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Random mirror</p>
 </blockquote><pre><code class="hljs clojure">(save-result (p/filter-channels (mirror) samurai) ...)</code></pre><img src="../images/glitch/71a070ecf4b6e4bfc4415851d287b7b8.jpg" /></div><div><blockquote><p>Mirror R(ight) to left</p>
@@ -192,11 +193,11 @@
  ...)</code></pre><img src="../images/glitch/4f6cf8ad9204286e6aac73215f95aa4c.jpg" /></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/glitch.clj#L301">view source</a></div></div><div class="public anchor" id="var-mirror-random-config"><h3>mirror-random-config</h3><div class="usage"><code>(mirror-random-config)</code></div><div class="doc"><div class="markdown"><p>Generate random mirroring functions.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Usage</p>
 </blockquote><pre><code class="hljs clojure">(mirror-random-config)
-;;=&gt; :RDR
-(mirror-random-config)
 ;;=&gt; :SDR2
 (mirror-random-config)
-;;=&gt; :SDL</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/glitch.clj#L296">view source</a></div></div><div class="public anchor" id="var-mirror-types"><h3>mirror-types</h3><div class="usage"></div><div class="doc"><div class="markdown"><p>Map of names and mirroring functions</p>
+;;=&gt; :SDL
+(mirror-random-config)
+;;=&gt; :U</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/glitch.clj#L296">view source</a></div></div><div class="public anchor" id="var-mirror-types"><h3>mirror-types</h3><div class="usage"></div><div class="doc"><div class="markdown"><p>Map of names and mirroring functions</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>List of mirror function keys</p>
 </blockquote><pre><code class="hljs clojure">(sort (keys mirror-types))
 ;;=&gt; (:D :DL
@@ -239,13 +240,13 @@
  ...)</code></pre><img src="../images/glitch/f1700e2f5a1bcc8f1aff29a06dea6ac6.jpg" /></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/glitch.clj#L345">view source</a></div></div><div class="public anchor" id="var-pix2line-random-config"><h3>pix2line-random-config</h3><div class="usage"><code>(pix2line-random-config)</code></div><div class="doc"><div class="markdown"><p>Make random config for pix2line.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Usage</p>
 </blockquote><pre><code class="hljs clojure">(pix2line-random-config)
-;;=&gt; {:nseed -509702146,
-;;=&gt;  :nx 34,
-;;=&gt;  :ny 69,
-;;=&gt;  :scale 3.332165940350316,
-;;=&gt;  :shiftx 0.6443182331839544,
-;;=&gt;  :shifty 0.1092319559153121,
-;;=&gt;  :tolerance 61,
+;;=&gt; {:nseed 819807126,
+;;=&gt;  :nx 68,
+;;=&gt;  :ny 76,
+;;=&gt;  :scale 1.7424556048353645,
+;;=&gt;  :shiftx 0.3177245732093803,
+;;=&gt;  :shifty 0.22563933737695618,
+;;=&gt;  :tolerance 25,
 ;;=&gt;  :whole true}</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/glitch.clj#L333">view source</a></div></div><div class="public anchor" id="var-shift-channels"><h3>shift-channels</h3><div class="usage"><code>(shift-channels)</code><code>(shift-channels {:keys [x-shift y-shift], :or {x-shift 0.05, y-shift -0.05}})</code></div><div class="doc"><div class="markdown"><p>Shift channels by given amount.</p>
 <p>Parameters:</p>
 <ul>
@@ -265,9 +266,9 @@
 <p>Optionally provide <code>spread</code> parameter to define maximum shift value.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Usage</p>
 </blockquote><pre><code class="hljs clojure">(shift-channels-random-config)
-;;=&gt; {:x-shift 0.028368766435102, :y-shift 0.0}
+;;=&gt; {:x-shift -0.08400308993051686, :y-shift 0.0}
 (shift-channels-random-config 100)
-;;=&gt; {:x-shift -39.593005466407845, :y-shift 0.0}</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/glitch.clj#L103">view source</a></div></div><div class="public anchor" id="var-slitscan"><h3>slitscan</h3><div class="usage"><code>(slitscan)</code><code>(slitscan {:keys [x y], :or {x [(make-random-wave)], y [(make-random-wave)]}})</code></div><div class="doc"><div class="markdown"><p>Create slitscan filter funtion.</p>
+;;=&gt; {:x-shift 0.0, :y-shift -11.971873660640966}</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/glitch.clj#L103">view source</a></div></div><div class="public anchor" id="var-slitscan"><h3>slitscan</h3><div class="usage"><code>(slitscan)</code><code>(slitscan {:keys [x y], :or {x [(make-random-wave)], y [(make-random-wave)]}})</code></div><div class="doc"><div class="markdown"><p>Create slitscan filter funtion.</p>
 <p>Config is a map each axis has it’s own list of maps defining waves. Each map contains:</p>
 <ul>
 <li><code>:wave</code> - oscillator name (see <a href="null">oscillators</a>.</li>
@@ -286,15 +287,15 @@
 <p>Optionally you can pass number of waves to create for each axis.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Usage</p>
 </blockquote><pre><code class="hljs clojure">(slitscan-random-config)
-;;=&gt; {:x
-;;=&gt;  ({:amp 0.25, :freq 4, :phase 0.07974816083236558, :wave :sin}
-;;=&gt;   {:amp 0.015625, :freq 64, :phase 0.5415271218193616, :wave :noise}),
-;;=&gt;  :y ({:amp 0.125, :freq 8, :phase 0.2309522872515506, :wave :noise}
-;;=&gt;      {:amp 0.5, :freq 2, :phase 0.34503534958680404, :wave :noise})}
+;;=&gt; {:x ({:amp 0.125, :freq 8, :phase 0.3456012273927298, :wave :sin}
+;;=&gt;      {:amp 1.0, :freq 1, :phase 0.18328029394952505, :wave :sin}
+;;=&gt;      {:amp 0.25, :freq 4, :phase 0.8813257121721714, :wave :sin}),
+;;=&gt;  :y ({:amp 1.0, :freq 1, :phase 0.47397468502910767, :wave :triangle}
+;;=&gt;      {:amp 0.0625, :freq 16, :phase 0.3702518697839021, :wave :saw}
+;;=&gt;      {:amp 0.25, :freq 4, :phase 0.9249306604283019, :wave :square})}
 (slitscan-random-config 1 1)
-;;=&gt; {:x
-;;=&gt;  ({:amp 0.125, :freq 8, :phase 0.051441682801876, :wave :cut-triangle}),
-;;=&gt;  :y ({:amp 0.125, :freq 8, :phase 0.4840557422838895, :wave :noise})}</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/glitch.clj#L58">view source</a></div></div><div class="public anchor" id="var-slitscan2"><h3>slitscan2</h3><div class="usage"><code>(slitscan2 {:keys [fields r], :or {r 2.0, fields (var/random-configuration 0)}})</code><code>(slitscan2)</code></div><div class="doc"><div class="markdown"><p>Slitscan filter based on vector fields.</p>
+;;=&gt; {:x ({:amp 0.125, :freq 8, :phase 0.642003026609131, :wave :square}),
+;;=&gt;  :y ({:amp 0.0625, :freq 16, :phase 0.7209523997645921, :wave :saw})}</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/glitch.clj#L58">view source</a></div></div><div class="public anchor" id="var-slitscan2"><h3>slitscan2</h3><div class="usage"><code>(slitscan2 {:keys [fields r], :or {r 2.0, fields (var/random-configuration 0)}})</code><code>(slitscan2)</code></div><div class="doc"><div class="markdown"><p>Slitscan filter based on vector fields.</p>
 <p>Parameters:</p>
 <ul>
 <li><code>:fields</code> - vector fields configuration <a href="null">combine</a></li>
@@ -347,19 +348,6 @@
 ;;=&gt;  {:amount 1.0,
 ;;=&gt;   :name :comp,
 ;;=&gt;   :type :operation,
-;;=&gt;   :var1
-;;=&gt;   {:amount 1.0,
-;;=&gt;    :name :comp,
-;;=&gt;    :type :operation,
-;;=&gt;    :var1 {:amount 1.0, :config {}, :name :power, :type :variation},
-;;=&gt;    :var2 {:amount 1.0, :config {}, :name :cylinder, :type :variation}},
-;;=&gt;   :var2 {:amount 1.0, :config {}, :name :spherical, :type :variation}},
-;;=&gt;  :r 2.0}
-(slitscan2-random-config 3.1234)
-;;=&gt; {:fields
-;;=&gt;  {:amount 1.0,
-;;=&gt;   :name :comp,
-;;=&gt;   :type :operation,
 ;;=&gt;   :var1 {:amount 1.0,
 ;;=&gt;          :name :comp,
 ;;=&gt;          :type :operation,
@@ -367,32 +355,64 @@
 ;;=&gt;                 :name :comp,
 ;;=&gt;                 :type :operation,
 ;;=&gt;                 :var1 {:amount 1.0,
-;;=&gt;                        :config {:d1 -1.1707350263451732,
-;;=&gt;                                 :d2 -1.5762759055802218,
-;;=&gt;                                 :r1 2.504481138892221,
-;;=&gt;                                 :r2 2.096227693875595},
-;;=&gt;                        :name :trade,
+;;=&gt;                        :config {:a 1.574249379093723,
+;;=&gt;                                 :b -0.21387765836530015,
+;;=&gt;                                 :c 1.4676096233389258,
+;;=&gt;                                 :d 1.0031555789734137},
+;;=&gt;                        :name :clifford,
 ;;=&gt;                        :type :variation},
 ;;=&gt;                 :var2 {:amount 1.0,
-;;=&gt;                        :config {:a 0.8550408766897934,
-;;=&gt;                                 :b -1.3124403724140419,
-;;=&gt;                                 :c -2.689844962818067,
-;;=&gt;                                 :d 0.6393811187463316,
-;;=&gt;                                 :e -0.4478235802699859,
-;;=&gt;                                 :f 2.4445538869300574,
-;;=&gt;                                 :g -1.908435114875543,
-;;=&gt;                                 :h 0.8578561151043447},
-;;=&gt;                        :name :rational3,
+;;=&gt;                        :config {:a -0.5963175956578206,
+;;=&gt;                                 :b -0.6576952500923229,
+;;=&gt;                                 :c -0.8677409067234376,
+;;=&gt;                                 :d 0.08269255053682634,
+;;=&gt;                                 :e 0.07502739435641526,
+;;=&gt;                                 :f -0.7035147087590323,
+;;=&gt;                                 :mode false},
+;;=&gt;                        :name :chunk,
 ;;=&gt;                        :type :variation}},
-;;=&gt;          :var2 {:amount 1.0,
-;;=&gt;                 :config {:x -0.5007331881536561, :y 1.0430079226874245},
-;;=&gt;                 :name :bent2,
-;;=&gt;                 :type :variation}},
-;;=&gt;   :var2 {:amount 1.0, :config {}, :name :miller, :type :variation}},
+;;=&gt;          :var2
+;;=&gt;          {:amount 1.0, :config {}, :name :foci, :type :variation}},
+;;=&gt;   :var2 {:amount 1.0, :config {}, :name :cylinder, :type :variation}},
+;;=&gt;  :r 2.0}
+(slitscan2-random-config 3.1234)
+;;=&gt; {:fields
+;;=&gt;  {:amount 1.0,
+;;=&gt;   :name :deriv,
+;;=&gt;   :step 0.030888012267171593,
+;;=&gt;   :type :operation,
+;;=&gt;   :var {:amount 1.0,
+;;=&gt;         :name :comp,
+;;=&gt;         :type :operation,
+;;=&gt;         :var1 {:amount 1.0,
+;;=&gt;                :name :comp,
+;;=&gt;                :type :operation,
+;;=&gt;                :var1 {:amount 1.0,
+;;=&gt;                       :config {:coeff20 -1.4792069677077913,
+;;=&gt;                                :coeff21 -1.6357429379384612},
+;;=&gt;                       :name :fan,
+;;=&gt;                       :type :variation},
+;;=&gt;                :var2 {:amount 1.0,
+;;=&gt;                       :config {:gain 0.4944831540216531,
+;;=&gt;                                :generator :single,
+;;=&gt;                                :interpolation :quintic,
+;;=&gt;                                :lacunarity 2.297986434568435,
+;;=&gt;                                :noise-type :value,
+;;=&gt;                                :normalize? true,
+;;=&gt;                                :octaves 4,
+;;=&gt;                                :scale 1.3995806913243078,
+;;=&gt;                                :seed 2129912916,
+;;=&gt;                                :warp-depth 1,
+;;=&gt;                                :warp-scale 0.0},
+;;=&gt;                       :name :general-noise2,
+;;=&gt;                       :type :variation}},
+;;=&gt;         :var2
+;;=&gt;         {:amount 1.0, :config {}, :name :cross, :type :variation}}},
 ;;=&gt;  :r 3.1234}
 (slitscan2-random-config 3.1234 0)
 ;;=&gt; {:fields {:amount 1.0,
-;;=&gt;           :config {:stretch -2.9782540254107808},
-;;=&gt;           :name :csin,
+;;=&gt;           :config {:distort -5.014045106369531,
+;;=&gt;                    :multiplier -1.797857883446247},
+;;=&gt;           :name :stwin,
 ;;=&gt;           :type :variation},
 ;;=&gt;  :r 3.1234}</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/glitch.clj#L131">view source</a></div></div></div></body></html>

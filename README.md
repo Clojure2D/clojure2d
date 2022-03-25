@@ -16,7 +16,7 @@ Clojure2D is a library supporting generative coding or glitching. It's based on 
 ## Documentation
 
 * [Documentation with examples](https://clojure2d.github.io/clojure2d/docs/codox/)
-* [clojure.color detailed documentation](https://clojure2d.github.io/clojure2d/docs/notebooks/index.html#/notebooks/color.clj)
+* [clojure.color detailed documentation](https://clojure2d.github.io/clojure2d/docs/notebooks/index.html#/notebooks/color.clj) - WIP
 
 ### Color/Palettes/Gradients
 
