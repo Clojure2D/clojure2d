@@ -125,8 +125,7 @@
             [fastmath.clustering :as cl]
             [fastmath.easings :as e]
             [clojure2d.protocols :as pr]
-            [clojure.java.io :refer [input-stream resource]]
-            [clojure2d.color :as c])
+            [clojure.java.io :refer [input-stream resource]])
   (:import [fastmath.vector Vec2 Vec3 Vec4]           
            [java.awt Color]
            [clojure.lang APersistentVector ISeq Seqable]))

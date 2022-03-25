@@ -1,17 +1,18 @@
 ^{:nextjournal.clerk/visibility :hide-ns}
 (ns notebooks.color
-  (:require [nextjournal.clerk :as clerk]
-            [nextjournal.clerk.viewer :as viewer]
-            [clojure2d.color :as c]
-            [clojure2d.color.blend :as bl]
-            [clojure2d.core :as c2d]
-            [clojure2d.pixels :as pixels]
-            [clojure2d.color.cssgram :as cssgram]
-            [clojure2d.extra.utils :as utils]
-            [clerk.styles :refer [🎨 color-styles]]
-            [fastmath.vector :as v]
-            [fastmath.core :as m]
-            [fastmath.random :as r]))
+  (:require
+   [clerk.styles :refer [color-styles 🎨]]
+   [clojure2d.color :as c]
+   [clojure2d.color.blend :as bl]
+   [clojure2d.color.cssgram :as cssgram]
+   [clojure2d.core :as c2d]
+   [clojure2d.extra.utils :as utils]
+   [clojure2d.pixels :as pixels]
+   [fastmath.core :as m]
+   [fastmath.random :as r]
+   [fastmath.vector :as v]
+   [nextjournal.clerk :as clerk]
+   [nextjournal.clerk.viewer :as viewer]))
 
 ^{::clerk/viewer :html ::clerk/visibility :hide ::clerk/no-cache true} color-styles
 ^{::clerk/visibility :hide
@@ -1303,11 +1304,11 @@ c/temperature-names
 ;; You can create your own filter using small DSL 
 
 (def more-blue-filter (cssgram/custom-filter [:blend :add 0x221122aa]
-                                             [:blend :divide 0x33aaaa22]
-                                             [:saturation 1.4]
-                                             [:contrast 1.3]
-                                             [:blend :hue 0x880044ff]
-                                             [:exposure 0.9]))
+                                           [:blend :divide 0x33aaaa22]
+                                           [:saturation 1.4]
+                                           [:contrast 1.3]
+                                           [:blend :hue 0x880044ff]
+                                           [:exposure 0.9]))
 
 (filter-cat more-blue-filter)
 

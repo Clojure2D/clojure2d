@@ -15,7 +15,8 @@ Clojure2D is a library supporting generative coding or glitching. It's based on 
 
 ## Documentation
 
-[Documentation with examples](https://clojure2d.github.io/clojure2d/docs/codox/)
+* [Documentation with examples](https://clojure2d.github.io/clojure2d/docs/codox/)
+* [clojure.color detailed documentation](https://clojure2d.github.io/clojure2d/docs/notebooks/index.html#/notebooks/color.clj)
 
 ### Color/Palettes/Gradients
 
@@ -60,10 +61,6 @@ There are still plenty of bugs and not idiomatic code. It may be slower than Pro
 Add the following line as a dependency to your `project.clj`
 
 ![](https://clojars.org/clojure2d/latest-version.svg)
-
-Latest snapshot
-
-`[clojure2d "1.4.0-SNAPSHOT"]`
 
 ## Usage
 
