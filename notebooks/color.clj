@@ -1,4 +1,5 @@
-^{:nextjournal.clerk/visibility :hide-ns}
+^{:nextjournal.clerk/visibility :hide-ns
+  :nextjournal.clerk/toc :pin}
 (ns notebooks.color
   (:require
    [clerk.styles :refer [color-styles 🎨]]
@@ -32,6 +33,8 @@
 ;; * palettes and gradients
 ;; * distances
 ;; * blending
+
+;; Note: Only CIE standard illuminant D65, 2° observer is supported
 
 ;; I use `🎨` internal function to render given color, palette or gradient.
 
@@ -387,39 +390,43 @@ c/colorspaces-list
 ^{::clerk/visibility :hide}
 (clerk/table
  {:head ["color space" "channel 1" "channel 2" "channel 3" "comment"]
-  :rows [[:CMY [0.0 255.0] [0.0 255.0] [0.0 255.0] ""]
-         [:Cubehelix [0.0 360.0] [0.0 4.61] [0.0 1.0] ""]
-         [:GLHS [0.0 1.0] [0.0 360.0] [0.0 1.0] "min=0.2, mid=0.1, max=0.7"]
-         [:Gray [0.0 255.0] [0.0 255.0] [0.0 255.0] ""]
-         [:HCL [-180.0 180.0] [0.0 170.0] [0.0 135.27] "Sarifuddin/Missaou, λ=3"]
-         [:HSB [0.0 360.0] [0.0 1.0] [0.0 1.0] "same as HSV"]
-         [:HSI [0.0 360.0] [0.0 1.0] [0.0 1.0] ""]
-         [:HSL [0.0 360.0] [0.0 1.0] [0.0 1.0] ""]
-         [:HSV [0.0 360.0] [0.0 1.0] [0.0 1.0] "same as HSB"]
-         [:HWB [0.0 360.0] [0.0 1.0] [0.0 1.0] ""]
-         [:HunterLAB [0.0 100.0] [-69.08 109.46] [-199.78 55.72] ""]
-         [:IPT [0.0 7.24] [-3.28 4.80] [-5.42 4.72] ""]
-         [:JAB [-3.32 0.17] [-0.09 0.11] [-0.16 0.12] "JzAzBz"]
-         [:JCH [0.0 0.17] [0.0 0.16] [0.0 360.0] "polar JzAzBz"]
-         [:LAB [0.0 100.0] [-86.18 98.23] [-107.86 94.48] "D65"]
-         [:LCH [0.0 100.0] [0.0 133.81] [0.0 360.0] "polar LAB"]
-         [:LMS [0.0 100.0] [0.0 100.0] [0.0 100.0] ""]
-         [:LUV [0.0 100.0] [-83.08 175.02] [-134.1 107.4] ""]
-         [:OHTA [0.0 255.0] [-127.5 127.5] [-127.5 127.5] ""]
-         [:OSA [-13.51 7.14] [-20.0 20.0] [-23.0 23.0] "excluded extreme values"]
-         [:Oklab [0.0 1.0] [-0.23 0.28] [-0.31 0.2] ""]
-         [:Oklch [0.0 1.0] [0.0 0.32] [0.0 360.0] "polar Oklab"]
-         [:PalettonHSV [0.0 360.0] [0.0 2.0] [0.0 2.0] ""]
-         [:RYB [0.0 255.0] [0.0 255.0] [0.0 255.0] "Sugita/Takahashi"]
-         [:XYB [-0.02 0.03] [0.0 0.85] [0.0 0.85] "from JPEG XL"]
-         [:XYZ [0.0 95.47] [0.0 100.0] [0.0 108.88] "D65"]
-         [:YCbCr [0.0 255.0] [-127.5 127.5] [-127.5 127.5] ""]
-         [:YCgCo [0.0 255.0] [-127.5 127.5] [-127.5 127.5] ""]
-         [:YDbDr [0.0 255.0] [-340.0 340.0] [-340.0 340.0] ""]
-         [:YIQ [0.0 255.0] [-151.9 151.9] [-133.26 133.26] ""]
-         [:YPbPr [0.0 255.0] [-236.59 236.59] [-200.79 200.79] ""]
-         [:YUV [0.0 255.0] [-111.18 111.18] [-156.83 156.83] ""]
-         [:Yxy [0.0 100.0] [0.15 0.64] [0.06 0.6] "CIE xyY"]]})
+  :rows (sort-by first [[:CMY [0.0 255.0] [0.0 255.0] [0.0 255.0] ""]
+                        [:Cubehelix [0.0 360.0] [0.0 4.61] [0.0 1.0] ""]
+                        [:GLHS [0.0 1.0] [0.0 360.0] [0.0 1.0] "min=0.2, mid=0.1, max=0.7"]
+                        [:Gray [0.0 255.0] [0.0 255.0] [0.0 255.0] ""]
+                        [:HCL [-180.0 180.0] [0.0 170.0] [0.0 135.27] "Sarifuddin/Missaou, λ=3"]
+                        [:HSB [0.0 360.0] [0.0 1.0] [0.0 1.0] "same as HSV"]
+                        [:HSI [0.0 360.0] [0.0 1.0] [0.0 1.0] ""]
+                        [:HSL [0.0 360.0] [0.0 1.0] [0.0 1.0] ""]
+                        [:HSV [0.0 360.0] [0.0 1.0] [0.0 1.0] "same as HSB"]
+                        [:HWB [0.0 360.0] [0.0 1.0] [0.0 1.0] ""]
+                        [:HunterLAB [0.0 100.0] [-69.08 109.46] [-199.78 55.72] ""]
+                        [:IPT [0.0 1.0] [-0.45 0.66] [-0.75 0.65] ""]
+                        [:IgPgTg [0.0 0.97] [-0.35 0.39] [-0.41 0.44] ""]
+                        [:JAB [0.0 0.17] [-0.09 0.11] [-0.16 0.12] "JzAzBz, white point=100"]
+                        [:JCH [0.0 0.17] [0.0 0.16] [0.0 360.0] "polar JzAzBz"]
+                        [:LAB [0.0 100.0] [-86.18 98.23] [-107.86 94.48] "D65"]
+                        [:LCH [0.0 100.0] [0.0 133.81] [0.0 360.0] "polar LAB"]
+                        [:LMS [0.0 100.0] [0.0 100.0] [0.0 100.0] ""]
+                        [:LUV [0.0 100.0] [-83.08 175.02] [-134.1 107.4] ""]
+                        [:OHTA [0.0 255.0] [-127.5 127.5] [-127.5 127.5] ""]
+                        [:OSA [-13.51 7.14] [-20.0 20.0] [-23.0 23.0] "excluded extreme values"]
+                        [:Oklab [0.0 1.0] [-0.23 0.28] [-0.31 0.2] ""]
+                        [:Oklch [0.0 1.0] [0.0 0.32] [0.0 360.0] "polar Oklab"]
+                        [:PalettonHSV [0.0 360.0] [0.0 2.0] [0.0 2.0] ""]
+                        [:RYB [0.0 255.0] [0.0 255.0] [0.0 255.0] "Sugita/Takahashi"]
+                        [:XYB [-0.02 0.03] [0.0 0.85] [0.0 0.85] "from JPEG XL"]
+                        [:XYZ [0.0 95.47] [0.0 100.0] [0.0 108.88] "D65"]
+                        [:XYZ1 [0.0 0.9547] [0.0 1.0] [0.0 1.0888] "D65"]
+                        [:UCS [0.0 0.63] [0.0 1.0] [0.0 1.57] ""]
+                        [:UVW [-82.15 171.81] [-87.16 70.82] [-17.0 99.0] ""]
+                        [:YCbCr [0.0 255.0] [-127.5 127.5] [-127.5 127.5] ""]
+                        [:YCgCo [0.0 255.0] [-127.5 127.5] [-127.5 127.5] ""]
+                        [:YDbDr [0.0 255.0] [-340.0 340.0] [-340.0 340.0] ""]
+                        [:YIQ [0.0 255.0] [-151.9 151.9] [-133.26 133.26] ""]
+                        [:YPbPr [0.0 255.0] [-236.59 236.59] [-200.79 200.79] ""]
+                        [:YUV [0.0 255.0] [-111.18 111.18] [-156.83 156.83] ""]
+                        [:Yxy [0.0 100.0] [0.15 0.64] [0.06 0.6] "CIE xyY"]])})
 
 ;; ### sRGB vs linear RGB
 
@@ -458,14 +465,43 @@ c/colorspaces-list
 
 c/color-themes
 
-(🎨 (sort-by c/hue (repeatedly 10 c/random-color))
-    (sort-by c/hue (repeatedly 10 #(c/random-color :warm (r/drand 100 255))))
-    (sort-by c/hue (repeatedly 10 #(c/random-color :pastels-dark))))
+(🎨 (sort-by c/hue (repeatedly 15 c/random-color))
+    (sort-by c/hue (repeatedly 15 #(c/random-color :warm (r/drand 100 255))))
+    (sort-by c/hue (repeatedly 15 #(c/random-color :pastels-dark))))
+
+;; ### Applying theme
+
+;; Sometimes you may want to generate random color similar to a given one. For that you can call `apply-theme` functions. Function accepts source color and color theme as a name or scheme vector.
+
+;; #### Color theme by name
+
+(🎨 :docc/green-blue
+    (repeatedly 15 #(c/apply-theme :docc/green-blue :warm))
+    (repeatedly 15 #(c/apply-theme :docc/green-blue :pastels-bright))
+    (repeatedly 15 #(c/apply-theme :docc/green-blue :fresh)))
+
+;; #### Color theme by scheme
+
+;; Scheme vector consists 3 values, one for each LCH channel. If a value is:
+
+;; * a 2-element vector, channel value is selected randomly from a given range
+;; * a number, channel value is selected randomly from [channel-number, channe+number] range
+;; * other values just leave original channel value
+
+;; Operations are done in LCH* (0-255) color space
+
+(🎨 :docc/yellow-ocher
+    ;; hue is selectod randomly from a values +-30 around source one
+    (repeatedly 15 #(c/apply-theme :docc/yellow-ocher [:keep :keep 30]))
+    ;; hue is kept but saturation (C) is selected from 220 to 255 range
+    (repeatedly 15 #(c/apply-theme :docc/yellow-ocher [:keep [10 255] :keep]))
+    ;; additionally let's vary luma
+    (repeatedly 15 #(c/apply-theme :docc/yellow-ocher [50.0 [200 255] :keep])))
 
 ;; # Palettes
 
 ;; Palette is a vector of colors. It can be constructed by hand, by name, created from hue, gradient, image or from other palette.
-(🎨 [:maroon 0xaa334455 :docc/olive [112 33 200]])
+(🎨 [:maroon 0xbba3b4f5 :docc/olive [112 33 200]])
 
 ;; ## Names
 
@@ -634,6 +670,22 @@ c/color-themes
 ;; Reduce in `OSA` color space
 
 (apply 🎨 (map #(c/reduce-colors cat-pixels % :OSA) [2 3 5 10]))
+
+;; ### Clarans
+
+;; Instead of providing a color space you can also provide distance function (either own function or one for `fastmath.distance`). For a reduction `clarans` algorithm is used.
+
+;; Warning: it can be very slow.
+
+(require '[fastmath.distance])
+
+(apply 🎨 (map (partial c/reduce-colors (c/palette :viridis) 10)
+               [c/contrast-ratio
+                c/delta-E*
+                c/delta-E-z
+                fastmath.distance/chebyshev
+                fastmath.distance/manhattan
+                fastmath.distance/canberra]))
 
 ;; ## Random palette.
 
@@ -880,6 +932,7 @@ c/color-themes
     (partial c/mixsub :orange :blue)
     (partial c/mixsub :orange :blue :Oklab))
 
+
 ;; Last method calculates average colors.
 
 (🎨 (c/average [:orange :blue :green :yellow]))
@@ -1039,6 +1092,24 @@ bl/blends-list
 (🎨 (c/gradient :cool)
     (comp c/brighten (c/gradient :cool))
     (comp c/darken (c/gradient :cool)))
+
+;; #### Whiten / blacken
+
+(🎨 :lightblue
+    (c/whiten :lightblue)
+    (c/whiten :lightblue -0.2) ;; less whiteness
+    (c/whiten :lightblue 1.0)
+    (c/blacken :lightblue)
+    (c/blacken :lightblue -0.2) ;; less blackness
+    (c/blacken :lightblue 1.0))
+
+(🎨 (c/palette :purple-gray-6)
+    (mapv c/whiten (c/palette :purple-gray-6))
+    (mapv c/blacken (c/palette :purple-gray-6)))
+
+(🎨 (c/gradient :cool)
+    (comp c/whiten (c/gradient :cool))
+    (comp c/blacken (c/gradient :cool)))
 
 ;; ### Temperature
 
@@ -1333,3 +1404,4 @@ c/temperature-names
   (clerk/build-static-app! {:browse? false :paths ["notebooks/color.clj"] :out-path "docs/notebooks/"})
   (clerk/clear-cache!)
   (clerk/halt!))
+

@@ -3,7 +3,7 @@
             [metadoc.examples :refer :all]
             [clojure2d.color :refer :all]
             [clojure2d.color.blend :as b]
-            [clojure2d.core :refer :all]
+            [clojure2d.core :as c2d]
             [clojure2d.pixels :as p]
             [fastmath.vector :as v]
             [fastmath.core :as m]
@@ -223,7 +223,7 @@
 (defsnippet clojure2d.color blend-images
   "Compose two cockatoo images (one is rotated) with given blend method." true
   (let [n (str "images/color/" (first opts) ".jpg")]
-    (save (p/compose-channels f false i1 i2) (str "docs/" n))
+    (c2d/save (p/compose-channels f false i1 i2) (str "docs/" n))
     (str "../" n)))
 
 (defmacro add-blends-examples

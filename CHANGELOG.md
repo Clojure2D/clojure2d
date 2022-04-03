@@ -1,6 +1,27 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 1.4.5-SNAPSHOT
+
+### Added
+
+* `apply-theme` to generate random color from a given color and theme definition
+* `whiten` and `blacken`
+* `to-XYZ1`, `from-XYZ1` not scaled version (range from 0 to around 1)
+* `scale` 3 or 4 channels by a value (to easier normalize rgb)
+* new colorspaces from [colour](https://colour.readthedocs.io/en/v0.4.1/index.html):
+    - [`:IgPgTg`](https://www.ingentaconnect.com/content/ist/jpi/2020/00000003/00000002/art00002#)
+	- [`:UCS`](https://en.wikipedia.org/wiki/CIE_1960_color_space#Relation_to_CIE_XYZ)
+	- [`:UVW`](https://en.wikipedia.org/wiki/CIE_1964_color_space)
+* `reduce-colors` can accept a distance (as function or `fastmath.distance` object), `clarans` algorithm is used then (instead of `xmeans`). `clarans` path is very slow though.
+
+### Fixed
+
+* `Oklab` should work on linear RGB not on sRGB
+* `UCS-OSA` color space should have different order of `g` and `j` channels. 
+* `IPT` should operate on not scaled XYZ
+* missing palettes from `:nord`
+
 ## 1.4.4
 
 * Clojure 1.11.0 

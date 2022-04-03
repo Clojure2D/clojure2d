@@ -28,10 +28,20 @@
 (def all-palettes (atom {}))
 (def all-gradients (atom {}))
 
+(def counter (let [a (atom {})]
+             (fn [t key]
+               (let [res (get-in (swap! a #(update-in % [t key] (fnil inc -1))) [t key])]
+                 (when (pos? res) (str "_" res))))))
+
+(defn fix-name+
+  [t n]
+  (let [v (fix-name n)]
+    (str v (counter t v))))
+
 ;; gradients _c_
 
 (doseq [[package palettes] (group-by :package (ds/->flyweight (r/r->clj p/palettes_c_names)))
-        :let [fpackage (fix-name package)
+        :let [fpackage (fix-name+ :gradients package)
               pals (into {} (map (fn [{:keys [palette]}]
                                    (let [k (keyword fpackage (fix-name palette))
                                          n (str package "::" palette)
@@ -43,7 +53,7 @@
 ;; palettes _d_
 
 (doseq [[package palettes] (group-by :package (ds/->flyweight (r/r->clj p/palettes_d_names)))
-        :let [fpackage (fix-name package)
+        :let [fpackage (fix-name+ :palettes package)
               pals (into {} (map (fn [{:keys [palette]}]
                                    (let [k (keyword fpackage (fix-name palette))
                                          n (str package "::" palette)
@@ -55,7 +65,7 @@
 ;; palettes _dynamic_
 
 (doseq [[package palettes] (group-by :package (ds/->flyweight (r/r->clj p/palettes_dynamic_names)))
-        :let [fpackage (fix-name package)
+        :let [fpackage (fix-name+ :palettes package)
               pals (into {} (mapcat (fn [{:keys [palette length]}]
                                       (let [n (str package "::" palette)]
                                         (for [id (range 1 (inc length))
@@ -64,6 +74,8 @@
                                           [k v])))) palettes)]]
   (swap! all-palettes merge pals)
   (spit (str "resources/palettes/c2d_" fpackage ".edn") (with-out-str (pr pals))))
+
+;;
 
 ;; http://soliton.vm.bytemark.co.uk/pub/cpt-city/
 
@@ -130,7 +142,7 @@
   []
   (doseq [[type groups] cpt-city]
     (doseq [[package group] groups
-            :let [fpackage (fix-name package)
+            :let [fpackage (fix-name+ type package)
                   m  (into {} (map (fn [{:keys [c p name]}]
                                      (let [k (keyword fpackage (fix-name name))]
                                        (if (= type :palettes)
@@ -165,7 +177,7 @@
                (str/replace #"\s+" "")
                (str/replace #",\]" "]")
                (str/replace #",\}" "}")
-               (json/read-str :key-fn (comp (partial keyword "thi.ng") #(subs % 2))))]
+               (json/read-str :key-fn (comp (partial keyword "thi.ng") #(str "p" %))))]
   (swap! all-palettes merge pals)
   (spit "resources/palettes/c2d_thi.ng.edn" (with-out-str (pr pals))))
 
@@ -254,6 +266,7 @@
   (spit "resources/palettes/c2d_docc.edn" (with-out-str (pr pals))))
 
 ;;
+
 
 (defn prepare-dictionary
   [m]
