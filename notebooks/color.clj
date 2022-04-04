@@ -413,6 +413,9 @@ c/colorspaces-list
                         [:OSA [-13.51 7.14] [-20.0 20.0] [-23.0 23.0] "excluded extreme values"]
                         [:Oklab [0.0 1.0] [-0.23 0.28] [-0.31 0.2] ""]
                         [:Oklch [0.0 1.0] [0.0 0.32] [0.0 360.0] "polar Oklab"]
+                        [:Okhsv [0.0 1.0] [0.0 1.0] [0.0 1.0] ""]
+                        [:Okhwb [0.0 1.0] [0.0 1.0] [0.0 1.0] ""]
+                        [:Okhsl [0.0 1.0] [0.0 1.0] [0.0 1.0] ""]
                         [:PalettonHSV [0.0 360.0] [0.0 2.0] [0.0 2.0] ""]
                         [:RYB [0.0 255.0] [0.0 255.0] [0.0 255.0] "Sugita/Takahashi"]
                         [:XYB [-0.02 0.03] [0.0 0.85] [0.0 0.85] "from JPEG XL"]
@@ -426,7 +429,32 @@ c/colorspaces-list
                         [:YIQ [0.0 255.0] [-151.9 151.9] [-133.26 133.26] ""]
                         [:YPbPr [0.0 255.0] [-236.59 236.59] [-200.79 200.79] ""]
                         [:YUV [0.0 255.0] [-111.18 111.18] [-156.83 156.83] ""]
-                        [:Yxy [0.0 100.0] [0.15 0.64] [0.06 0.6] "CIE xyY"]])})
+                        [:Yxy [0.0 100.0] [0.15 0.64] [0.06 0.6] "CIE xyY"]
+                        [:DIN99 [0.0 100.0] [-27.45 36.18] [-33.4 31.2] ""]
+                        [:DIN99b [0.0 100.0] [-40.11 45.52] [-40.5 44.37] ""]
+                        [:DIN99o [0.0 100.0] [-35.43 48.88] [-50.3 45.9] "from Wikipedia"]
+                        [:DIN99c [0.0 100.0] [-38.44 43.67] [-40.8 43.6] ""]
+                        [:DIN99d [0.0 100.0] [-37.35 42.32] [-41.0 43.0] ""]])})
+
+;; ### Polar coordinates
+
+;; For every luma based color space you can create polar representation with `to-lch` or `from-lch`. Some of the colorspace are already predefined.
+
+;; The following two are the same:
+
+(c/to-lch c/to-LUV [20 30 100])
+(c/to-LCHuv [20 30 100])
+
+;; Let's make LCH out of YUV.
+
+(def yuv-polar (c/to-lch c/to-YUV [20 30 100]))
+(c/from-lch c/from-YUV yuv-polar)
+
+;; You can create conversion pair by calling `make-LCH` function.
+
+(let [[to from] (c/make-LCH :YUV)]
+  [(to [20 30 100])
+   (from (to [20 30 100]))])
 
 ;; ### sRGB vs linear RGB
 

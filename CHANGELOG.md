@@ -13,11 +13,13 @@ All notable changes to this project will be documented in this file. This change
     - [`:IgPgTg`](https://www.ingentaconnect.com/content/ist/jpi/2020/00000003/00000002/art00002#)
 	- [`:UCS`](https://en.wikipedia.org/wiki/CIE_1960_color_space#Relation_to_CIE_XYZ)
 	- [`:UVW`](https://en.wikipedia.org/wiki/CIE_1964_color_space)
+* more from `Oklab` family: `Okhsv`, `Okhsl` and `Okhwb`
+* `DIN99` color space family: `:DIN99`, `:DIN99b`, `:DIN99c`, `:DIN99d` and `:DIN99o`
 * `reduce-colors` can accept a distance (as function or `fastmath.distance` object), `clarans` algorithm is used then (instead of `xmeans`). `clarans` path is very slow though.
 
 ### Fixed
 
-* `Oklab` should work on linear RGB not on sRGB
+* `Oklab` should use linear RGB not on sRGB
 * `UCS-OSA` color space should have different order of `g` and `j` channels. 
 * `IPT` should operate on not scaled XYZ
 * missing palettes from `:nord`

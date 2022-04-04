@@ -249,4 +249,3 @@
 ;; test paletton generator
 
 ;; test nearest color distance
-

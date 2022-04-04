@@ -127,7 +127,7 @@
             [fastmath.easings :as e]
             [clojure2d.protocols :as pr]
             [clojure.java.io :refer [input-stream resource]])
-  (:import [fastmath.vector Vec2 Vec3 Vec4]           
+  (:import [fastmath.vector Vec2 Vec3 Vec4]
            [java.awt Color]
            [clojure.lang APersistentVector ISeq Seqable]))
 
@@ -829,6 +829,17 @@
 
 ;; ### Oklab
 
+(defn- linear->Oklab
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)
+        l (m/cbrt (+ (* 0.4122214708 (.x c)) (* 0.5363325363 (.y c)) (* 0.0514459929 (.z c))))
+        m (m/cbrt (+ (* 0.2119034982 (.x c)) (* 0.6806995451 (.y c)) (* 0.1073969566 (.z c))))
+        s (m/cbrt (+ (* 0.0883024619 (.x c)) (* 0.2817188376 (.y c)) (* 0.6299787005 (.z c))))]
+    (Vec4. (+ (* 0.2104542553 l) (* 0.7936177850 m) (* -0.0040720468 s))
+           (+ (* 1.9779984951 l) (* -2.4285922050 m) (* 0.4505937099 s))
+           (+ (* 0.0259040371 l) (* 0.7827717662 m) (* -0.8086757660 s))
+           (.w c))))
+
 (defn to-Oklab
   "RGB -> Oklab
 
@@ -838,14 +849,7 @@
   * a: -0.234 - 0.276
   * b: -0.312 - 0.199"
   ^Vec4 [c]
-  (let [^Vec4 c (from-sRGB c)
-        l (m/cbrt (/ (+ (* 0.4122214708 (.x c)) (* 0.5363325363 (.y c)) (* 0.0514459929 (.z c))) 255.0))
-        m (m/cbrt (/ (+ (* 0.2119034982 (.x c)) (* 0.6806995451 (.y c)) (* 0.1073969566 (.z c))) 255.0))
-        s (m/cbrt (/ (+ (* 0.0883024619 (.x c)) (* 0.2817188376 (.y c)) (* 0.6299787005 (.z c))) 255.0))]
-    (Vec4. (+ (* 0.2104542553 l) (* 0.7936177850 m) (* -0.0040720468 s))
-           (+ (* 1.9779984951 l) (* -2.4285922050 m) (* 0.4505937099 s))
-           (+ (* 0.0259040371 l) (* 0.7827717662 m) (* -0.8086757660 s))
-           (.w c))))
+  (linear->Oklab (scale (from-sRGB c) 0.00392156862745098)))
 
 (defn to-Oklab*
   "RGB -> Oklab, normalized"
@@ -856,17 +860,21 @@
            (m/mnorm (.z c) -0.3115281476783752  0.19856975465179516 0.0 255.0)
            (.w c))))
 
-(defn from-Oklab
-  "Oklab -> RGB, see [[to-Oklab]]"
+(defn- Oklab->linear
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
         l (m/cb (+ (.x c) (* 0.3963377774 (.y c)) (* 0.2158037573 (.z c))))
         m (m/cb (+ (.x c) (* -0.1055613458 (.y c)) (* -0.0638541728 (.z c))))
         s (m/cb (+ (.x c) (* -0.0894841775 (.y c)) (* -1.2914855480 (.z c))))]
-    (to-sRGB (Vec4. (* 255.0 (+ (* 4.0767416621  l) (* -3.3077115913 m) (* 0.2309699292 s)))
-                    (* 255.0 (+ (* -1.2684380046 l) (* 2.6097574011 m) (* -0.3413193965 s)))
-                    (* 255.0 (+ (* -0.0041960863 l) (* -0.7034186147 m) (* 1.7076147010 s)))
-                    (.w c)))))
+    (Vec4. (+ (* 4.0767416621  l) (* -3.3077115913 m) (* 0.2309699292 s))
+           (+ (* -1.2684380046 l) (* 2.6097574011 m) (* -0.3413193965 s))
+           (+ (* -0.0041960863 l) (* -0.7034186147 m) (* 1.7076147010 s))
+           (.w c))))
+
+(defn from-Oklab
+  "Oklab -> RGB, see [[to-Oklab]]"
+  ^Vec4 [c]
+  (to-sRGB (scale (Oklab->linear c) 255.0)))
 
 (defn from-Oklab*
   "RGB -> Oklab, normalized"
@@ -879,7 +887,8 @@
 
 ;;
 
-(defn- to-lch
+(defn to-lch
+  "For given color space return polar representation of the color"
   ^Vec4 [to c]
   (let [^Vec4 cc (to c)
         H (m/atan2 (.z cc) (.y cc))
@@ -887,7 +896,8 @@
         C (m/hypot-sqrt (.y cc) (.z cc))]
     (Vec4. (.x cc) C Hd (.w cc))))
 
-(defn- from-lch
+(defn from-lch
+  "For given color space convert from polar representation of the color"
   ^Vec4 [from c]
   (let [^Vec4 c (pr/to-color c)
         h (m/radians (.z c))]
@@ -923,6 +933,355 @@
                        (m/mnorm (.z c) 0.0 255.0 0.0 359.99988541074447)
                        (.w c)))))
 
+;; Okhsv, Okhsl, Okhwb
+;; https://bottosson.github.io/posts/colorpicker/
+
+(defn- toe
+  ^double [^double x]
+  (let [v (- (* 1.170873786407767 x) 0.206)]
+    (* 0.5 (+ v (m/sqrt (+ (m/sq v) (* 0.14050485436893204 x)))))))
+
+(defn- inv-toe
+  ^double [^double x]
+  (/ (+ (* x x) (* 0.206 x))
+     (* 1.17087378640776 (+ x 0.03))))
+
+(defn- ->ST
+  ^Vec2 [^Vec2 cusp]
+  (Vec2. (/ (.y cusp) (.x cusp))
+         (/ (.y cusp) (- 1.0 (.x cusp)))))
+
+(defmacro ^:private oklab-poly
+  [k0 k1 k2 k3 k4 wl wm ws]
+  `(Vec4. (+ ~k0 (* ~k1 ~'a) (* ~k2 ~'b) (* ~k3 ~'a ~'a) (* ~k4 ~'a ~'b)) ~wl ~wm ~ws))
+
+(defn- compute-max-saturation
+  ^double [^double a ^double b]
+  (let [^Vec4 v (cond
+                  (> (- (* -1.88170328 a)
+                        (* 0.80936493 b)) 1.0)
+                  (oklab-poly 1.19086277 1.76576728 0.59662641 0.75515197 0.56771245
+                              4.0767416621 -3.3077115913 0.2309699292)
+
+                  (> (- (* 1.81444104 a)
+                        (* 1.19445276 b)) 1.0)
+                  (oklab-poly 0.73956515 -0.45954404 0.08285427 0.12541070 0.14503204
+                              -1.2684380046 2.6097574011 -0.3413193965)
+
+                  :else (oklab-poly 1.35733652 -0.00915799 -1.15130210 -0.50559606 0.00692167
+		                    -0.0041960863 -0.7034186147 1.7076147010))
+        S (.x v)
+        wl (.y v)
+        wm (.z v)
+        ws (.w v)
+        kl (+ (* 0.3963377774 a) (* 0.2158037573 b))
+        km (+ (* -0.1055613458 a) (* -0.0638541728 b))
+        ks (+ (* -0.0894841775 a) (* -1.2914855480 b))
+        l- (inc (* S kl))
+        m- (inc (* S km))
+        s- (inc (* S ks))
+        l (* l- l- l-)
+        m (* m- m- m-)
+        s (* s- s- s-)
+        lds (* 3.0 kl l- l-)
+        mds (* 3.0 km m- m-)
+        sds (* 3.0 ks s- s-)
+        lds2 (* 6.0 kl kl l-)
+        mds2 (* 6.0 km km m-)
+        sds2 (* 6.0 ks ks s-)
+        f (+ (* wl l) (* wm m) (* ws s))
+        f1 (+ (* wl lds) (* wm mds) (* ws sds))
+        f2 (+ (* wl lds2) (* wm mds2) (* ws sds2))]
+    (- S (/ (* f f1)
+            (- (* f1 f1) (* 0.5 f f2))))))
+
+(defn- find-cusp
+  ^Vec2 [^double a ^double b]
+  (let [S-cusp (compute-max-saturation a b)
+        ^Vec4 rgb-at-max (Oklab->linear (Vec4. 1.0 (* S-cusp a) (* S-cusp b) 1.0))
+        L-cusp (m/cbrt (/ (max (.x rgb-at-max) (.y rgb-at-max) (.z rgb-at-max))))]
+    (Vec2. L-cusp (* L-cusp S-cusp))))
+
+(defn to-Okhsv
+  "sRGB -> Okhsv
+
+  Ranges:
+
+  * h: 0.0 - 1.0
+  * s: 0.0 - 1.0
+  * v: 0.0 - 1.0"
+  {:metadoc/categories meta-conv}
+  ^Vec4 [c]
+  (let [^Vec4 lab (to-Oklab c)]
+    (if (zero? (.x lab))
+      (Vec4. 0.0 0.0 0.0 (.w lab))
+      (let [L (.x lab)
+            C (m/hypot-sqrt (.y lab) (.z lab))
+            a- (/ (.y lab) C)
+            b- (/ (.z lab) C)
+            h (+ 0.5 (/ (* 0.5 (m/atan2 (- (.z lab)) (- (.y lab)))) m/PI))
+            ^Vec2 ST-max (->ST (find-cusp a- b-))
+            S-max (.x ST-max)
+            T-max (.y ST-max)
+            k (- 1.0 (/ 0.5 S-max))
+            t (/ T-max (+ C (* L T-max)))
+            Lv (* t L)
+            Cv (* t C)
+            Lvt (inv-toe Lv)
+            Cvt (/ (* Cv Lvt) Lv)
+            ^Vec4 rgb-scale (Oklab->linear (Vec4. Lvt (* a- Cvt) (* b- Cvt) 1.0))
+            scale-L (m/cbrt (/ (max (.x rgb-scale) (.y rgb-scale) (.z rgb-scale) 0.0)))
+            L (/ L scale-L)
+            C (/ C scale-L)
+            tL (toe L)
+            C (/ (* C tL) L)
+            L tL
+            v (/ L Lv)
+            s (* (+ 0.5 T-max)
+                 (/ Cv (+ (* 0.5 T-max)
+                          (* T-max k Cv))))]
+        (Vec4. h s v (.w lab))))))
+
+(defn to-Okhsv*
+  "RGB -> Okhsv, normalized"
+  ^Vec4 [c]
+  (let [^Vec4 c (to-Okhsv c)]
+    (Vec4. (m/mnorm (.x c) 0.0 0.9999999496045209 0.0 255.0)
+           (m/mnorm (.y c) 0.0 1.0119788696532530 0.0 255.0)
+           (m/mnorm (.z c) 0.0 1.0000000319591997 0.0 255.0)
+           (.w c))))
+
+(defn from-Okhsv
+  "Okhsv -> sRGB"
+  ^Vec4 [c]
+  (let [^Vec4 hsv (pr/to-color c)]
+    (if (zero? (.z hsv))
+      (Vec4. 0.0 0.0 0.0 (.w hsv))
+      (let [h (* m/TWO_PI (.x hsv))
+            a- (m/cos h)
+            b- (m/sin h)
+            ^Vec2 ST-max (->ST (find-cusp a- b-))
+            S-max (.x ST-max)
+            T-max (.y ST-max)
+            k (- 1.0 (/ 0.5 S-max))
+            r (/ (+ 0.5 (- T-max (* T-max k (.y hsv)))))
+            Lv (- 1.0 (* 0.5 (.y hsv) r))
+            Cv (* 0.5 (.y hsv) T-max r)
+            L (* (.z hsv) Lv)
+            C (* (.z hsv) Cv)
+            Lvt (inv-toe Lv)
+            Cvt (/ (* Cv Lvt) Lv)
+            Lnew (inv-toe L)
+            C (/ (* C Lnew) L)
+            L Lnew
+            ^Vec4 rgb-scale (Oklab->linear (Vec4. Lvt (* a- Cvt) (* b- Cvt) 1.0))
+            scaleL (m/cbrt (/ (max (.x rgb-scale) (.y rgb-scale) (.z rgb-scale))))
+            L (* L scaleL)
+            C (* C scaleL)]
+        (from-Oklab (Vec4. L (* C a-) (* C b-) (.w hsv)))))))
+
+(defn from-Okhsv*
+  "Okhsv -> sRGB, normalized"
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)]
+    (from-Okhsv (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 0.9999999496045209)
+                       (m/mnorm (.y c) 0.0 255.0 0.0 1.0119788696532530)
+                       (m/mnorm (.z c) 0.0 255.0 0.0 1.0000000319591997)
+                       (.w c)))))
+
+;; Okhwb
+
+(defn to-Okhwb
+  "sRGB -> Okhwb
+
+  Ranges:
+
+  * h: 0.0 - 1.0
+  * w: 0.0 - 1.0
+  * b: 0.0 - 1.0"
+  ^Vec4 [c]
+  (let [^Vec4 c (to-Okhsv c)]
+    (Vec4. (.x c) (* (- 1.0 (.y c)) (.z c)) (- 1.0 (.z c)) (.w c))))
+
+(defn to-Okhwb*
+  "RGB -> Okhwb, normalized"
+  ^Vec4 [c]
+  (let [^Vec4 c (to-Okhwb c)]
+    (Vec4. (m/mnorm (.x c) 0.0 0.9999999496045209 0.0 255.0)
+           (m/mnorm (.y c) -0.011902363837373111 0.999999923528539 0.0 255.0)
+           (m/mnorm (.z c) -3.195919973109085E-8 1.0 0.0 255.0)
+           (.w c))))
+
+(defn from-Okhwb
+  "Okhwb -> sRGB"
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)
+        v (- 1.0 (.z c))]
+    (if (zero? v)
+      (Vec4. 0.0 0.0 0.0 (.w c))
+      (from-Okhsv (Vec4. (.x c) (- 1.0 (/ (.y c) v)) v (.w c))))))
+
+(defn from-Okhwb*
+  "Okhwb -> sRGB, normalized"
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)]
+    (from-Okhwb (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 0.9999999496045209)
+                       (m/mnorm (.y c) 0.0 255.0 -0.011902363837373111 0.999999923528539)
+                       (m/mnorm (.z c) 0.0 255.0 -3.195919973109085E-8 1.0                                )
+                       (.w c)))))
+
+;; Okhsl
+
+(defn- get-ST-mid
+  ^Vec2 [^double a ^double b]
+  (Vec2. (+ 0.11516993 (/ (+ 7.44778970 (* 4.1590124 b)
+                             (* a (+ -2.19557347 (* 1.7519840 b)
+                                     (* a (+ -2.1370494 (* -10.0230104 b)
+                                             (* a (+ -4.24894561 (* 5.38770819 b)
+                                                     (* 4.69891013 a))))))))))
+         (+ 0.11239642 (/ (+ 1.61320320 (* -0.68124379 b)
+                             (* a (+ 0.40370612 (* 0.90148123 b)
+                                     (* a (+ -0.27087943 (* 0.61223990 b)
+                                             (* a (+ 0.00299215 (* -0.45399568 b)
+                                                     (* -0.14661872 a))))))))))))
+
+(defn- find-gamut-intersection
+  ^double [^double a ^double b ^double L ^Vec2 cusp]
+  ;; L0 = L1 = L, C1 = 1
+  (if (<= L (.x cusp))
+    (/ (* (.y cusp) L) (.x cusp))
+    (let [t (/ (* (.y cusp) (dec L)) (dec (.x cusp)))
+          dL 0.0
+          dC 1.0
+          kl (+ (* 0.3963377774 a) (* 0.2158037573 b))
+          km (+ (* -0.1055613458 a) (* -0.0638541728 b))
+          ks (+ (* -0.0894841775 a) (* -1.2914855480 b))
+          L (+ (* L (- 1.0 t)) (* L t))
+          C t
+          l- (+ L (* C kl))
+          m- (+ L (* C km))
+          s- (+ L (* C ks))
+          l (* l- l- l-)
+          m (* m- m- m-)
+          s (* s- s- s-)
+          ldt (* 3.0 kl l- l-)
+          mdt (* 3.0 km m- m-)
+          sdt (* 3.0 ks s- s-)
+          ldt2 (* 6.0 kl kl l-)
+          mdt2 (* 6.0 km km m-)
+          sdt2 (* 6.0 ks ks s-)
+          r (dec (+ (* 4.0767416621 l) (* -3.3077115913 m) (* 0.2309699292 s)))
+          r1 (+ (* 4.0767416621 ldt) (* -3.3077115913 mdt) (* 0.2309699292 sdt))
+          r2 (+ (* 4.0767416621 ldt2) (* -3.3077115913 mdt2) (* 0.2309699292 sdt2))
+          ur (/ r1 (- (* r1 r1) (* 0.5 r r2)))
+          tr (* -1.0 r ur)
+          g (dec (+ (* -1.2684380046 l) (* 2.6097574011 m) (* -0.3413193965 s)))
+          g1 (+ (* -1.2684380046 ldt) (* 2.6097574011 mdt) (* -0.3413193965 sdt))
+          g2 (+ (* -1.2684380046 ldt2) (* 2.6097574011 mdt2) (* -0.3413193965 sdt2))
+          ug (/ g1 (- (* g1 g1) (* 0.5 g g2)))
+          tg (* -1.0 g ug)
+          b(dec (+ (* -0.0041960863 l) (* -0.7034186147 m) (* 1.7076147010 s)))
+          b1 (+ (* -0.0041960863 ldt) (* -0.7034186147 mdt) (* 1.7076147010 sdt))
+          b2 (+ (* -0.0041960863 ldt2) (* -0.7034186147 mdt2) (* 1.7076147010 sdt2))
+          ub (/ b1 (- (* b1 b1) (* 0.5 b b2)))
+          tb (* -1.0 b ub)
+          tr (if (>= ur 0.0) tr Double/MAX_VALUE)
+          tg (if (>= ug 0.0) tg Double/MAX_VALUE)
+          tb (if (>= ub 0.0) tb Double/MAX_VALUE)]
+      (+ t (min tr tg tb)))))
+
+(defn- get-Cs
+  ^Vec3 [^double L ^double a ^double b]
+  (let [^Vec2 cusp (find-cusp a b)
+        C-max (find-gamut-intersection a b L cusp)
+        ^Vec2 ST-max (->ST cusp)
+        L- (- 1.0 L)
+        k (/ C-max (min (* L (.x ST-max)) (* L- (.y ST-max))))
+        ^Vec2 ST-mid (get-ST-mid a b)
+        Ca (* L (.x ST-mid))
+        Cb (* L- (.y ST-mid))
+        C-mid (* 0.9 k (m/sqrt (m/sqrt (/ (+ (/ (m/sq (* Ca Ca)))
+                                             (/ (m/sq (* Cb Cb))))))))
+        Ca (* L 0.4)
+        Cb (* L- 0.8)
+        C-0 (m/sqrt (/ (+ (/ (* Ca Ca))
+                          (/ (* Cb Cb)))))]
+    (Vec3. C-0 C-mid C-max)))
+
+(defn to-Okhsl
+  "sRGB -> Okhsl
+
+  Ranges:
+
+  * h: 0.0 - 1.0
+  * s: 0.0 - 1.0
+  * l: 0.0 - 1.0"
+  ^Vec4 [c]
+  (let [^Vec4 lab (to-Oklab c)]
+    (if (zero? (.x lab))
+      (Vec4. 0.0 0.0 0.0 (.w lab))
+      (let [C (m/hypot-sqrt (.y lab) (.z lab))
+            a- (/ (.y lab) C)
+            b- (/ (.z lab) C)
+            L (.x lab)
+            h (+ 0.5 (* 0.5 (/ (m/atan2 (- (.z lab)) (- (.y lab))) m/PI)))
+            ^Vec3 cs (get-Cs L a- b-)
+            C-0 (.x cs)
+            C-mid (.y cs)
+            C-max (.z cs)
+            s (if (< C C-mid)
+                (let [k1 (* 0.8 C-0)
+                      k2 (- 1.0 (/ k1 C-mid))]
+                  (* 0.8 (/ C (+ k1 (* k2 C)))))
+                (let [k1 (/ (* 0.3125 C-mid C-mid) C-0)
+                      k2 (- 1.0 (/ k1 (- C-max C-mid)))]
+                  (+ 0.8 (* 0.2 (/ (- C C-mid)
+                                   (+ k1 (* k2 (- C C-mid))))))))]
+        (Vec4. h s (toe L) (.w lab))))))
+
+(defn to-Okhsl*
+  "RGB -> Okhsl, normalized"
+  ^Vec4 [c]
+  (let [^Vec4 c (to-Okhsl c)]
+    (Vec4. (m/mnorm (.x c) 0.0 0.999999949604520 0.0 255.0)
+           (m/mnorm (.y c) 0.0 1.012343260867314 0.0 255.0)
+           (m/mnorm (.z c) 0.0 0.999999992396189 0.0 255.0)
+           (.w c))))
+
+(defn from-Okhsl
+  "Okhsl -> sRGB"
+  ^Vec4 [c]
+  (let [^Vec4 hsl (pr/to-color c)]
+    (if (zero? (.z hsl))
+      (Vec4. 0.0 0.0 0.0 (.w hsl))
+      (let [h (* m/TWO_PI (.x hsl))
+            a- (m/cos h)
+            b- (m/sin h)
+            L (inv-toe (.z hsl))
+            ^Vec3 cs (get-Cs L a- b-)
+            C-0 (.x cs)
+            C-mid (.y cs)
+            C-max (.z cs)
+            C (if (< (.y hsl) 0.8)
+                (let [t (* 1.25 (.y hsl))
+                      k1 (* 0.8 C-0)
+                      k2 (- 1.0 (/ k1 C-mid))]
+                  (/ (* t k1) (- 1.0 (* t k2))))
+                (let [t (/ (- (.y hsl) 0.8) 0.2)
+                      k1 (/ (* 0.3125 C-mid C-mid) C-0)
+                      k2 (- 1.0 (/ k1 (- C-max C-mid)))]
+                  (+ C-mid (/ (* t k1) (- 1.0 (* t k2))))))]
+        (from-Oklab (Vec4. L (* C a-) (* C b-) (.w hsl)))))))
+
+(defn from-Okhsl*
+  "Okhsl -> sRGB, normalized"
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)]
+    (from-Okhsl (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 0.999999949604520)
+                       (m/mnorm (.y c) 0.0 255.0 0.0 1.012343260867314)
+                       (m/mnorm (.z c) 0.0 255.0 0.0 0.999999992396189)
+                       (.w c)))))
+
 ;; ### XYZ
 
 (def ^:private ^:const ^double D65X 95.047)
@@ -933,21 +1292,21 @@
 
 
 (defn- to-XYZ-
-  "Pure RGB->XYZ conversion without corrections."
-  ^Vec3 [^Vec3 c]
-  (Vec3. (+ (* (.x c) 0.4124564390896921) (* (.y c) 0.357576077643909) (* (.z c) 0.18043748326639894))
-         (+ (* (.x c) 0.21267285140562248) (* (.y c) 0.715152155287818) (* (.z c) 0.07217499330655958))
-         (+ (* (.x c) 0.019333895582329317) (* (.y c) 0.119192025881303) (* (.z c) 0.9503040785363677))))
+"Pure RGB->XYZ conversion without corrections."
+^Vec3 [^Vec3 c]
+(Vec3. (+ (* (.x c) 0.4124564390896921) (* (.y c) 0.357576077643909) (* (.z c) 0.18043748326639894))
+       (+ (* (.x c) 0.21267285140562248) (* (.y c) 0.715152155287818) (* (.z c) 0.07217499330655958))
+       (+ (* (.x c) 0.019333895582329317) (* (.y c) 0.119192025881303) (* (.z c) 0.9503040785363677))))
 
 (defn to-XYZ1
-  "sRGB -> XYZ, scaled to range 0-1"
-  {:metadoc/categories meta-conv}
-  ^Vec4 [c]
-  (let [^Vec4 c (pr/to-color c)
-        xyz-raw (to-XYZ- (-> (Vec3. (.x c) (.y c) (.z c))
-                             (v/div 255.0)
-                             (v/fmap to-linear)))]
-    (v/vec4 xyz-raw (.w c))))
+"sRGB -> XYZ, scaled to range 0-1"
+{:metadoc/categories meta-conv}
+^Vec4 [c]
+(let [^Vec4 c (pr/to-color c)
+      xyz-raw (to-XYZ- (-> (Vec3. (.x c) (.y c) (.z c))
+                           (v/div 255.0)
+                           (v/fmap to-linear)))]
+  (v/vec4 xyz-raw (.w c))))
 
 (defn to-XYZ
   "sRGB -> XYZ
@@ -966,23 +1325,23 @@
            (.w c))))
 
 (defn to-XYZ*
-  "sRGB -> XYZ, normalized"
-  {:metadoc/categories meta-conv}
-  ^Vec4 [c]
-  (let [cc (to-XYZ c)]
-    (Vec4. (m/mnorm (.x cc) 0.0 D65X 0.0 255.0)
-           (m/mnorm (.y cc) 0.0 D65Y 0.0 255.0)
-           (m/mnorm (.z cc) 0.0 D65Z 0.0 255.0)
-           (.w cc))))
+"sRGB -> XYZ, normalized"
+{:metadoc/categories meta-conv}
+^Vec4 [c]
+(let [cc (to-XYZ c)]
+  (Vec4. (m/mnorm (.x cc) 0.0 D65X 0.0 255.0)
+         (m/mnorm (.y cc) 0.0 D65Y 0.0 255.0)
+         (m/mnorm (.z cc) 0.0 D65Z 0.0 255.0)
+         (.w cc))))
 
 (def ^{:doc "sRGB -> XYZ, normalized" :metadoc/categories meta-conv} to-XYZ1* to-XYZ*)
 
 (defn- from-XYZ-
-  "Pure XYZ->RGB conversion."
-  ^Vec3 [^Vec3 v]
-  (Vec3. (+ (* (.x v) 3.2404541621141054) (* (.y v) -1.5371385127977166) (* (.z v) -0.4985314095560162))
-         (+ (* (.x v) -0.9692660305051868) (* (.y v)  1.8760108454466942) (* (.z v)  0.04155601753034984))
-         (+ (* (.x v)  0.05564343095911469) (* (.y v) -0.20402591351675387) (* (.z v) 1.0572251882231791))))
+"Pure XYZ->RGB conversion."
+^Vec3 [^Vec3 v]
+(Vec3. (+ (* (.x v) 3.2404541621141054) (* (.y v) -1.5371385127977166) (* (.z v) -0.4985314095560162))
+       (+ (* (.x v) -0.9692660305051868) (* (.y v)  1.8760108454466942) (* (.z v)  0.04155601753034984))
+       (+ (* (.x v)  0.05564343095911469) (* (.y v) -0.20402591351675387) (* (.z v) 1.0572251882231791))))
 
 (defn from-XYZ1
   "XYZ -> sRGB, from range 0-1"
@@ -1425,6 +1784,49 @@
                      (m/mnorm (.y c) 0.0 255.0 0.0 133.81586201619493)
                      (m/mnorm (.z c) 0.0 255.0 0.0 359.99994682530985)
                      (.w c)))))
+
+;; LCHuv
+
+(defn to-LCHuv
+  "RGB -> LCHuv
+
+  Returned ranges:
+
+  * L: 0.0 - 100.0
+  * C: 0.0 - 180.0
+  * H: 0.0 - 360.0"
+  {:metadoc/categories meta-conv}
+  ^Vec4 [c]
+  (to-lch to-LUV c))
+
+(defn to-LCHuv*
+  "RGB -> LCHuv, normalized"
+  {:metadoc/categories meta-conv}
+  ^Vec4 [c]
+  (let [cc (to-LCHuv c)]
+    (Vec4. (m/mnorm (.x cc) 0.0 100.0 0.0 255.0)
+           (m/mnorm (.y cc) 0.0 179.04142708939605 0.0 255.0)
+           (m/mnorm (.z cc) 0.0 359.99994137350546 0.0 255.0)
+           (.w cc))))
+
+(defn from-LCHuv
+  "LCHuv -> RGB
+
+  For ranges, see [[to-LCH]]."
+  {:metadoc/categories meta-conv}
+  ^Vec4 [c]
+  (from-lch from-LUV c))
+
+(defn from-LCHuv*
+  "LCHuv -> RGB, normalized"
+  {:metadoc/categories meta-conv}
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)]
+    (from-LCHuv (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.0)
+                       (m/mnorm (.y c) 0.0 255.0 0.0 179.04142708939605)
+                       (m/mnorm (.z c) 0.0 255.0 0.0 359.99994137350546)
+                       (.w c)))))
+
 
 ;; ### Yxy (xyY)
 
@@ -2860,6 +3262,110 @@
                      (m/pow3 (m/pow3 (m/pow3 (m/mnorm (.z c) 0.0 255.0 -1.4057783957453063 1.4175468647969818))))
                      (.w c)))))
 
+;; ### DIN99 family
+
+(def ^:private din99-config
+  {:din99 {:l99mult 105.509 :lmult 0.0158
+           :cosc (m/cos (m/radians 16.0)) :sinc (m/sin (m/radians 16.0))
+           :fmult 0.7 :c99mult 1.0 :gmult (/ 9.0 200.0) :hshift 0.0 :gdiv (/ 9.0 200.0)
+           :r [0.0 100.0003116920774], :g [-27.45031251565246 36.17533184258057], :b [-33.395536343165965 31.1550705394938]}
+   :din99b {:l99mult 303.67 :lmult 0.0039
+            :cosc (m/cos (m/radians 26.0)) :sinc (m/sin (m/radians 26.0))
+            :fmult 0.83 :c99mult 23.0 :gmult 0.075 :hshift (m/radians 26.0) :gdiv 1.0
+            :r [0.0 99.99966889479346], :g [-40.110035967857236 45.52421609386709], :b [-40.48993353097326 44.366160432960626]}
+   ;; there is no shift on Wikipedia, culori adds 26deg
+   :din99o {:l99mult 303.67 :lmult 0.0039
+            :cosc (m/cos (m/radians 26.0)) :sinc (m/sin (m/radians 26.0))
+            :fmult 0.83 :c99mult 1.0 :gmult 0.075 :hshift 0.0 :gdiv 0.0435
+            :r [0.0 99.99966889479346], :g [-35.434778333676974 48.87944227965091], :b [-50.296317246972684 45.92474100066964]}
+   :din99c {:l99mult 317.65 :lmult 0.0037
+            :cosc 1.0 :sinc 0.0
+            :fmult 0.94 :c99mult 23.0 :gmult 0.066 :hshift 0.0 :gdiv 1.0
+            :r [0.0 99.99963151018662], :g [-38.44209843435516 43.67298483923871], :b [-40.79039987931203 43.59390987464932]}
+   :din99d {:l99mult 325.22 :lmult 0.0036
+            :cosc (m/cos (m/radians 50.0)) :sinc (m/sin (m/radians 50.0))
+            :fmult 1.14 :c99mult 22.5 :gmult 0.06 :hshift (m/radians 50.0) :gdiv 1.0
+            :r [0.0 100.0001740520318], :g [-37.35102456489855 42.32332072914751], :b [-41.036070820486316 43.037583796265324]}})
+
+(defn- make-to-DIN99
+  [n]
+  (let [{:keys [^double cosc ^double sinc ^double fmult ^double hshift ^double c99mult
+                ^double gmult ^double gdiv ^double l99mult ^double lmult]} (din99-config n)]
+    (fn ^Vec4 [c]
+      (let [^Vec4 c (to-LAB c)
+            e (+ (* cosc (.y c)) (* sinc (.z c)))
+            f (* fmult (- (* cosc (.z c)) (* sinc (.y c))))
+            G (m/hypot-sqrt e f)
+            h-ef (+ (m/atan2 f e) hshift)
+            C99 (* c99mult (/ (m/log1p (* gmult G)) gdiv))
+            a99 (* C99 (m/cos h-ef))
+            b99 (* C99 (m/sin h-ef))
+            L99 (* l99mult (m/log1p (* lmult (.x c))))]
+        (Vec4. L99 a99 b99 (.w c))))))
+
+(defn- make-to-DIN99*
+  [f n]
+  (let [{[^double minr ^double maxr] :r
+         [^double ming ^double maxg] :g
+         [^double minb ^double maxb] :b} (din99-config n)]
+    (fn ^Vec4 [c]
+      (let [^Vec4 c (f c)]
+        (Vec4. (m/mnorm (.x c) minr maxr 0.0 255.0)
+               (m/mnorm (.y c) ming maxg 0.0 255.0)
+               (m/mnorm (.z c) minb maxb 0.0 255.0)
+               (.w c))))))
+
+(defn- make-from-DIN99
+  [n]
+  (let [{:keys [^double cosc ^double sinc ^double fmult ^double hshift ^double c99mult
+                ^double gmult ^double gdiv ^double l99mult ^double lmult]} (din99-config n)
+        C99mult (/ gdiv c99mult)]
+    (fn ^Vec4 [c]
+      (let [^Vec4 c (pr/to-color c)
+            h99 (- (m/atan2 (.z c) (.y c)) hshift)
+            C99 (m/hypot-sqrt (.y c) (.z c))
+            G (/ (m/expm1 (* C99mult C99)) gmult)
+            e (* G (m/cos h99))
+            f (/ (* G (m/sin h99)) fmult)
+            a (- (* e cosc) (* f sinc))
+            b (+ (* e sinc) (* f cosc))
+            L (/ (m/expm1 (/ (.x c) l99mult)) lmult)]
+        (from-LAB (Vec4. L a b (.w c)))))))
+
+(defn- make-from-DIN99*
+  [f n]
+  (let [{[^double minr ^double maxr] :r
+         [^double ming ^double maxg] :g
+         [^double minb ^double maxb] :b} (din99-config n)]
+    (fn ^Vec4 [c]
+      (let [^Vec4 c (pr/to-color c)]
+        (f (Vec4. (m/mnorm (.x c) 0.0 255.0 minr maxr)
+                  (m/mnorm (.y c) 0.0 255.0 ming maxg)
+                  (m/mnorm (.z c) 0.0 255.0 minb maxb)
+                  (.w c)))))))
+
+(def ^{:doc "RGB -> DIN99" :metadoc/categories meta-conv} to-DIN99 (make-to-DIN99 :din99))
+(def ^{:doc "RGB -> DIN99" :metadoc/categories meta-conv} to-DIN99b (make-to-DIN99 :din99b))
+(def ^{:doc "RGB -> DIN99" :metadoc/categories meta-conv} to-DIN99o (make-to-DIN99 :din99o))
+(def ^{:doc "RGB -> DIN99" :metadoc/categories meta-conv} to-DIN99c (make-to-DIN99 :din99c))
+(def ^{:doc "RGB -> DIN99" :metadoc/categories meta-conv} to-DIN99d (make-to-DIN99 :din99d))
+(def ^{:doc "RGB -> DIN99, normalized" :metadoc/categories meta-conv} to-DIN99* (make-to-DIN99* to-DIN99 :din99))
+(def ^{:doc "RGB -> DIN99b, normalized" :metadoc/categories meta-conv} to-DIN99b* (make-to-DIN99* to-DIN99b :din99b))
+(def ^{:doc "RGB -> DIN99o, normalized" :metadoc/categories meta-conv} to-DIN99o* (make-to-DIN99* to-DIN99o :din99o))
+(def ^{:doc "RGB -> DIN99c, normalized" :metadoc/categories meta-conv} to-DIN99c* (make-to-DIN99* to-DIN99c :din99c))
+(def ^{:doc "RGB -> DIN99d, normalized" :metadoc/categories meta-conv} to-DIN99d* (make-to-DIN99* to-DIN99d :din99d))
+
+(def ^{:doc "DIN99 -> RGB" :metadoc/categories meta-conv} from-DIN99 (make-from-DIN99 :din99))
+(def ^{:doc "DIN99b -> RGB" :metadoc/categories meta-conv} from-DIN99b (make-from-DIN99 :din99b))
+(def ^{:doc "DIN99o -> RGB" :metadoc/categories meta-conv} from-DIN99o (make-from-DIN99 :din99o))
+(def ^{:doc "DIN99c -> RGB" :metadoc/categories meta-conv} from-DIN99c (make-from-DIN99 :din99c))
+(def ^{:doc "DIN99d -> RGB" :metadoc/categories meta-conv} from-DIN99d (make-from-DIN99 :din99d))
+(def ^{:doc "DIN99 -> RGB, normalized" :metadoc/categories meta-conv} from-DIN99* (make-from-DIN99* from-DIN99 :din99))
+(def ^{:doc "DIN99b -> RGB, normalized" :metadoc/categories meta-conv} from-DIN99b* (make-from-DIN99* from-DIN99b :din99b))
+(def ^{:doc "DIN99o -> RGB, normalized" :metadoc/categories meta-conv} from-DIN99o* (make-from-DIN99* from-DIN99o :din99o))
+(def ^{:doc "DIN99c -> RGB, normalized" :metadoc/categories meta-conv} from-DIN99c* (make-from-DIN99* from-DIN99c :din99c))
+(def ^{:doc "DIN99d -> RGB, normalized" :metadoc/categories meta-conv} from-DIN99d* (make-from-DIN99* from-DIN99d :din99d))
+
 ;; ### Grayscale
 
 (defn to-Gray
@@ -2897,6 +3403,11 @@
                :OHTA  [to-OHTA from-OHTA]
                :XYZ   [to-XYZ from-XYZ]
                :XYZ1   [to-XYZ1 from-XYZ1]
+               :DIN99 [to-DIN99 from-DIN99]
+               :DIN99b [to-DIN99b from-DIN99b]
+               :DIN99c [to-DIN99c from-DIN99c]
+               :DIN99d [to-DIN99d from-DIN99d]
+               :DIN99o [to-DIN99o from-DIN99o]
                :UCS   [to-UCS from-UCS]
                :UVW   [to-UVW from-UVW]
                :XYB   [to-XYB from-XYB]
@@ -2909,9 +3420,13 @@
                :LAB   [to-LAB from-LAB]
                :Oklab [to-Oklab from-Oklab]
                :Oklch [to-Oklch from-Oklch]
+               :Okhsv [to-Okhsv from-Okhsv]
+               :Okhwb [to-Okhwb from-Okhwb]
+               :Okhsl [to-Okhsl from-Okhsl]
                :JAB   [to-JAB from-JAB]
                :HunterLAB  [to-HunterLAB from-HunterLAB]
                :LCH   [to-LCH from-LCH]
+               :LCHuv   [to-LCHuv from-LCHuv]
                :JCH   [to-JCH from-JCH]
                :HCL   [to-HCL from-HCL]
                :HSB   [to-HSB from-HSB]
@@ -2943,6 +3458,11 @@
                 :OHTA  [to-OHTA* from-OHTA*]
                 :XYZ   [to-XYZ* from-XYZ*]
                 :XYZ1   [to-XYZ1* from-XYZ1*]
+                :DIN99 [to-DIN99* from-DIN99*]
+                :DIN99b [to-DIN99b* from-DIN99b*]
+                :DIN99c [to-DIN99c* from-DIN99c*]
+                :DIN99d [to-DIN99d* from-DIN99d*]
+                :DIN99o [to-DIN99o* from-DIN99o*]
                 :UCS   [to-UCS* from-UCS*]
                 :UVW   [to-UVW* from-UVW*]
                 :XYB   [to-XYB* from-XYB*]
@@ -2955,9 +3475,13 @@
                 :LAB   [to-LAB* from-LAB*]
                 :Oklab [to-Oklab* from-Oklab*]
                 :Oklch [to-Oklch* from-Oklch*]
+                :Okhsv [to-Okhsv* from-Okhsv*]
+                :Okhwb [to-Okhwb* from-Okhwb*]
+                :Okhsl [to-Okhsl* from-Okhsl*]
                 :JAB   [to-JAB* from-JAB*]
                 :HunterLAB  [to-HunterLAB* from-HunterLAB*]
                 :LCH   [to-LCH* from-LCH*]
+                :LCHuv   [to-LCHuv* from-LCHuv*]
                 :JCH   [to-JCH* from-JCH*]
                 :HCL   [to-HCL* from-HCL*]
                 :HSB   [to-HSB* from-HSB*]
@@ -2982,6 +3506,13 @@
 
 ;; List of color spaces names
 (def ^{:doc "List of all color space names." :metadoc/categories meta-conv} colorspaces-list (sort (keys colorspaces)))
+
+(defn make-LCH
+  "Create LCH conversion functions pair from any luma based color space. "
+  [cs]
+  (let [[to from] (colorspaces cs)]
+    [(partial to-lch to)
+     (partial from-lch from)]))
 
 (defn complementary
   "Create complementary color. Possible colorspaces are:
@@ -4559,9 +5090,13 @@
           nmxg (if (> (.y res) mxg) (.y res) mxg)
           nmnb (if (< (.z res) mnb) (.z res) mnb)
           nmxb (if (> (.z res) mxb) (.z res) mxb)]
+      (when (or (m/invalid-double? (.x res))
+                (m/invalid-double? (.y res))
+                (m/invalid-double? (.z res)))
+        (println "Warning: invalid numbers in " res " for " [r g b]))
       (if (< cc 0x1000000)
         (recur (inc cc) (double nmnr) (double nmxr) (double nmng) (double nmxg) (double nmnb) (double nmxb))
-        {:min-r nmnr :max-r nmxr :min-g nmng :max-g nmxg :min-b nmnb :max-b nmxb}))))
+        {:r [nmnr nmxr] :g [nmng nmxg] :b [nmnb nmxb]}))))
 
 (defn- test-reversibility
   ([colorspace]
@@ -4576,3 +5111,11 @@
                rgb (from cs)]
          :when (not= in (lclamp rgb))]
      [r g b cs (lclamp rgb) (v/dist in rgb)])))
+
+(comment (run! (fn [[k [to from]]]
+                 (println "---")
+                 (println k)
+                 (let [f (time (doall (test-reversibility to from)))]
+                   (println (take 3 f))))
+               (remove (comp #{:Gray} first) colorspaces))
+         )
