@@ -139,7 +139,6 @@
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
 
-;; 
 ;;
 (def ^{:doc "If you access pixels which is outside possible range. You'll always get some value. You can control what is returned by setting this variable. Possible values are:
 
@@ -147,7 +146,7 @@
   * `:edge` - value from the edge of the image (left, right, top, bottom or corners) (default)
   * `:wrap` - wrap around image
   * or channel value 0-255 - set specific value"
-       :metadoc/categories #{:pix}}
+     :metadoc/categories #{:pix}}
   ^:dynamic *pixels-edge* :edge)
 
 ;; ## Pixels type

@@ -126,6 +126,7 @@
             [fastmath.distance :as dist]
             [fastmath.easings :as e]
             [clojure2d.protocols :as pr]
+            [clojure2d.color.whitepoints :as wp]
             [clojure.java.io :refer [input-stream resource]])
   (:import [fastmath.vector Vec2 Vec3 Vec4]
            [java.awt Color]
@@ -1842,7 +1843,7 @@
   (let [xyz (to-XYZ c)
         d (+ (.x xyz) (.y xyz) (.z xyz))]
     (if (zero? d)
-      (Vec4. 0.0 0.3127159072215825 0.3290014805066623 (.w xyz))
+      (Vec4. 0.0 D65x D65y (.w xyz))
       (Vec4. (.y xyz)
              (/ (.x xyz) d)
              (/ (.y xyz) d)
@@ -1884,23 +1885,7 @@
 
 ;; UVW, https://en.wikipedia.org/wiki/CIE_1964_color_space
 
-(defn- xy->uv
-  ^Vec2 [^Vec2 xy]
-  (let [d (/ (+ (* 12.0 (.y xy))
-                (* -2.0 (.x xy))
-                3.0))]
-    (Vec2. (* 4.0 (.x xy) d)
-           (* 6.0 (.y xy) d))))
-
-(defn- uv->xy
-  ^Vec2 [^Vec2 uv]
-  (let [d (/ (+ (* 2.0 (.x uv))
-                (* -8.0 (.y uv))
-                4.0))]
-    (Vec2. (* 3.0 (.x uv) d)
-           (* 2.0 (.y uv) d))))
-
-(def ^:private ^Vec2 uv0 (xy->uv (Vec2. D65x D65y)))
+(def ^:private ^Vec2 uv0 (wp/xy->uv (Vec2. D65x D65y)))
 
 (defn to-UVW
   "sRGB -> UVW
@@ -1910,7 +1895,7 @@
   * W: -17.0 99.0"
   ^Vec4 [c]
   (let [^Vec4 c (to-Yxy c)
-        ^Vec2 uv (v/sub (xy->uv (Vec2. (.y c) (.z c))) uv0)
+        ^Vec2 uv (v/sub (wp/xy->uv (Vec2. (.y c) (.z c))) uv0)
         W (- (* 25.0 (m/cbrt (.x c))) 17.0)
         W13 (* 13.0 W)]
     (Vec4. (* W13 (.x uv)) (* W13 (.y uv)) W (.w c))))
@@ -1931,8 +1916,8 @@
   (let [^Vec4 c (pr/to-color c)
         Y (m/cb (/ (+ 17.0 (.z c)) 25.0))
         W13 (/ (* 13.0 (.z c)))
-        ^Vec2 xy (uv->xy (Vec2. (+ (* (.x c) W13) (.x uv0))
-                                (+ (* (.y c) W13) (.y uv0))))]
+        ^Vec2 xy (wp/uv->xy (Vec2. (+ (* (.x c) W13) (.x uv0))
+                                   (+ (* (.y c) W13) (.y uv0))))]
     (from-Yxy (Vec4. Y (.x xy) (.y xy) (.w c)))))
 
 (defn from-UVW*

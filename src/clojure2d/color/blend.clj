@@ -14,8 +14,7 @@
   (:refer-clojure :exclude [or and])
   (:require [fastmath.core :as m]
             [fastmath.vector :as v]
-            [clojure2d.color :as c]
-            [clojure.set :as set])
+            [clojure2d.color :as c])
   (:import [fastmath.vector Vec4]))
 
 (set! *unchecked-math* :warn-on-boxed)
