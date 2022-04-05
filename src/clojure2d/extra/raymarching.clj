@@ -7,7 +7,6 @@
             [fastmath.vector :as v])
   (:import [fastmath.vector Vec3]))
 
-(set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
 

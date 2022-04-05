@@ -7,7 +7,6 @@
             [clojure2d.pixels :as p])
   (:import [clojure2d.pixels Pixels]))
 
-(set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
 

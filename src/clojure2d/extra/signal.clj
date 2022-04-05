@@ -16,7 +16,6 @@
   (:import [clojure2d.pixels Pixels]
            [clojure2d.java.signal Converter]))
 
-(set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
 

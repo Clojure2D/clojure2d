@@ -54,7 +54,7 @@ In points:
 ### What's odd?
 
 It's kind of a personal library which supports my (probably not optimal, not convenient for others) way of creating stuff.
-There are still plenty of bugs and not idiomatic code. It may be slower than Processing. Eats a lot of memory (Pixels code is generally immutable). Still not stable API and architecture.
+There are still plenty of bugs and not idiomatic code. It may be slower than Processing. Eats a lot of memory (Pixels code is generally immutable).
 
 ## Installation
 
@@ -124,9 +124,8 @@ All math functions are in [fastmath](https://github.com/generateme/fastmath) rep
 Yes! You can help with this project:
 
 * Beginners:
-  - create more variations
   - create pixel filters
-  - create analog (audio) filters
+  - create color spaces
 * Advanced:
   - speed optimizations
   - idiomatic clojure fixes
@@ -146,5 +145,5 @@ Or just Pull Request.
 
 ## License
 
-Copyright © 2016-2018 GenerateMe
+Copyright © 2016-2022 GenerateMe
 Distributed under the MIT Licence

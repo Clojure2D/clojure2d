@@ -131,7 +131,6 @@
            [java.awt Color]
            [clojure.lang APersistentVector ISeq Seqable]))
 
-(set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
 

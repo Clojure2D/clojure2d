@@ -19,7 +19,6 @@
             [fastmath.core :as m]
             [fastmath.random :as r]))
 
-(set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
 

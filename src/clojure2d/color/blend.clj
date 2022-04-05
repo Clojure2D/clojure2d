@@ -18,7 +18,6 @@
             [clojure.set :as set])
   (:import [fastmath.vector Vec4]))
 
-(set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
 
