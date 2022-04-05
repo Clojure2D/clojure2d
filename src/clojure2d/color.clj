@@ -2527,23 +2527,23 @@
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        H (m/wrap -180.0 180.0 (.x c))
-        C (* 3.0 (.y c))
-        L (* 4.0 (.z c))
-        Q (* 2.0 (m/exp (* 0.03 (- 1.0 (/ C L)))))
-        mn (/ (- L C) (* 2.0 (dec Q)))
-        mx (+ mn (/ C Q))]
+        H       (m/wrap -180.0 180.0 (.x c))
+        C       (* 3.0 (.y c))
+        L       (* 4.0 (.z c))
+        Q       (* 2.0 (m/exp (* 0.03 (- 1.0 (/ C L)))))
+        mn      (/ (- L C) (* 2.0 (dec Q)))
+        mx      (+ mn (/ C Q))]
     (cond
-      (<= 0.0 H 60.0) (let [t (m/tan (m/radians (* 1.5 H)))]
-                        (Vec4. mx (/ (+ (* mx t) mn) (inc t)) mn (.w c)))
-      (<= 60.0 H 120.0) (let [t (m/tan (m/radians (* 0.75 (- H 180.0))))]
-                          (Vec4. (/ (- (* mx (inc t)) mn) t) mx mn (.w c)))
-      (<= 120.0 H 180.0) (let [t (m/tan (m/radians (* 0.75 (- H 180.0))))]
-                           (Vec4. mn mx (- (* mx (inc t)) (* mn t)) (.w c)))
-      (<= -60.0 H 0.0) (let [t (m/tan (m/radians (* 0.75 H)))]
-                         (Vec4. mx mn (- (* mn (inc t)) (* mx t)) (.w c)))
-      (<= -120.0 H -60.0) (let [t (m/tan (m/radians (* 0.75 H)))]
-                            (Vec4. (/ (- (* mn (inc t)) mx) t) mn mx (.w c)))
+      (<= 0.0 H 60.0)      (let [t (m/tan (m/radians (* 1.5 H)))]
+                             (Vec4. mx (/ (+ (* mx t) mn) (inc t)) mn (.w c)))
+      (<= 60.0 H 120.0)    (let [t (m/tan (m/radians (* 0.75 (- H 180.0))))]
+                             (Vec4. (/ (- (* mx (inc t)) mn) t) mx mn (.w c)))
+      (<= 120.0 H 180.0)   (let [t (m/tan (m/radians (* 0.75 (- H 180.0))))]
+                             (Vec4. mn mx (- (* mx (inc t)) (* mn t)) (.w c)))
+      (<= -60.0 H 0.0)     (let [t (m/tan (m/radians (* 0.75 H)))]
+                             (Vec4. mx mn (- (* mn (inc t)) (* mx t)) (.w c)))
+      (<= -120.0 H -60.0)  (let [t (m/tan (m/radians (* 0.75 H)))]
+                             (Vec4. (/ (- (* mn (inc t)) mx) t) mn mx (.w c)))
       (<= -180.0 H -120.0) (let [t (m/tan (m/radians (* 1.5 (+ H 180.0))))]
                              (Vec4. mn (/ (+ (* mn t) mx) (inc t)) mx (.w c))))))
 
@@ -3383,110 +3383,110 @@
 * key - name as keyword
 * value - vector with functions containing to-XXX and from-XXX converters."
      :metadoc/categories meta-conv}
-  colorspaces {:CMY   [to-CMY from-CMY]
-               :OHTA  [to-OHTA from-OHTA]
-               :XYZ   [to-XYZ from-XYZ]
-               :XYZ1   [to-XYZ1 from-XYZ1]
-               :DIN99 [to-DIN99 from-DIN99]
-               :DIN99b [to-DIN99b from-DIN99b]
-               :DIN99c [to-DIN99c from-DIN99c]
-               :DIN99d [to-DIN99d from-DIN99d]
-               :DIN99o [to-DIN99o from-DIN99o]
-               :UCS   [to-UCS from-UCS]
-               :UVW   [to-UVW from-UVW]
-               :XYB   [to-XYB from-XYB]
-               :RYB   [to-RYB from-RYB]
-               :Yxy   [to-Yxy from-Yxy]
-               :LMS   [to-LMS from-LMS]
-               :IPT   [to-IPT from-IPT]
-               :IgPgTg  [to-IgPgTg from-IgPgTg]
-               :LUV   [to-LUV from-LUV]
-               :LAB   [to-LAB from-LAB]
-               :Oklab [to-Oklab from-Oklab]
-               :Oklch [to-Oklch from-Oklch]
-               :Okhsv [to-Okhsv from-Okhsv]
-               :Okhwb [to-Okhwb from-Okhwb]
-               :Okhsl [to-Okhsl from-Okhsl]
-               :JAB   [to-JAB from-JAB]
-               :HunterLAB  [to-HunterLAB from-HunterLAB]
-               :LCH   [to-LCH from-LCH]
-               :LCHuv   [to-LCHuv from-LCHuv]
-               :JCH   [to-JCH from-JCH]
-               :HCL   [to-HCL from-HCL]
-               :HSB   [to-HSB from-HSB]
-               :HSI   [to-HSI from-HSI]
-               :HSL   [to-HSL from-HSL]
-               :HSV   [to-HSV from-HSV]
-               :PalettonHSV   [to-PalettonHSV from-PalettonHSV]
-               :HWB   [to-HWB from-HWB]
-               :GLHS  [to-GLHS from-GLHS]
-               :YPbPr [to-YPbPr from-YPbPr]
-               :YDbDr [to-YDbDr from-YDbDr]
-               :YCbCr [to-YCbCr from-YCbCr]
-               :YCgCo [to-YCgCo from-YCgCo]
-               :YUV   [to-YUV from-YUV]
-               :YIQ   [to-YIQ from-YIQ]
-               :Gray  [to-Gray from-Gray]
-               :sRGB  [to-sRGB from-sRGB]
-               :linearRGB [from-sRGB to-sRGB]
-               :Cubehelix [to-Cubehelix from-Cubehelix]
-               :OSA [to-OSA from-OSA]
-               :RGB   [to-color to-color]})
+  colorspaces {:CMY         [to-CMY from-CMY]
+               :OHTA        [to-OHTA from-OHTA]
+               :XYZ         [to-XYZ from-XYZ]
+               :XYZ1        [to-XYZ1 from-XYZ1]
+               :DIN99       [to-DIN99 from-DIN99]
+               :DIN99b      [to-DIN99b from-DIN99b]
+               :DIN99c      [to-DIN99c from-DIN99c]
+               :DIN99d      [to-DIN99d from-DIN99d]
+               :DIN99o      [to-DIN99o from-DIN99o]
+               :UCS         [to-UCS from-UCS]
+               :UVW         [to-UVW from-UVW]
+               :XYB         [to-XYB from-XYB]
+               :RYB         [to-RYB from-RYB]
+               :Yxy         [to-Yxy from-Yxy]
+               :LMS         [to-LMS from-LMS]
+               :IPT         [to-IPT from-IPT]
+               :IgPgTg      [to-IgPgTg from-IgPgTg]
+               :LUV         [to-LUV from-LUV]
+               :LAB         [to-LAB from-LAB]
+               :Oklab       [to-Oklab from-Oklab]
+               :Oklch       [to-Oklch from-Oklch]
+               :Okhsv       [to-Okhsv from-Okhsv]
+               :Okhwb       [to-Okhwb from-Okhwb]
+               :Okhsl       [to-Okhsl from-Okhsl]
+               :JAB         [to-JAB from-JAB]
+               :HunterLAB   [to-HunterLAB from-HunterLAB]
+               :LCH         [to-LCH from-LCH]
+               :LCHuv       [to-LCHuv from-LCHuv]
+               :JCH         [to-JCH from-JCH]
+               :HCL         [to-HCL from-HCL]
+               :HSB         [to-HSB from-HSB]
+               :HSI         [to-HSI from-HSI]
+               :HSL         [to-HSL from-HSL]
+               :HSV         [to-HSV from-HSV]
+               :PalettonHSV [to-PalettonHSV from-PalettonHSV]
+               :HWB         [to-HWB from-HWB]
+               :GLHS        [to-GLHS from-GLHS]
+               :YPbPr       [to-YPbPr from-YPbPr]
+               :YDbDr       [to-YDbDr from-YDbDr]
+               :YCbCr       [to-YCbCr from-YCbCr]
+               :YCgCo       [to-YCgCo from-YCgCo]
+               :YUV         [to-YUV from-YUV]
+               :YIQ         [to-YIQ from-YIQ]
+               :Gray        [to-Gray from-Gray]
+               :sRGB        [to-sRGB from-sRGB]
+               :linearRGB   [from-sRGB to-sRGB]
+               :Cubehelix   [to-Cubehelix from-Cubehelix]
+               :OSA         [to-OSA from-OSA]
+               :RGB         [to-color to-color]})
 
 (def ^{:doc "Map of all color spaces functions (normalized).
 
 * key - name as keyword
 * value - vector with functions containing to-XXX* and from-XXX* converters."
      :metadoc/categories meta-conv}
-  colorspaces* {:CMY   [to-CMY* from-CMY*]
-                :OHTA  [to-OHTA* from-OHTA*]
-                :XYZ   [to-XYZ* from-XYZ*]
-                :XYZ1   [to-XYZ1* from-XYZ1*]
-                :DIN99 [to-DIN99* from-DIN99*]
-                :DIN99b [to-DIN99b* from-DIN99b*]
-                :DIN99c [to-DIN99c* from-DIN99c*]
-                :DIN99d [to-DIN99d* from-DIN99d*]
-                :DIN99o [to-DIN99o* from-DIN99o*]
-                :UCS   [to-UCS* from-UCS*]
-                :UVW   [to-UVW* from-UVW*]
-                :XYB   [to-XYB* from-XYB*]
-                :RYB   [to-RYB* from-RYB*]
-                :Yxy   [to-Yxy* from-Yxy*]
-                :LMS   [to-LMS* from-LMS*]
-                :IPT   [to-IPT* from-IPT*]
-                :IgPgTg   [to-IgPgTg* from-IgPgTg*]
-                :LUV   [to-LUV* from-LUV*]
-                :LAB   [to-LAB* from-LAB*]
-                :Oklab [to-Oklab* from-Oklab*]
-                :Oklch [to-Oklch* from-Oklch*]
-                :Okhsv [to-Okhsv* from-Okhsv*]
-                :Okhwb [to-Okhwb* from-Okhwb*]
-                :Okhsl [to-Okhsl* from-Okhsl*]
-                :JAB   [to-JAB* from-JAB*]
-                :HunterLAB  [to-HunterLAB* from-HunterLAB*]
-                :LCH   [to-LCH* from-LCH*]
-                :LCHuv   [to-LCHuv* from-LCHuv*]
-                :JCH   [to-JCH* from-JCH*]
-                :HCL   [to-HCL* from-HCL*]
-                :HSB   [to-HSB* from-HSB*]
-                :HSI   [to-HSI* from-HSI*]
-                :HSL   [to-HSL* from-HSL*]
-                :HSV   [to-HSV* from-HSV*]
-                :PalettonHSV   [to-PalettonHSV* from-PalettonHSV*]
-                :HWB   [to-HWB* from-HWB*]
-                :GLHS  [to-GLHS* from-GLHS*]
-                :YPbPr [to-YPbPr* from-YPbPr*]
-                :YDbDr [to-YDbDr* from-YDbDr*]
-                :YCbCr [to-YCbCr* from-YCbCr*]
-                :YCgCo [to-YCgCo* from-YCgCo*]
-                :YUV   [to-YUV* from-YUV*]
-                :YIQ   [to-YIQ* from-YIQ*]
-                :Gray  [to-Gray from-Gray]
-                :sRGB  [to-sRGB* from-sRGB*]
-                :linearRGB [from-sRGB* to-sRGB*]
-                :Cubehelix [to-Cubehelix* from-Cubehelix*]
-                :OSA [to-OSA* from-OSA*]
-                :RGB   [to-color to-color]})
+  colorspaces* {:CMY         [to-CMY* from-CMY*]
+                :OHTA        [to-OHTA* from-OHTA*]
+                :XYZ         [to-XYZ* from-XYZ*]
+                :XYZ1        [to-XYZ1* from-XYZ1*]
+                :DIN99       [to-DIN99* from-DIN99*]
+                :DIN99b      [to-DIN99b* from-DIN99b*]
+                :DIN99c      [to-DIN99c* from-DIN99c*]
+                :DIN99d      [to-DIN99d* from-DIN99d*]
+                :DIN99o      [to-DIN99o* from-DIN99o*]
+                :UCS         [to-UCS* from-UCS*]
+                :UVW         [to-UVW* from-UVW*]
+                :XYB         [to-XYB* from-XYB*]
+                :RYB         [to-RYB* from-RYB*]
+                :Yxy         [to-Yxy* from-Yxy*]
+                :LMS         [to-LMS* from-LMS*]
+                :IPT         [to-IPT* from-IPT*]
+                :IgPgTg      [to-IgPgTg* from-IgPgTg*]
+                :LUV         [to-LUV* from-LUV*]
+                :LAB         [to-LAB* from-LAB*]
+                :Oklab       [to-Oklab* from-Oklab*]
+                :Oklch       [to-Oklch* from-Oklch*]
+                :Okhsv       [to-Okhsv* from-Okhsv*]
+                :Okhwb       [to-Okhwb* from-Okhwb*]
+                :Okhsl       [to-Okhsl* from-Okhsl*]
+                :JAB         [to-JAB* from-JAB*]
+                :HunterLAB   [to-HunterLAB* from-HunterLAB*]
+                :LCH         [to-LCH* from-LCH*]
+                :LCHuv       [to-LCHuv* from-LCHuv*]
+                :JCH         [to-JCH* from-JCH*]
+                :HCL         [to-HCL* from-HCL*]
+                :HSB         [to-HSB* from-HSB*]
+                :HSI         [to-HSI* from-HSI*]
+                :HSL         [to-HSL* from-HSL*]
+                :HSV         [to-HSV* from-HSV*]
+                :PalettonHSV [to-PalettonHSV* from-PalettonHSV*]
+                :HWB         [to-HWB* from-HWB*]
+                :GLHS        [to-GLHS* from-GLHS*]
+                :YPbPr       [to-YPbPr* from-YPbPr*]
+                :YDbDr       [to-YDbDr* from-YDbDr*]
+                :YCbCr       [to-YCbCr* from-YCbCr*]
+                :YCgCo       [to-YCgCo* from-YCgCo*]
+                :YUV         [to-YUV* from-YUV*]
+                :YIQ         [to-YIQ* from-YIQ*]
+                :Gray        [to-Gray from-Gray]
+                :sRGB        [to-sRGB* from-sRGB*]
+                :linearRGB   [from-sRGB* to-sRGB*]
+                :Cubehelix   [to-Cubehelix* from-Cubehelix*]
+                :OSA         [to-OSA* from-OSA*]
+                :RGB         [to-color to-color]})
 
 ;; List of color spaces names
 (def ^{:doc "List of all color space names." :metadoc/categories meta-conv} colorspaces-list (sort (keys colorspaces)))
@@ -4639,10 +4639,10 @@
                  :warm (gradient-cubehelix [(Vec4. -100.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0)])
                  :cool (gradient-cubehelix [(Vec4. 260.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0)])
                  :rainbow (fn [^double t] (let [ts (m/abs (- t 0.5))]
-                                            (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
-                                                                   (- 1.5 (* 1.5 ts))
-                                                                   (- 0.8 (* 0.9 ts))
-                                                                   255.0))))
+                                           (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
+                                                                  (- 1.5 (* 1.5 ts))
+                                                                  (- 0.8 (* 0.9 ts))
+                                                                  255.0))))
                  :black-body (fn [^double t] (temperature (m/mlerp 1000 15000 t)))})))
 
 (defn- get-gradient-from-file-

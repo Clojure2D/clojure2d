@@ -216,29 +216,30 @@
   (.multiply m1 m2))
 
 (def chromatic-adaptation-methods
-  (let [I (diagonal->matrix 1.0 1.0 1.0)
-        bradford (rows->matrix [0.8951000  0.2664000 -0.1614000]
-                               [-0.7502000  1.7135000  0.0367000]
-                               [0.0389000 -0.0685000  1.0296000])
+  (let [I         (diagonal->matrix 1.0 1.0 1.0)
+        bradford  (rows->matrix [0.8951000  0.2664000 -0.1614000]
+                                [-0.7502000  1.7135000  0.0367000]
+                                [0.0389000 -0.0685000  1.0296000])
         von-kries (rows->matrix [0.4002400  0.7076000 -0.0808100]
                                 [-0.2263000  1.1653200  0.0457000]
                                 [0.0000000  0.0000000  0.9182200])]
     {:xy-scaling [I I]
-     :bradford [bradford (inverse-matrix bradford)]
-     :von-kries [von-kries (inverse-matrix von-kries)]}))
+     :bradford   [bradford (inverse-matrix bradford)]
+     :von-kries  [von-kries (inverse-matrix von-kries)]}))
 
 (defn- chromatic-adaptation-matrix
   ([source-wp destination-wp] (chromatic-adaptation-matrix :von-kries source-wp destination-wp))
   ([adaptation-method source-wp destination-wp]
    (let [ws (tristimulus source-wp)
          wd (tristimulus destination-wp)
-         [M M-1] (chromatic-adaptation-methods adaptation-method)
-         ^doubles s (.getDataRef (mv M ws))
-         ^doubles d (.getDataRef (mv M wd))
+         [Ma Ma-1] (chromatic-adaptation-methods adaptation-method)
+         ^doubles s (.getDataRef (mv Ma ws))
+         ^doubles d (.getDataRef (mv Ma wd))
          diag (diagonal->matrix (/ (aget d 0) (aget s 0))
                                 (/ (aget d 1) (aget s 1))
-                                (/ (aget d 2) (aget s 2)))]
-     (mm M-1 (mm diag M)))))
+                                (/ (aget d 2) (aget s 2)))
+         M (mm Ma-1 (mm diag Ma))]
+     [M (inverse-matrix M)])))
 
 #_(chromatic-adaptation-matrix :von-kries [:CIE2 :D65] [:CIE2 :D50])
 
