@@ -24,6 +24,10 @@ All notable changes to this project will be documented in this file. This change
 * `IPT` should operate on not scaled XYZ
 * missing palettes from `:nord`
 
+### Removed
+
+* Dependency to `smile-mkl` is removed. `openblas` seems to be enough for current functionality. This makes a package lighter (1GB -> 250MB).
+
 ## 1.4.4
 
 * Clojure 1.11.0 

@@ -3,8 +3,8 @@
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
-  :dependencies [[org.clojure/clojure "1.11.0"]
-                 [generateme/fastmath "2.1.8"]
+  :dependencies [[org.clojure/clojure "1.11.1"]
+                 [generateme/fastmath "2.1.8" :exclusions [com.github.haifengl/smile-mkl]]
                  [org.apache.xmlgraphics/batik-transcoder "1.14"]]
   :resource-path "resources/"
   :java-source-paths ["src"]
