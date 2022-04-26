@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file. This change
 * `apply-theme` to generate random color from a given color and theme definition
 * `whiten` and `blacken`
 * `to-XYZ1`, `from-XYZ1` not scaled version (range from 0 to around 1)
-* `scale` 3 or 4 channels by a value (to easier normalize rgb)
+* `scale` 3 or 4 channels by a value (to easier normalize rgb), also `scale-up`, `scale-down`
 * new colorspaces from [colour](https://colour.readthedocs.io/en/v0.4.1/index.html):
     - [`:IgPgTg`](https://www.ingentaconnect.com/content/ist/jpi/2020/00000003/00000002/art00002#)
 	- [`:UCS`](https://en.wikipedia.org/wiki/CIE_1960_color_space#Relation_to_CIE_XYZ)

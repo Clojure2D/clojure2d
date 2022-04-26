@@ -452,7 +452,7 @@
   (v/fmap (pr/to-color c) lclamp255))
 
 (defn scale
-  "Multiply color by given value, do not change alpha channel by default"
+  "Multiply color channels by given value, do not change alpha channel by default"
   {:metadoc/categories meta-ops}
   (^Vec4 [c ^double v] (scale c v false))
   (^Vec4 [c ^double v alpha?]
@@ -461,6 +461,18 @@
             (* v (.y c))
             (* v (.z c))
             (if alpha? (* v (.w c)) (.w c))))))
+
+(defn scale-down
+  "Divide color channels by 255.0"
+  {:metadoc/categories meta-ops}
+  (^Vec4 [c] (scale-down c false))
+  (^Vec4 [c alpha?] (scale c (/ 255.0) alpha?)))
+
+(defn scale-up
+  "Multiply color channels by 255.0"
+  {:metadoc/categories meta-ops}
+  (^Vec4 [c] (scale-up c false))
+  (^Vec4 [c alpha?] (scale c 255.0 alpha?)))
 
 (defn gray
   "Create grayscale color based on intensity `v`. Optional parameter alpha `a`.
