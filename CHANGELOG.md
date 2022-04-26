@@ -16,6 +16,8 @@ All notable changes to this project will be documented in this file. This change
 * more from `Oklab` family: `Okhsv`, `Okhsl` and `Okhwb`
 * `DIN99` color space family: `:DIN99`, `:DIN99b`, `:DIN99c`, `:DIN99d` and `:DIN99o`
 * `reduce-colors` can accept a distance (as function or `fastmath.distance` object), `clarans` algorithm is used then (instead of `xmeans`). `clarans` path is very slow though.
+* path definition accepts winding rule and shape appending
+* certain shapes can accept coordinates as vectors
 
 ### Fixed
 

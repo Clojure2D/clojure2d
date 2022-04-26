@@ -886,30 +886,38 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
                                       PathIterator/SEG_QUADTO :quad
                                       PathIterator/SEG_CUBICTO :cubic})
 
+(def ^:private winding-rules->keywords {PathIterator/WIND_EVEN_ODD :even-odd
+                                      PathIterator/WIND_NON_ZERO :non-zero})
+
 (defn- shape->path-seq
   ([iterator] (shape->path-seq iterator (double-array 6)))
   ([^PathIterator iterator ^doubles buff]
    (lazy-seq
     (when-not (.isDone iterator)
       (let [t (segment-types->keywords (.currentSegment iterator buff) :unknown)
-            pair [t (case t
-                      :close nil
-                      :line (vec (take 2 buff))
-                      :move (vec (take 2 buff))
-                      :quad (vec (take 4 buff))
-                      :cubic (vec buff)
-                      :unknown)]]
+            w (winding-rules->keywords (.getWindingRule iterator) :unknown)
+            triplet [t (case t
+                         :close nil
+                         :line (vec (take 2 buff))
+                         :move (vec (take 2 buff))
+                         :quad (vec (take 4 buff))
+                         :cubic (vec buff)
+                         :unknown) w]]
         (.next iterator)
-        (cons pair (shape->path-seq iterator buff)))))))
+        (cons triplet (shape->path-seq iterator buff)))))))
 
 (defn shape->path-def
-  "Create path definition, sequence of pairs of [command coords]:
+  "Create path definition from a shape
+  
+  Returns sequence of triplets of [command coords winding-rule]:
 
   * `[:move [x y]]` - move to a position
   * `[:line [x y]]` - line to a position
   * `[:quad [x1 y1 x2 y2]` - curved line to a position
   * `[:cubic [x1 y1 x2 y2 x3 y3]]` - bezier line to a position
   * `[:close]` - close path
+  
+  Winding rule is one of `:even-odd` and `:non-zero` (default)  
 
   See [[path-def->shape]]"
   [^Shape shape]
@@ -921,16 +929,31 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 (defn- seg-cubicto [^Path2D p [x1 y1 x2 y2 x3 y3]] (.curveTo p x1 y1 x2 y2 x3 y3))
 
 (defn path-def->shape
-  "Create a shape from path definition, see [[shape->path-def]]"
+  "Create a shape from path definition, see [[shape->path-def]].
+  
+  Path entry is a tripplet [command arguments [winding-rule]]  
+
+  * `[:move [x y]]` - move to a position
+  * `[:line [x y]]` - line to a position
+  * `[:quad [x1 y1 x2 y2]` - curved line to a position
+  * `[:cubic [x1 y1 x2 y2 x3 y3]]` - bezier line to a position
+  * `[:close]` - close path
+  * `[:shape [shape-object connect?]]` - append given shape
+  
+  Winding rule can be one of `:even-odd` and `:non-zero` (default) and is optional. "
   [path-def]
   (let [^Path2D p (Path2D$Double.)]
-    (doseq [[t v] path-def]
+    (doseq [[t v w] path-def]
+      (when w (.setWindingRule p (case t
+                                   :even-odd Path2D/WIND_EVEN_ODD
+                                   :non-zero Path2D/WIND_NON_ZERO)))
       (case t
         :close (.closePath p)
         :line (seg-lineto p v)
         :quad (seg-quadto p v)
         :cubic (seg-cubicto p v)
-        :move (seg-moveto p v)))
+        :move (seg-moveto p v)
+        :shape (.append p ^Shape (first v) (if (second v) true false))))
     p))
 
 ;; clip
@@ -1040,8 +1063,8 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   ([canvas ^double x ^double y]
    (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
    canvas)
-  ([canvas vect]
-   (point canvas (vect 0) (vect 1))))
+  ([canvas [^double x ^double y]]
+   (point canvas x y)))
 
 (defn shape
   "Draw Java2D shape object"
@@ -1058,18 +1081,22 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    (.setFrame r x y w h)
    r)
   ([x y w h]
-   (rect-shape (Rectangle2D$Double.) x y w h)))
+   (rect-shape (Rectangle2D$Double.) x y w h))
+  ([[x y] w h]
+   (rect-shape x y w h)))
 
 (defn rect
   "Draw rectangle with top-left corner at `(x,y)` position with width `w` and height `h`. Optionally you can set `stroke?` (default: `false`) to `true` if you don't want to fill rectangle and draw outline only.
 
-  See also: [[crect]]."
+  See also: [[crect]] and [[prect]]."
   {:metadoc/categories #{:draw}}
   ([^Canvas canvas x y w h stroke?]
    (shape canvas (rect-shape (.rect-obj canvas) x y w h) stroke?)
    canvas)
   ([canvas x y w h]
-   (rect canvas x y w h false)))
+   (rect canvas x y w h false))
+  ([canvas [x y] w h]
+   (rect canvas x y w h)))
 
 (defn crect-shape
   ([^Rectangle2D r x y w h]
@@ -1078,7 +1105,9 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
      (.setFrame r (- ^double x w2) (- ^double y h2) w h)
      r))
   ([x y w h]
-   (crect-shape (Rectangle2D$Double.) x y w h)))
+   (crect-shape (Rectangle2D$Double.) x y w h))
+  ([[x y] w h]
+   (crect-shape x y w h)))
 
 (defn crect
   "Centered version of [[rect]]."
@@ -1087,37 +1116,67 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    (shape canvas (crect-shape (.rect-obj canvas) x y w h) stroke?)
    canvas)
   ([canvas x y w h]
-   (crect canvas x y w h false)))
+   (crect canvas x y w h false))
+  ([canvas [x y] w h]
+   (crect canvas x y w h)))
+
+(defn prect-shape
+  ([^Rectangle2D r x1 y1 x2 y2]
+   (.setFrame r x1 y1 (- ^double x2 ^double x1) (- ^double y2 ^double y1))
+   r)
+  ([x y w h]
+   (prect-shape (Rectangle2D$Double.) x y w h))
+  ([[x y] w h]
+   (prect-shape x y w h)))
+
+(defn prect
+  "Draw rectangle with top-left corner at `(x1,y1)` and bottom-right corner at `(x2,y2)`. Optionally you can set `stroke?` (default: `false`) to `true` if you don't want to fill rectangle and draw outline only.
+
+  See also: [[rect]]."
+  {:metadoc/categories #{:draw}}
+  ([^Canvas canvas x1 y1 x2 y2 stroke?]
+   (shape canvas (prect-shape (.rect-obj canvas) x1 y1 x2 y2) stroke?)
+   canvas)
+  ([canvas x1 y1 x2 y2]
+   (prect canvas x1 y1 x2 y2 false))
+  ([canvas [x1 y1] [x2 y2]]
+   (prect canvas x1 y1 x2 y2)))
 
 (defn ellipse-shape
   ([^Ellipse2D e x y w h]
    (.setFrame e (- ^double x (* ^double w 0.5)) (- ^double y (* ^double h 0.5)) w h)
    e)
   ([x y w h]
-   (ellipse-shape (Ellipse2D$Double.) x y w h)))
+   (ellipse-shape (Ellipse2D$Double.) x y w h))
+  ([[x y] w h]
+   (ellipse-shape x y w h)))
 
 (defn ellipse
   "Draw ellipse with middle at `(x,y)` position with width `w` and height `h`."
   {:metadoc/categories #{:draw}}
-  ([^Canvas canvas x1 y1 w h stroke?]
-   (shape canvas (ellipse-shape (.ellipse_obj canvas) x1 y1 w h) stroke?)
+  ([^Canvas canvas x y w h stroke?]
+   (shape canvas (ellipse-shape (.ellipse_obj canvas) x y w h) stroke?)
    canvas)
-  ([canvas x1 y1 w h]
-   (ellipse canvas x1 y1 w h false)))
+  ([canvas x y w h]
+   (ellipse canvas x y w h false))
+  ([canvas [x y] w h]
+   (ellipse canvas x y w h)))
 
 (defn arc-shape
-  ([^Arc2D a x1 y1 w h start extent type]
-   (.setArc a (- ^double x1 (* ^double w 0.5)) (- ^double y1 (* ^double h 0.5)) w h
+  ([^Arc2D a x y w h start extent type]
+   (.setArc a (- ^double x (* ^double w 0.5)) (- ^double y (* ^double h 0.5)) w h
             (m/degrees start) (- (m/degrees extent))
             (case type
               :chord Arc2D/CHORD
               :pie Arc2D/PIE
               Arc2D/OPEN))
    a)
-  ([x1 y1 w h start extent type]
-   (arc-shape (Arc2D$Double.) x1 y1 w h start extent type))
-  ([x1 y1 w h start extent]
-   (arc-shape x1 y1 w h start extent :open)))
+  ([x y w h start extent type]
+   (arc-shape (Arc2D$Double.) x y w h start extent type))
+  ([x y w h start extent]
+   (arc-shape x y w h start extent :open))
+  ([[x y] w h start extent]
+   (arc-shape x y w h start extent)))
 
 (defn arc
   "Draw arc with middle at `(x,y)` position with width `w` and height `h`.
@@ -1130,27 +1189,31 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   * `:pie`
   * `:chord`"
   {:metadoc/categories #{:draw}}
-  ([^Canvas canvas x1 y1 w h start extent type stroke?]
-   (shape canvas (arc-shape (.arc-obj canvas) x1 y1 w h start extent type) stroke?)
+  ([^Canvas canvas x y w h start extent type stroke?]
+   (shape canvas (arc-shape (.arc-obj canvas) x y w h start extent type) stroke?)
    canvas)
-  ([canvas x1 y1 w h start extent type]
-   (arc canvas x1 y1 w h start extent type true))
-  ([canvas x1 y1 w h start extent]
-   (arc canvas x1 y1 w h start extent :open true)))
+  ([canvas x y w h start extent type]
+   (arc canvas x y w h start extent type true))
+  ([canvas x y w h start extent]
+   (arc canvas x y w h start extent :open))
+  ([canvas [x y] w h start extent]
+   (arc canvas x y w h start extent)))
 
 (defn rarc-shape
-  ([^Arc2D a x1 y1 r start extent type]
-   (.setArcByCenter a x1 y1 r
+  ([^Arc2D a x y r start extent type]
+   (.setArcByCenter a x y r
                     (m/degrees start) (- (m/degrees extent))
                     (case type
                       :chord Arc2D/CHORD
                       :pie Arc2D/PIE
                       Arc2D/OPEN))
    a)
-  ([x1 y1 r start extent type]
-   (rarc-shape (Arc2D$Double.) x1 y1 r start extent type))
-  ([x1 y1 r start extent]
-   (rarc-shape x1 y1 r start extent :open)))
+  ([x y r start extent type]
+   (rarc-shape (Arc2D$Double.) x y r start extent type))
+  ([x y r start extent]
+   (rarc-shape x y r start extent :open))
+  ([[x y] r start extent]
+   (rarc-shape x y r start extent)))
 
 (defn rarc
   "Draw arc with middle at `(x,y)` with radius `r`.
@@ -1163,23 +1226,27 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   * `:pie`
   * `:chord`"
   {:metadoc/categories #{:draw}}
-  ([^Canvas canvas x1 y1 r start extent type stroke?]
-   (shape canvas (rarc-shape (.arc-obj canvas) x1 y1 r start extent type) stroke?)
+  ([^Canvas canvas x y r start extent type stroke?]
+   (shape canvas (rarc-shape (.arc-obj canvas) x y r start extent type) stroke?)
    canvas)
-  ([canvas x1 y1 r start extent type]
-   (rarc canvas x1 y1 r start extent type true))
-  ([canvas x1 y1 r start extent]
-   (rarc canvas x1 y1 r start extent :open true)))
+  ([canvas x y r start extent type]
+   (rarc canvas x y r start extent type true))
+  ([canvas x y r start extent]
+   (rarc canvas x y r start extent :open))
+  ([canvas [x y] r start extent]
+   (rarc canvas x y r start extent)))
 
 (defn triangle-shape
-  [x1 y1 x2 y2 x3 y3]
-  (let [^Path2D p (Path2D$Double.)]
-    (doto p
-      (.moveTo x1 y1)
-      (.lineTo x2 y2)
-      (.lineTo x3 y3)
-      (.closePath))
-    p))
+  ([x1 y1 x2 y2 x3 y3]
+   (let [^Path2D p (Path2D$Double.)]
+     (doto p
+       (.moveTo x1 y1)
+       (.lineTo x2 y2)
+       (.lineTo x3 y3)
+       (.closePath))
+     p))
+  ([[x1 y1] [x2 y2] [x3 y3]]
+   (triangle-shape x1 y1 x2 y2 x3 y3)))
 
 (defn triangle
   "Draw triangle with corners at 3 positions."
@@ -1188,7 +1255,9 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    (shape canvas (triangle-shape x1 y1 x2 y2 x3 y3) stroke?)
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3]
-   (triangle canvas x1 y1 x2 y2 x3 y3 false)))
+   (triangle canvas x1 y1 x2 y2 x3 y3 false))
+  ([canvas [x1 y1] [x2 y2] [x3 y3]]
+   (triangle canvas x1 y1 x2 y2 x3 y3)))
 
 (defn triangle-strip
   "Draw triangle strip. Implementation of `Processing` `STRIP` shape.
@@ -1333,12 +1402,14 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   ([canvas vs] (path-bezier canvas vs false true)))
 
 (defn bezier-shape
-  [x1 y1 x2 y2 x3 y3 x4 y4]
-  (let [^Path2D p (Path2D$Double.)]
-    (doto p
-      (.moveTo x1 y1)
-      (.curveTo x2 y2 x3 y3 x4 y4))
-    p))
+  ([x1 y1 x2 y2 x3 y3 x4 y4]
+   (let [^Path2D p (Path2D$Double.)]
+     (doto p
+       (.moveTo x1 y1)
+       (.curveTo x2 y2 x3 y3 x4 y4))
+     p))
+  ([[x1 y1] [x2 y2] [x3 y3] [x4 y4]]
+   (bezier-shape x1 y1 x2 y2 x3 y3 x4 y4)))
 
 (defn bezier
   "Draw bezier curve with 4 sets of coordinates."
@@ -1346,15 +1417,19 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
    (shape canvas (bezier-shape x1 y1 x2 y2 x3 y3 x4 y4) stroke?))
   ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
-   (bezier canvas x1 y1 x2 y2 x3 y3 x4 y4 true)))
+   (bezier canvas x1 y1 x2 y2 x3 y3 x4 y4 true))
+  ([canvas [x1 y1] [x2 y2] [x3 y3] [x4 y4]]
+   (bezier canvas x1 y1 x2 y2 x3 y3 x4 y4)))
 
 (defn curve-shape
-  [x1 y1 x2 y2 x3 y3]
-  (let [^Path2D p (Path2D$Double.)]
-    (doto p
-      (.moveTo x1 y1)
-      (.quadTo x2 y2 x3 y3))
-    p))
+  ([x1 y1 x2 y2 x3 y3]
+   (let [^Path2D p (Path2D$Double.)]
+     (doto p
+       (.moveTo x1 y1)
+       (.quadTo x2 y2 x3 y3))
+     p))
+  ([[x1 y1] [x2 y2] [x3 y3]]
+   (curve-shape x1 y1 x2 y2 x3 y3)))
 
 (defn curve
   "Draw quadratic curve with 3 sets of coordinates."
@@ -1362,18 +1437,22 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 stroke?]
    (shape canvas (curve-shape x1 y1 x2 y2 x3 y3) stroke?))
   ([canvas x1 y1 x2 y2 x3 y3]
-   (curve canvas x1 y1 x2 y2 x3 y3 true)))
+   (curve canvas x1 y1 x2 y2 x3 y3 true))
+  ([canvas [x1 y1] [x2 y2] [x3 y3]]
+   (curve canvas x1 y1 x2 y2 x3 y3)))
 
 (defn quad-shape
-  [x1 y1 x2 y2 x3 y3 x4 y4]
-  (let [^Path2D p (Path2D$Double.)]
-    (doto p
-      (.moveTo x1 y1)
-      (.lineTo x2 y2)
-      (.lineTo x3 y3)
-      (.lineTo x4 y4)
-      (.closePath))
-    p))
+  ([x1 y1 x2 y2 x3 y3 x4 y4]
+   (let [^Path2D p (Path2D$Double.)]
+     (doto p
+       (.moveTo x1 y1)
+       (.lineTo x2 y2)
+       (.lineTo x3 y3)
+       (.lineTo x4 y4)
+       (.closePath))
+     p))
+  ([[x1 y1] [x2 y2] [x3 y3] [x4 y4]]
+   (quad-shape x1 y1 x2 y2 x3 y3 x4 y4)))
 
 (defn quad
   "Draw quad with corners at 4 positions."
@@ -1382,13 +1461,17 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    (shape canvas (quad-shape x1 y1 x2 y2 x3 y3 x4 y4) stroke?)
    canvas)
   ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
-   (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false)))
+   (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false))
+  ([canvas [x1 y1] [x2 y2] [x3 y3] [x4 y4]]
+   (quad canvas x1 y1 x2 y2 x3 y3 x4 y4)))
 
 ;; hex
 
 (defn pointy-hex-shape
-  [x y size]
-  (path-shape (grid/pointy-hex-corners size x y) true))
+  ([x y size]
+   (path-shape (grid/pointy-hex-corners size x y) true))
+  ([[x y] size]
+   (pointy-hex-shape x y size)))
 
 (defn pointy-hex
   "Draw pointy topped hex."
@@ -1396,11 +1479,15 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   ([canvas x y size stroke?]
    (shape canvas (pointy-hex-shape x y size) stroke?))
   ([canvas x y size]
-   (pointy-hex canvas x y size false)))
+   (pointy-hex canvas x y size false))
+  ([canvas [x y] size]
+   (pointy-hex canvas x y size)))
 
 (defn flat-hex-shape
-  [x y size]
-  (path-shape (grid/flat-hex-corners size x y) true))
+  ([x y size]
+   (path-shape (grid/flat-hex-corners size x y) true))
+  ([[x y] size]
+   (flat-hex-shape x y size)))
 
 (defn flat-hex
   "Draw flat topped hex."
@@ -1408,7 +1495,9 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   ([canvas x y size stroke?]
    (shape canvas (flat-hex-shape x y size) stroke?))
   ([canvas x y size]
-   (flat-hex canvas x y size false)))
+   (flat-hex canvas x y size false))
+  ([canvas [x y] size]
+   (flat-hex canvas x y size)))
 
 ;; grid
 

@@ -1,5 +1,5 @@
 ^{:nextjournal.clerk/visibility :hide-ns
-  :nextjournal.clerk/toc :pin}
+  :nextjournal.clerk/toc true}
 (ns notebooks.color
   (:require
    [clerk.styles :refer [color-styles 🎨]]
@@ -12,6 +12,7 @@
    [fastmath.core :as m]
    [fastmath.random :as r]
    [fastmath.vector :as v]
+   [fastmath.interpolation]
    [nextjournal.clerk :as clerk]
    [nextjournal.clerk.viewer :as viewer]))
 
@@ -23,8 +24,6 @@
   (mapv #(cond-> % (contains? % :fetch-opts) (assoc-in [:fetch-opts :n] 500)) viewer/default-viewers)
   {:name :block
    :render-fn '#(v/html (into [:div.flex.flex-col] (v/inspect-children %2) %1))}))
-
-;; # clojure2d.color namespace
 
 ;; `clojure2d.color` namespace for Clojure is a rich collection of functions for various color, palettes and grandents manipulations. Including:
 ;;
@@ -160,15 +159,15 @@
 (class (c/to-color :green))
 (map c/to-color [:red 0xffaa33 "fa4" [1 2 3 4]])
 (🎨 (c/color :red 200)
-    (c/color 12 33 99)
-    (c/color 12 33 99 200)
-    (c/gray 99))
+    (c/color 12.0 33.0 99.0)
+    (c/color 12.0 33.0 99.0 200.0)
+    (c/gray 99.0))
 
 ;; You can also convert to AWT Color, integer and - as previously mentioned - to a CSS Color
 
 ^{::clerk/viewer :block}
 [(c/awt-color :pink)
- (c/awt-gray 123)
+ (c/awt-gray 123.0)
  (c/format-hex :pink)
  (c/pack :pink)]
 
@@ -176,7 +175,7 @@
 
 (c/quil :pink)
 
-;; ### All color representations in one place
+;; ### Representations
 
 ^{::clerk/visibility :hide}
 (clerk/table {:head [:input :output]
@@ -220,7 +219,7 @@
 (c/black? :black)
 (c/not-black? :black)
 
-;; ## Getting and setting channels
+;; ## Accessing channels
 
 ;; ### Setting channels
 
@@ -1014,7 +1013,7 @@ bl/blends-list
     (bl/blend-gradients bl/screen
                         (c/gradient :yellow-purple-magenta) (c/gradient :cubehelix)))
 
-;; ### Channel copying
+;; ### Copying channel
 
 ;; You can also copy channels between colors in HSB or any color space.
 
