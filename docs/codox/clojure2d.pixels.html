@@ -509,19 +509,19 @@
  ...)</code></pre><img src="../images/pixels/21ff5d544217b9be40d121783a482d9b.jpg" /></div><div><blockquote><p>Splat rendering</p>
 </blockquote><pre><code class="hljs clojure">(saver
  (fn* []
-   (let [r (renderer 300 300)]
-     (dotimes [i 20000000]
-       (let [x (+ 150 (r/grand 30))
-             y (+ 150 (r/grand 30))
-             x (+ x
-                  (* 20.0
-                     (- (local-noise (/ x 50.0) (/ y 50.0) 0.34) 0.5)))
-             y (+ y
-                  (* 20.0
-                     (- (local-noise (/ y 50.0) (/ x 50.0) 2.23) 0.5)))]
-         (add-pixel! r x y :white)))
+   (let [r (renderer 300 300 :gaussian)]
+     (doseq [x (range 300)
+             y (range 300)]
+       (dotimes [i 10]
+         (let [xx (+ x (r/drand))
+               yy (+ y (r/drand))]
+           (add-pixel!
+            r
+            x
+            y
+            (c/gray (* 255.0 (local-noise (/ xx 50.0) (/ yy 50.0))))))))
      (to-pixels r {:gamma-color 0.8, :splats? true})))
- ...)</code></pre><img src="../images/pixels/92151eaffb36da21cfa3b8e2853faf87.jpg" /></div><div><blockquote><p>Compare to native Java2d rendering. You can observe oversaturation.</p>
+ ...)</code></pre><img src="../images/pixels/277cd57416725f8dca8219f3c736ef50.jpg" /></div><div><blockquote><p>Compare to native Java2d rendering. You can observe oversaturation.</p>
 </blockquote><pre><code class="hljs clojure">(saver
  (fn* []
    (let [r (core/black-canvas 300 300)]

@@ -386,13 +386,12 @@
            (add-pixel! r x y :white)))
        (to-pixels r {:gamma-alpha 0.6 :gamma-color 0.8 :linear? true})))
   (example-snippet "Splat rendering" saver :image
-    #(let [r (renderer 300 300)]
-       (dotimes [i 20000000]
-         (let [x (+ 150 (r/grand 30))
-               y (+ 150 (r/grand 30))
-               x (+ x (* 20.0 (- ^double (local-noise (/ x 50.0) (/ y 50.0) 0.34) 0.5)))
-               y (+ y (* 20.0 (- ^double (local-noise (/ y 50.0) (/ x 50.0) 2.23) 0.5)))]
-           (add-pixel! r x y :white)))
+    #(let [r (renderer 300 300 :gaussian)]
+       (doseq [^long x (range 300) ^long y (range 300)]
+         (dotimes [i 10]
+           (let [xx (+ x (r/drand))
+                 yy (+ y (r/drand))]
+             (add-pixel! r x y (c/gray (* 255.0 ^double (local-noise (/ xx 50.0) (/ yy 50.0))))))))
        (to-pixels r {:gamma-color 0.8 :splats? true})))
   (example-snippet "Compare to native Java2d rendering. You can observe oversaturation." saver :image
     #(let [r (core/black-canvas 300 300)]
