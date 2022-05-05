@@ -738,17 +738,19 @@
              255.0)))
   (to-pixels [r] (pr/to-pixels r {}))
   (to-pixels [_ {:keys [background ^double gamma-alpha ^double gamma-color ^double vibrancy
-                        ^double saturation ^double brightness ^double contrast]
+                        ^double saturation ^double brightness ^double contrast linear? splats?]
                  :or {background :black
                       gamma-alpha 1.0
                       gamma-color 1.0
-                      vibrancy 0.5
+                      vibrancy 1.0
                       saturation 1.0
                       brightness 1.0
-                      contrast 1.0}}]
+                      contrast 1.0
+                      linear? false
+                      splats? false}}]
     (let [size (* w h)
           arr (int-array (* 4 size))
-          conf (clojure2d.java.LogDensity$Config. buff gamma-alpha gamma-color vibrancy brightness contrast saturation)
+          conf (clojure2d.java.LogDensity$Config. buff gamma-alpha gamma-color vibrancy brightness contrast saturation (boolean linear?) (boolean splats?))
           parts (segment-range size)
           tasks (doall (map #(future (let [[start end] %]
                                        (.toPixels buff arr start end conf (c/to-color background)))) parts))]
@@ -760,6 +762,17 @@
   (height [_] h)
   (save [b n] (pr/save (pr/to-pixels b) n))
   (convolve [b t] (pr/convolve (pr/to-pixels b) t)))
+
+(defn set-renderer-scaling-factor!
+  "Changes internal representation of density renderer values.
+
+  By default each channel is divided by 255.0 (and later multiplied by 255.0). Other values can be used to scale down and up other than RGB color ranges.
+
+  The main goal is to store values from `0.0` to `1.0`."
+  (^LDRenderer [^LDRenderer renderer ^double ch1-scale ^double ch2-scale ^double ch3-scale]
+   (LDRenderer. (.setScalingFactor ^clojure2d.java.LogDensity (.buff renderer) ch1-scale ch2-scale ch3-scale) (.w renderer) (.h renderer)))
+  (^LDRenderer [^LDRenderer renderer ^double scale]
+   (LDRenderer. (.setScalingFactor ^clojure2d.java.LogDensity (.buff renderer) scale) (.w renderer) (.h renderer))))
 
 (defn- create-filter
   "Create antialiasing filter."

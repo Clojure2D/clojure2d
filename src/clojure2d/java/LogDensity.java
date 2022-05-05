@@ -10,25 +10,39 @@ import clojure2d.java.reconstruction.AFilter;
 public final class LogDensity {    
     public int w,h,size;
     public AFilter f;
+    public double scaler, scaleg, scaleb;
+    public double rscaler, rscaleg, rscaleb;
 
-    private int wdec, hdec;
-    
     public double[] r,g,b,a;
 
+    public LogDensity setScalingFactor(double r, double g, double b) {
+        scaler = r;
+        scaleg = g;
+        scaleb = b;
+        rscaler = 1.0/r;
+        rscaleg = 1.0/g;
+        rscaleb = 1.0/b;
+
+        return this;
+    }
+
+    public LogDensity setScalingFactor(double scale) {
+        return setScalingFactor(scale, scale, scale);
+    }
+    
     public LogDensity(int w, int h, AFilter f) {
         this.f = f;
         this.w = w;
         this.h = h;
 
-        wdec = w - 1;
-        hdec = h - 1;
-        
         size = w * h;
 
         r = new double[size];
         g = new double[size];
         b = new double[size];
         a = new double[size];
+
+        setScalingFactor(255.0);
     }
 
     public LogDensity(int w, int h) {
@@ -47,8 +61,8 @@ public final class LogDensity {
     public void setFiltered(double fx, double fy, Vec4 c) {
         int p0x = Math.max((int)FastMath.ceil(fx-0.5-f.radius), 0);
         int p0y = Math.max((int)FastMath.ceil(fy-0.5-f.radius), 0);
-        int p1x = Math.min((int)FastMath.floor(fx-0.5+f.radius)+1, wdec);
-        int p1y = Math.min((int)FastMath.floor(fy-0.5+f.radius)+1, hdec);
+        int p1x = Math.min((int)FastMath.floor(fx-0.5+f.radius)+1, w);
+        int p1y = Math.min((int)FastMath.floor(fy-0.5+f.radius)+1, h);
 
         int diffx = p1x-p0x;
         int diffy = p1y-p0y;
@@ -70,9 +84,9 @@ public final class LogDensity {
         if(xx>=0 && xx<w && yy>=0 && yy<h) {
             int off = yy*w+xx;
             double w = (c.w >= 255.0) ? 1.0 : (c.w / 255.0);
-            r[off] += w*c.x;
-            g[off] += w*c.y;
-            b[off] += w*c.z;
+            r[off] += w*c.x*rscaler;
+            g[off] += w*c.y*rscaleg;
+            b[off] += w*c.z*rscaleb;
             a[off] += w;
         }
     }
@@ -80,25 +94,31 @@ public final class LogDensity {
     public void set(int x, int y, Vec4 c, double weight) {
         int off = y*w+x;
         double w = (c.w >= 255.0) ? weight : weight * (c.w / 255.0);
-        r[off] += w*c.x;
-        g[off] += w*c.y;
-        b[off] += w*c.z;
+        r[off] += w*c.x*rscaler;
+        g[off] += w*c.y*rscaleg;
+        b[off] += w*c.z*rscaleb;
         a[off] += w;
     }
 
 
     public class Config {
         public double agamma, cgamma, vibrancy, saturation;
-        public double mx, lmx;
-        public boolean do_saturation, do_bc, do_vibrancy, do_gamma;
+        public double mx, lmx, rmx, rlmx;
+        public boolean do_saturation, do_bc, do_vibrancy, do_gamma, do_linear, do_splats;
         public int[] bc_lut;
-
-        public Config(double gamma_alpha, double gamma_color, double vibrancy, double brightness, double contrast, double saturation) {
+        
+        public Config(double gamma_alpha, double gamma_color, double vibrancy, double brightness, double contrast, double saturation, boolean is_linear) {
+            this(gamma_alpha, gamma_color, vibrancy, brightness, contrast, saturation, false, false);
+        }
+        
+        public Config(double gamma_alpha, double gamma_color, double vibrancy, double brightness, double contrast, double saturation, boolean do_linear, boolean do_splats) {
             agamma = 1.0 / gamma_alpha;
             cgamma = 1.0 / gamma_color;
             this.vibrancy = vibrancy<0.0 ? 0.0 : (vibrancy > 1.0 ? 1.0 : vibrancy);
             this.saturation = saturation;
-
+            this.do_linear = do_linear || do_splats;
+            this.do_splats = do_splats;
+            
             do_saturation = saturation != 1.0;
             do_bc = (brightness != 1.0) || (contrast != 1.0);
             do_vibrancy = (this.vibrancy > 0.0) && (gamma_color != 1.0);
@@ -112,7 +132,10 @@ public final class LogDensity {
                 if (a[i]>mx) mx=a[i];
             }
             
-            lmx = 1.0 / FastMath.log1p(mx);
+            lmx = FastMath.log1p(mx);
+
+            rmx = 1.0 / mx;
+            rlmx = 1.0 / lmx;
         }
         
         private void calcBrightnessContrastLut(double brightness, double contrast) {
@@ -132,43 +155,58 @@ public final class LogDensity {
             
             if (hit > 0.0) {
                 double rhit = 1.0/hit;
+                double alpha = 0.0;
 
-                double alpha = conf.do_gamma ? FastMath.pow(FastMath.log(hit+1.0) * conf.lmx, conf.agamma) : FastMath.log(hit+1.0) * conf.lmx;
+                if (!conf.do_splats) {
+                    alpha = conf.do_linear ?
+                        (conf.do_gamma ?
+                         FastMath.pow(hit * conf.rmx, conf.agamma) :
+                         hit * conf.rmx) :
+                        (conf.do_gamma ?
+                         FastMath.pow(FastMath.log(hit+1.0) * conf.rlmx, conf.agamma) :
+                         FastMath.log(hit+1.0) * conf.rlmx);
+                }
 
-                double fr = Math.min(Math.max(r[i]*rhit,0.0),255.0);
-                double fg = Math.min(Math.max(g[i]*rhit,0.0),255.0);
-                double fb = Math.min(Math.max(b[i]*rhit,0.0),255.0);
+                double fr = r[i]*rhit;
+                double fg = g[i]*rhit;
+                double fb = b[i]*rhit;
 
                 if(conf.do_vibrancy) {
-                    fr = PrimitiveMath.lerp(fr, 255.0*Math.pow(fr/255.0, conf.cgamma), conf.vibrancy);
-                    fg = PrimitiveMath.lerp(fg, 255.0*Math.pow(fg/255.0, conf.cgamma), conf.vibrancy);
-                    fb = PrimitiveMath.lerp(fb, 255.0*Math.pow(fb/255.0, conf.cgamma), conf.vibrancy);
+                    fr = PrimitiveMath.lerp(fr, Math.pow(fr, conf.cgamma), conf.vibrancy);
+                    fg = PrimitiveMath.lerp(fg, Math.pow(fg, conf.cgamma), conf.vibrancy);
+                    fb = PrimitiveMath.lerp(fb, Math.pow(fb, conf.cgamma), conf.vibrancy);
+                }
+
+                if (conf.do_splats) {
+                    rr = (int)(fr*scaler);
+                    gg = (int)(fg*scaleg);
+                    bb = (int)(fb*scaleb);                          
+                } else {
+                    rr = (int)PrimitiveMath.lerp(bg.x, fr*scaler, alpha);
+                    gg = (int)PrimitiveMath.lerp(bg.y, fg*scaleg, alpha);
+                    bb = (int)PrimitiveMath.lerp(bg.z, fb*scaleb, alpha);
+                }
+
+                if(conf.do_bc) {
+                    rr = conf.bc_lut[rr];
+                    gg = conf.bc_lut[gg];
+                    bb = conf.bc_lut[bb];
+                }
+
+                if (conf.do_saturation) {
+                    float[] hsb = Color.RGBtoHSB(rr, gg, bb, null);
+                    hsb[1] = (float)Math.min(Math.max(hsb[1]*conf.saturation, 0.0), 1.0);
+                    int s = Color.HSBtoRGB(hsb[0], hsb[1], hsb[2]);
+                    Pixels.setColor(res, i, new Vec4((s>>16)&0xff, (s>>8)&0xff, s&0xff, 255.0));
+                } else {      
+                    Pixels.setColor(res, i, new Vec4(rr,gg,bb,255.0));
                 }
                 
-                rr = (int)PrimitiveMath.lerp(bg.x, fr, alpha);
-                gg = (int)PrimitiveMath.lerp(bg.y, fg, alpha);
-                bb = (int)PrimitiveMath.lerp(bg.z, fb, alpha);
-
             } else {
-                rr = (int)bg.x;
-                gg = (int)bg.y;
-                bb = (int)bg.z;
+                Pixels.setColor(res, i, bg);
             }
 
-            if(conf.do_bc) {
-                rr = conf.bc_lut[rr];
-                gg = conf.bc_lut[gg];
-                bb = conf.bc_lut[bb];
-            }
-
-            if (conf.do_saturation) {
-                float[] hsb = Color.RGBtoHSB(rr, gg, bb, null);
-                hsb[1] = (float)Math.min(Math.max(hsb[1]*conf.saturation, 0.0), 1.0);
-                int s = Color.HSBtoRGB(hsb[0], hsb[1], hsb[2]);
-                Pixels.setColor(res, i, new Vec4((s>>16)&0xff, (s>>8)&0xff, s&0xff, 255.0));
-            } else {      
-                Pixels.setColor(res, i, new Vec4(rr,gg,bb,255.0));
-            }
+            
         }
     }
 

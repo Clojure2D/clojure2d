@@ -25,6 +25,17 @@ All notable changes to this project will be documented in this file. This change
 * `UCS-OSA` color space should have different order of `g` and `j` channels. 
 * `IPT` should operate on not scaled XYZ
 * missing palettes from `:nord`
+* `LDRenderer` with filtering should draw on borders
+
+### Changed
+
+* `LDRenderer` revisited
+    - added new `to-pixel` modes:
+	    * `linear?` (default: `false`), when `true` turns off `log` scaling
+		* `splats?` (default: `false`), when `true` averages pixel's values only
+	- `vibrancy` is `1.0` by default (was `0.5`)
+	- contrast/saturation/brightness don't affect background now
+	- changed internal splat representation (as a number from `0.0` to `1.0`)
 
 ### Removed
 
