@@ -732,9 +732,9 @@
     (let [x (unchecked-int x)
           y (unchecked-int y)
           a (fastmath.java.Array/get2d (.a buff) w x y)]
-      (Vec4. (/ (fastmath.java.Array/get2d (.r buff) w x y) a)
-             (/ (fastmath.java.Array/get2d (.g buff) w x y) a)
-             (/ (fastmath.java.Array/get2d (.b buff) w x y) a)
+      (Vec4. (* (.scaler buff) (/ (fastmath.java.Array/get2d (.r buff) w x y) a))
+             (* (.scaleg buff) (/ (fastmath.java.Array/get2d (.g buff) w x y) a))
+             (* (.scaleb buff) (/ (fastmath.java.Array/get2d (.b buff) w x y) a))
              255.0)))
   (to-pixels [r] (pr/to-pixels r {}))
   (to-pixels [_ {:keys [background ^double gamma-alpha ^double gamma-color ^double vibrancy

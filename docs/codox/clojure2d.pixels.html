@@ -319,7 +319,7 @@
       v0 (get-color ldp 50 50)
       v1 (get-color (set-color! ldp 50 50 :maroon) 50 50)]
   {:before v0, :after v1})
-;;=&gt; {:after [0.5019607843137255 0.0 0.0 255.0],
+;;=&gt; {:after [128.0 0.0 0.0 255.0],
 ;;=&gt;  :before [##NaN ##NaN ##NaN 255.0]}</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/pixels.clj#L899">view source</a></div></div><div class="public anchor" id="var-get-pixel"><h3>get-pixel</h3><div class="usage"><code>(get-pixel r x y)</code></div><div class="doc"><div class="markdown"><p>Get pixel (color) from renderer buffer</p>
 </div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/pixels.clj#L940">view source</a></div></div><div class="public anchor" id="var-get-value"><h3>get-value</h3><div class="usage"><code>(get-value pixels ch x y)</code><code>(get-value pixels ch idx)</code></div><div class="doc"><div class="markdown"><p>Get channel value by index or position.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Get channel value from given position.</p>
@@ -566,7 +566,7 @@
       v0 (get-color ldp 50 50)
       v1 (get-color (set-color! ldp 50 50 :maroon) 50 50)]
   {:before v0, :after v1})
-;;=&gt; {:after [0.5019607843137255 0.0 0.0 255.0],
+;;=&gt; {:after [128.0 0.0 0.0 255.0],
 ;;=&gt;  :before [##NaN ##NaN ##NaN 255.0]}</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/pixels.clj#L911">view source</a></div></div><div class="public anchor" id="var-set-image-pixels.21"><h3>set-image-pixels!</h3><div class="usage"><code>(set-image-pixels! b x y pin)</code><code>(set-image-pixels! b p)</code></div><div class="doc"><div class="markdown"><p>Set <code>Pixels</code> to image, mutating it.</p>
 <p>Optionally you can set position when Pixels object has smaller size.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Usage</p>

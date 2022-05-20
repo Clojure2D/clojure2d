@@ -246,33 +246,33 @@
 </blockquote><pre><code class="hljs clojure">(canvas 20 30 :low)
 ;;=&gt; #clojure2d.core.Canvas
 ;;=&gt;  {:arc-obj
-;;=&gt;   #object[java.awt.geom.Arc2D$Double 0xa6f3781 "java.awt.geom.Arc2D$Double@0"],
+;;=&gt;   #object[java.awt.geom.Arc2D$Double 0x7c93ed40 "java.awt.geom.Arc2D$Double@0"],
 ;;=&gt;   :buffer
-;;=&gt;   #object[java.awt.image.BufferedImage 0x646fe45d "BufferedImage@646fe45d: type = 2 DirectColorModel: rmask=ff0000 gmask=ff00 bmask=ff amask=ff000000 IntegerInterleavedRaster: width = 20 height = 30 #Bands = 4 xOff = 0 yOff = 0 dataOffset[0] 0"],
+;;=&gt;   #object[java.awt.image.BufferedImage 0x177ae229 "BufferedImage@177ae229: type = 2 DirectColorModel: rmask=ff0000 gmask=ff00 bmask=ff amask=ff000000 IntegerInterleavedRaster: width = 20 height = 30 #Bands = 4 xOff = 0 yOff = 0 dataOffset[0] 0"],
 ;;=&gt;   :ellipse-obj
-;;=&gt;   #object[java.awt.geom.Ellipse2D$Double 0x3759f3f8 "java.awt.geom.Ellipse2D$Double@0"],
+;;=&gt;   #object[java.awt.geom.Ellipse2D$Double 0x7c6c1162 "java.awt.geom.Ellipse2D$Double@0"],
 ;;=&gt;   :font nil,
 ;;=&gt;   :graphics nil,
 ;;=&gt;   :h 30,
 ;;=&gt;   :hints
-;;=&gt;   [[#object[sun.awt.SunHints$Key 0x36f30b30 "Global antialiasing enable key"]
-;;=&gt;     #object[sun.awt.SunHints$Value 0x6e8a53d0 "Nonantialiased rendering mode"]]
-;;=&gt;    [#object[sun.awt.SunHints$Key 0x36961bb1 "Image interpolation method key"]
-;;=&gt;     #object[sun.awt.SunHints$Value 0x74dc75d8 "Nearest Neighbor image interpolation mode"]]
-;;=&gt;    [#object[sun.awt.SunHints$Key 0x14b01a1e "Alpha blending interpolation method key"]
-;;=&gt;     #object[sun.awt.SunHints$Value 0xc629e88 "Fastest alpha blending methods"]]
-;;=&gt;    [#object[sun.awt.SunHints$Key 0x1d63bb69 "Color rendering quality key"]
-;;=&gt;     #object[sun.awt.SunHints$Value 0xbd524d3 "Fastest color rendering mode"]]
-;;=&gt;    [#object[sun.awt.SunHints$Key 0x7f452789 "Global rendering quality key"]
-;;=&gt;     #object[sun.awt.SunHints$Value 0x377df2aa "Fastest rendering methods"]]
-;;=&gt;    [#object[sun.awt.SunHints$Key 0x4e3d3639 "Fractional metrics enable key"]
-;;=&gt;     #object[sun.awt.SunHints$Value 0x20183328 "Integer text metrics mode"]]
-;;=&gt;    [#object[sun.awt.SunHints$Key 0x2ad5fbb2 "Text-specific antialiasing enable key"]
-;;=&gt;     #object[sun.awt.SunHints$Value 0x746e7bcc "Nonantialiased text mode"]]],
+;;=&gt;   [[#object[sun.awt.SunHints$Key 0x1e01cf63 "Global antialiasing enable key"]
+;;=&gt;     #object[sun.awt.SunHints$Value 0x72d07a47 "Nonantialiased rendering mode"]]
+;;=&gt;    [#object[sun.awt.SunHints$Key 0x330e3ec0 "Image interpolation method key"]
+;;=&gt;     #object[sun.awt.SunHints$Value 0x379198ef "Nearest Neighbor image interpolation mode"]]
+;;=&gt;    [#object[sun.awt.SunHints$Key 0x6c73bcba "Alpha blending interpolation method key"]
+;;=&gt;     #object[sun.awt.SunHints$Value 0x2b6a687e "Fastest alpha blending methods"]]
+;;=&gt;    [#object[sun.awt.SunHints$Key 0x6ba82a7b "Color rendering quality key"]
+;;=&gt;     #object[sun.awt.SunHints$Value 0x5c99a026 "Fastest color rendering mode"]]
+;;=&gt;    [#object[sun.awt.SunHints$Key 0x2bf3002f "Global rendering quality key"]
+;;=&gt;     #object[sun.awt.SunHints$Value 0x2deaebb0 "Fastest rendering methods"]]
+;;=&gt;    [#object[sun.awt.SunHints$Key 0x10a51f5b "Fractional metrics enable key"]
+;;=&gt;     #object[sun.awt.SunHints$Value 0x16875802 "Integer text metrics mode"]]
+;;=&gt;    [#object[sun.awt.SunHints$Key 0x77a20bfe "Text-specific antialiasing enable key"]
+;;=&gt;     #object[sun.awt.SunHints$Value 0x2acbb9ec "Nonantialiased text mode"]]],
 ;;=&gt;   :line-obj
-;;=&gt;   #object[java.awt.geom.Line2D$Double 0x38167f7d "java.awt.geom.Line2D$Double@38167f7d"],
+;;=&gt;   #object[java.awt.geom.Line2D$Double 0x6e56eb34 "java.awt.geom.Line2D$Double@6e56eb34"],
 ;;=&gt;   :rect-obj
-;;=&gt;   #object[java.awt.geom.Rectangle2D$Double 0x72d1dd3f "java.awt.geom.Rectangle2D$Double[x=0.0,y=0.0,w=0.0,h=0.0]"],
+;;=&gt;   #object[java.awt.geom.Rectangle2D$Double 0x64ef74a6 "java.awt.geom.Rectangle2D$Double[x=0.0,y=0.0,w=0.0,h=0.0]"],
 ;;=&gt;   :retina? false,
 ;;=&gt;   :transform-stack nil,
 ;;=&gt;   :w 20}</code></pre></div><div><blockquote><p>Check ImageProto on canvas.</p>
@@ -281,7 +281,7 @@
 (height (canvas 10 20))
 ;;=&gt; 20
 (get-image (canvas 5 6))
-;;=&gt; BufferedImage@184f5756: type = 2 DirectColorModel: rmask=ff0000 gmask=ff00 bmask=ff amask=ff000000 IntegerInterleavedRaster: width = 5 height = 6 #Bands = 4 xOff = 0 yOff = 0 dataOffset[0] 0
+;;=&gt; BufferedImage@2ad80997: type = 2 DirectColorModel: rmask=ff0000 gmask=ff00 bmask=ff amask=ff000000 IntegerInterleavedRaster: width = 5 height = 6 #Bands = 4 xOff = 0 yOff = 0 dataOffset[0] 0
 (width (resize (canvas 1 2) 15 15))
 ;;=&gt; 15
 (height (subimage (canvas 10 10) 5 5 2 2))
@@ -298,11 +298,11 @@
                        ...)</code></pre><img src="../images/core/97ee3241bf291548d1bd3781e277d4a4.jpg" /></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L961">view source</a></div></div><div class="public anchor" id="var-close-session"><h3>close-session</h3><div class="usage"><code>(close-session)</code></div><div class="doc"><div class="markdown"><p>Close session via agent</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Usage</p>
 </blockquote><pre><code class="hljs clojure">(session-name)
-;;=&gt; ["20220505170159" "94BDF9F3"]
+;;=&gt; ["20220520151058" "E197B6D2"]
 (close-session)
 ;;=&gt; nil
 (session-name)
-;;=&gt; ["20220505170227" "94BE67DF"]</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2564">view source</a></div></div><div class="public anchor" id="var-close-window"><h3>close-window</h3><div class="usage"><code>(close-window window)</code></div><div class="doc"><div class="markdown"><p>Close window programmatically</p>
+;;=&gt; ["20220520151127" "E1982A23"]</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2564">view source</a></div></div><div class="public anchor" id="var-close-window"><h3>close-window</h3><div class="usage"><code>(close-window window)</code></div><div class="doc"><div class="markdown"><p>Close window programmatically</p>
 </div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2196">view source</a></div></div><div class="public anchor" id="var-contains-point.3F"><h3>contains-point?</h3><div class="usage"><code>(contains-point? shape x y)</code><code>(contains-point? shape point)</code></div><div class="doc"><div class="markdown"><p>Returns <code>true</code> if given point is inside a shape.</p>
 </div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L866">view source</a></div></div><div class="public anchor" id="var-contains-rectangle.3F"><h3>contains-rectangle?</h3><div class="usage"><code>(contains-rectangle? shape x y w h)</code><code>(contains-rectangle? shape [x y w h])</code></div><div class="doc"><div class="markdown"><p>Returns <code>true</code> if given rectangle is inside a shape.</p>
 </div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L871">view source</a></div></div><div class="public anchor" id="var-control-down.3F"><h3>control-down?</h3><div class="usage"><code>(control-down? e)</code></div><div class="doc"><div class="markdown"><p>CONTROL key state as boolean.</p>
@@ -349,20 +349,20 @@
                  ...)</code></pre><img src="../images/core/2a9d169b9823a6e6233635721f40158d.jpg" /></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L1434">view source</a></div></div><div class="public anchor" id="var-curve-shape"><h3>curve-shape</h3><div class="usage"><code>(curve-shape x1 y1 x2 y2 x3 y3)</code><code>(curve-shape [x1 y1] [x2 y2] [x3 y3])</code></div><div class="doc"><div class="markdown"></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L1424">view source</a></div></div><div class="public anchor" id="var-datetime"><h3>datetime</h3><div class="usage"><code>(datetime type-of-array)</code><code>(datetime)</code></div><div class="doc"><div class="markdown"><p>Date time values in the array. Optional parameter :vector or :hashmap (default) to indicate what to return.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Current value</p>
 </blockquote><pre><code class="hljs clojure">(datetime)
-;;=&gt; {:day 5,
-;;=&gt;  :hour 17,
-;;=&gt;  :millis 1651762947691,
-;;=&gt;  :minute 2,
+;;=&gt; {:day 20,
+;;=&gt;  :hour 15,
+;;=&gt;  :millis 1653052287922,
+;;=&gt;  :minute 11,
 ;;=&gt;  :month 5,
-;;=&gt;  :nanos 304469882534200,
+;;=&gt;  :nanos 185664323806291,
 ;;=&gt;  :sec 27,
 ;;=&gt;  :second 27,
 ;;=&gt;  :year 2022}
 (datetime :vector)
-;;=&gt; [2022 5 5 17 2 27 1651762947691 304469882618135]</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2461">view source</a></div></div><div class="public anchor" id="var-day"><h3>day</h3><div class="usage"><code>(day)</code></div><div class="doc"><div class="markdown"><p>Current day</p>
+;;=&gt; [2022 5 20 15 11 27 1653052287922 185664323898214]</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2461">view source</a></div></div><div class="public anchor" id="var-day"><h3>day</h3><div class="usage"><code>(day)</code></div><div class="doc"><div class="markdown"><p>Current day</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Current value</p>
 </blockquote><pre><code class="hljs clojure">(day)
-;;=&gt; 5</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2455">view source</a></div></div><div class="public anchor" id="var-double-array-2d"><h3>double-array-2d</h3><div class="usage"><code>(double-array-2d sizex sizey)</code></div><div class="doc"><div class="markdown"><p>Create 2d int array getter and setter methods. Array is mutable!</p>
+;;=&gt; 20</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2455">view source</a></div></div><div class="public anchor" id="var-double-array-2d"><h3>double-array-2d</h3><div class="usage"><code>(double-array-2d sizex sizey)</code></div><div class="doc"><div class="markdown"><p>Create 2d int array getter and setter methods. Array is mutable!</p>
 </div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2626">view source</a></div></div><div class="public anchor" id="var-ellipse"><h3>ellipse</h3><div class="usage"><code>(ellipse canvas x y w h stroke?)</code><code>(ellipse canvas x y w h)</code><code>(ellipse canvas [x y] w h)</code></div><div class="doc"><div class="markdown"><p>Draw ellipse with middle at <code>(x,y)</code> position with width <code>w</code> and height <code>h</code>.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>A couple of ellipses.</p>
 </blockquote><pre><code class="hljs clojure">(drawing-snippet (fn [canvas]
@@ -532,7 +532,7 @@
 ;;=&gt; 150</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2650">view source</a></div></div><div class="public anchor" id="var-hour"><h3>hour</h3><div class="usage"><code>(hour)</code></div><div class="doc"><div class="markdown"><p>Current hour</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Current value</p>
 </blockquote><pre><code class="hljs clojure">(hour)
-;;=&gt; 17</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2456">view source</a></div></div><div class="public anchor" id="var-image"><h3>image</h3><div class="usage"><code>(image canvas img x y w h)</code><code>(image canvas img)</code><code>(image canvas img x y)</code></div><div class="doc"><div class="markdown"><p>Draw an image.</p>
+;;=&gt; 15</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2456">view source</a></div></div><div class="public anchor" id="var-image"><h3>image</h3><div class="usage"><code>(image canvas img x y w h)</code><code>(image canvas img)</code><code>(image canvas img x y)</code></div><div class="doc"><div class="markdown"><p>Draw an image.</p>
 <p>You can specify position and size of the image. Default it’s placed on whole canvas.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Draw image at given position.</p>
 </blockquote><pre><code class="hljs clojure">(drawing-snippet (fn [canvas]
@@ -609,7 +609,7 @@
                  ...)</code></pre><img src="../images/core/88fa3e3a3afda0afd61035eefe58de11.jpg" /></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L984">view source</a></div></div><div class="public anchor" id="var-load-bytes"><h3>load-bytes</h3><div class="usage"><code>(load-bytes file-or-url)</code></div><div class="doc"><div class="markdown"><p>Load file or http and return byte array.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Load image file to byte array</p>
 </blockquote><pre><code class="hljs clojure">(load-bytes "docs/cockatoo.jpg")
-;;=&gt; [B@16e7b37c
+;;=&gt; [B@4ef2d867
 (second (load-bytes "docs/cockatoo.jpg"))
 ;;=&gt; -40</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2475">view source</a></div></div><div class="public anchor" id="var-load-font"><h3>load-font</h3><div class="usage"><code>(load-font font-file-or-url)</code></div><div class="doc"><div class="markdown"><p>Load font from file or url. Only TrueType and OpenTrueType fonts are supported.</p>
 </div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L1528">view source</a></div></div><div class="public anchor" id="var-load-image"><h3>load-image</h3><div class="usage"><code>(load-image filename-or-url)</code></div><div class="doc"><div class="markdown"><p>Load Image from file.</p>
@@ -621,27 +621,27 @@
 </div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L239">view source</a></div></div><div class="public anchor" id="var-load-svg"><h3>load-svg</h3><div class="usage"><code>(load-svg filename-or-url)</code></div><div class="doc"><div class="markdown"><p>Load image into Batik Document. See <a href="clojure2d.core.html#var-transcode-svg">transcode-svg</a>.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Load SVG into Batik object</p>
 </blockquote><pre><code class="hljs clojure">(load-svg "docs/takkun.svg")
-;;=&gt; org.apache.batik.transcoder.TranscoderInput@128d8ba</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L1790">view source</a></div></div><div class="public anchor" id="var-load-url-image"><h3>load-url-image</h3><div class="usage"><code>(load-url-image url)</code></div><div class="doc"><div class="markdown"><p>Load image from given URL, see <a href="clojure2d.core.html#var-load-image">load-image</a>.</p>
+;;=&gt; org.apache.batik.transcoder.TranscoderInput@6f8583e2</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L1790">view source</a></div></div><div class="public anchor" id="var-load-url-image"><h3>load-url-image</h3><div class="usage"><code>(load-url-image url)</code></div><div class="doc"><div class="markdown"><p>Load image from given URL, see <a href="clojure2d.core.html#var-load-image">load-image</a>.</p>
 </div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L252">view source</a></div></div><div class="public anchor" id="var-log"><h3>log</h3><div class="usage"><code>(log message)</code></div><div class="doc"><div class="markdown"><p>Log message to file or console</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Example usage</p>
 </blockquote><pre><code class="hljs clojure">(session-name)
-;;=&gt; ["20220505170227" "94BE67DF"]
+;;=&gt; ["20220520151127" "E1982A23"]
 (binding [*log-to-file* true]
   (log "Log information to file under session"))
 ;;=&gt; #clojure2d.core.SessionType
-;;=&gt;  {:counter #<fn@762cd846 clojure2d.core="" ake_counter[fn]="">,
+;;=&gt;  {:counter #<fn@177690de clojure2d.core="" ake_counter[fn]="">,
 ;;=&gt;   :logger
-;;=&gt;   #object[java.io.BufferedWriter 0x5fc9cdf4 "java.io.BufferedWriter@5fc9cdf4"],
-;;=&gt;   :name ["20220505170227" "94BE67DF"]}
+;;=&gt;   #object[java.io.BufferedWriter 0x2b5cf46e "java.io.BufferedWriter@2b5cf46e"],
+;;=&gt;   :name ["20220520151127" "E1982A23"]}
 (Thread/sleep 1000)
 ;;=&gt; nil
 (slurp (log-name))
-;;=&gt; Session id: 94BE67DF
+;;=&gt; Session id: E1982A23
 ;;=&gt; 
-;;=&gt; 2022-05-05 17:02:27: Log information to file under session</fn@762cd846></code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2594">view source</a></div></div><div class="public anchor" id="var-log-name"><h3>log-name</h3><div class="usage"><code>(log-name)</code></div><div class="doc"><div class="markdown"><p>Returns log file name with path.</p>
+;;=&gt; 2022-05-20 15:11:27: Log information to file under session</fn@177690de></code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2594">view source</a></div></div><div class="public anchor" id="var-log-name"><h3>log-name</h3><div class="usage"><code>(log-name)</code></div><div class="doc"><div class="markdown"><p>Returns log file name with path.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Usage</p>
 </blockquote><pre><code class="hljs clojure">(log-name)
-;;=&gt; log/20220505170159.log</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2534">view source</a></div></div><div class="public anchor" id="var-long-array-2d"><h3>long-array-2d</h3><div class="usage"><code>(long-array-2d sizex sizey)</code></div><div class="doc"><div class="markdown"><p>Create 2d int array getter and setter methods. Array is mutable!</p>
+;;=&gt; log/20220520151058.log</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2534">view source</a></div></div><div class="public anchor" id="var-long-array-2d"><h3>long-array-2d</h3><div class="usage"><code>(long-array-2d sizex sizey)</code></div><div class="doc"><div class="markdown"><p>Create 2d int array getter and setter methods. Array is mutable!</p>
 </div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2619">view source</a></div></div><div class="public anchor" id="var-make-counter"><h3>make-counter</h3><div class="usage"><code>(make-counter v)</code><code>(make-counter)</code></div><div class="doc"><div class="markdown"><p>Create counter function, each call returns next number.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Usage</p>
 </blockquote><pre><code class="hljs clojure">(let [cnt (make-counter)] (repeatedly 5 cnt))
@@ -652,18 +652,18 @@
 </div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L554">view source</a></div></div><div class="public anchor" id="var-make-session"><h3>make-session</h3><div class="usage"><code>(make-session)</code></div><div class="doc"><div class="markdown"><p>Create session via agent</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Usage</p>
 </blockquote><pre><code class="hljs clojure">(make-session)
-;;=&gt; ["20220505170228" "94BE6B05"]
+;;=&gt; ["20220520151128" "E1982E4D"]
 (Thread/sleep 2000)
 ;;=&gt; nil
 (make-session)
-;;=&gt; ["20220505170230" "94BE73D6"]</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2557">view source</a></div></div><div class="public anchor" id="var-meta-down.3F"><h3>meta-down?</h3><div class="usage"><code>(meta-down? e)</code></div><div class="doc"><div class="markdown"><p>META key state as boolean.</p>
+;;=&gt; ["20220520151130" "E198361D"]</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2557">view source</a></div></div><div class="public anchor" id="var-meta-down.3F"><h3>meta-down?</h3><div class="usage"><code>(meta-down? e)</code></div><div class="doc"><div class="markdown"><p>META key state as boolean.</p>
 </div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L1871">view source</a></div></div><div class="public anchor" id="var-millis"><h3>millis</h3><div class="usage"><code>(millis)</code></div><div class="doc"><div class="markdown"><p>Milliseconds from epoch</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Current value</p>
 </blockquote><pre><code class="hljs clojure">(millis)
-;;=&gt; 1651762919253</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2459">view source</a></div></div><div class="public anchor" id="var-minute"><h3>minute</h3><div class="usage"><code>(minute)</code></div><div class="doc"><div class="markdown"><p>Current minute</p>
+;;=&gt; 1653052257784</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2459">view source</a></div></div><div class="public anchor" id="var-minute"><h3>minute</h3><div class="usage"><code>(minute)</code></div><div class="doc"><div class="markdown"><p>Current minute</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Current value</p>
 </blockquote><pre><code class="hljs clojure">(minute)
-;;=&gt; 1</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2457">view source</a></div></div><div class="public anchor" id="var-month"><h3>month</h3><div class="usage"><code>(month)</code></div><div class="doc"><div class="markdown"><p>Current month</p>
+;;=&gt; 10</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2457">view source</a></div></div><div class="public anchor" id="var-month"><h3>month</h3><div class="usage"><code>(month)</code></div><div class="doc"><div class="markdown"><p>Current month</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Current value</p>
 </blockquote><pre><code class="hljs clojure">(month)
 ;;=&gt; 5</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2454">view source</a></div></div><div class="public anchor" id="var-mouse-button"><h3>mouse-button</h3><div class="usage"><code>(mouse-button m)</code></div><div class="doc"><div class="markdown"><p>Get mouse pressed button status: :left :right :center or :none</p>
@@ -690,22 +690,22 @@
 </div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L1831">view source</a></div></div><div class="public anchor" id="var-nanos"><h3>nanos</h3><div class="usage"><code>(nanos)</code></div><div class="doc"><div class="markdown"><p>JVM running time in nanoseconds</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Current value</p>
 </blockquote><pre><code class="hljs clojure">(nanos)
-;;=&gt; 304441587412425</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2460">view source</a></div></div><div class="public anchor" id="var-next-filename"><h3>next-filename</h3><div class="usage"><code>(next-filename prefix)</code><code>(next-filename prefix suffix)</code></div><div class="doc"><div class="markdown"><p>Create next unique filename based on session</p>
+;;=&gt; 185634356257252</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2460">view source</a></div></div><div class="public anchor" id="var-next-filename"><h3>next-filename</h3><div class="usage"><code>(next-filename prefix)</code><code>(next-filename prefix suffix)</code></div><div class="doc"><div class="markdown"><p>Create next unique filename based on session</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Usage</p>
 </blockquote><pre><code class="hljs clojure">(next-filename "folder/name/")
-;;=&gt; folder/name/94BE73D6_000000
+;;=&gt; folder/name/E198361D_000000
 (next-filename "folder/name/")
-;;=&gt; folder/name/94BE73D6_000001
+;;=&gt; folder/name/E198361D_000001
 (next-filename "folder/name/" ".jpg")
-;;=&gt; folder/name/94BE73D6_000002.jpg
+;;=&gt; folder/name/E198361D_000002.jpg
 (close-session)
 ;;=&gt; nil
 (next-filename "folder/name/")
-;;=&gt; folder/name/94BE73DF_000000
+;;=&gt; folder/name/E1983627_000000
 (next-filename "folder/name/")
-;;=&gt; folder/name/94BE73DF_000001
+;;=&gt; folder/name/E1983627_000001
 (next-filename "folder/name/" ".jpg")
-;;=&gt; folder/name/94BE73DF_000002.jpg</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2584">view source</a></div></div><div class="public anchor" id="var-orient-canvas"><h3>orient-canvas</h3><h4 class="type">multimethod</h4><div class="usage"></div><div class="doc"><div class="markdown"><p>Place origin into one of four window corners and reorient axes.</p>
+;;=&gt; folder/name/E1983627_000002.jpg</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2584">view source</a></div></div><div class="public anchor" id="var-orient-canvas"><h3>orient-canvas</h3><h4 class="type">multimethod</h4><div class="usage"></div><div class="doc"><div class="markdown"><p>Place origin into one of four window corners and reorient axes.</p>
 <ul>
 <li><code>-</code> as suffix - means default orientation (y-axis reversed)</li>
 <li><code>+</code> as suffix - means usual (mathematical) orientation (y-axis not reversed).</li>
@@ -903,10 +903,10 @@
 ;;=&gt; 1920</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L409">view source</a></div></div><div class="public anchor" id="var-sec"><h3>sec</h3><div class="usage"><code>(sec)</code></div><div class="doc"><div class="markdown"><p>Current second</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Current value</p>
 </blockquote><pre><code class="hljs clojure">(sec)
-;;=&gt; 59</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2458">view source</a></div></div><div class="public anchor" id="var-session-name"><h3>session-name</h3><div class="usage"><code>(session-name)</code></div><div class="doc"><div class="markdown"><p>Get session name</p>
+;;=&gt; 58</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2458">view source</a></div></div><div class="public anchor" id="var-session-name"><h3>session-name</h3><div class="usage"><code>(session-name)</code></div><div class="doc"><div class="markdown"><p>Get session name</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Currenct session value</p>
 </blockquote><pre><code class="hljs clojure">(session-name)
-;;=&gt; ["20220505170230" "94BE73DF"]</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2577">view source</a></div></div><div class="public anchor" id="var-set-awt-background"><h3>set-awt-background</h3><div class="usage"><code>(set-awt-background canvas c)</code></div><div class="doc"><div class="markdown"><p>Set background color. Expects valid <code>java.awt.Color</code> object.</p>
+;;=&gt; ["20220520151130" "E1983627"]</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/core.clj#L2577">view source</a></div></div><div class="public anchor" id="var-set-awt-background"><h3>set-awt-background</h3><div class="usage"><code>(set-awt-background canvas c)</code></div><div class="doc"><div class="markdown"><p>Set background color. Expects valid <code>java.awt.Color</code> object.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Set background with <code>java.awt.Color</code>.</p>
 </blockquote><pre><code class="hljs clojure">(drawing-snippet (fn [canvas]
                    (-&gt; canvas

@@ -4895,17 +4895,17 @@
       - a number - [channel-value, channel+value] range is used for random selection
       - nil, or anything else - keep original channel value"
   [color color-theme]
-  (if (keyword color-theme)
-    (if (thing-presets-list color-theme)
-      (let [[[l1 l2] [c1 c2]] (thing-presets color-theme)
-            ^Vec4 c (to-LCH* color)]
-        (from-LCH* (Vec4. (r/drand l1 l2) (r/drand c1 c2) (.z c) (.w c))))
-      (let [g (->> {:preset color-theme}
-                   (paletton :monochromatic (hue-paletton color))
-                   (sort-by luma)
-                   (gradient))]
-        (set-alpha (g (r/drand)) (alpha color))))
-    (apply-LCH-theme color color-theme)))
+  (clamp (if (keyword color-theme)
+           (if (thing-presets-list color-theme)
+             (let [[[l1 l2] [c1 c2]] (thing-presets color-theme)
+                   ^Vec4 c (to-LCH* color)]
+               (from-LCH* (Vec4. (r/drand l1 l2) (r/drand c1 c2) (.z c) (.w c))))
+             (let [g (->> {:preset color-theme}
+                          (paletton :monochromatic (hue-paletton color))
+                          (sort-by luma)
+                          (gradient))]
+               (set-alpha (g (r/drand)) (alpha color))))
+           (apply-LCH-theme color color-theme))))
 
 (defn random-color
   "Generate random color.
@@ -4915,10 +4915,10 @@
   List of possible color themes is stored in `color-themes` var. These are taken from thi.ng and paletton."
   {:metadoc/categories #{:pal}}
   ([color-theme alpha]
-   (if (thing-presets-list color-theme)
-     (let [[[l1 l2] [c1 c2]] (thing-presets color-theme)]
-       (from-LCH* [(r/drand l1 l2) (r/drand c1 c2) (r/drand 255.0) alpha]))
-     (set-alpha (rand-nth (paletton :monochromatic (r/drand 360.0) {:preset color-theme})) alpha)))
+   (clamp (if (thing-presets-list color-theme)
+            (let [[[l1 l2] [c1 c2]] (thing-presets color-theme)]
+              (from-LCH* [(r/drand l1 l2) (r/drand c1 c2) (r/drand 255.0) alpha]))
+            (set-alpha (rand-nth (paletton :monochromatic (r/drand 360.0) {:preset color-theme})) alpha))))
   ([alpha-or-color-theme]
    (if (keyword? alpha-or-color-theme)
      (random-color alpha-or-color-theme 255.0)

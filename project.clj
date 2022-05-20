@@ -4,7 +4,7 @@
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.11.1"]
-                 [generateme/fastmath "2.1.8" :exclusions [com.github.haifengl/smile-mkl]]
+                 [generateme/fastmath "2.1.9-SNAPSHOT" :exclusions [com.github.haifengl/smile-mkl]]
                  [org.apache.xmlgraphics/batik-transcoder "1.14"]]
   :resource-path "resources/"
   :java-source-paths ["src"]
