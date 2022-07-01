@@ -19,9 +19,11 @@
 ^{::clerk/viewer :html ::clerk/visibility :hide ::clerk/no-cache true} color-styles
 ^{::clerk/visibility :hide
   ::clerk/viewer :hide-result}
-(clerk/set-viewers!
+(clerk/add-viewers!
  (conj
-  (mapv #(cond-> % (contains? % :fetch-opts) (assoc-in [:fetch-opts :n] 500)) viewer/default-viewers)
+  (->> viewer/default-viewers
+       (filter #(contains? % :fetch-opts))
+       (mapv #(assoc-in % [:fetch-opts :n] 500)))
   {:name :block
    :render-fn '#(v/html (into [:div.flex.flex-col] (v/inspect-children %2) %1))}))
 
@@ -43,8 +45,10 @@
 
 ;; * `color` - representation of the single color with 3 color information channels and additional alpha channel (4 in total).
 
-(🎨 :darkcyan)
-(🎨 (c/color :cyan))
+^{::clerk/visibility :hide}
+(clerk/example
+ (🎨 :darkcyan)
+ (🎨 (c/color :cyan)))
 
 ;; * `palette` - vector of colors
 
@@ -54,6 +58,7 @@
 ;; * `gradient` - continuous interpolation between colors, returning a color for given value from `0.0` to `1.0`
 
 (def yb-gradient (c/gradient [:yellow :blue]))
+
 (yb-gradient 0.3)
 (🎨 yb-gradient)
 

@@ -113,14 +113,16 @@
 
 (defn show-vector-field
   "Show scalar field R^2->R^2"
-  [f norm-out]
-  (let [c (black-canvas 800 800)]
-    (with-canvas [c c]
-      (set-color c :white 8)
-      (dotimes [_ 2500000]
-        (let [x (r/drand (- m/PI) m/PI)
-              y (r/drand (- m/PI) m/PI)
-              v (f (v/vec2 x y))]
-          (point c (norm-out (v 0)) (norm-out (v 1))))))
-    (show-window {:canvas c})))
+  ([f] (show-vector-field f m/PI m/PI))
+  ([f ^double norm-in-scale ^double norm-out-scale]
+   (let [norm-out (m/make-norm (- norm-out-scale) norm-out-scale 0.0 800.0)
+         c (black-canvas 800 800)]
+     (with-canvas [c c]
+       (set-color c :white 8)
+       (dotimes [_ 2500000]
+         (let [x (r/drand (- norm-in-scale) norm-in-scale)
+               y (r/drand (- norm-in-scale) norm-in-scale)
+               v (f (v/vec2 x y))]
+           (point c (norm-out (v 0)) (norm-out (v 1))))))
+     (show-window {:canvas c}))))
 

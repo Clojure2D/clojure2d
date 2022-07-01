@@ -18,7 +18,9 @@
            .csfnt {font-family: monospace; font-size: 12px;}
            span.csblk {display: block; padding: 5.2px; border: 1px solid; border-radius: 3px;}
            span.gs {border: 1px solid; border-radius: 3px;}
-           .viewer + .viewer { padding-top: 0.2rem; padding-bottom: 0.2rem; margin-top: 1rem;}
+           .viewer {margin-top: 0.5rem;}
+           .uppercase {margin-top: 0.5rem;}
+           .viewer + .viewer { padding-top: 0.2rem; padding-bottom: 0.2rem; margin-top: 0.5rem;}
            h1, h2, h3, h4, p, ul {margin-bottom: 0.2rem !important; }"])
 
 (defn color-spans [c]
