@@ -95,7 +95,8 @@
   Additional informations:
 
   * Display refreshment is done by displaying canvas on JFrame. You can set separate quality hints (same as for canvas) for this process with `:hint` parameter.
-  * When you privide drawing function, it's called every refreshment. By default graphical context is created every call - which costs time but is safe in case you want to directly access pixels. The second variant which can be used is to create graphical context once at the moment of window creation. This variant can be forced by setting `:refresher` parameter to `:fast`.
+  * When you privide drawing function, it's called every refreshment. By default graphical context is created every call - which costs time but is safe in case you want to directly access pixels. The second variant which can be used is to create graphical context once at the moment of window creation. This variant can be forced by setting `:refresher` parameter to `:fast`
+  * In case you don't want to refresh window content automatically, set `:refresher` to `:onrepaint`. This will lower CPU consumption.
   * You can replace canvas attached to window with [[replace-canvas]] function.
   * Window itself acts as event object (implements all event protocols)
   * Canvas and window can have different sizes. Display refreshing functions will scale up/down in such case.
