@@ -13,12 +13,13 @@
 
 (defn show-image
   "Show image"
-  [img]
-  (let [img (get-image img)
-        c (canvas (width img) (height img))]
-    (with-canvas-> c
-      (image img))
-    (show-window {:canvas c})))
+  ([img] (show-image img {}))
+  ([img args]
+   (let [img (get-image img)
+         c (canvas (width img) (height img))]
+     (with-canvas-> c
+       (image img))
+     (show-window (merge {:refresher :onrepaint} args {:canvas c})))))
 
 (defn palette->image
   "Create image with rendered palette.

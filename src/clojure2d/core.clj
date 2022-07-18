@@ -2219,6 +2219,29 @@ See [[set-color]]."
       (.setPreferredSize d)
       (.setBackground Color/white))))
 
+(defn- create-panel-auto-repaint
+  "Create panel which displays canvas. Attach mouse events, give a name (same as window), set size etc.
+  Buffer is repainted automatically without FPS refreshing."
+  [windowname width height buffer ^BufferedImage background hints]
+  (let [panel (proxy [java.awt.Canvas] []
+                (paint [^java.awt.Graphics g]
+                  (let [^java.awt.Canvas this this
+                        ^Canvas canvas @buffer]
+                    (proxy-super paint g)
+                    (.drawImage g background 0 0 (.getWidth this) (.getHeight this) nil)
+                    (when hints (set-rendering-hints g hints))
+                    (.drawImage g (.buffer canvas) 0 0 (.getWidth this) (.getHeight this) nil))))
+        d (Dimension. width height)]
+    (doto panel
+      (.setName windowname)
+      (.addMouseListener mouse-processor)
+      (.addKeyListener key-char-processor)
+      (.addKeyListener key-event-processor)
+      (.addMouseMotionListener mouse-motion-processor)
+      (.setFocusTraversalKeysEnabled false)
+      (.setPreferredSize d)
+      (.setBackground Color/white))))
+
 (defn- close-window-fn
   "Close window frame"
   [^JFrame frame active?]
@@ -2232,7 +2255,9 @@ See [[set-color]]."
   "Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event."
   [^JFrame frame ^java.awt.Canvas panel active? on-top? windowname width height]
   (let [closer (proxy [WindowAdapter] []
-                 (windowClosing [^WindowEvent e] (close-window-fn frame active?)))]
+                 (windowClosing [^WindowEvent e]
+                   (do (close-window-fn frame active?)
+                       (clear-state! windowname))))]
     (doto frame
       (.setLayout (java.awt.BorderLayout.))
       (.setIconImages window-icons)
@@ -2280,6 +2305,7 @@ See [[set-color]]."
 
   * Input: frame, active? atom, function to run before repaint, canvas and sleep time."
   [^Window window draw-fun draw-state hints]
+  (repaint (.panel window) @(.buffer window) (.background window) hints) ;; initial repaint
   (let [stime (/ 1000.0 ^double (.fps window))]
     (loop [cnt (long 0)
            result draw-state
@@ -2311,6 +2337,7 @@ See [[set-color]]."
 
   * Input: frame, active? atom, function to run before repaint, canvas and sleep time."
   [^Window window draw-fun draw-state hints]
+  (repaint (.panel window) @(.buffer window) (.background window) hints) ;; initial repaint
   (let [stime (/ 1000.0 ^double (.fps window))]
     (with-canvas [canvas @(.buffer window)]
       (loop [cnt (long 0)
@@ -2374,8 +2401,11 @@ See [[set-color]]."
   * `:draw-state` - initial drawing state
   * `:setup` - inital callback function, returns drawing state (fn [canvas window] ... initial-loop-state)
   * `:hint` - rendering hint for display: `:low`, `:mid`, `:high` or `:highest`
-  * `:refresher` - `:safe` (default) or `:fast`
-  * `:background` - background color for window panel, default white."
+  * `:refresher` - `:safe` (default), `:fast`, `:onrepaint`
+  * `:background` - background color for window panel, default white.
+  * `:position` - window position as a pair of [x y], `nil` (default) for center.
+
+  `:refresher` controls what to do with repainting a window. `:safe` and `:fast` repaint a window autmatically, calling `draw-fn` (if provided) and repaint is done `:fps` times per second. `:onrepaint` leaves repainting to the AWT, `draw-fn` is ignored."
   {:metadoc/categories #{:window}}
   ([canvas window-name]
    (show-window {:canvas canvas
@@ -2402,17 +2432,23 @@ See [[set-color]]."
                  :w w
                  :h h
                  :draw-fn draw-fn}))
-  ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint refresher always-on-top? background]
+  ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint refresher always-on-top? background position]
      :or {canvas (canvas 200 200)
           window-name (str "Clojure2D - " (to-hex (rand-int (Integer/MAX_VALUE)) 8))
           fps 60
-          background :white}}]
+          background :white
+          refresher :safe}}]
+   (assert (#{:safe :fast :onrepaint} refresher) "refresher should be one of :safe, :fast or :onrepaint")
    (let [w (or w (pr/width canvas))
          h (or h (pr/height canvas))
          active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
-         panel (create-panel window-name w h)
+         background-img (pr/get-image (with-canvas-> (clojure2d.core/canvas w h)
+                                        (set-background background)))
+         panel (if (= refresher :onrepaint)
+                 (create-panel-auto-repaint window-name w h buffer background-img hint)
+                 (create-panel window-name w h))
          window (->Window frame
                           active?
                           buffer
@@ -2422,18 +2458,20 @@ See [[set-color]]."
                           h
                           window-name
                           (atom {})
-                          (pr/get-image (with-canvas-> (clojure2d.core/canvas w h)
-                                          (set-background background))))
+                          background-img)
          setup-state (when setup (with-canvas-> canvas
                                    (setup window))) 
-         refresh-screen-task (if (= refresher :fast)
-                               refresh-screen-task-speed
-                               refresh-screen-task-safety)
+         refresh-screen-task (case refresher
+                               :fast refresh-screen-task-speed
+                               :safe refresh-screen-task-safety
+                               :onrepaint nil)
          draw-fn (when draw-fn #(draw-fn %1 %2 %3 %4))]
      (SwingUtilities/invokeAndWait #(build-frame frame panel active? always-on-top? window-name w h))
      (add-events-state-processors window)
      (change-state! window-name state)
-     (future (refresh-screen-task window draw-fn (or setup-state draw-state) (when hint (get-rendering-hints #{hint} :mid))))
+     (when refresh-screen-task (future (refresh-screen-task window draw-fn (or setup-state draw-state) (when hint (get-rendering-hints #{hint} :mid)))))
+     (when-let [[x y] position]
+       (.setLocation frame (int x) (int y)))
      window))
   ([] (show-window {})))
 

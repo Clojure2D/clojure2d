@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file. This change
 * `reduce-colors` can accept a distance (as function or `fastmath.distance` object), `clarans` algorithm is used then (instead of `xmeans`). `clarans` path is very slow though.
 * path definition accepts winding rule and shape appending
 * certain shapes can accept coordinates as vectors
+* `:onrepaint` refresher type for a window, leaves repainting a window for AWT. Good when you want to diplay a static image.
+* `:position` argument for window creation, sets location of the window in desired position.
 
 ### Fixed
 
@@ -36,6 +38,7 @@ All notable changes to this project will be documented in this file. This change
 	- `vibrancy` is `1.0` by default (was `0.5`)
 	- contrast/saturation/brightness don't affect background now
 	- changed internal splat representation (as a number from `0.0` to `1.0`)
+* `show-image` (and other functions in `clojure2d.extra.utils`) uses `:onrepaint` refreshing strategy by default.
 
 ### Removed
 
