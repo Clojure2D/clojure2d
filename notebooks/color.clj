@@ -965,6 +965,11 @@ c/color-themes
     (partial c/mixsub :orange :blue :Oklab))
 
 
+;; `mixbox` is a pigment-based color mixing developed by [Secret Weapons](https://github.com/scrtwpns/mixbox)
+
+(🎨 (partial c/mixbox :orange :blue)
+    (partial c/mixbox :yellow :blue))
+
 ;; Last method calculates average colors.
 
 (🎨 (c/average [:orange :blue :green :yellow]))
@@ -1433,7 +1438,7 @@ c/temperature-names
 (comment
   (clerk/serve! {:browse? false :watch-paths ["notebooks"]})
   (clerk/show! "notebooks/color.clj")
-  (clerk/build-static-app! {:browse? false :paths ["notebooks/color.clj"] :out-path "docs/notebooks/"})
+  (clerk/build! {:browse? false :paths ["notebooks/color.clj"] :out-path "docs/notebooks/"})
   (clerk/clear-cache!)
   (clerk/halt!))
 

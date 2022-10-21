@@ -100,7 +100,7 @@
 
   Call [[palette]] to resample palette to other number of colors. Internally input palette is converted to gradient and sampled back.
 
-  Use [[lerp]], [[lerp+]], [[mix]], [[average]] to mix two colors in different ways.
+  Use [[lerp]], [[lerp+]], [[mix]], [[average]], [[mixbox]] to mix two colors in different ways.
   
   ## Distances
 
@@ -130,7 +130,8 @@
             [clojure.java.io :refer [input-stream resource]])
   (:import [fastmath.vector Vec2 Vec3 Vec4]
            [java.awt Color]
-           [clojure.lang APersistentVector ISeq Seqable]))
+           [clojure.lang APersistentVector ISeq Seqable]
+           [com.scrtwpns Mixbox]))
 
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
@@ -4358,6 +4359,16 @@
             (mix-interpolator (.y c1) (.y c2) t)
             (mix-interpolator (.z c1) (.z c2) t)
             (m/mlerp (.w c1) (.w c2) t)))))
+
+(defn mixbox
+  "Pigment based color mixing.
+
+  https://github.com/scrtwpns/mixbox"
+  (^Vec4 [col1 col2] (mixbox col1 col2 0.5))
+  (^Vec4 [col1 col2 ^double t]
+   (let [^int c1 (pack col1)
+         ^int c2 (pack col2)]
+     (pr/to-color (Mixbox/lerp c1 c2 (float t))))))
 
 (defn negate
   "Negate color (subract from 255.0)"

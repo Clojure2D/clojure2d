@@ -127,14 +127,14 @@
 <p>Pixels can be restored from Signal with <a href="clojure2d.extra.signal.html#var-signal-.3Epixels">signal-&gt;pixels</a> function.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Basic usage</p>
 </blockquote><pre><code class="hljs clojure">(pixels-&gt;signal (p/load-pixels "docs/cockatoo.jpg"))
-;;=&gt; [D@42b85bba</code></pre></div><div><blockquote><p>Custom configuration</p>
+;;=&gt; [D@71b94241</code></pre></div><div><blockquote><p>Custom configuration</p>
 </blockquote><pre><code class="hljs clojure">(pixels-&gt;signal (p/load-pixels "docs/cockatoo.jpg")
                 {:planar? false,
                  :signed? true,
                  :bits 24,
                  :coding :ulaw,
                  :channels [2 1]})
-;;=&gt; [D@25cc966f</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/signal.clj#L32">view source</a></div></div><div class="public anchor" id="var-signal-.3Epixels"><h3>signal-&gt;pixels</h3><div class="usage"><code>(signal-&gt;pixels sig target {:keys [planar? signed? little-endian? bits channels coding], :or {planar? true, little-endian? true, bits 8, signed? false, channels [0 1 2], coding :none}})</code><code>(signal-&gt;pixels sig target)</code></div><div class="doc"><div class="markdown"><p>Convert <code>Signal</code> to <code>Pixels</code> storing result into <code>target</code> (mutating it!).</p>
+;;=&gt; [D@30b03273</code></pre></div></div><div class="src-link"><a href="https://github.com/Clojure2D/clojure2d/blob/master/src/clojure2d/extra/signal.clj#L32">view source</a></div></div><div class="public anchor" id="var-signal-.3Epixels"><h3>signal-&gt;pixels</h3><div class="usage"><code>(signal-&gt;pixels sig target {:keys [planar? signed? little-endian? bits channels coding], :or {planar? true, little-endian? true, bits 8, signed? false, channels [0 1 2], coding :none}})</code><code>(signal-&gt;pixels sig target)</code></div><div class="doc"><div class="markdown"><p>Convert <code>Signal</code> to <code>Pixels</code> storing result into <code>target</code> (mutating it!).</p>
 <p>Specification is the same as in <a href="null">pixels-signal</a> functions.</p>
 </div></div><div class="markdown"><h4>Examples</h4><div><blockquote><p>Basic usage</p>
 </blockquote><pre><code class="hljs clojure">(let [p (p/load-pixels "docs/cockatoo.jpg")

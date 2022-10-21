@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file. This change
 * certain shapes can accept coordinates as vectors
 * `:onrepaint` refresher type for a window, leaves repainting a window for AWT. Good when you want to diplay a static image.
 * `:position` argument for window creation, sets location of the window in desired position.
+* `mixbox` pigment-based color mixing by [Secret Weapons](https://github.com/scrtwpns/mixbox)
 
 ### Fixed
 

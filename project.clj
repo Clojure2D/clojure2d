@@ -5,6 +5,7 @@
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [generateme/fastmath "2.1.9-SNAPSHOT" :exclusions [com.github.haifengl/smile-mkl]]
+                 [com.scrtwpns/mixbox "2.0.0"]
                  [org.apache.xmlgraphics/batik-transcoder "1.14"]]
   :resource-path "resources/"
   :java-source-paths ["src"]

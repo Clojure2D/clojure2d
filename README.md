@@ -147,3 +147,5 @@ Or just Pull Request.
 
 Copyright © 2016-2022 GenerateMe
 Distributed under the MIT Licence
+
+[`mixbox`](https://github.com/scrtwpns/mixbox) is provided under the CC BY-NC 4.0 license for non-commercial use only.

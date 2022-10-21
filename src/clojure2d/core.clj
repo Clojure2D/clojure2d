@@ -489,7 +489,7 @@ The differences are in interpolation, antialiasing, speed vs quality rendering e
 The `:highest` is `:high` with `VALUE_STROKE_PURE` added. Be aware that this option can give very soft lines.
 
 Default hint for Canvas is `:high`. You can set also hint for Window which means that when display is refreshed this hint is applied (java defaults are used otherwise)."
-       :metadoc/categories #{:canvas :window}}
+     :metadoc/categories #{:canvas :window}}
   rendering-hints {:low [[RenderingHints/KEY_ANTIALIASING        RenderingHints/VALUE_ANTIALIAS_OFF]
                          [RenderingHints/KEY_INTERPOLATION       RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR]
                          [RenderingHints/KEY_ALPHA_INTERPOLATION RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED]
