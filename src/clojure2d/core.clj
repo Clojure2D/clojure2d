@@ -1506,10 +1506,10 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   ([grid x y]
    (path-shape (grid/corners grid [x y]) true))
   ([grid x y scale]
-   (path-shape (grid/corners grid [x y] scale) true)))
+   (path-shape (grid/corners grid x y scale) true)))
 
 (defn grid-cell
-  "Draw grid cell for given grid."
+  "Draw grid cell for given grid in screen (x,y) coordinates. For cell coordinates, see [[grid-qr-cell]]."
   {:metadoc/categories #{:draw}}
   ([canvas grid x y stroke?]
    (shape canvas (grid-cell-shape grid x y) stroke?))
@@ -1518,10 +1518,22 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   ([canvas grid x y scale stroke?]
    (shape canvas (grid-cell-shape grid x y scale) stroke?)))
 
+(defn grid-qr-cell
+  "Draw grid cell for given grid in cell (q,r) coordinates. For screen coordinates, see [[grid-cell]]."
+  {:metadoc/categories #{:draw}}
+  ([canvas grid q r stroke?]
+   (let [[x y] (grid/cell->anchor grid q r)]
+     (shape canvas (grid-cell-shape grid x y) stroke?)))
+  ([canvas grid q r]
+   (grid-qr-cell canvas grid q r false))
+  ([canvas grid q r scale stroke?]
+   (let [[x y] (grid/cell->anchor grid q r)]
+     (shape canvas (grid-cell-shape grid x y scale) stroke?))))
+
 ;;
 
 (def ^{:doc "List of all available font names."
-       :metadoc/categories #{:write}} fonts-list
+     :metadoc/categories #{:write}} fonts-list
   (try
     (into [] (.getAvailableFontFamilyNames (java.awt.GraphicsEnvironment/getLocalGraphicsEnvironment)))
     (catch Exception _ []))) ;; in headless mode function call fails
