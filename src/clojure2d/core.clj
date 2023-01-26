@@ -680,6 +680,8 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
     (with-canvas-> ncanvas
       (image (pr/get-image c)))))
 
+;; Point2d
+
 ;;
 
 (defn scale

@@ -1,7 +1,6 @@
 (ns clerk.styles
   (:require [clojure2d.color :as c]
             [nextjournal.clerk :as clerk]
-            [nextjournal.clerk.viewer :as view]
             [hiccup.util :as hutil]
             [clojure.string :as str]
             [fastmath.core :as m]))
@@ -71,8 +70,7 @@
    [:span.gs {:style (emit-fn gradient-or-palette)}]])
 
 (defn palette-div [emit-fn palette]
-  [:div.gs.gsfull
-   (emit-fn palette)])
+  [:div.gs.gsfull (emit-fn palette)])
 
 (def palette->div (partial palette-div palette->css-gradient))
 (def gradient->div (partial gradient-div gradient->css-gradient))
