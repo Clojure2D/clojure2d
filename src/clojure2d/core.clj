@@ -2652,20 +2652,22 @@ See [[set-color]]."
 
 ;; ## Date/Time functions
 
-(defn year "Current year" {:metadoc/categories #{:dt}} ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/YEAR))
-(defn month "Current month" {:metadoc/categories #{:dt}} ^long [] (inc ^int (.get ^Calendar (Calendar/getInstance) Calendar/MONTH)))
-(defn day "Current day" {:metadoc/categories #{:dt}} ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/DAY_OF_MONTH))
-(defn hour "Current hour" {:metadoc/categories #{:dt}} ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/HOUR_OF_DAY))
-(defn minute "Current minute" {:metadoc/categories #{:dt}} ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/MINUTE))
-(defn sec "Current second" {:metadoc/categories #{:dt}} ^long [] (.get ^Calendar (Calendar/getInstance) Calendar/SECOND))
-(defn millis "Milliseconds from epoch" {:metadoc/categories #{:dt}} ^long [] (System/currentTimeMillis))
+(defn calendar "Current calendar" {:metadoc/categories #{:dt}} ^Calendar [] (Calendar/getInstance))
+(defn year "Current year" {:metadoc/categories #{:dt}} ^long [& [c]] (.get ^Calendar (or c (calendar)) Calendar/YEAR))
+(defn month "Current month" {:metadoc/categories #{:dt}} ^long [& [c]] (inc ^int (.get ^Calendar (or c (calendar)) Calendar/MONTH)))
+(defn day "Current day" {:metadoc/categories #{:dt}} ^long [& [c]] (.get ^Calendar (or c (calendar)) Calendar/DAY_OF_MONTH))
+(defn hour "Current hour" {:metadoc/categories #{:dt}} ^long [& [c]] (.get ^Calendar (or c (calendar)) Calendar/HOUR_OF_DAY))
+(defn minute "Current minute" {:metadoc/categories #{:dt}} ^long [& [c]] (.get ^Calendar (or c (calendar)) Calendar/MINUTE))
+(defn sec "Current second" {:metadoc/categories #{:dt}} ^long [& [c]] (.get ^Calendar (or c (calendar)) Calendar/SECOND))
+(defn millis "Milliseconds from epoch" {:metadoc/categories #{:dt}} ^long [& [c]] (if c (.getTimeInMillis ^Calendar c) (System/currentTimeMillis)))
 (defn nanos "JVM running time in nanoseconds" {:metadoc/categories #{:dt}} ^long [] (System/nanoTime))
 (defn datetime
   "Date time values in the array. Optional parameter :vector or :hashmap (default) to indicate what to return."
   {:metadoc/categories #{:dt}}
   ([type-of-array]
-   (let [y (year) m (month) d (day)
-         h (hour) mi (minute) s (sec) mil (millis)
+   (let [c (calendar)
+         y (year c) m (month c) d (day c)
+         h (hour c) mi (minute c) s (sec c) mil (millis c)
          n (nanos)]
      (if (= type-of-array :vector)
        [y m d h mi s mil n]
