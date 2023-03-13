@@ -900,7 +900,7 @@
 
 ;;
 
-(defn to-lch
+(defn to-luma-color-hue
   "For given color space return polar representation of the color"
   ^Vec4 [to c]
   (let [^Vec4 cc (to c)
@@ -909,7 +909,7 @@
         C (m/hypot-sqrt (.y cc) (.z cc))]
     (Vec4. (.x cc) C Hd (.w cc))))
 
-(defn from-lch
+(defn from-luma-color-hue
   "For given color space convert from polar representation of the color"
   ^Vec4 [from c]
   (let [^Vec4 c (pr/to-color c)
@@ -921,7 +921,7 @@
 (defn to-Oklch
   "RGB -> Oklch"
   ^Vec4 [c]
-  (to-lch to-Oklab c))
+  (to-luma-color-hue to-Oklab c))
 
 (defn to-Oklch*
   "RGB -> Oklch, normalized"
@@ -935,7 +935,7 @@
 (defn from-Oklch
   "Oklch -> RGB"
   ^Vec4 [c]
-  (from-lch from-Oklab c))
+  (from-luma-color-hue from-Oklab c))
 
 (defn from-Oklch*
   "Oklch -> RGB, normalized"
@@ -1768,7 +1768,7 @@
   * H: 0.0 - 360.0"
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
-  (to-lch to-LAB c))
+  (to-luma-color-hue to-LAB c))
 
 (defn to-LCH*
   "RGB -> LCH, normalized"
@@ -1786,7 +1786,7 @@
   For ranges, see [[to-LCH]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
-  (from-lch from-LAB c))
+  (from-luma-color-hue from-LAB c))
 
 (defn from-LCH*
   "LCH -> RGB, normalized"
@@ -1810,7 +1810,7 @@
   * H: 0.0 - 360.0"
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
-  (to-lch to-LUV c))
+  (to-luma-color-hue to-LUV c))
 
 (defn to-LCHuv*
   "RGB -> LCHuv, normalized"
@@ -1828,7 +1828,7 @@
   For ranges, see [[to-LCH]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
-  (from-lch from-LUV c))
+  (from-luma-color-hue from-LUV c))
 
 (defn from-LCHuv*
   "LCHuv -> RGB, normalized"
@@ -2262,7 +2262,7 @@
   * H: 0.0 - 360.0"
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
-  (to-lch to-JAB c))
+  (to-luma-color-hue to-JAB c))
 
 (defn to-JCH*
   "RGB -> JCH, normalized"
@@ -2280,7 +2280,7 @@
   For ranges, see [[to-JCH]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
-  (from-lch from-JAB c))
+  (from-luma-color-hue from-JAB c))
 
 (defn from-JCH*
   "JCH -> RGB, normalized"
@@ -3508,8 +3508,8 @@
   "Create LCH conversion functions pair from any luma based color space. "
   [cs]
   (let [[to from] (colorspaces cs)]
-    [(partial to-lch to)
-     (partial from-lch from)]))
+    [(partial to-luma-color-hue to)
+     (partial from-luma-color-hue from)]))
 
 (defn complementary
   "Create complementary color. Possible colorspaces are:
