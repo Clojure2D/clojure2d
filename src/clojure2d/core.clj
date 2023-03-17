@@ -580,7 +580,8 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   Each function have to accept canvas as second parameter and have to return canvas.
 
   See also [[with-canvas]]."
-  {:metadoc/categories #{:canvas}}
+  {:metadoc/categories #{:canvas}
+   :clj-kondo/lint-as 'clojure.core/->}
   [canvas & body]  
   `(let [newcanvas# (make-graphics ~canvas)
          result# (-> newcanvas#
