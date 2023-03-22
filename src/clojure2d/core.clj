@@ -593,8 +593,9 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 (defmacro with-canvas
   "Macro which takes care to create and destroy `Graphics2D` object for drawings on canvas. Macro returns result of last call.
 
-  See also [[with-canvas->]]." 
-  {:metadoc/categories #{:canvas}}
+  See also [[with-canvas->]]."
+  {:metadoc/categories #{:canvas}
+   :clj-kondo/lint-as 'clojure.core/let}
   [[c canvas] & body]
   `(let [~c (make-graphics ~canvas)
          result# (do ~@body)]
