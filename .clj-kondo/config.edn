@@ -1,4 +1,1 @@
-{:lint-as {clojure2d.core/with-canvas clojure.core/let
-           clojure2d.core/with-canvas-> clojure.core/->}
- :hooks {:macroexpand {clojure2d.core/with-oriented-canvas clojure2d.core/with-oriented-canvas
-                       clojure2d.core/with-oriented-canvas-> clojure2d.core/with-oriented-canvas->}}}
+{:config-paths ["../resources/clj-kondo.exports/clojure2d/clojure2d"]}
