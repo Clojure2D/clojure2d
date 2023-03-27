@@ -448,17 +448,17 @@ c/colorspaces-list
 
 ;; ### Polar coordinates
 
-;; For every luma based color space you can create polar representation with `to-lch` or `from-lch`. Some of the colorspace are already predefined.
+;; For every luma based color space you can create polar representation with `to-luma-color-hue` or `from-luma-color-hue`. Some of the colorspace are already predefined.
 
 ;; The following two are the same:
 
-(c/to-lch c/to-LUV [20 30 100])
+(c/to-luma-color-hue c/to-LUV [20 30 100])
 (c/to-LCHuv [20 30 100])
 
 ;; Let's make LCH out of YUV.
 
-(def yuv-polar (c/to-lch c/to-YUV [20 30 100]))
-(c/from-lch c/from-YUV yuv-polar)
+(def yuv-polar (c/to-luma-color-hue c/to-YUV [20 30 100]))
+(c/from-luma-color-hue c/from-YUV yuv-polar)
 
 ;; You can create conversion pair by calling `make-LCH` function.
 
