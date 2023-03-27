@@ -30,6 +30,7 @@ All notable changes to this project will be documented in this file. This change
 * `IPT` should operate on not scaled XYZ
 * missing palettes from `:nord`
 * `LDRenderer` with filtering should draw on borders
+* [breaking] `to-lch` and `from-lch` renenamed to `to-luma-color-hue` and `from-luma-color-hue` [#21](https://github.com/Clojure2D/clojure2d/issues/21)
 
 ### Changed
 

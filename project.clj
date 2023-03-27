@@ -9,7 +9,8 @@
                  [org.apache.xmlgraphics/batik-transcoder "1.14"]]
   :resource-path "resources/"
   :java-source-paths ["src"]
-  :javac-options ["-target" "1.8" "-source" "1.8"]
+  ;; :javac-options ["-target" "1.8" "-source" "1.8"]
+  :javac-options ["--release" "8"]
   :prep-tasks [["compile" "fastmath.vector"] "javac"]
   :scm {:name "git"
         ::url "https://github.com/Clojure2D/clojure2d.git"}
