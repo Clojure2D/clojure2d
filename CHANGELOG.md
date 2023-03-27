@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file. This change
 * `:position` argument for window creation, sets location of the window in desired position.
 * `mixbox` pigment-based color mixing by [Secret Weapons](https://github.com/scrtwpns/mixbox)
 * `grid-qr-cell` to allow draw grid cells in `q,r` coordinate system
+* `clj-kondo` configs
 
 ### Fixed
 
