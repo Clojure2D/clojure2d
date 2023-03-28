@@ -1,0 +1,1 @@
+{:config-paths ["../resources/clj-kondo.exports/clojure2d/clojure2d"]}

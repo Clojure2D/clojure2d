@@ -19,7 +19,7 @@ _site
 /log
 utils/palettes/.nrepl-port
 utils/palettes/target
-.clj-kondo
+.clj-kondo/.cache
 .lsp
 /playground
 /.clerk
