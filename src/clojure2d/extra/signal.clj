@@ -48,7 +48,7 @@
    (let [channels (int-array (if (= :all channels) [0 1 2 3] channels))]
      (Converter/toSignal
       (.p p) channels
-      (dec (>> bits 3))
+      (dec (m/>> bits 3))
       little-endian? signed? planar?
       (coding-value coding))))
   ([p]
@@ -66,7 +66,7 @@
       sig
       (.p target)
       channels
-      (dec (>> bits 3))
+      (dec (m/>> bits 3))
       little-endian? signed? planar?
       (coding-value coding))
      target))

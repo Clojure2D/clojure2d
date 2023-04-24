@@ -294,9 +294,9 @@
                     (.getDataElements raster x y b)
                     (let [v (aget b 0)
                           b (bit-and v 0xff)
-                          g (bit-and (>> v 8) 0xff)
-                          r (bit-and (>> v 16) 0xff)
-                          a (bit-and (>> v 24) 0xff)]
+                          g (bit-and (m/>> v 8) 0xff)
+                          r (bit-and (m/>> v 16) 0xff)
+                          a (bit-and (m/>> v 24) 0xff)]
                       (if (== (.getNumBands raster) 3)
                         (c/color r g b)
                         (c/color r g b a))))))

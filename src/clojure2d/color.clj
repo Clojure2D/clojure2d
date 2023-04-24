@@ -570,25 +570,25 @@
   (green [_] nil)
   (blue [_] nil)
   Long
-  (alpha ^double [^long c] (bit-and 0xff (>> c 24)))
-  (red ^double [^long c] (bit-and 0xff (>> c 16)))
-  (green ^double [^long c] (bit-and 0xff (>> c 8)))
+  (alpha ^double [^long c] (bit-and 0xff (m/>> c 24)))
+  (red ^double [^long c] (bit-and 0xff (m/>> c 16)))
+  (green ^double [^long c] (bit-and 0xff (m/>> c 8)))
   (blue ^double [^long c] (bit-and 0xff c))
-  (to-color ^Vec4 [^long c] (Vec4. (bit-and 0xff (>> c 16))
-                                   (bit-and 0xff (>> c 8))
+  (to-color ^Vec4 [^long c] (Vec4. (bit-and 0xff (m/>> c 16))
+                                   (bit-and 0xff (m/>> c 8))
                                    (bit-and 0xff c)
-                                   (if (zero? (bit-and 0xff000000 c)) 255.0 (bit-and 0xff (>> c 24)))))
+                                   (if (zero? (bit-and 0xff000000 c)) 255.0 (bit-and 0xff (m/>> c 24)))))
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
   (luma ^double [c] (pr/luma (pr/to-color c)))
   Integer
-  (alpha ^double [c] (bit-and 0xff (>> ^int c 24)))
-  (red ^double [c] (bit-and 0xff (>> ^int c 16)))
-  (green ^double [c] (bit-and 0xff (>> ^int c 8)))
+  (alpha ^double [c] (bit-and 0xff (m/>> ^int c 24)))
+  (red ^double [c] (bit-and 0xff (m/>> ^int c 16)))
+  (green ^double [c] (bit-and 0xff (m/>> ^int c 8)))
   (blue ^double [c] (bit-and 0xff ^int c))
-  (to-color ^Vec4 [c] (Vec4. (bit-and 0xff (>> ^int c 16))
-                             (bit-and 0xff (>> ^int c 8))
+  (to-color ^Vec4 [c] (Vec4. (bit-and 0xff (m/>> ^int c 16))
+                             (bit-and 0xff (m/>> ^int c 8))
                              (bit-and 0xff ^int c)
-                             (if (zero? (bit-and 0xff000000 c)) 255.0 (bit-and 0xff (>> ^int c 24)))))
+                             (if (zero? (bit-and 0xff000000 c)) 255.0 (bit-and 0xff (m/>> ^int c 24)))))
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
   (luma ^double [c] (pr/luma (pr/to-color c)))
   String
@@ -698,9 +698,9 @@
   "Pack color to ARGB 32bit integer."
   {:metadoc/categories meta-ops}
   [c]
-  (unchecked-int (bit-or (<< (lclamp255 (pr/alpha c)) 24)
-                         (<< (lclamp255 (pr/red c)) 16)
-                         (<< (lclamp255 (pr/green c)) 8)
+  (unchecked-int (bit-or (m/<< (lclamp255 (pr/alpha c)) 24)
+                         (m/<< (lclamp255 (pr/red c)) 16)
+                         (m/<< (lclamp255 (pr/green c)) 8)
                          (lclamp255 (pr/blue c)))))
 
 (def ^{:doc "Convert color to `quil` color type (ie. ARGB Integer). Alias to [[pack]]."
@@ -1045,9 +1045,9 @@
             ^Vec4 rgb-scale (Oklab->linear (Vec4. Lvt (* a- Cvt) (* b- Cvt) 1.0))
             scale-L (m/cbrt (/ (max (.x rgb-scale) (.y rgb-scale) (.z rgb-scale) 0.0)))
             L (/ L scale-L)
-            C (/ C scale-L)
+            #_#_ C (/ C scale-L) ;; it's in original source code
             tL (toe L)
-            C (/ (* C tL) L)
+            #_#_ C (/ (* C tL) L) 
             L tL
             v (/ L Lv)
             s (* (+ 0.5 T-max)
@@ -1164,8 +1164,8 @@
   (if (<= L (.x cusp))
     (/ (* (.y cusp) L) (.x cusp))
     (let [t (/ (* (.y cusp) (dec L)) (dec (.x cusp)))
-          dL 0.0
-          dC 1.0
+          #_#_ dL 0.0
+          #_#_ dC 1.0
           kl (+ (* 0.3963377774 a) (* 0.2158037573 b))
           km (+ (* -0.1055613458 a) (* -0.0638541728 b))
           ks (+ (* -0.0894841775 a) (* -1.2914855480 b))

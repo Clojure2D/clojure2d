@@ -241,7 +241,7 @@
          M (mm Ma-1 (mm diag Ma))]
      [M (inverse-matrix M)])))
 
-#_(chromatic-adaptation-matrix :von-kries [:CIE2 :D65] [:CIE2 :D50])
+(chromatic-adaptation-matrix :von-kries [:CIE2 :D65] [:CIE2 :D50])
 
 (def rgbs
   {:sRGB {:red (Vec2. 0.64 0.33) :green (Vec2. 0.3 0.6) :blue (Vec2. 0.15 0.06)}})

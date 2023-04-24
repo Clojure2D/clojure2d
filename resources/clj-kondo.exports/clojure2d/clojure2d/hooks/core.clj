@@ -1,4 +1,4 @@
-(ns clojure2d.core)
+(ns hooks.core)
 
 (defmacro with-oriented-canvas
   [_orientation [c canv] & body]

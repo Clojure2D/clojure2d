@@ -133,7 +133,7 @@
                          ^double wa (gauss (dec dst) hardscan)
                          ^double wb (gauss dst hardscan)
                          ^double wc (gauss (inc dst) hardscan)
-                         xf (>>> (rem (+ xx (* mask-mult yy)) 6) 1)]
+                         xf (m/>>> (rem (+ xx (* mask-mult yy)) 6) 1)]
                      (-> (+ (* a wa) (+ (* b wb) (* c wc)))
                          (/ 1000000.0)
                          (c/from-linear) 
