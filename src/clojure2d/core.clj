@@ -279,20 +279,20 @@
   [filename]
   (second (re-find #"\.(\w+)$" filename)))
 
-(defn- ^ImageWriter get-image-writer
+(defn- get-image-writer
   "Returns image writer of image type based on extension."
-  [filename]
+  ^ImageWriter [filename]
   (let [ext (file-extension filename)
         ^Iterator iter (ImageIO/getImageWritersByFormatName ext)]
     (when (.hasNext iter)
       (.next iter))))
 
-(defn- ^BufferedImage flatten-image
+(defn- flatten-image
   "Flatten image, properly drop alpha channel.
 
   * Input: ARGB BufferedImage object
   * Returns RGB BufferedImage object"
-  [^BufferedImage img]
+  ^BufferedImage [^BufferedImage img]
   (let [w (.getWidth img)
         h (.getHeight img)
         arr (.getRGB img 0 0 w h nil 0 w)
@@ -403,9 +403,9 @@
 
 ;; ## Screen info
 
-(defn- ^Dimension screen-size
+(defn- screen-size
   "Screen size from java.awt.Toolkit."
-  [] (.getScreenSize (Toolkit/getDefaultToolkit)))
+  ^Dimension [] (.getScreenSize (Toolkit/getDefaultToolkit)))
 
 (defn screen-width
   "Returns width of the screen."
@@ -2243,7 +2243,7 @@ See [[set-color]]."
                   (let [^java.awt.Canvas this this
                         ^Canvas canvas @buffer]
                     (proxy-super paint g)
-                    (.drawImage g background 0 0 (.getWidth this) (.getHeight this) nil)
+                    (when background (.drawImage g background 0 0 (.getWidth this) (.getHeight this) nil))
                     (when hints (set-rendering-hints g hints))
                     (.drawImage g (.buffer canvas) 0 0 (.getWidth this) (.getHeight this) nil))))
         d (Dimension. width height)]
@@ -2295,7 +2295,7 @@ See [[set-color]]."
       (.requestFocus)
       (.createBufferStrategy 2))))
 
-(defn- repaint
+(defn- refresh-repaint
   "Draw buffer on panel using `BufferStrategy` object."
   [^java.awt.Canvas panel ^Canvas canvas ^BufferedImage background hints]
   (let [^BufferStrategy strategy (.getBufferStrategy panel)
@@ -2320,7 +2320,7 @@ See [[set-color]]."
 
   * Input: frame, active? atom, function to run before repaint, canvas and sleep time."
   [^Window window draw-fun draw-state hints]
-  (repaint (.panel window) @(.buffer window) (.background window) hints) ;; initial repaint
+  (refresh-repaint (.panel window) @(.buffer window) (.background window) hints) ;; initial repaint
   (let [stime (/ 1000.0 ^double (.fps window))]
     (loop [cnt (long 0)
            result draw-state
@@ -2338,7 +2338,7 @@ See [[set-color]]."
             delay (- stime diff overt)]
         (when (pos? delay)
           (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay)))))
-        (repaint (.panel window) @(.buffer window) (.background window) hints)
+        (refresh-repaint (.panel window) @(.buffer window) (.background window) hints)
         (if (and @(.active? window) (not (.exception? new-result)))
           (recur (inc cnt)
                  (.value new-result)
@@ -2352,7 +2352,7 @@ See [[set-color]]."
 
   * Input: frame, active? atom, function to run before repaint, canvas and sleep time."
   [^Window window draw-fun draw-state hints]
-  (repaint (.panel window) @(.buffer window) (.background window) hints) ;; initial repaint
+  (refresh-repaint (.panel window) @(.buffer window) (.background window) hints) ;; initial repaint
   (let [stime (/ 1000.0 ^double (.fps window))]
     (with-canvas [canvas @(.buffer window)]
       (loop [cnt (long 0)
@@ -2370,7 +2370,7 @@ See [[set-color]]."
               delay (- stime diff overt)]
           (when (pos? delay)
             (Thread/sleep (long delay) (int (* 1000000.0 (m/frac delay)))))
-          (repaint (.panel window) @(.buffer window) (.background window) hints)
+          (refresh-repaint (.panel window) @(.buffer window) (.background window) hints)
           (if (and @(.active? window) (not (.exception? new-result)))
             (recur (inc cnt)
                    (.value new-result)
@@ -2386,6 +2386,12 @@ See [[set-color]]."
   {:metadoc/categories #{:canvas :window}}
   [^Window window canvas]
   (reset! (.buffer window) canvas))
+
+(defn repaint
+  "Repaints window, call only in `:onrepaint` mode"
+  [^Window window]
+  (let [^java.awt.Canvas panel (.panel window)]
+    (.repaint panel)))
 
 ;; You may want to extract canvas bound to window
 
@@ -2420,7 +2426,7 @@ See [[set-color]]."
   * `:background` - background color for window panel, default white.
   * `:position` - window position as a pair of [x y], `nil` (default) for center.
 
-  `:refresher` controls what to do with repainting a window. `:safe` and `:fast` repaint a window autmatically, calling `draw-fn` (if provided) and repaint is done `:fps` times per second. `:onrepaint` leaves repainting to the AWT, `draw-fn` is ignored."
+  `:refresher` controls what to do with repainting a window. `:safe` and `:fast` repaint a window autmatically, calling `draw-fn` (if provided) and repaint is done `:fps` times per second. `:onrepaint` leaves repainting to the AWT or user by calling `repaint`, `draw-fn` is ignored."
   {:metadoc/categories #{:window}}
   ([canvas window-name]
    (show-window {:canvas canvas
@@ -2459,8 +2465,8 @@ See [[set-color]]."
          active? (atom true)
          buffer (atom canvas)
          frame (JFrame.)
-         background-img (pr/get-image (with-canvas-> (clojure2d.core/canvas w h)
-                                        (set-background background)))
+         background-img (when background (pr/get-image (with-canvas-> (clojure2d.core/canvas w h)
+                                                         (set-background background))))
          panel (if (= refresher :onrepaint)
                  (create-panel-auto-repaint window-name w h buffer background-img hint)
                  (create-panel window-name w h))
