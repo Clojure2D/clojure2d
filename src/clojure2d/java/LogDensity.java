@@ -132,7 +132,7 @@ public final class LogDensity {
                 if (a[i]>mx) mx=a[i];
             }
             
-            lmx = FastMath.log1p(mx);
+            lmx = FastMath.log(mx+1.0);
 
             rmx = 1.0 / mx;
             rlmx = 1.0 / lmx;
@@ -187,6 +187,10 @@ public final class LogDensity {
                     bb = (int)PrimitiveMath.lerp(bg.z, fb*scaleb, alpha);
                 }
 
+                rr = rr < 0 ? 0 : rr > 255 ? 255 : rr;
+                gg = gg < 0 ? 0 : gg > 255 ? 255 : gg;
+                bb = bb < 0 ? 0 : bb > 255 ? 255 : bb;
+                
                 if(conf.do_bc) {
                     rr = conf.bc_lut[rr];
                     gg = conf.bc_lut[gg];
