@@ -17,7 +17,7 @@
   :repl-options {:timeout 120000}
   :target-path "target/%s"
   :profiles {:dev {:source-paths ["dev"]
-                   :dependencies [[io.github.nextjournal/clerk "0.11.603"]]}
+                   :dependencies [[io.github.nextjournal/clerk "0.13.842"]]}
              :dev-codox {:codox {:source-uri "https://github.com/Clojure2D/clojure2d/blob/master/{filepath}#L{line}"
                                  :output-path "docs/codox/"}}
              :uberjar {:aot :all}})
