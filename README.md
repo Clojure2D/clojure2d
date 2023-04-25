@@ -1,4 +1,4 @@
-# clojure2d [![Build Status](https://travis-ci.org/Clojure2D/clojure2d.svg?branch=master)](https://travis-ci.org/Clojure2D/clojure2d) [![Clojars Project](https://img.shields.io/clojars/v/clojure2d.svg)](https://clojars.org/clojure2d)
+# clojure2d [![Clojars Project](https://img.shields.io/clojars/v/clojure2d.svg)](https://clojars.org/clojure2d)
 
 Clojure2D is a library supporting generative coding or glitching. It's based on Java2D directly. It's Clojure only, no ClojureScript version.
 
@@ -29,6 +29,12 @@ Lists:
 * [color names](https://clojure2d.github.io/clojure2d/docs/static/colors.html)
 * [named palettes](https://clojure2d.github.io/clojure2d/docs/static/palettes/index.html)
 * [named gradients](https://clojure2d.github.io/clojure2d/docs/static/gradients/index.html)
+
+## Examples
+
+200+ examples are in separate repository
+
+https://github.com/Clojure2D/clojure2d-examples
 
 ## Motivation
 
@@ -109,12 +115,6 @@ This is the namespace for common generative/glitch specific libraries:
 
 All math functions are in [fastmath](https://github.com/generateme/fastmath) repository.
 
-## Examples
-
-200+ examples are in separate repository
-
-[EXAMPLES](https://github.com/Clojure2D/clojure2d-examples)
-
 ## Community
 
 [Clojurians](https://clojurians.slack.com/archives/clojure2d)
@@ -145,7 +145,7 @@ Or just Pull Request.
 
 ## License
 
-Copyright © 2016-2022 GenerateMe
+Copyright © 2016-2023 GenerateMe
 Distributed under the MIT Licence
 
 [`mixbox`](https://github.com/scrtwpns/mixbox) is provided under the CC BY-NC 4.0 license for non-commercial use only.
