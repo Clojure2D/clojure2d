@@ -29,7 +29,6 @@
             [clojure2d.color.blend :as b]
             [fastmath.fields :as var])
   (:import [clojure2d.pixels Pixels]
-           [clojure2d.java.glitch Segmentation]
            [fastmath.vector Vec2]))
 
 (set! *unchecked-math* :warn-on-boxed)
@@ -42,7 +41,7 @@
 ;; Pixels are shifted by value returned by wave function. You have to provide separate wave functions for x and y axises.
 ;; Random setup is based on sum of oscillators defined in `signal` namespace.
 
-(def ^:private freqs (mapv #(<< 1 ^long %) (range 8)))
+(def ^:private freqs (mapv #(m/<< 1 ^long %) (range 8)))
 (def ^:private amps (mapv #(/ ^long %) freqs))
 
 (defn- make-random-wave 
@@ -72,14 +71,16 @@
 (defn- do-slitscan
   "Shift pixels by amount returned by functions fx and fy."
   [fx fy ch ^Pixels p x y]
-  (let [wp (.w p)
+  (let [x (int x)
+        y (int y)
+        wp (.w p)
         hp (.h p)
         sx (/ wp)
         sy (/ hp)
-        shiftx (* 0.3 wp ^double (fx (* ^int x sx)))
-        shifty (* 0.3 hp ^double (fy (* ^int y sy)))
-        xx (m/wrap 0.0 wp (+ ^int x shiftx))
-        yy (m/wrap 0.0 hp (+ ^int y shifty))]
+        shiftx (* 0.3 wp ^double (fx (* x sx)))
+        shifty (* 0.3 hp ^double (fy (* y sy)))
+        xx (m/wrap 0.0 wp (+ x shiftx))
+        yy (m/wrap 0.0 hp (+ y shifty))]
     (p/get-value p ch xx yy)))
 
 (defn slitscan
@@ -197,7 +198,6 @@
 ;; mirrorimage
 
 (defn- mi-draw-point
-  ""
   ([ch target source oldx oldy newx newy sx sy]
    (p/set-value! target ch (+ ^long newx ^long sx) (+ ^long newy ^long sy)
                  (p/get-value source ch (+ ^long oldx ^long sx) (+ ^long oldy ^long sy))))
@@ -205,7 +205,6 @@
    (p/set-value! target ch newx newy (p/get-value source ch oldx oldy))))
 
 (defn- mi-do-horizontal
-  ""
   [t ch target ^Pixels source]
   (dotimes [y (/ (.h source) 2)]
     (dotimes [x (.w source)]
@@ -214,7 +213,6 @@
         (mi-draw-point ch target source x (- (.h source) y 1) x y)))))
 
 (defn- mi-do-vertical
-  ""
   [t ch target ^Pixels source]
   (dotimes [x (/ (.w source) 2)]
     (dotimes [y (.h source)]
@@ -223,7 +221,6 @@
         (mi-draw-point ch target source (- (.w source) x 1) y x y)))))
 
 (defn- mi-do-diag-ul
-  ""
   [t shift? ch target ^Pixels source]
   (let [t (int t)
         size (min (.w source) (.h source))
@@ -238,7 +235,6 @@
           3 (mi-draw-point ch target source y x (- size y 1) (- size x 1) tx ty))))))
 
 (defn- mi-do-diag-ur
-  ""
   [t shift? ch target ^Pixels source]
   (let [t (int t)
         size (min (.w source) (.h source))
@@ -255,7 +251,6 @@
           (recur (dec x)))))))
 
 (defn- mi-do-diag-rect
-  ""
   [t l ch target ^Pixels source]
   (dotimes [y (.h source)]
     (let [d (int (if t
@@ -305,7 +300,6 @@
 ;; pix2line
 
 (defn- pix2line-grid 
-  ""
   [^long grid-sx ^long grid-sy {:keys [^long nx ^long ny ^double scale nseed ^double shiftx ^double shifty]}]
   (let [nnx (m/round (inc (* nx scale)))
         nny (m/round (inc (* ny scale)))
@@ -364,15 +358,15 @@
            (if (< x (.w source))
              (let [c (p/get-value source ch x y)
                    [ncurrentc nlastx] (if (<= tolerance (m/abs (- currentc c)))
-                                        (let [^int gval (grid x y)
-                                              ^int myx (if (and whole (< lastx gval)) lastx gval)]
+                                        (let [^long gval (grid x y)
+                                              myx (if (and whole (< lastx gval)) lastx gval)]
                                           (dotimes [xx (- x myx)] (p/set-value! target ch (+ myx xx) y c))
                                           [c x])
                                         [currentc lastx])]
                (recur (long ncurrentc) (long nlastx) (unchecked-inc x)))
              (let [x- (dec x)
-                   ^int gval (grid x- y)
-                   ^int myx (if (< lastx gval) lastx gval)]
+                   ^long gval (grid x- y)
+                   myx (if (< lastx gval) lastx gval)]
                (dotimes [xx (- x- myx)] (p/set-value! target ch (+ myx xx) y currentc))))))))))
 
 ;; blend machine
@@ -383,8 +377,8 @@
   (let [cs1 (r/randval 0.9 (rand-nth c/colorspaces-list) nil) ; let's convert to some colorspace (or leave rgb)
         cs2 (r/randval 0.2 (r/randval 0.9 (rand-nth c/colorspaces-list) nil) cs1) ; maybe different cs on second image?
         outcs (r/randval 0.2 (r/randval 0.9 (rand-nth c/colorspaces-list) nil) cs1) ; maybe some random colorspace on output?
-        bl1 (r/randval 0.85 (rand-nth b/blends-list) nil)    ; ch1 blend
-        bl2 (r/randval 0.85 (rand-nth b/blends-list) nil) ; ch2 blend
+        bl1 (r/randval 0.85 (rand-nth b/blends-list) nil)  ; ch1 blend
+        bl2 (r/randval 0.85 (rand-nth b/blends-list) nil)  ; ch2 blend
         bl3 (r/randval 0.85 (rand-nth b/blends-list) nil)] ; ch3 blend
     {:switch? (r/brand 0.5)
      :in1-cs cs1
@@ -430,23 +424,3 @@
        (p/filter-colors (out-sel (out-cs c/colorspaces*)) result)
        result))))
 
-;; imgslicer
-
-;; TODO: finish
-(defn imgslicer
-  [^Pixels pixels {:keys [distance threshold min-size mode]
-                   :or {distance v/dist threshold 200 min-size 500 mode :color}
-                   :as options}]
-  (let [w (width pixels)
-        h (height pixels)
-        target (p/pixels w h)
-        segm (doto (Segmentation. (.p pixels) w h)
-               (.makeEdges distance)
-               (.calculateSegmentation threshold min-size))]
-    (reduce (fn [buff [x y]]
-              (let [id (.getSegment segm x y)
-                    segm-info (buff id)
-                    info (or segm-info {:color (p/get-color pixels x y)})]
-                (p/set-color! target x y (:color info))
-                (if segm-info buff (assoc buff id info)))) {} (for [x (range w) y (range h)] [x y]))
-    target))

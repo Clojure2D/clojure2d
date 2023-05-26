@@ -3,6 +3,12 @@ All notable changes to this project will be documented in this file. This change
 
 ## 1.4.6-SNAPSHOT
 
+### Fixed
+
+* `OHTA` conversion should coerce input to color
+* `IgPgTg` normalized conversion fixed
+* `HCL` conversion fixed (uncached case)
+
 ## 1.4.5
 
 ### Added

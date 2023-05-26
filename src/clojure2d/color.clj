@@ -793,7 +793,7 @@
   "OHTA -> RGB, normalized"
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
-  (from-OHTA (v/sub c ohta-s)))
+  (from-OHTA (v/sub (pr/to-color c) ohta-s)))
 
 ;; ### sRGB
 
@@ -2105,7 +2105,7 @@
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-IgPgTg c)]
-    (Vec4. (m/mnorm (.x cc) 0.0 974152505851159 0.0 255.0)
+    (Vec4. (m/mnorm (.x cc) 0.0 0.974152505851159 0.0 255.0)
            (m/mnorm (.y cc) -0.3538247140103022 0.393984191390090 0.0 255.0)
            (m/mnorm (.z cc) -0.41178992005867743 0.43676627200707374 0.0 255.0)
            (.w cc))))
@@ -2144,7 +2144,7 @@
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
-    (from-IgPgTg (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 974152505851159)
+    (from-IgPgTg (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 0.974152505851159)
                         (m/mnorm (.y c) 0.0 255.0 -0.3538247140103022 0.393984191390090)
                         (m/mnorm (.z c) 0.0 255.0 -0.41178992005867743 0.43676627200707374)
                         (.w c)))))
@@ -2557,8 +2557,8 @@
                              (Vec4. mx mn (- (* mn (inc t)) (* mx t)) (.w c)))
       (<= -120.0 H -60.0)  (let [t (m/tan (m/radians (* 0.75 H)))]
                              (Vec4. (/ (- (* mn (inc t)) mx) t) mn mx (.w c)))
-      (<= -180.0 H -120.0) (let [t (m/tan (m/radians (* 1.5 (+ H 180.0))))]
-                             (Vec4. mn (/ (+ (* mn t) mx) (inc t)) mx (.w c))))))
+      :else (let [t (m/tan (m/radians (* 1.5 (+ H 180.0))))]
+              (Vec4. mn (/ (+ (* mn t) mx) (inc t)) mx (.w c))))))
 
 (defn to-HCL*
   "RGB -> HCL, normalized"
