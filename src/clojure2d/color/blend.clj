@@ -23,9 +23,9 @@
 (defmacro ^:private clamp255 [v] `(m/constrain ~v 0.0 255.0))
 (defmacro ^:private mod255 [v] `(mod ~v 256.0))
 
-(def ^:const ^:private ^double r255 (/ 255.0))
-(def ^:const ^:private ^double r255-2 (/ (* 255.0 255.0)))
-(def ^:const ^:private ^double rsqrt255 (/ (m/sqrt 255)))
+(def ^{:const true :private true :tag 'double} r255 (/ 255.0))
+(def ^{:const true :private true :tag 'double} r255-2 (/ (* 255.0 255.0)))
+(def ^{:const true :private true :tag 'double} rsqrt255 (/ (m/sqrt 255)))
 
 (defn normal
   "Return second value only."

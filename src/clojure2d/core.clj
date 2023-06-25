@@ -211,11 +211,10 @@
 (m/use-primitive-operators)
 
 ;; how many tasks we can run (one less than available cores)?
-(def ^:const ^long
-  ^{:doc "How much processor cores are in system. Constant is machine dependant."}
+(def ^{:const true :tag 'long :doc "How much processor cores are in system. Constant is machine dependant."}
   available-cores (.availableProcessors (Runtime/getRuntime)))
-(def ^:const ^long
-  ^{:doc "How much intensive tasks can we run. Which is 150% of available cores. Constant is machine dependant."}
+
+(def ^{:const true :tag 'long :doc "How much intensive tasks can we run. Which is 150% of available cores. Constant is machine dependant."}
   available-tasks (m/round (* 1.5 available-cores)))
 
 ;; ## Image
@@ -451,7 +450,7 @@
                               (t convolution-matrices)
                               (let [s (int (m/sqrt (count t)))]
                                 (Kernel. s s (float-array t))))]
-                 (.filter ^ConvolveOp (ConvolveOp. kernel) i nil)))
+                 (.filter (ConvolveOp. kernel) i nil)))
    :subimage get-subimage
    :resize resize-image})
 

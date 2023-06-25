@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file. This change
 * `OHTA` conversion should coerce input to color
 * `IgPgTg` normalized conversion fixed
 * `HCL` conversion fixed (uncached case)
+* eastwood related fixes
 
 ## 1.4.5
 

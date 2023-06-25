@@ -771,8 +771,8 @@
   ^Vec4 [c]
   (v/add (to-OHTA c) ohta-s))
 
-(def ^:private ^:const ^double c23- (/ -2.0 3.0))
-(def ^:private ^:const ^double c43 (/ 4.0 3.0))
+(def ^{:private true :const true :tag 'double} c23- (/ -2.0 3.0))
+(def ^{:private true :const true :tag 'double} c43 (/ 4.0 3.0))
 
 (defn from-OHTA
   "OHTA -> RGB
@@ -797,7 +797,7 @@
 
 ;; ### sRGB
 
-(def ^:private ^:const ^double gamma-factor (/ 2.4))
+(def ^{:private true :const true :tag 'double} gamma-factor (/ 2.4))
 
 (defn to-linear
   "Gamma correction (gamma=2.4), darken"
@@ -1297,11 +1297,11 @@
 
 ;; ### XYZ
 
-(def ^:private ^:const ^double D65X 95.047)
-(def ^:private ^:const ^double D65Y 100.0)
-(def ^:private ^:const ^double D65Z 108.883)
-(def ^:private ^:const ^double D65x 0.31270)
-(def ^:private ^:const ^double D65y 0.32900)
+(def ^{:private true :const true :tag 'double} D65X 95.047)
+(def ^{:private true :const true :tag 'double} D65Y 100.0)
+(def ^{:private true :const true :tag 'double} D65Z 108.883)
+(def ^{:private true :const true :tag 'double} D65x 0.31270)
+(def ^{:private true :const true :tag 'double} D65y 0.32900)
 
 
 (defn- to-XYZ-
@@ -1557,10 +1557,10 @@
 
 ;; ### LAB
 
-(def ^:private ^:const ^double CIEEpsilon (/ 216.0 24389.0))
-(def ^:private ^:const ^double CIEK (/ 24389.0 27.0))
-(def ^:private ^:const ^double REF-U (/ (* 4.0 D65X) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
-(def ^:private ^:const ^double REF-V (/ (* 9.0 D65Y) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
+(def ^{:private true :const true :tag 'double} CIEEpsilon (/ 216.0 24389.0))
+(def ^{:private true :const true :tag 'double} CIEK (/ 24389.0 27.0))
+(def ^{:private true :const true :tag 'double} REF-U (/ (* 4.0 D65X) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
+(def ^{:private true :const true :tag 'double} REF-V (/ (* 9.0 D65Y) (+ D65X (* 15.0 D65Y) (* 3.0 D65Z))))
 
 (defn- to-lab-correct
   "LAB correction"
@@ -1695,8 +1695,8 @@
 
 ;; HLab
 
-(def ^:private ^:const ^double Ka (* (/ 175.0 198.04) (+ D65X D65Y)))
-(def ^:private ^:const ^double Kb (* (/ 70.0 218.11) (+ D65Y D65Z)))
+(def ^{:private true :const true :tag 'double} Ka (* (/ 175.0 198.04) (+ D65X D65Y)))
+(def ^{:private true :const true :tag 'double} Kb (* (/ 70.0 218.11) (+ D65Y D65Z)))
 
 (defn to-HunterLAB
   "RGB -> HunterLAB
@@ -2151,22 +2151,22 @@
 
 ;; Jab https://www.osapublishing.org/oe/abstract.cfm?uri=oe-25-13-15131
 
-(def ^:private ^:const ^double jab-b 1.15)
-(def ^:private ^:const ^double jab-g 0.66)
-(def ^:private ^:const ^double jab-rb (/ jab-b))
-(def ^:private ^:const ^double jab-rg (/ jab-g))
-(def ^:private ^:const ^double jab-b- (dec jab-b))
-(def ^:private ^:const ^double jab-g- (dec jab-g))
-(def ^:private ^:const ^double jab-c1 (/ 3424.0 (m/fpow 2.0 12)))
-(def ^:private ^:const ^double jab-c2 (/ 2413.0 (m/fpow 2.0 7)))
-(def ^:private ^:const ^double jab-c3 (/ 2392.0 (m/fpow 2.0 7)))
-(def ^:private ^:const ^double jab-n (/ 2610.0 (m/fpow 2.0 14)))
-(def ^:private ^:const ^double jab-p (* 1.7 (/ 2523.0 (m/fpow 2.0 5))))
-(def ^:private ^:const ^double jab-rn (/ jab-n))
-(def ^:private ^:const ^double jab-rp (/ jab-p))
-(def ^:private ^:const ^double jab-d -0.56)
-(def ^:private ^:const ^double jab-d+ (inc jab-d))
-(def ^:private ^:const ^double jab-d0 1.6295499532821566e-11)
+(def ^{:private true :const true :tag 'double} jab-b 1.15)
+(def ^{:private true :const true :tag 'double} jab-g 0.66)
+(def ^{:private true :const true :tag 'double} jab-rb (/ jab-b))
+(def ^{:private true :const true :tag 'double} jab-rg (/ jab-g))
+(def ^{:private true :const true :tag 'double} jab-b- (dec jab-b))
+(def ^{:private true :const true :tag 'double} jab-g- (dec jab-g))
+(def ^{:private true :const true :tag 'double} jab-c1 (/ 3424.0 (m/fpow 2.0 12)))
+(def ^{:private true :const true :tag 'double} jab-c2 (/ 2413.0 (m/fpow 2.0 7)))
+(def ^{:private true :const true :tag 'double} jab-c3 (/ 2392.0 (m/fpow 2.0 7)))
+(def ^{:private true :const true :tag 'double} jab-n (/ 2610.0 (m/fpow 2.0 14)))
+(def ^{:private true :const true :tag 'double} jab-p (* 1.7 (/ 2523.0 (m/fpow 2.0 5))))
+(def ^{:private true :const true :tag 'double} jab-rn (/ jab-n))
+(def ^{:private true :const true :tag 'double} jab-rp (/ jab-p))
+(def ^{:private true :const true :tag 'double} jab-d -0.56)
+(def ^{:private true :const true :tag 'double} jab-d+ (inc jab-d))
+(def ^{:private true :const true :tag 'double} jab-d0 1.6295499532821566e-11)
 
 (defn- jab-lms->lms' 
   ^double [^double v]
@@ -2321,8 +2321,8 @@
     (<= 4.0 h 5.0) (Vec3. x 0.0 c)
     :else (Vec3. c 0.0 x)))
 
-(def ^:private ^:const ^double n360->255 (/ 255.0 360.0))
-(def ^:private ^:const ^double n255->360 (/ 360.0 255.0))
+(def ^{:private true :const true :tag 'double} n360->255 (/ 255.0 360.0))
+(def ^{:private true :const true :tag 'double} n255->360 (/ 360.0 255.0))
 
 (defn- normalize-HSx
   "Make output range 0-255"
@@ -2624,9 +2624,9 @@
 ;; Color Theory and Modeling for Computer Graphics, Visualization, and Multimedia Applications (The Springer International Series in Engineering and Computer Science) by Haim Levkowitz
 
 ;; Page 79, minimizer
-(def ^:private ^:const ^double weight-max 0.7)
-(def ^:private ^:const ^double weight-mid 0.1)
-(def ^:private ^:const ^double weight-min 0.2)
+(def ^{:private true :const true :tag 'double} weight-max 0.7)
+(def ^{:private true :const true :tag 'double} weight-mid 0.1)
+(def ^{:private true :const true :tag 'double} weight-min 0.2)
 
 (defn to-GLHS
   "RGB -> GLHS
@@ -3029,15 +3029,15 @@
 
 ;; Cubehelix
 
-(def ^:private ^:const ^:double ch-a -0.14861)
-(def ^:private ^:const ^:double ch-b 1.78277)
-(def ^:private ^:const ^:double ch-c -0.29227)
-(def ^:private ^:const ^:double ch-d -0.90649)
-(def ^:private ^:const ^:double ch-e 1.97294)
-(def ^:private ^:const ^:double ch-ed (* ch-e ch-d))
-(def ^:private ^:const ^:double ch-eb (* ch-e ch-b))
-(def ^:private ^:const ^:double ch-bc-da (- (* ch-b ch-c) (* ch-d ch-a)))
-(def ^:private ^:const ^:double ch-bc-da+ed-eb-r (/ (+ ch-bc-da ch-ed (- ch-eb))))
+(def ^{:private true :const true :tag 'double} ch-a -0.14861)
+(def ^{:private true :const true :tag 'double} ch-b 1.78277)
+(def ^{:private true :const true :tag 'double} ch-c -0.29227)
+(def ^{:private true :const true :tag 'double} ch-d -0.90649)
+(def ^{:private true :const true :tag 'double} ch-e 1.97294)
+(def ^{:private true :const true :tag 'double} ch-ed (* ch-e ch-d))
+(def ^{:private true :const true :tag 'double} ch-eb (* ch-e ch-b))
+(def ^{:private true :const true :tag 'double} ch-bc-da (- (* ch-b ch-c) (* ch-d ch-a)))
+(def ^{:private true :const true :tag 'double} ch-bc-da+ed-eb-r (/ (+ ch-bc-da ch-ed (- ch-eb))))
 
 (defn to-Cubehelix
   "RGB -> Cubehelix
@@ -3145,11 +3145,11 @@
         L (/ (- L' 14.3993) m/SQRT2)]
     (Vec4. L (* C b) (* C a) (.w xyz))))
 
-(defonce ^:private ^:const ^double OSA-v (* 0.042 0.042 0.042))
-(defonce ^:private ^:const ^double OSA-30v (* 30.0 OSA-v))
-(defonce ^:private ^:const ^double OSA-a (- (inc OSA-v)))
-(defonce ^:private ^:const ^double OSA-detr (/ -139.68999999999997))
-(defonce ^:private ^:const ^double OSA-omega 4.957506551095124)
+(def ^{:private true :const true :tag 'double} OSA-v (* 0.042 0.042 0.042))
+(def ^{:private true :const true :tag 'double} OSA-30v (* 30.0 OSA-v))
+(def ^{:private true :const true :tag 'double} OSA-a (- (inc OSA-v)))
+(def ^{:private true :const true :tag 'double} OSA-detr (/ -139.68999999999997))
+(def ^{:private true :const true :tag 'double} OSA-omega 4.957506551095124)
 
 (deftype OSAFDF [^double fomega ^double dfomega ^double X ^double Y ^double Z])
 
@@ -3165,24 +3165,23 @@
         g (.z col)
         L' (+ (* m/SQRT2 L) 14.3993)
         u (+ (/ L' 5.9) m/TWO_THIRD)
-        a OSA-a
         b (* 3.0 u)
         c (* -3.0 u u)
         d (+ (* u u u) OSA-30v)
-        p (/ (- (* 3.0 a c)
+        p (/ (- (* 3.0 OSA-a c)
                 (* b b))
-             (* 3.0 a a))
-        aa27 (* 27.0 a a)
+             (* 3.0 OSA-a OSA-a))
+        aa27 (* 27.0 OSA-a OSA-a)
         q (/ (+ (* 2.0 b b b)
-                (* -9.0 a b c)
+                (* -9.0 OSA-a b c)
                 (* aa27 d))
-             (* aa27 a))
+             (* aa27 OSA-a))
         q2 (* 0.5 q)
         s (m/sqrt (+ (m/sq q2)
                      (m/pow3 (* p m/THIRD))))
         t (- (+ (m/cbrt (- s q2))
                 (m/cbrt (- (- q2) s)))
-             (/ b (* 3.0 a)))
+             (/ b (* 3.0 OSA-a)))
         Y0 (* t t t)
         C (/ L' (* 5.9 (- t m/TWO_THIRD)))
         a (/ g C)
@@ -3226,7 +3225,7 @@
                      df (+ (* dY K) (* Y dK))]
                  (OSAFDF. f df X Y Z)))]
     (loop [iter (int 0)
-           omega OSA-omega]
+           omega (double OSA-omega)]
       (let [^OSAFDF res (f-df omega)]
         (if (and (< iter 20)
                  (> (.fomega res) 1.0e-10))
@@ -4015,12 +4014,12 @@
 
 (defn delta-E-HyAB
   "ΔE_HyAB difference"
-  [c1 c2]
-  ^double (let [^Vec4 c1 (to-LAB c1)
-                ^Vec4 c2 (to-LAB c2)]
-            (+ (m/hypot-sqrt (- (.y c2) (.y c1))
-                             (- (.z c2) (.z c1)))
-               (m/abs (- (.x c2) (.x c1))))))
+  ^double [c1 c2]
+  (let [^Vec4 c1 (to-LAB c1)
+        ^Vec4 c2 (to-LAB c2)]
+    (+ (m/hypot-sqrt (- (.y c2) (.y c1))
+                     (- (.z c2) (.z c1)))
+       (m/abs (- (.x c2) (.x c1))))))
 
 (defn delta-E*-94
   "ΔE* difference, CIE 1994"
@@ -4152,10 +4151,10 @@
 
 (def ^{:deprecated "Use delta-e-jab"} delta-e-jab delta-E-z)
 
-(def ^:const ^long p25_7 (* 25 25 25 25 25 25 25))
-(def ^:const ^double r30 (m/radians 30.0))
-(def ^:const ^double r6 (m/radians 6.0))
-(def ^:const ^double r63 (m/radians 63.0))
+(def ^{:private true :const true :tag 'long} p25_7 (* 25 25 25 25 25 25 25))
+(def ^{:private true :const true :tag 'double} r30 (m/radians 30.0))
+(def ^{:private true :const true :tag 'double} r6 (m/radians 6.0))
+(def ^{:private true :const true :tag 'double} r63 (m/radians 63.0))
 
 (defn- de2000p7
   ^double [^double v]
