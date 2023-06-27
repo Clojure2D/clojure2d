@@ -16,7 +16,8 @@
         ::url "https://github.com/Clojure2D/clojure2d.git"}
   :repl-options {:timeout 120000}
   :target-path "target/%s"
-  :profiles {:eastwood {:plugins [[jonase/eastwood "1.4.0"]]
+  :profiles {:1.10 {:dependencies [[org.clojure/clojure "1.10.3"]]}
+             :eastwood {:plugins [[jonase/eastwood "1.4.0"]]
                         :eastwood {:add-linters [:performance :boxed-math]
                                    :exclude-namespaces [notebooks.color]}}
              :dev {:source-paths ["dev"]
