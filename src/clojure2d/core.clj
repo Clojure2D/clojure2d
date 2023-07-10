@@ -633,7 +633,8 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
   Font you set while creating canvas will be default font. You can set another font in the code with [[set-font]] and [[set-font-attributes]] functions. However these set font temporary."
   {:metadoc/categories #{:canvas}}
-  ([^long width ^long height hints font]
+  ([{:keys [^long width ^long height hints font]
+     :or {hints :high width 600 height 600}}]
    (let [[hint retina?] (resolve-canvas-options hints)
          w (if retina? (* 2 width) width)
          h (if retina? (* 2 height) height)
@@ -661,10 +662,12 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
        (.setComposite ^Graphics2D (.graphics ^Canvas c) java.awt.AlphaComposite/Src)
        (set-background c Color/black 0))
      result))
+  ([width height hints font]
+   (canvas {:width width :height height :hints hints :font font}))
   ([width height]
-   (canvas width height :high nil))
+   (canvas {:width width :height height}))
   ([width height hints]
-   (canvas width height hints nil)))
+   (canvas {:width width :height height :hints hints})))
 
 (defn black-canvas
   "Create [[canvas]] with black, opaque background."
@@ -2029,8 +2032,52 @@ See [[set-color]]."
 
 (defn- event-window-name
   "Returns name of the component. Used to dispatch events."
-  [^ComponentEvent e]
-  (.getName ^Component (.getComponent e)))
+  [^java.awt.AWTEvent e]
+  (.getName ^Component (.getSource e)))
+
+(defn- process-state-and-event 
+  "For given event call provided multimethod passing state. Save new state."
+  ([ef e]
+   (let [window-name (event-window-name e)]
+     (change-state! window-name (ef e (@global-state window-name)))))
+  ([ef e d]
+   (let [window-name (event-window-name e)]
+     (change-state! window-name (ef e (@global-state window-name) d)))))
+
+(defmulti custom-event
+  "Called when [[fire-custom-event]] is invoked. Dispatch is a window name.
+
+  Parameters are: event, state and additional data passed to [[fire-custom-event]]."
+  (fn [e _ _] (event-window-name e)))
+
+(defmethod custom-event :default [_ s _] s)
+
+(definterface ICustomEvent (getData []))
+
+;; add custom event listener
+(defonce custom-event-listener
+  (let [listener (reify java.awt.event.AWTEventListener
+                   (eventDispatched [_ event]
+                     (when (instance? ICustomEvent event)
+                       (let [^ICustomEvent event event]
+                         (process-state-and-event custom-event event (.getData event))))))]
+    (.addAWTEventListener (java.awt.Toolkit/getDefaultToolkit)
+                          listener
+                          java.awt.AWTEvent/ACTION_EVENT_MASK)
+    listener))
+
+(defn fire-custom-event
+  "Add an event to AWT Event Queue, helps to process window state. Can carry additional data."
+  ([window] (fire-custom-event window nil))
+  ([^Window window data]
+   (.postEvent (.getSystemEventQueue (java.awt.Toolkit/getDefaultToolkit))
+               (proxy [java.awt.event.ActionEvent ICustomEvent]
+                   [(.panel window) java.awt.event.ActionEvent/ACTION_FIRST "event"]
+                 (getData [] data)))))
+
+#_(run! #(.removeAWTEventListener (java.awt.Toolkit/getDefaultToolkit) %)
+        (.getAWTEventListeners (java.awt.Toolkit/getDefaultToolkit))      )
+
 
 (def ^:const ^{:doc "Use as a dispatch in key events for keys like up/down/etc."} virtual-key (char 0xffff))
 
@@ -2148,17 +2195,11 @@ See [[set-color]]."
 
 ;; Event adapter objects.
 
-(defn- process-state-and-event 
-  "For given event call provided multimethod passing state. Save new state."
-  [ef e]
-  (let [window-name (event-window-name e)]
-    (change-state! window-name (ef e (@global-state window-name)))))
-
 ;; Key
 (def ^:private key-char-processor (proxy [KeyAdapter] []
-                                    (keyPressed [e] (process-state-and-event key-pressed e))
-                                    (keyReleased [e] (process-state-and-event key-released e))
-                                    (keyTyped [e] (process-state-and-event key-typed e))))
+                                  (keyPressed [e] (process-state-and-event key-pressed e))
+                                  (keyReleased [e] (process-state-and-event key-released e))
+                                  (keyTyped [e] (process-state-and-event key-typed e))))
 
 (def ^:private key-event-processor (proxy [KeyAdapter] []
                                      (keyPressed [e] (process-state-and-event key-event e))

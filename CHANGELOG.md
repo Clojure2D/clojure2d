@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file. This change
 * `IgPgTg` normalized conversion fixed
 * `HCL` conversion fixed (uncached case)
 * eastwood related fixes
+* `custom-event` and `fire-custom-event` to allow firing an event from the code
 
 ## 1.4.5
 
