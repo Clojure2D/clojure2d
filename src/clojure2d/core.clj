@@ -2044,6 +2044,8 @@ See [[set-color]]."
    (let [window-name (event-window-name e)]
      (change-state! window-name (ef e (@global-state window-name) d)))))
 
+;; Custom event section
+
 (defmulti custom-event
   "Called when [[fire-custom-event]] is invoked. Dispatch is a window name.
 
@@ -2052,11 +2054,23 @@ See [[set-color]]."
 
 (defmethod custom-event :default [_ s _] s)
 
+;; Custom event interface
 (definterface ICustomEvent (getData []))
 
-;; add custom event listener
-(defonce custom-event-listener
-  (let [listener (reify java.awt.event.AWTEventListener
+(defn fire-custom-event
+  "Add an event to AWT Event Queue, helps to process window state. Can carry additional data."
+  ([window] (fire-custom-event window nil))
+  ([^Window window data]
+   (.postEvent (.getSystemEventQueue (java.awt.Toolkit/getDefaultToolkit))
+               (proxy [java.awt.event.ActionEvent ICustomEvent]
+                   [(.panel window) java.awt.event.ActionEvent/ACTION_FIRST "clojure2d custom event"]
+                 (getData [] data)))))
+
+;; add custom event listener, it should be added only once, space for possbile refactoring
+#_{:clj-kondo/ignore [:unused-private-var]}
+(defonce ^:private _custom-event-listener
+  (let [listener (reify
+                   java.awt.event.AWTEventListener
                    (eventDispatched [_ event]
                      (when (instance? ICustomEvent event)
                        (let [^ICustomEvent event event]
@@ -2066,18 +2080,8 @@ See [[set-color]]."
                           java.awt.AWTEvent/ACTION_EVENT_MASK)
     listener))
 
-(defn fire-custom-event
-  "Add an event to AWT Event Queue, helps to process window state. Can carry additional data."
-  ([window] (fire-custom-event window nil))
-  ([^Window window data]
-   (.postEvent (.getSystemEventQueue (java.awt.Toolkit/getDefaultToolkit))
-               (proxy [java.awt.event.ActionEvent ICustomEvent]
-                   [(.panel window) java.awt.event.ActionEvent/ACTION_FIRST "event"]
-                 (getData [] data)))))
-
 #_(run! #(.removeAWTEventListener (java.awt.Toolkit/getDefaultToolkit) %)
-        (.getAWTEventListeners (java.awt.Toolkit/getDefaultToolkit))      )
-
+        (.getAWTEventListeners (java.awt.Toolkit/getDefaultToolkit)))
 
 (def ^:const ^{:doc "Use as a dispatch in key events for keys like up/down/etc."} virtual-key (char 0xffff))
 
