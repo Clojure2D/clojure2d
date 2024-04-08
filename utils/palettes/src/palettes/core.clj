@@ -6,7 +6,7 @@
             [clojure.string :as str]))
 
 (require '[clojisr.v1.r :as r]
-         '[tech.ml.dataset :as ds])
+         '[tech.v3.dataset :as ds])
 
 (r/discard-all-sessions)
 
@@ -40,7 +40,7 @@
 
 ;; gradients _c_
 
-(doseq [[package palettes] (group-by :package (ds/->flyweight (r/r->clj p/palettes_c_names)))
+(doseq [[package palettes] (group-by :package (ds/rows (r/r->clj p/palettes_c_names)))
         :let [fpackage (fix-name+ :gradients package)
               pals (into {} (map (fn [{:keys [palette]}]
                                    (let [k (keyword fpackage (fix-name palette))
@@ -52,7 +52,7 @@
 
 ;; palettes _d_
 
-(doseq [[package palettes] (group-by :package (ds/->flyweight (r/r->clj p/palettes_d_names)))
+(doseq [[package palettes] (group-by :package (ds/rows (r/r->clj p/palettes_d_names)))
         :let [fpackage (fix-name+ :palettes package)
               pals (into {} (map (fn [{:keys [palette]}]
                                    (let [k (keyword fpackage (fix-name palette))
@@ -64,7 +64,7 @@
 
 ;; palettes _dynamic_
 
-(doseq [[package palettes] (group-by :package (ds/->flyweight (r/r->clj p/palettes_dynamic_names)))
+(doseq [[package palettes] (group-by :package (ds/rows (r/r->clj p/palettes_dynamic_names)))
         :let [fpackage (fix-name+ :palettes package)
               pals (into {} (mapcat (fn [{:keys [palette length]}]
                                       (let [n (str package "::" palette)]
@@ -169,15 +169,24 @@
 
 ;; thi.ng palettes
 
-(let [pals (-> (->> "https://raw.githubusercontent.com/thi-ng/umbrella/develop/packages/color-palettes/src/index.ts"
+(let [pals-old (-> (->> "https://raw.githubusercontent.com/thi-ng/umbrella/d9ea6dd96cce6f0a551507a2d1d44796c521ba88/packages/color-palettes/src/index.ts"
+                        io/reader
+                        line-seq
+                        rest
+                        (apply str "{"))
+                   (str/replace #"\s+" "")
+                   (str/replace #",\]" "]")
+                   (str/replace #",\}" "}")
+                   (json/read-str :key-fn (comp (partial keyword "thi.ng") #(str "p" %))))
+      ;; new thi.ng format
+      pals (-> (->> "https://raw.githubusercontent.com/thi-ng/umbrella/develop/packages/color-palettes/tools/themes.ts"
                     io/reader
                     line-seq
-                    rest
-                    (apply str "{"))
-               (str/replace #"\s+" "")
-               (str/replace #",\]" "]")
-               (str/replace #",\}" "}")
-               (json/read-str :key-fn (comp (partial keyword "thi.ng") #(str "p" %))))]
+                    (map (partial re-find #"^\s+(\[.*\]),"))
+                    (filter identity)
+                    (map (comp read-string last))
+                    (map-indexed (fn [id p] [(keyword "thi.ng" (str "p" id)) p]))
+                    (into pals-old)))]
   (swap! all-palettes merge pals)
   (spit "resources/palettes/c2d_thi.ng.edn" (with-out-str (pr pals))))
 
