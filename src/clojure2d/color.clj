@@ -122,8 +122,8 @@
             [fastmath.vector :as v]
             [fastmath.stats :as stat]
             [fastmath.interpolation :as i]
-            [fastmath.clustering :as cl]
-            [fastmath.distance :as dist]
+            [fastmath.interpolation.linear :as li]
+            [fastmath.ml.clustering :as cl]
             [fastmath.easings :as e]
             [clojure2d.protocols :as pr]
             [clojure2d.color.whitepoints :as wp]
@@ -4188,11 +4188,11 @@
          diffh' (- h2' h1')
          adiffh' (m/abs diffh')
          C1'C2' (* C1' C2')
-         dh' (m/radians (cond
-                          (zero? C1'C2') 0.0
-                          (<= adiffh' 180.0) diffh'
-                          (> diffh' 180.0) (- diffh' 360.0)
-                          :else (+ diffh' 360.0)))
+         dh' (m/radians (double (cond
+                                  (zero? C1'C2') 0.0
+                                  (<= adiffh' 180.0) diffh'
+                                  (> diffh' 180.0) (- diffh' 360.0)
+                                  :else (+ diffh' 360.0))))
          dH' (* 2.0 (m/sqrt C1'C2') (m/sin (* 0.5 dh')))
          Lm' (* 0.5 (+ (.x c1) (.x c2)))
          Cm' (* 0.5 (+ C1' C2'))
@@ -4269,7 +4269,7 @@
             currdist Double/MAX_VALUE]
        (if (< i s)
          (let [c1 (nth pal i)
-               dist (m/abs (dist-fn c c1))]
+               dist (m/abs (double (dist-fn c c1)))]
            (recur (unchecked-inc i)
                   (if (< dist currdist) c1 currc)
                   (if (< dist currdist) dist currdist)))
@@ -4413,35 +4413,19 @@
        (let [c (v/add (pr/to-color c) vec4-one)]
          (clamp (v/mult (v/sqrt (v/div (v/emult c tint) 65536.0)) 255.0)))))))
 
-;; color reduction using x-means
-
-(defn- make-smile-distance
-  [f]
-  (cond
-    (instance? smile.math.distance.Distance f) f
-    (ifn? f) (reify
-               smile.math.distance.Metric
-               smile.math.distance.Distance
-               (d [_ x y] (f ^double x ^double y)))
-    :else dist/euclidean))
-
 (defn reduce-colors
-  "Reduce colors using x-means clustering in given `colorspace` (default `:RGB`).
+  "Reduce colors using k-means++ (or fuzzy-kmeans) clustering in given `colorspace` (default `:RGB`).
 
   Use for long sequences (for example to generate palette from image)."
   {:metadoc/categories #{:pal}}
-  ([xs number-of-colors] (reduce-colors xs number-of-colors :RGB))
-  ([xs number-of-colors colorspace-or-dist]
-   (let [[to from] (if (keyword? colorspace-or-dist)
-                     (colorspaces* colorspace-or-dist)
-                     [identity identity])
-         clustering-fn (if (keyword? colorspace-or-dist)
-                         #(cl/x-means % number-of-colors)
-                         #(cl/clarans % (make-smile-distance colorspace-or-dist) number-of-colors))]     
+  ([xs number-of-colors] (reduce-colors xs number-of-colors nil))
+  ([xs number-of-colors {:keys [fuzzy? colorspace]
+                         :or {fuzzy? true}
+                         :as options}]
+   (let [[to from] (if colorspace (colorspaces* colorspace) [identity identity])
+         clustering-fn (if fuzzy? cl/fuzzy-kmeans cl/kmeans++)]     
      (sort-by luma ;; sort by brightness
-              (for [{:keys [data]} (-> (map to xs) ;; convert to given colorspace
-                                       (clustering-fn)          ;; clustering
-                                       (cl/regroup))] ;; reshape
+              (for [{:keys [data]} (clustering-fn (map to xs) (assoc options :clusters number-of-colors))]
                 (->> (map pack data) ;; pack colors into integers
                      (stat/modes) ;; find colors which appears most often
                      (map (comp pr/to-color unchecked-long)) ;; convert back to colors
@@ -4569,7 +4553,7 @@
   [palette-or-gradient-name {:keys [colorspace interpolation domain to? from?]
                              :or {colorspace :RGB
                                   to? true from? true
-                                  interpolation :linear-smile}}]
+                                  interpolation :linear}}]
   (let [[to from] (colorspaces colorspace)
         to (if to? to identity)
         from (if from? from identity)
@@ -4591,7 +4575,7 @@
             c1 (map pr/green cpalette)
             c2 (map pr/blue cpalette)
             c3 (map pr/alpha cpalette)
-            ifn (if (keyword? interpolation) (i/interpolators-1d-list interpolation) interpolation)
+            ifn (if (keyword? interpolation) (partial i/interpolation interpolation) interpolation)
             i0 (ifn r c0)
             i1 (ifn r c1)
             i2 (ifn r c2)
@@ -4604,7 +4588,7 @@
                                   (i3 ct))) clamp255)))))))
 
 (def ^{:metadoc/categories #{:gr}
-       :doc "Cubehelix gradient generator from two colors."}
+     :doc "Cubehelix gradient generator from two colors."}
   gradient-cubehelix #(interpolated-gradient % {:colorspace :Cubehelix :to? false :interpolation :linear}))
 
 (defonce ^{:private true} basic-gradients-delay
@@ -4698,7 +4682,7 @@
   * `palette-or-gradient-name` - name of the [predefined gradient](../static/gradients.html) or palette (seq of colors).
   * (optional) additional parameters map:
       * `:colorspace` - operate in given color space. Default: `:RGB`.
-      * `:interpolation` - interpolation name or interpolation function. Interpolation can be one of [[interpolators-1d-list]] or [[easings-list]]. When easings is used, only first two colors are interpolated. Default: `:linear-smile`.
+      * `:interpolation` - interpolation name or interpolation function. Interpolation can be one of [[interpolators-1d-list]] or [[easings-list]]. When easings is used, only first two colors are interpolated. Default: `:linear`.
       * `:to?` - turn on/off conversion to given color space. Default: `true`.
       * `:from?` - turn on/off conversion from given color space. Default: `true`.
       * `:domain` - interpolation domain as seq of values for each color.
@@ -4802,7 +4786,7 @@
            l1 (ch0 (to-LAB (palette-or-gradient 1.0)))
            xs (m/slice-range 0.0 1.0 200)
            ls (map (fn [^double v] (ch0 (to-LAB (palette-or-gradient v)))) xs)
-           i (i/linear-smile ls xs)]
+           i (li/linear ls xs)]
        (fn ^Vec4 [^double t] (palette-or-gradient (i (m/lerp l0 l1 t)))))
      (let [n (count palette-or-gradient)
            g (correct-luma (gradient palette-or-gradient gradient-params))]
@@ -4846,7 +4830,7 @@
   {:metadoc/categories #{:pal}}
   []
   (let [gpars {:colorspace (r/randval :RGB (rand-nth colorspaces-list))
-               :interpolation (r/randval :linear-smile :cubic-spline)}]
+               :interpolation (r/randval :linear :cubic)}]
     (condp clojure.core/> (r/drand)
       0.1 (iq-random-gradient)
       0.6 (gradient (palette) gpars)
@@ -5117,6 +5101,9 @@
                rgb (from cs)]
          :when (not= in (lclamp rgb))]
      [r g b cs (lclamp rgb) (v/dist in rgb)])))
+
+(m/unuse-primitive-operators)
+
 
 (comment (run! (fn [[k [to from]]]
                  (println "---")

@@ -941,3 +941,5 @@
   "Get pixel (color) from renderer buffer"
   {:metadoc/categories #{:ld}} 
   (^Vec4 [r x y] (pr/get-pixel r x y)))
+
+(m/unuse-primitive-operators)

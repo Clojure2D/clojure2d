@@ -1,7 +1,20 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 1.5.0-SNAPSHOT
+
+Moved to `fastmath 3.x`
+
+### Changed
+
+* [breaking] `reduce-colors` uses (fuzzy)-kmeans++ and arguments are changed
+
 ## 1.4.6-SNAPSHOT
+
+### Added
+
+* Refreshed palettes and gradients
+* `quad-strip`
 
 ### Fixed
 

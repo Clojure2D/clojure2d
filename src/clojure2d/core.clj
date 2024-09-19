@@ -196,7 +196,7 @@
             [clojure.java.io :as io]
             [clojure2d.protocols :as pr])
   (:import [java.awt Font Shape BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Toolkit Transparency]
-           [java.awt.event InputEvent ComponentEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
+           [java.awt.event InputEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
            [java.awt.geom PathIterator Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double Arc2D Arc2D$Double]
            [java.awt.font GlyphVector]
            [java.awt.image BufferedImage BufferStrategy Kernel ConvolveOp]
@@ -1170,7 +1170,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 (defn arc-shape
   ([^Arc2D a x y w h start extent type]
    (.setArc a (- ^double x (* ^double w 0.5)) (- ^double y (* ^double h 0.5)) w h
-            (m/degrees start) (- (m/degrees extent))
+            (m/degrees (double start)) (- (m/degrees (double extent)))
             (case type
               :chord Arc2D/CHORD
               :pie Arc2D/PIE
@@ -1207,7 +1207,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 (defn rarc-shape
   ([^Arc2D a x y r start extent type]
    (.setArcByCenter a x y r
-                    (m/degrees start) (- (m/degrees extent))
+                    (m/degrees (double start)) (- (m/degrees (double extent)))
                     (case type
                       :chord Arc2D/CHORD
                       :pie Arc2D/PIE
@@ -1469,6 +1469,22 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false))
   ([canvas [x1 y1] [x2 y2] [x3 y3] [x4 y4]]
    (quad canvas x1 y1 x2 y2 x3 y3 x4 y4)))
+
+(defn quad-strip
+  "Draw quad strip. Implementation of `Processing` shape.
+  
+  List of vertices as vectors.
+
+  0-2-4-...
+  | | |
+  1-3-5-..."
+  ([canvas vs stroke?]
+   (doseq [[[x0 y0] [x1 y1] [x2 y2] [x3 y3]] (partition 4 2 vs)]
+     (quad canvas x0 y0 x1 y1 x3 y3 x2 y2 stroke?))
+   canvas)
+  ([canvas vs]
+   (quad-strip canvas vs false)))
+
 
 ;; hex
 
@@ -2499,7 +2515,7 @@ See [[set-color]]."
                  :draw-fn draw-fn}))
   ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint refresher always-on-top? background position]
      :or {canvas (canvas 200 200)
-          window-name (str "Clojure2D - " (to-hex (rand-int (Integer/MAX_VALUE)) 8))
+          window-name (str "Clojure2D - " (to-hex (rand-int Integer/MAX_VALUE) 8))
           fps 60
           background :white
           refresher :safe}}]
@@ -2778,3 +2794,5 @@ See [[set-color]]."
   "Resize image."
   {:metadoc/categories #{:image :canvas}}
   [i w h] (pr/resize i w h))
+
+(m/unuse-primitive-operators)
