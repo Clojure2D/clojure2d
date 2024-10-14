@@ -40,9 +40,18 @@ public class GradientDensity {
             setFiltered(px,py);
         }
     }
+
+    public void addPixel(double px, double py, double v) {
+        if(f==null) {
+            set(px,py,v);
+        } else {
+            setFiltered(px,py,v);
+        }
+    }
+    
     
     // pbrt way
-    public void setFiltered(double fx, double fy) {
+    public void setFiltered(double fx, double fy, double v) {
         int p0x = Math.max((int)FastMath.ceil(fx-0.5-f.radius), 0);
         int p0y = Math.max((int)FastMath.ceil(fy-0.5-f.radius), 0);
         int p1x = Math.min((int)FastMath.floor(fx-0.5+f.radius)+1, wdec);
@@ -56,20 +65,28 @@ public class GradientDensity {
                 int yy = Math.min((int)FastMath.floor(FastMath.abs((y-fy)*f.iradius16)), 15) << 4;
                 for (int x=p0x; x<p1x; x++) {
                     int xx = Math.min((int)FastMath.floor(FastMath.abs((x-fx)*f.iradius16)), 15);
-                    set(x, y, f.filterTable[yy+xx]);
+                    set(x, y, v*f.filterTable[yy+xx]);
                 }
             }
         }
     }
 
-    public void set(double x, double y) {
+    public void setFiltered(double fx, double fy) {
+        setFiltered(fx,fy,1.0);
+    }
+    
+    public void set(double x, double y, double v) {
         int xx = (int)(x+0.5);
         int yy = (int)(y+0.5);
         if(xx>=0 && xx<w && yy>=0 && yy<h) {
-            cnt[yy*w+xx] ++;
+            cnt[yy*w+xx]+=v;
         }
     }
 
+    public void set(double x, double y) {
+        set(x,y,1.0);
+    }
+    
     public void set(int x, int y, double weight) {
         cnt[y*w+x] += weight;
     }

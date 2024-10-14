@@ -3,7 +3,7 @@
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
-  :dependencies [[generateme/fastmath "3.0.0-alpha1"]
+  :dependencies [[generateme/fastmath "3.0.0-alpha2"]
                  [com.scrtwpns/mixbox "2.0.0"]
                  [org.apache.xmlgraphics/batik-transcoder "1.17"]]
   :resource-path "resources/"

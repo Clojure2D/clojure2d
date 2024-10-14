@@ -339,7 +339,8 @@
   (fn [filename _ _] (keyword (file-extension filename))))
 
 ;; JPG requires flatten image and we must set the quality defined in `*jpeg-image-quality*` variable.
-(defmethod save-file-type :jpg
+
+(defn- save-jpg-file
   [filename img ^ImageWriter writer]
   (let [nimg (flatten-image img)
         ^ImageWriteParam param (.getDefaultWriteParam writer)]
@@ -348,8 +349,24 @@
       (.setCompressionQuality *jpeg-image-quality*))
     (do-save filename nimg writer param)))
 
+(defmethod save-file-type :jpg
+  [filename img writer]
+  (save-jpg-file filename img writer))
+
+(defmethod save-file-type :jpeg
+  [filename img writer]
+  (save-jpg-file filename img writer))
+
 ;; BMP also requires image flattening
 (defmethod save-file-type :bmp
+  [filename img writer]
+  (do-save filename (flatten-image img) writer))
+
+(defmethod save-file-type :tiff
+  [filename img writer]
+  (do-save filename (flatten-image img) writer))
+
+(defmethod save-file-type :tif
   [filename img writer]
   (do-save filename (flatten-image img) writer))
 

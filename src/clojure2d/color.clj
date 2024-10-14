@@ -4024,22 +4024,26 @@
 (defn delta-E*-94
   "ΔE* difference, CIE 1994"
   {:metadoc/categories #{:dist}}
-  ^double [c1 c2]
-  (let [^Vec4 c1 (to-LAB c1)
-        ^Vec4 c2 (to-LAB c2)
-        C* (m/sqrt (* (m/hypot-sqrt (.y c1) (.z c1))
-                      (m/hypot-sqrt (.y c2) (.z c2))))
-        Sc (inc (* 0.045 C*))
-        Sh (inc (* 0.015 C*))
-        dab (delta-ab c1 c2)]
-    (m/sqrt (+ (m/sq (- (.x c2) (.x c1)))
-               (m/sq (/ dab Sc))
-               (m/sq (/ (m/safe-sqrt (- (+ (m/sq (- (.y c2) (.y c1)))
-                                           (m/sq (- (.z c2) (.z c1))))
-                                        (m/sq dab))) Sh))))))
+  (^double [c1 c2] (delta-E*-94 c1 c2 false))
+  (^double [c1 c2 textiles?]
+   (let [k1 (if textiles? 0.048 0.045)
+         k2 (if textiles? 0.014 0.015)
+         ^Vec4 c1 (to-LAB c1)
+         ^Vec4 c2 (to-LAB c2)
+         C* (m/sqrt (* (m/hypot-sqrt (.y c1) (.z c1))
+                       (m/hypot-sqrt (.y c2) (.z c2))))
+         Sc (inc (* k1 C*))
+         Sh (inc (* k2 C*))
+         SL (if textiles? 2.0 1.0)
+         dab (delta-ab c1 c2)]
+     (m/sqrt (+ (m/sq (/ (- (.x c2) (.x c1)) SL))
+                (m/sq (/ dab Sc))
+                (m/sq (/ (m/safe-sqrt (- (+ (m/sq (- (.y c2) (.y c1)))
+                                            (m/sq (- (.z c2) (.z c1))))
+                                         (m/sq dab))) Sh)))))))
 
 (def ^{:metadoc/categories #{:dist} :deprecated "Use delta-E*"
-       :doc "Delta E CIE distance (euclidean in LAB colorspace."}
+     :doc "Delta E CIE distance (euclidean in LAB colorspace."}
   delta-e-cie delta-E*)
 
 (defn delta-E*-euclidean

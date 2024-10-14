@@ -844,6 +844,9 @@
   (add-pixel! [r x y]
     (.addPixel buff x y)
     r)
+  (add-pixel! [r x y v]
+    (.addPixel buff x y v)
+    r)
   (get-pixel [_ x y]
     (fastmath.java.Array/get2d (.cnt buff) w (unchecked-int x) (unchecked-int y)))
   pr/PixelsProto
