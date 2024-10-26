@@ -127,7 +127,9 @@
             [fastmath.easings :as e]
             [clojure2d.protocols :as pr]
             [clojure2d.color.whitepoints :as wp]
-            [clojure.java.io :refer [input-stream resource]])
+            [clojure.java.io :refer [input-stream resource]]
+            [clojure.edn :as edn]
+            [fastmath.matrix :as mat])
   (:import [fastmath.vector Vec2 Vec3 Vec4]
            [java.awt Color]
            [clojure.lang APersistentVector ISeq Seqable]
@@ -145,12 +147,7 @@
 ;; read
 ;;;;;;;;;
 
-(defn- read-edn
-  [n]
-  (-> (resource n)
-      (input-stream)
-      (slurp)
-      (read-string)))
+(defn- read-edn [n] (-> (resource n) input-stream slurp edn/read-string))
 
 ;; color names
 
@@ -1297,19 +1294,46 @@
 
 ;; ### XYZ
 
+(defn ->XYZ-to-XYZ
+  "Create XYZ converter between different white points and given adaptation method.
+
+  Adaptation method can be one of: `:xyz-scaling`, `:bradford` (default), `:von-kries`, `:sharp`, `:fairchild`, `:cat97`, `:cat2000`, `:cat02`, `:cat02brill2008`, `:cat16`, `bianco2010`, `:bianco2010-pc`."
+  ([source-wp destination-wp] (->XYZ-to-XYZ :bradford source-wp destination-wp))
+  ([adaptation-method source-wp destination-wp]
+   (let [M (wp/chromatic-adaptation-matrix adaptation-method source-wp destination-wp)]
+     (fn ^Vec4 [c]
+       (let [^Vec4 c (pr/to-color c)
+             ^Vec3 c3 (mat/mulv M (Vec3. (.x c) (.y c) (.z c)))]
+         (Vec4. (.x c3) (.y c3) (.z c3) (.w c)))))))
+
+(defn XYZ-to-XYZ1
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)]
+    (Vec4. (* 0.01 (.x c))
+           (* 0.01 (.y c))
+           (* 0.01 (.z c))
+           (.w c))))
+
+(defn XYZ1-to-XYZ
+  ^Vec4 [c]
+  (let [^Vec4 c (pr/to-color c)]
+    (Vec4. (* 100.0 (.x c))
+           (* 100.0 (.y c))
+           (* 100.0 (.z c))
+           (.w c))))
+
 (def ^{:private true :const true :tag 'double} D65X 95.047)
 (def ^{:private true :const true :tag 'double} D65Y 100.0)
 (def ^{:private true :const true :tag 'double} D65Z 108.883)
 (def ^{:private true :const true :tag 'double} D65x 0.31270)
 (def ^{:private true :const true :tag 'double} D65y 0.32900)
 
-
 (defn- to-XYZ-
-"Pure RGB->XYZ conversion without corrections."
-^Vec3 [^Vec3 c]
-(Vec3. (+ (* (.x c) 0.4124564390896921) (* (.y c) 0.357576077643909) (* (.z c) 0.18043748326639894))
-       (+ (* (.x c) 0.21267285140562248) (* (.y c) 0.715152155287818) (* (.z c) 0.07217499330655958))
-       (+ (* (.x c) 0.019333895582329317) (* (.y c) 0.119192025881303) (* (.z c) 0.9503040785363677))))
+  "Pure RGB->XYZ conversion without corrections."
+  ^Vec3 [^Vec3 c]
+  (Vec3. (+ (* (.x c) 0.4124564390896921) (* (.y c) 0.357576077643909) (* (.z c) 0.18043748326639894))
+         (+ (* (.x c) 0.21267285140562248) (* (.y c) 0.715152155287818) (* (.z c) 0.07217499330655958))
+         (+ (* (.x c) 0.019333895582329317) (* (.y c) 0.119192025881303) (* (.z c) 0.9503040785363677))))
 
 (defn to-XYZ1
 "sRGB -> XYZ, scaled to range 0-1"
@@ -1331,11 +1355,7 @@
   * Z: 0.0 - 108.883"
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
-  (let [^Vec4 c (to-XYZ1 c)]
-    (Vec4. (* 100.0 (.x c))
-           (* 100.0 (.y c))
-           (* 100.0 (.z c))
-           (.w c))))
+  (XYZ1-to-XYZ (to-XYZ1 c)))
 
 (defn to-XYZ*
 "sRGB -> XYZ, normalized"
@@ -1370,11 +1390,7 @@
   For ranges, see [[to-XYZ]]"
   {:metadoc/categories meta-conv}
   ^Vec4 [c] 
-  (let [^Vec4 c (pr/to-color c)]
-    (from-XYZ1 (Vec4. (* 0.01 (.x c))
-                      (* 0.01 (.y c))
-                      (* 0.01 (.z c))
-                      (.w c)))))
+  (from-XYZ1 (XYZ-to-XYZ1 c)))
 
 (defn from-XYZ*
   "XYZ -> sRGB, normalized"
@@ -3980,12 +3996,15 @@
 
 (defn delta-E*
   "ΔE*_ab difference, CIE 1976"
-  ^double [c1 c2]
-  (let [^Vec4 c1 (to-LAB c1)
-        ^Vec4 c2 (to-LAB c2)]
-    (m/hypot-sqrt (- (.x c2) (.x c1))
-                  (- (.y c2) (.y c1))
-                  (- (.z c2) (.z c1)))))
+  (^double [c1 c2] (delta-E* c1 c2 nil))
+  (^double [c1 c2 {:keys [colorspace]
+                   :or {colorspace :LAB}}]
+   (let [to (first (colorspaces colorspace))
+         ^Vec4 c1 (to c1)
+         ^Vec4 c2 (to c2)]
+     (m/hypot-sqrt (- (.x c2) (.x c1))
+                   (- (.y c2) (.y c1))
+                   (- (.z c2) (.z c1))))))
 
 (defn- delta-ab
   ^double [^Vec4 c1 ^Vec4 c2]
@@ -3995,41 +4014,52 @@
 (defn delta-C*
   "ΔC*_ab difference, chroma difference in LAB color space, CIE 1976"
   {:metadoc/categories #{:dist}}
-  ^double [c1 c2]
-  (delta-ab (to-LAB c1) (to-LAB c2)))
+  (^double [c1 c2] (delta-C* c1 c2 nil))
+  (^double [c1 c2 {:keys [colorspace]
+                   :or {colorspace :LAB}}]
+   (let [to (first (colorspaces colorspace))]
+     (delta-ab (to c1) (to c2)))))
 
 (def ^{:deprecated "Use delta-C*"} delta-c delta-C*)
 
 (defn delta-H*
   "ΔH* difference, hue difference in LAB, CIE 1976"
   {:metadoc/categories #{:dist}}
-  ^double [c1 c2]
-  (let [^Vec4 c1 (to-LAB c1)
-        ^Vec4 c2 (to-LAB c2)]
-    (m/safe-sqrt (- (+ (m/sq (- (.y c2) (.y c1)))
-                       (m/sq (- (.z c2) (.z c1))))
-                    (m/sq (delta-ab c1 c2))))))
+  (^double [c1 c2] (delta-H* c1 c2 nil))
+  (^double [c1 c2 {:keys [colorspace]
+                   :or {colorspace :LAB}}]
+   (let [to (first (colorspaces colorspace))
+         ^Vec4 c1 (to c1)
+         ^Vec4 c2 (to c2)]
+     (m/safe-sqrt (- (+ (m/sq (- (.y c2) (.y c1)))
+                        (m/sq (- (.z c2) (.z c1))))
+                     (m/sq (delta-ab c1 c2)))))))
 
 (def ^{:deprecated "Use delta-H*"} delta-h delta-H*)
 
 (defn delta-E-HyAB
   "ΔE_HyAB difference"
-  ^double [c1 c2]
-  (let [^Vec4 c1 (to-LAB c1)
-        ^Vec4 c2 (to-LAB c2)]
-    (+ (m/hypot-sqrt (- (.y c2) (.y c1))
-                     (- (.z c2) (.z c1)))
-       (m/abs (- (.x c2) (.x c1))))))
+  (^double [c1 c2] (delta-E-HyAB c1 c2 nil))
+  (^double [c1 c2 {:keys [colorspace]
+                   :or {colorspace :LAB}}]
+   (let [to (first (colorspaces colorspace))
+         ^Vec4 c1 (to c1)
+         ^Vec4 c2 (to c2)]
+     (+ (m/hypot-sqrt (- (.y c2) (.y c1))
+                      (- (.z c2) (.z c1)))
+        (m/abs (- (.x c2) (.x c1)))))))
 
 (defn delta-E*-94
   "ΔE* difference, CIE 1994"
   {:metadoc/categories #{:dist}}
-  (^double [c1 c2] (delta-E*-94 c1 c2 false))
-  (^double [c1 c2 textiles?]
+  (^double [c1 c2] (delta-E*-94 c1 c2 nil))
+  (^double [c1 c2 {:keys [textiles? colorspace]
+                   :or {textiles? false colorspace :LAB}}]
    (let [k1 (if textiles? 0.048 0.045)
          k2 (if textiles? 0.014 0.015)
-         ^Vec4 c1 (to-LAB c1)
-         ^Vec4 c2 (to-LAB c2)
+         to (first (colorspaces colorspace))
+         ^Vec4 c1 (to c1)
+         ^Vec4 c2 (to c2)
          C* (m/sqrt (* (m/hypot-sqrt (.y c1) (.z c1))
                        (m/hypot-sqrt (.y c2) (.z c2))))
          Sc (inc (* k1 C*))
@@ -4049,8 +4079,9 @@
 (defn delta-E*-euclidean
   ^{:metadoc/categories #{:dist}
     :doc "Euclidean distance in given colorspace (default Oklab)."}
-  (^double [c1 c2] (delta-E*-euclidean c1 c2 :Oklab))
-  (^double [c1 c2 colorspace]
+  (^double [c1 c2] (delta-E*-euclidean c1 c2 nil))
+  (^double [c1 c2 {:keys [colorspace]
+                   :or {colorspace :Oklab}}]
    (let [to (first (colorspaces colorspace))
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)]
@@ -4081,26 +4112,31 @@
 ;; http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.125.3833&rep=rep1&type=pdf
 (defn delta-D-HCL
   "Color difference in HCL (Sarifuddin and Missaou) color space"
-  ^double [c1 c2]
-  (let [^Vec4 c1 (to-HCL c1)
-        ^Vec4 c2 (to-HCL c2)
-        dH (diff-H (.x c2) (.x c1))
-        dL (- (.z c2) (.z c1))]
-    (m/sqrt (+ (m/sq (* 1.4456 dL))
-               (* (+ dH 0.16)
-                  (+ (m/sq (.y c1))
-                     (m/sq (.y c2))
-                     (* -2.0 (.y c1) (.y c2) (m/cos (m/radians dH)))))))))
+  (^double [c1 c2] (delta-D-HCL c1 c2 nil))
+  (^double [c1 c2 {:keys [colorspace]
+                   :or {colorspace :HCL}}]
+   (let [to (first (colorspaces colorspace))
+         ^Vec4 c1 (to c1)
+         ^Vec4 c2 (to c2)
+         dH (diff-H (.x c2) (.x c1))
+         dL (- (.z c2) (.z c1))]
+     (m/sqrt (+ (m/sq (* 1.4456 dL))
+                (* (+ dH 0.16)
+                   (+ (m/sq (.y c1))
+                      (m/sq (.y c2))
+                      (* -2.0 (.y c1) (.y c2) (m/cos (m/radians dH))))))))))
 
 (defn delta-E*-CMC
   "ΔE* CMC difference
 
   Parameters `l` and `c` defaults to 1.0. Other common settings is `l=2.0` and `c=1.0`."
   {:metadoc/categories #{:dist}}
-  (^double [c1 c2] (delta-E*-CMC c1 c2 1.0 1.0))
-  (^double [c1 c2 ^double l ^double c ]
-   (let [^Vec4 c1 (to-LAB c1)
-         ^Vec4 c2 (to-LAB c2)
+  (^double [c1 c2] (delta-E*-CMC c1 c2 nil))
+  (^double [c1 c2 {:keys [^double l ^double c colorspace]
+                   :or {l 1.0 c 1.0 colorspace :LAB}}]
+   (let [to (first (colorspaces colorspace))
+         ^Vec4 c1 (to c1)
+         ^Vec4 c2 (to c2)
          L1 (.x c1)
          L2 (.x c2)
          a1 (.y c1)
@@ -4136,22 +4172,25 @@
 (defn delta-E-z
   "ΔE* calculated in JAB color space."
   {:metadoc/categories #{:dist}}
-  ^double [c1 c2]
-  (let [^Vec4 c1 (to-JAB c1)
-        ^Vec4 c2 (to-JAB c2)
-        J1 (.x c1)
-        J2 (.x c2)
-        a1 (.y c1)
-        a2 (.y c2)
-        b1 (.z c1)
-        b2 (.z c2)
-        C1 (m/hypot-sqrt a1 b1)
-        C2 (m/hypot-sqrt a2 b2)
-        h1 (m/atan2 b1 a1)
-        h2 (m/atan2 b2 a2)]
-    (m/hypot-sqrt (- J2 J1)
-                  (- C2 C1)
-                  (* 2.0 (m/sqrt (* C1 C2)) (m/sin (* 0.5 (- h2 h1)))))))
+  (^double [c1 c2] (delta-E-z c1 c2 nil))
+  (^double [c1 c2 {:keys [colorspace]
+                   :or {colorspace :JAB}}]
+   (let [to (first (colorspaces colorspace))
+         ^Vec4 c1 (to c1)
+         ^Vec4 c2 (to c2)
+         J1 (.x c1)
+         J2 (.x c2)
+         a1 (.y c1)
+         a2 (.y c2)
+         b1 (.z c1)
+         b2 (.z c2)
+         C1 (m/hypot-sqrt a1 b1)
+         C2 (m/hypot-sqrt a2 b2)
+         h1 (m/atan2 b1 a1)
+         h2 (m/atan2 b2 a2)]
+     (m/hypot-sqrt (- J2 J1)
+                   (- C2 C1)
+                   (* 2.0 (m/sqrt (* C1 C2)) (m/sin (* 0.5 (- h2 h1))))))))
 
 (def ^{:deprecated "Use delta-e-jab"} delta-e-jab delta-E-z)
 
@@ -4171,10 +4210,12 @@
   "ΔE* color difference, CIE 2000
 
   http://www2.ece.rochester.edu/~gsharma/ciede2000/ciede2000noteCRNA.pdf"
-  (^double [c1 c2] (delta-E*-2000 c1 c2 1.0 1.0 1.0))
-  ([c1 c2 l c h]
-   (let [^Vec4 c1 (to-LAB c1)
-         ^Vec4 c2 (to-LAB c2)
+  (^double [c1 c2] (delta-E*-2000 c1 c2 nil))
+  (^double [c1 c2 {:keys [^double l ^double c ^double h colorspace]
+                   :or {l 1.0 c 1.0 h 1.0 colorspace :LAB}}]
+   (let [to (first (colorspaces colorspace))
+         ^Vec4 c1 (to c1)
+         ^Vec4 c2 (to c2)
          C1* (m/hypot-sqrt (.y c1) (.z c1))
          C2* (m/hypot-sqrt (.y c2) (.z c2))
          Cm* (* 0.5 (+ C1* C2*))
@@ -4220,9 +4261,9 @@
          Sc (inc (* 0.045 Cm'))
          Sh (inc (* 0.015 Cm' T))
          Rt (- (* (m/sin (* 2.0 dtheta)) Rc))
-         l' (/ dL' (* (double l) Sl))
-         c' (/ dC' (* (double c) Sc))
-         h' (/ dH' (* (double h) Sh))]
+         l' (/ dL' (* l Sl))
+         c' (/ dC' (* c Sc))
+         h' (/ dH' (* h Sh))]
      (m/sqrt (+ (m/sq l') (m/sq c') (m/sq h')
                 (* Rt c' h'))))))
 
@@ -4252,10 +4293,12 @@
   
   Implementation from: https://github.com/connorgr/d3-jnd/blob/master/src/jnd.js"
   {:metadoc/categories #{:dist}}
-  ([c1 c2] (noticable-different? c1 c2 0.1 0.5))
-  ([c1 c2 ^double s ^double p ]
-   (let [c1 (to-LAB c1)
-         c2 (to-LAB c2)
+  ([c1 c2] (noticable-different? c1 c2 nil))
+  ([c1 c2 {:keys [^double s ^double p colorspace]
+           :or {s 0.1 p 0.5 colorspace :LAB}} ]
+   (let [to (first (colorspaces colorspace))
+         c1 (to c1)
+         c2 (to c2)
          ^Vec4 diff (v/abs (v/sub c1 c2))
          ^Vec3 nd (nd-lab-interval s p)]
      (or (>= (.x diff) (.x nd))
@@ -4295,9 +4338,9 @@
   {:metadoc/categories #{:interp}}
   ([cs weights colorspace]
    (let [[to from] (colorspaces colorspace)]
-     (from (v/div (reduce v/add (map #(v/mult (to %1) %2) cs weights)) (reduce m/fast+ weights)))))
+     (from (v/div (reduce v/add (map #(v/mult (to %1) %2) cs weights)) (reduce m/+ weights)))))
   ([cs weights]
-   (v/div (reduce v/add (map #(v/mult (pr/to-color %1) %2) cs weights)) (reduce m/fast+ weights))))
+   (v/div (reduce v/add (map #(v/mult (pr/to-color %1) %2) cs weights)) (reduce m/+ weights))))
 
 (defn lerp
   "Linear interpolation of two colors.
