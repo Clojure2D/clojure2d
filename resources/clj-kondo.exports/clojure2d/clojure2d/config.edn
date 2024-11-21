@@ -4,4 +4,5 @@
                                           clojure2d.color/test-colors]}}
  :hooks {:macroexpand {clojure2d.core/with-oriented-canvas hooks.core/with-oriented-canvas
                        clojure2d.core/with-oriented-canvas-> hooks.core/with-oriented-canvas->
-                       clojure2d.core/make-set-color-fn hooks.core/make-set-color-fn}}}
+                       clojure2d.core/make-set-color-fn hooks.core/make-set-color-fn
+                       clojure2d.color.whitepoints/gen-whitepoints hooks.whitepoints/gen-whitepoints}}}

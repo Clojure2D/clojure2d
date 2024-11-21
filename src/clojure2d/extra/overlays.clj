@@ -16,6 +16,7 @@
             [clojure2d.pixels :as p]
             [clojure2d.color :as c]
             [clojure2d.color.blend :as b]
+            [clojure2d.color.rgb :as rgb]
             [fastmath.core :as m]
             [fastmath.random :as r]))
 
@@ -118,7 +119,7 @@
                  (-> (+ (* a wa) (+ (* b wb) (* c wc)))
                      (/ (+ wa wb wc))
                      (/ 255.0)
-                     (c/to-linear)
+                     (rgb/srgb-to-linear)
                      (* 1000000.0))))]
        
        (let [blurred (p/filter-channels (partial p/filter-channel-xy h3-blur) nil p)
@@ -136,7 +137,7 @@
                          xf (m/>>> (rem (+ xx (* mask-mult yy)) 6) 1)]
                      (-> (+ (* a wa) (+ (* b wb) (* c wc)))
                          (/ 1000000.0)
-                         (c/from-linear) 
+                         (rgb/linear-to-srgb) 
                          (* 255.0)
                          (* (if (== ch xf) mask-light mask-dark))
                          (m/constrain 0.0 255.0))))]
@@ -241,3 +242,4 @@
      (get-image cnvs)))
   ([img] (render-spots img (spots-overlay (width img) (height img)))))
 
+(m/unuse-primitive-operators)

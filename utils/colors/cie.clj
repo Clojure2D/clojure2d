@@ -333,16 +333,17 @@
             :ISO-SPF  CIE-10-ISO-SPF
             :ISO-SP   CIE-10-ISO-SP}})
 
-(def white {:range [100 1000]
-          :lambda [100 1000]
-          :value [1 1]})
+(def white {:range [0 999]
+          :lambda (range 1000)
+          :value (repeat 1000 1.0)})
 
 ;; from cmfs and spectrum
 (def whitepoints (into {} (for [os (keys cmfs)
                               is (keys illuminants)
                               :let [k (keyword (str (name os) "-" (name is) "*"))
-                                    ->xyz (wp/spectrum-to-XYZ1 os is {:extrapolation
-                                                                      (if (#{:E} is) :constant :trim)})
+                                    ->xyz (wp/->spectrum-to-XYZ1 os is {:interpolation :linear
+                                                                        :extrapolation
+                                                                        (if (#{:E} is) :constant :trim)})
                                     ^Vec3 XZ (->xyz white)
                                     ^Vec2 xy (wp/XZ->xy (v/vec2 (.x XZ) (.z XZ)))]]
                           [k [(.x XZ) (.z XZ) (.x xy) (.y xy)]])))

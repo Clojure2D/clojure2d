@@ -3,7 +3,7 @@
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
-  :dependencies [[generateme/fastmath "3.0.0-alpha2"]
+  :dependencies [[generateme/fastmath "3.0.0-alpha3"]
                  [com.scrtwpns/mixbox "2.0.0"]
                  [org.apache.xmlgraphics/batik-transcoder "1.17"]]
   :resource-path "resources/"
@@ -21,7 +21,8 @@
                                    :exclude-namespaces [notebooks.color]}}
              :dev {:source-paths ["dev"]
                    :dependencies [[org.clojure/clojure "1.12.0"]
-                                  [io.github.nextjournal/clerk "0.13.842"]]}
+                                  [io.github.nextjournal/clerk "0.13.842"]
+                                  [org.scicloj/clay "2-beta23"]]}
              :dev-codox {:codox {:source-uri "https://github.com/Clojure2D/clojure2d/blob/master/{filepath}#L{line}"
                                  :output-path "docs/codox/"}}
              :uberjar {:aot :all}})

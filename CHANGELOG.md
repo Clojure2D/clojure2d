@@ -5,9 +5,22 @@ All notable changes to this project will be documented in this file. This change
 
 Moved to `fastmath 3.x`
 
+### Added
+
+* White point manipulation namespace `clojure2d.color.whitepoints`
+* `delta-` accepts input without conversion
+* various conversions related to XYZ and white points
+* spectrum <-> XYZ converter
+
 ### Changed
 
 * [breaking] `reduce-colors` uses (fuzzy)-kmeans++ and arguments are changed
+* api for `delta-` functions
+* `wavelength` conversion uses interpolated color matching function
+
+### Fixed
+
+* `delta-E*-94` - error of calculating `C*` var
 
 ## 1.4.6-SNAPSHOT
 

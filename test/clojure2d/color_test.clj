@@ -139,7 +139,7 @@
       c/to-Oklab (v/vec4 0.52 0.15 0.06 255.0)
       c/to-OSA (v/vec4 -3.0 3.0 -9.67 255.0)
       c/to-UCS (v/vec4 0.14 0.12 0.11 255.0)
-      c/to-UVW (v/vec4 94.55 11.56 40.55 255.0))
+      c/to-UVW (v/vec4 94.55 11.55 40.55 255.0))
     ;; colorio, colour has different XYZ scaling
     (are [f res] (= res (v/approx (f reference-color) 4))
       c/to-JAB (v/vec4 0.0747 0.0707 0.0472 255.0))
@@ -208,8 +208,8 @@
 (deftest chroma-distance
   (is (= 96.95 (m/approx (c/delta-E* "fff" "ff0"))))
   (is (= 122.16 (m/approx (c/delta-E* "fff" "f0f"))))
-  (is (= 255.0 (m/approx (c/delta-E*-euclidean "fff" "ff0" :RGB))))
-  (is (= 255.0 (m/approx (c/delta-E*-euclidean "fff" "f0f" :RGB))))
+  (is (= 255.0 (m/approx (c/delta-E*-euclidean "fff" "ff0" {:colorspace :RGB}))))
+  (is (= 255.0 (m/approx (c/delta-E*-euclidean "fff" "f0f" {:colorspace :RGB}))))
   (is (= 1.64 (m/approx (c/delta-E*-CMC 0xededee 0xedeeed))))
   (is (= 3.16 (m/approx (c/delta-E*-CMC 0xececee 0xeceeec))))
   (is (= 7.36 (m/approx (c/delta-E*-CMC 0xe9e9ee 0xe9eee9))))
