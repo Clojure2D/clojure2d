@@ -1792,7 +1792,69 @@ See [[set-color]]."
   To revert call [[paint-mode]]"
   {:metadoc/categories #{:draw}}
   ([^Canvas canvas x1 y1 color1 x2 y2 color2]
-   (let [gp (java.awt.GradientPaint. x1 y1 (c/awt-color color1) x2 y2 (c/awt-color color2))
+   (gradient-mode canvas x1 y1 color1 x2 y2 color2 false))
+  ([^Canvas canvas x1 y1 color1 x2 y2 color2 cyclic?]
+   (let [gp (java.awt.GradientPaint. x1 y1 (c/awt-color color1) x2 y2 (c/awt-color color2)
+                                     (boolean cyclic?))
+         ^Graphics2D g (.graphics canvas)]
+     (.setPaint g gp)
+     canvas)))
+
+(defn- infer-fractions-colors
+  [fractions-or-cnt colors-or-gradient]
+  (let [[f c] (if (or (number? fractions-or-cnt) (fn? colors-or-gradient))
+                (let [fractions (if (number? fractions-or-cnt)
+                                  (m/slice-range fractions-or-cnt)
+                                  fractions-or-cnt)
+                      cnt (if (number? fractions-or-cnt) fractions-or-cnt (count fractions-or-cnt))
+                      colors (if (fn? colors-or-gradient)
+                               (map colors-or-gradient fractions)
+                               (c/palette colors-or-gradient cnt))]
+                  [fractions colors])
+                [fractions-or-cnt colors-or-gradient])]
+    [(into-array Float/TYPE f)
+     (into-array (map c/awt-color c))]))
+
+(defn- multiple-gradient-method
+  ^java.awt.MultipleGradientPaint$CycleMethod [cycle-method]
+  (case cycle-method
+    :reflect java.awt.MultipleGradientPaint$CycleMethod/REFLECT
+    :repeat java.awt.MultipleGradientPaint$CycleMethod/REPEAT
+    java.awt.MultipleGradientPaint$CycleMethod/NO_CYCLE))
+
+(defn radial-gradient-mode
+  "Set paint to radial gradient.
+
+  To revert call [[paint-mode]]"
+  ([^Canvas canvas cx cy radius fractions-or-cnt colors-or-gradient]
+   (radial-gradient-mode canvas cx cy radius cx cy fractions-or-cnt colors-or-gradient :no-cycle))
+  ([^Canvas canvas cx cy radius fractions-or-cnt colors-or-gradient cycle-method]
+   (radial-gradient-mode canvas cx cy radius cx cy fractions-or-cnt colors-or-gradient cycle-method))
+  ([^Canvas canvas cx cy radius fx fy fractions-or-cnt colors-or-gradient cycle-method]
+   (let [[fractions colors] (infer-fractions-colors fractions-or-cnt colors-or-gradient)
+         gp (java.awt.RadialGradientPaint. (float cx) (float cy)
+                                           (float radius)
+                                           (float fx) (float fy)
+                                           ^floats fractions
+                                           ^"[Ljava.awt.Color;" colors
+                                           (multiple-gradient-method cycle-method))
+         ^Graphics2D g (.graphics canvas)]
+     (.setPaint g gp)
+     canvas)))
+
+(defn linear-gradient-mode
+  "Set paint to linear multiple gradient.
+
+  To revert call [[paint-mode]]"
+  ([^Canvas canvas sx sy ex ey fractions-or-cnt colors-or-gradient]
+   (linear-gradient-mode canvas sx sy ex ey fractions-or-cnt colors-or-gradient :no-cycle))
+  ([^Canvas canvas sx sy ex ey fractions-or-cnt colors-or-gradient cycle-method]
+   (let [[fractions colors] (infer-fractions-colors fractions-or-cnt colors-or-gradient)
+         gp (java.awt.LinearGradientPaint. (float sx) (float sy)
+                                           (float ex) (float ey)
+                                           ^floats fractions
+                                           ^"[Ljava.awt.Color;" colors
+                                           (multiple-gradient-method cycle-method))
          ^Graphics2D g (.graphics canvas)]
      (.setPaint g gp)
      canvas)))
@@ -2345,11 +2407,13 @@ See [[set-color]]."
 
 (defn- build-frame
   "Create JFrame object, create and attach panel and do what is needed to show window. Attach key events and closing event."
-  [^JFrame frame ^java.awt.Canvas panel active? on-top? windowname width height]
+  [^JFrame frame ^java.awt.Canvas panel active? on-top? windowname width height init-fn close-fn]
   (let [closer (proxy [WindowAdapter] []
                  (windowClosing [^WindowEvent e]
-                   (do (close-window-fn frame active?)
+                   (do (when close-fn (close-fn))
+                       (close-window-fn frame active?)
                        (clear-state! windowname))))]
+    (when init-fn (init-fn))
     (doto frame
       (.setLayout (java.awt.BorderLayout.))
       (.setIconImages window-icons)
@@ -2495,6 +2559,8 @@ See [[set-color]]."
   * `:h` - height of the window (default as canvas heiht)
   * `:fps` - refresh rate
   * `:draw-fn` - drawing callback (fn [canvas window frame loop-state] ... new-loop-state)
+  * `:init-fn` - called when window is created
+  * `:close-fn` - called when window is closed
   * `:state` - initial global state data
   * `:draw-state` - initial drawing state
   * `:setup` - inital callback function, returns drawing state (fn [canvas window] ... initial-loop-state)
@@ -2530,7 +2596,7 @@ See [[set-color]]."
                  :w w
                  :h h
                  :draw-fn draw-fn}))
-  ([{:keys [canvas window-name w h fps draw-fn state draw-state setup hint refresher always-on-top? background position]
+  ([{:keys [canvas window-name w h fps draw-fn init-fn close-fn state draw-state setup hint refresher always-on-top? background position]
      :or {canvas (canvas 200 200)
           window-name (str "Clojure2D - " (to-hex (rand-int Integer/MAX_VALUE) 8))
           fps 60
@@ -2564,7 +2630,7 @@ See [[set-color]]."
                                :safe refresh-screen-task-safety
                                :onrepaint nil)
          draw-fn (when draw-fn #(draw-fn %1 %2 %3 %4))]
-     (SwingUtilities/invokeAndWait #(build-frame frame panel active? always-on-top? window-name w h))
+     (SwingUtilities/invokeAndWait #(build-frame frame panel active? always-on-top? window-name w h init-fn close-fn))
      (add-events-state-processors window)
      (change-state! window-name state)
      (when refresh-screen-task (future (refresh-screen-task window draw-fn (or setup-state draw-state) (when hint (get-rendering-hints #{hint} :mid)))))

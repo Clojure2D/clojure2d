@@ -11,6 +11,8 @@ Moved to `fastmath 3.x`
 * `delta-` accepts input without conversion
 * various conversions related to XYZ and white points
 * spectrum <-> XYZ converter
+* `init-fn` and `close-fn` callbacks for window creation and closing
+* `radial-gradient-mode` and `linear-gradient-mode` added
 
 ### Changed
 
