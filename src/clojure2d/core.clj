@@ -2652,15 +2652,58 @@ See [[set-color]]."
 
 ;; ## Date/Time functions
 
-(defn calendar "Current calendar" {:metadoc/categories #{:dt}} ^Calendar [] (Calendar/getInstance))
-(defn year "Current year" {:metadoc/categories #{:dt}} ^long [& [c]] (.get ^Calendar (or c (calendar)) Calendar/YEAR))
-(defn month "Current month" {:metadoc/categories #{:dt}} ^long [& [c]] (inc ^int (.get ^Calendar (or c (calendar)) Calendar/MONTH)))
-(defn day "Current day" {:metadoc/categories #{:dt}} ^long [& [c]] (.get ^Calendar (or c (calendar)) Calendar/DAY_OF_MONTH))
-(defn hour "Current hour" {:metadoc/categories #{:dt}} ^long [& [c]] (.get ^Calendar (or c (calendar)) Calendar/HOUR_OF_DAY))
-(defn minute "Current minute" {:metadoc/categories #{:dt}} ^long [& [c]] (.get ^Calendar (or c (calendar)) Calendar/MINUTE))
-(defn sec "Current second" {:metadoc/categories #{:dt}} ^long [& [c]] (.get ^Calendar (or c (calendar)) Calendar/SECOND))
-(defn millis "Milliseconds from epoch" {:metadoc/categories #{:dt}} ^long [& [c]] (if c (.getTimeInMillis ^Calendar c) (System/currentTimeMillis)))
-(defn nanos "JVM running time in nanoseconds" {:metadoc/categories #{:dt}} ^long [] (System/nanoTime))
+(defn calendar
+  "Current calendar"
+  {:metadoc/categories #{:dt}}
+  ^Calendar [] (Calendar/getInstance))
+
+(defn year
+  "Current year"
+  {:metadoc/categories #{:dt}}
+  (^long [] (year (calendar)))
+  (^long [^Calendar c] (.get c Calendar/YEAR)))
+
+(defn month
+  "Current month"
+  {:metadoc/categories #{:dt}}
+  (^long [] (month (calendar)))
+  (^long [^Calendar c] (inc ^int (.get c Calendar/MONTH))))
+
+(defn day
+  "Current day"
+  {:metadoc/categories #{:dt}}
+  (^long [] (day (calendar)))
+  (^long [^Calendar c] (.get c Calendar/DAY_OF_MONTH)))
+
+(defn hour
+  "Current hour"
+  {:metadoc/categories #{:dt}}
+  (^long [] (hour (calendar)))
+  (^long [^Calendar c] (.get c  Calendar/HOUR_OF_DAY)))
+
+(defn minute
+  "Current minute"
+  {:metadoc/categories #{:dt}}
+  (^long [] (minute (calendar)))
+  (^long [^Calendar c] (.get c Calendar/MINUTE)))
+
+(defn sec
+  "Current second"
+  {:metadoc/categories #{:dt}}
+  (^long [] (sec (calendar)))
+  (^long [^Calendar c] (.get c Calendar/SECOND)))
+
+(defn millis
+  "Milliseconds from epoch"
+  {:metadoc/categories #{:dt}}
+  (^long [] (System/currentTimeMillis))
+  (^long [^Calendar c] (.getTimeInMillis c)))
+
+(defn nanos
+  "JVM running time in nanoseconds"
+  {:metadoc/categories #{:dt}}
+  ^long [] (System/nanoTime))
+
 (defn datetime
   "Date time values in the array. Optional parameter :vector or :hashmap (default) to indicate what to return."
   {:metadoc/categories #{:dt}}
