@@ -194,20 +194,22 @@
             [clojure.string :as s]
             [fastmath.grid :as grid]
             [clojure.java.io :as io]
-            [clojure2d.protocols :as pr])
+            [clojure2d.protocols :as pr]
+            [clojure2d.core.shape :as sh])
   (:import [java.awt Font Shape BasicStroke Color Component Dimension Graphics2D GraphicsEnvironment Image RenderingHints Toolkit Transparency]
            [java.awt.event InputEvent KeyAdapter KeyEvent MouseAdapter MouseEvent MouseMotionAdapter WindowAdapter WindowEvent]
-           [java.awt.geom PathIterator Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double Arc2D Arc2D$Double]
-           [java.awt.font GlyphVector]
+           [java.awt.geom PathIterator Path2D Path2D$Double Rectangle2D$Double Point2D Point2D$Double]
            [java.awt.image BufferedImage BufferStrategy Kernel ConvolveOp]
            [java.util Iterator Calendar]
            [javax.imageio IIOImage ImageIO ImageWriteParam ImageWriter]
            [javax.swing ImageIcon JFrame SwingUtilities]
            [org.apache.batik.transcoder.image ImageTranscoder]
            [org.apache.batik.transcoder TranscoderInput]
+           #_[org.apache.batik.svggen SVGGraphics2D]
            [fastmath.vector Vec2]))
 
 (set! *unchecked-math* :warn-on-boxed)
+(set! *warn-on-reflection* true)
 (m/use-primitive-operators)
 
 ;; how many tasks we can run (one less than available cores)?
@@ -475,26 +477,23 @@
 
 (declare resize-canvas)
 
-(defrecord ^{:doc "Test"}
-    Canvas [^Graphics2D graphics
-            ^BufferedImage buffer
-            ^Line2D line-obj
-            ^Rectangle2D rect-obj
-            ^Ellipse2D ellipse-obj
-            ^Arc2D arc-obj
-            hints
-            ^long w
-            ^long h
-            transform-stack
-            font
-            retina?]
+(defrecord Canvas [^Graphics2D graphics
+                   ^BufferedImage buffer
+                   hints
+                   ^long w
+                   ^long h
+                   transform-stack
+                   font
+                   retina?]
+  pr/CanvasProto
+  (graphics2d [_] graphics)
+  (transform-stack-atom [_] transform-stack)
   pr/ImageProto
   (get-image [_] (if retina? (pr/resize buffer w h) buffer))
   (width [_] w)
   (height [_] h)
   (save [c n] (save-image buffer n) c)
-  (convolve [_ t]
-    (pr/convolve buffer t))
+  (convolve [_ t]  (pr/convolve buffer t))
   (resize [c w h] (resize-canvas c w h))
   (subimage [_ x y w h] (get-subimage buffer x y w h)))
 
@@ -579,10 +578,6 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
     (when (.retina? canvas) (.scale ng 2.0 2.0))
     (Canvas. ng
              (.buffer canvas)
-             (.line-obj canvas)
-             (.rect-obj canvas)
-             (.ellipse-obj canvas)
-             (.arc-obj canvas)
              (.hints canvas)
              (.w canvas)
              (.h canvas)
@@ -664,10 +659,6 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
                                       (BufferedImage. w h BufferedImage/TYPE_INT_ARGB)))
          result (Canvas. nil
                          buffer
-                         (Line2D$Double.)
-                         (Rectangle2D$Double.)
-                         (Ellipse2D$Double.)
-                         (Arc2D$Double.)
                          hint
                          width height
                          nil
@@ -699,99 +690,85 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
     (with-canvas-> ncanvas
       (image (pr/get-image c)))))
 
-;; Point2d
-
 ;;
 
 (defn scale
   "Scale canvas"
-  {:metadoc/categories #{:transform :canvas}} 
-  ([^Canvas canvas ^double scalex ^double scaley]
-   (.scale ^Graphics2D (.graphics canvas) scalex scaley)
+  ([canvas ^double scalex ^double scaley]
+   (.scale ^Graphics2D (pr/graphics2d canvas) scalex scaley)
    canvas)
-  ([canvas s] (scale canvas s s)))
+  ([canvas ^double s] (scale canvas s s)))
 
 (defn flip-x
   "Flip canvas over x axis"
-  {:metadoc/categories #{:transform :canvas}}
   [canvas]
   (scale canvas -1.0 1.0))
 
 (defn flip-y
   "Flip canvas over y axis"
-  {:metadoc/categories #{:transform :canvas}}
   [canvas]
   (scale canvas 1.0 -1.0))
 
 (defn translate
   "Translate origin"
-  {:metadoc/categories #{:transform :canvas}}
-  ([^Canvas canvas ^double tx ^double ty]
-   (.translate ^Graphics2D (.graphics canvas) tx ty)
+  ([canvas ^double tx ^double ty]
+   (.translate ^Graphics2D (pr/graphics2d canvas) tx ty)
    canvas)
-  ([canvas [x y]]
-   (translate canvas x y)))
+  ([canvas [^double x ^double y]] (translate canvas x y)))
 
 (defn rotate
   "Rotate canvas"
-  {:metadoc/categories #{:transform :canvas}}
-  [^Canvas canvas ^double angle]
-  (.rotate ^Graphics2D (.graphics canvas) angle)
+  [canvas ^double angle]
+  (.rotate ^Graphics2D (pr/graphics2d canvas) angle)
   canvas)
 
 (defn shear
   "Shear canvas"
-  {:metadoc/categories #{:transform :canvas}}
-  ([^Canvas canvas ^double sx ^double sy]
-   (.shear ^Graphics2D (.graphics canvas) sx sy)
+  ([canvas ^double sx ^double sy]
+   (.shear ^Graphics2D (pr/graphics2d canvas) sx sy)
    canvas)
-  ([canvas s] (shear canvas s s)))
+  ([canvas ^double s] (shear canvas s s)))
 
 (defn push-matrix
   "Remember current transformation state.
 
   See also [[pop-matrix]], [[reset-matrix]]."
-  {:metadoc/categories #{:transform :canvas}}
-  [^Canvas canvas]
-  (swap! (.transform-stack canvas) conj (.getTransform ^Graphics2D (.graphics canvas)))
+  [canvas]
+  (swap! (pr/transform-stack-atom canvas) conj (.getTransform ^Graphics2D (pr/graphics2d canvas)))
   canvas)
 
 (defn pop-matrix
   "Restore saved transformation state.
 
   See also [[push-matrix]], [[reset-matrix]]."
-  {:metadoc/categories #{:transform :canvas}}
-  [^Canvas canvas]
-  (when (seq @(.transform-stack canvas))
-    (let [v (peek @(.transform-stack canvas))]
-      (swap! (.transform-stack canvas) pop)
-      (.setTransform ^Graphics2D (.graphics canvas) v)))
+  [canvas]
+  (when (seq @(pr/transform-stack-atom canvas))
+    (let [v (peek @(pr/transform-stack-atom canvas))]
+      (swap! (pr/transform-stack-atom canvas) pop)
+      (.setTransform ^Graphics2D (pr/graphics2d canvas) v)))
   canvas)
 
 (defn transform
   "Transform given point or coordinates with current transformation. See [[inv-transform]]."
-  {:metadoc/categories #{:transform :canvas}}
-  ([^Canvas canvas x y]
-   (let [^Point2D p (.transform ^java.awt.geom.AffineTransform (.getTransform ^Graphics2D (.graphics canvas)) (Point2D$Double. x y) nil)]
-     [(.getX p) (.getY p)]))
-  ([canvas [x y]]
+  ([canvas ^double x ^double y]
+   (let [^Point2D p (.transform ^java.awt.geom.AffineTransform (.getTransform ^Graphics2D (pr/graphics2d canvas)) (Point2D$Double. x y) nil)]
+     (Vec2. (.getX p) (.getY p))))
+  ([canvas [^double x ^double y]]
    (transform canvas x y)))
 
 (defn inv-transform
   "Inverse transform of given point or coordinates with current transformation. See [[transform]]."
-  {:metadoc/categories #{:transform :canvas}}
-  ([^Canvas canvas x y]
-   (let [^Point2D p (.inverseTransform ^java.awt.geom.AffineTransform (.getTransform ^Graphics2D (.graphics canvas)) (Point2D$Double. x y) nil)]
-     [(.getX p) (.getY p)]))
-  ([canvas [x y]]
+  ([canvas ^double x ^double y]
+   (let [^Point2D p (.inverseTransform ^java.awt.geom.AffineTransform (.getTransform ^Graphics2D (pr/graphics2d canvas)) (Point2D$Double. x y) nil)]
+     (Vec2. (.getX p) (.getY p))))
+  ([canvas [^double x ^double y]]
    (inv-transform canvas x y)))
 
 (defn reset-matrix
   "Reset transformations."
-  {:metadoc/categories #{:transform :canvas}}
-  [^Canvas canvas]
-  (.setTransform ^Graphics2D (.graphics canvas) (java.awt.geom.AffineTransform.))
-  (when (.retina? canvas) (.scale ^Graphics2D (.graphics canvas) 2.0 2.0))
+  [canvas]
+  (.setTransform ^Graphics2D (pr/graphics2d canvas) (java.awt.geom.AffineTransform.))
+  (when (:retina? canvas) (.scale ^Graphics2D (pr/graphics2d canvas) 2.0 2.0))
   canvas)
 
 ;; canvas orientation
@@ -864,22 +841,6 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
      (-> c# ~@body)))
 
 ;; shape
-
-(defn- rectangle2d->box
-  [^Rectangle2D box]
-  [(.getX box) (.getY box)
-   (.getWidth box) (.getHeight box)])
-
-(extend-type Shape
-  pr/ShapeProto
-  (bounding-box [shape]
-    (rectangle2d->box (.getBounds2D ^Shape shape)))
-  (contains-point? [shape x y]
-    (.contains ^Shape shape ^double x ^double y))
-  (contains-rectangle? [shape x y w h]
-    (.contains ^Shape shape ^double x ^double y ^double w ^double h))
-  (intersects-rectangle? [shape x y w h]
-    (.intersects ^Shape shape ^double x ^double y ^double w ^double h)))
 
 (defn bounding-box
   "Returns `[x,y,width,height]` of shape's bounding box."
@@ -984,38 +945,40 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   "Clip drawing to specified rectangle or shape.
 
   See also [[reset-clip]]."
-  {:metadoc/categories #{:canvas}}
-  ([^Canvas canvas x y w h] 
-   (.setClip ^Graphics2D (.graphics canvas) x y w h)
+  ([canvas x y w h] 
+   (.setClip ^Graphics2D (pr/graphics2d canvas) x y w h)
    canvas)
-  ([^Canvas canvas ^Shape shape] 
-   (.setClip ^Graphics2D (.graphics canvas) shape)
+  ([canvas ^Shape shape] 
+   (.setClip ^Graphics2D (pr/graphics2d canvas) shape)
    canvas))
 
 (defn reset-clip
   "Resets current clipping.
 
   See also [[clip]]."
-  {:metadoc/categories #{:canvas}}
-  [^Canvas canvas] 
-  (.setClip ^Graphics2D (.graphics canvas) 0 0 (pr/width canvas) (pr/height canvas))
+  [canvas] 
+  (.setClip ^Graphics2D (pr/graphics2d canvas) 0 0 (pr/width canvas) (pr/height canvas))
   canvas)
 
 ;; Drawing functions
 
+(defn shape
+  "Draw Java2D shape object"
+  ([canvas sh stroke?]
+   (if stroke?
+     (.draw ^Graphics2D (pr/graphics2d canvas) sh)
+     (.fill ^Graphics2D (pr/graphics2d canvas) sh))
+   canvas)
+  ([canvas sh] (shape canvas sh false)))
+
 (defn line
   "Draw line from point `(x1,y1)` to `(x2,y2)`"
-  {:metadoc/categories #{:draw}}
-  ([^Canvas canvas x1 y1 x2 y2]
-   (let [^Line2D l (.line-obj canvas)]
-     (.setLine l x1 y1 x2 y2)
-     (.draw ^Graphics2D (.graphics canvas) l))
-   canvas)
-  ([canvas vect1 vect2]
-   (line canvas (vect1 0) (vect1 1) (vect2 0) (vect2 1))))
+  ([canvas x1 y1 x2 y2]
+   (shape canvas (sh/line x1 y1 x2 y2) true))
+  ([canvas [x1 y1] [x2 y2]] (line canvas x1 y1 x2 y2)))
 
 (def ^{:doc "Stroke join types"
-       :metadoc/categories #{:draw}}
+     :metadoc/categories #{:draw}}
   stroke-joins {:bevel BasicStroke/JOIN_BEVEL
                 :miter BasicStroke/JOIN_MITER
                 :round BasicStroke/JOIN_ROUND})
@@ -1035,20 +998,17 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
   See [[set-stroke-custom]]."
   {:metadoc/categories #{:draw}}
-  ([^Canvas canvas size cap join miter-limit]
-   (.setStroke ^Graphics2D (.graphics canvas) (BasicStroke. size
-                                                            (or (stroke-caps cap) BasicStroke/CAP_ROUND)
-                                                            (or (stroke-joins join) BasicStroke/JOIN_BEVEL)
-                                                            (float miter-limit)))
+  ([canvas size cap join miter-limit]
+   (.setStroke ^Graphics2D (pr/graphics2d canvas)
+               (BasicStroke. size
+                             (or (stroke-caps cap) BasicStroke/CAP_ROUND)
+                             (or (stroke-joins join) BasicStroke/JOIN_BEVEL)
+                             (float miter-limit)))
    canvas)
-  ([canvas size cap join]
-   (set-stroke canvas size cap join 1.0))
-  ([canvas size cap]
-   (set-stroke canvas size cap :bevel 1.0))
-  ([canvas size]
-   (set-stroke canvas size :round :bevel 1.0))
-  ([canvas]
-   (set-stroke canvas 1.0)))
+  ([canvas size cap join] (set-stroke canvas size cap join 1.0))
+  ([canvas size cap] (set-stroke canvas size cap :bevel 1.0))
+  ([canvas size] (set-stroke canvas size :round :bevel 1.0))
+  ([canvas] (set-stroke canvas 1.0)))
 
 (defn set-stroke-custom
   "Create custom stroke.
@@ -1064,16 +1024,17 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
   See also [[set-stroke]]."
   {:metadoc/categories #{:draw}}
-  [^Canvas canvas {:keys [size cap join miter-limit dash dash-phase]
-                   :or {size 1.0 cap :butt join :round miter-limit 1.0 dash nil dash-phase 0.0}}]
+  [canvas {:keys [size cap join miter-limit dash dash-phase]
+           :or {size 1.0 cap :butt join :round miter-limit 1.0 dash nil dash-phase 0.0}}]
   (if dash
     (do
-      (.setStroke ^Graphics2D (.graphics canvas) (BasicStroke. size
-                                                               (or (stroke-caps cap) BasicStroke/CAP_BUTT)
-                                                               (or (stroke-joins join) BasicStroke/JOIN_ROUND)
-                                                               (float miter-limit)
-                                                               (float-array dash)
-                                                               (float dash-phase)))
+      (.setStroke ^Graphics2D (pr/graphics2d canvas)
+                  (BasicStroke. size
+                                (or (stroke-caps cap) BasicStroke/CAP_BUTT)
+                                (or (stroke-joins join) BasicStroke/JOIN_ROUND)
+                                (float miter-limit)
+                                (float-array dash)
+                                (float dash-phase)))
       canvas) 
     (set-stroke canvas size cap join miter-limit)))
 
@@ -1081,124 +1042,41 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   "Draw point at `x`,`y` or at vector position.
 
   It's implemented as a very short line. Consider using `(rect x y 1 1)` for speed when `x` and `y` are integers."
-  {:metadoc/categories #{:draw}}  
   ([canvas ^double x ^double y]
-   (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6))
-   canvas)
-  ([canvas [^double x ^double y]]
-   (point canvas x y)))
-
-(defn shape
-  "Draw Java2D shape object"
-  {:metadoc/categories #{:draw}}
-  ([^Canvas canvas sh stroke?]
-   (if stroke?
-     (.draw ^Graphics2D (.graphics canvas) sh)
-     (.fill ^Graphics2D (.graphics canvas) sh))
-   canvas)
-  ([canvas sh] (shape canvas sh false)))
-
-(defn rect-shape
-  ([^Rectangle2D r x y w h]
-   (.setFrame r x y w h)
-   r)
-  ([x y w h]
-   (rect-shape (Rectangle2D$Double.) x y w h))
-  ([[x y] w h]
-   (rect-shape x y w h)))
+   (line canvas x y (+ x 10.0e-6) (+ y 10.0e-6)))
+  ([canvas [^double x ^double y]] (point canvas x y)))
 
 (defn rect
   "Draw rectangle with top-left corner at `(x,y)` position with width `w` and height `h`. Optionally you can set `stroke?` (default: `false`) to `true` if you don't want to fill rectangle and draw outline only.
 
   See also: [[crect]] and [[prect]]."
-  {:metadoc/categories #{:draw}}
-  ([^Canvas canvas x y w h stroke?]
-   (shape canvas (rect-shape (.rect-obj canvas) x y w h) stroke?)
-   canvas)
-  ([canvas x y w h]
-   (rect canvas x y w h false))
-  ([canvas [x y] w h]
-   (rect canvas x y w h)))
-
-(defn crect-shape
-  ([^Rectangle2D r x y w h]
-   (let [w2 (* 0.5 ^double w)
-         h2 (* 0.5 ^double h)]
-     (.setFrame r (- ^double x w2) (- ^double y h2) w h)
-     r))
-  ([x y w h]
-   (crect-shape (Rectangle2D$Double.) x y w h))
-  ([[x y] w h]
-   (crect-shape x y w h)))
+  ([canvas x y w h stroke?]
+   (shape canvas (sh/rect x y w h) stroke?))
+  ([canvas x y w h] (rect canvas x y w h false))
+  ([canvas [x y] w h] (rect canvas x y w h)))
 
 (defn crect
   "Centered version of [[rect]]."
-  {:metadoc/categories #{:draw}}
-  ([^Canvas canvas x y w h stroke?]
-   (shape canvas (crect-shape (.rect-obj canvas) x y w h) stroke?)
-   canvas)
-  ([canvas x y w h]
-   (crect canvas x y w h false))
-  ([canvas [x y] w h]
-   (crect canvas x y w h)))
-
-(defn prect-shape
-  ([^Rectangle2D r x1 y1 x2 y2]
-   (.setFrame r x1 y1 (- ^double x2 ^double x1) (- ^double y2 ^double y1))
-   r)
-  ([x y w h]
-   (prect-shape (Rectangle2D$Double.) x y w h))
-  ([[x y] w h]
-   (prect-shape x y w h)))
+  ([canvas x y w h stroke?]
+   (shape canvas (sh/crect x y w h) stroke?))
+  ([canvas x y w h] (crect canvas x y w h false))
+  ([canvas [x y] w h] (crect canvas x y w h)))
 
 (defn prect
   "Draw rectangle with top-left corner at `(x1,y1)` and bottom-right corner at `(x2,y2)`. Optionally you can set `stroke?` (default: `false`) to `true` if you don't want to fill rectangle and draw outline only.
 
   See also: [[rect]]."
-  {:metadoc/categories #{:draw}}
-  ([^Canvas canvas x1 y1 x2 y2 stroke?]
-   (shape canvas (prect-shape (.rect-obj canvas) x1 y1 x2 y2) stroke?)
-   canvas)
-  ([canvas x1 y1 x2 y2]
-   (prect canvas x1 y1 x2 y2 false))
-  ([canvas [x1 y1] [x2 y2]]
-   (prect canvas x1 y1 x2 y2)))
-
-(defn ellipse-shape
-  ([^Ellipse2D e x y w h]
-   (.setFrame e (- ^double x (* ^double w 0.5)) (- ^double y (* ^double h 0.5)) w h)
-   e)
-  ([x y w h]
-   (ellipse-shape (Ellipse2D$Double.) x y w h))
-  ([[x y] w h]
-   (ellipse-shape x y w h)))
+  ([canvas x1 y1 x2 y2 stroke?]
+   (shape canvas (sh/prect x1 y1 x2 y2) stroke?))
+  ([canvas x1 y1 x2 y2] (prect canvas x1 y1 x2 y2 false))
+  ([canvas [x1 y1] [x2 y2]] (prect canvas x1 y1 x2 y2)))
 
 (defn ellipse
   "Draw ellipse with middle at `(x,y)` position with width `w` and height `h`."
-  {:metadoc/categories #{:draw}}
-  ([^Canvas canvas x y w h stroke?]
-   (shape canvas (ellipse-shape (.ellipse_obj canvas) x y w h) stroke?)
-   canvas)
-  ([canvas x y w h]
-   (ellipse canvas x y w h false))
-  ([canvas [x y] w h]
-   (ellipse canvas x y w h)))
-
-(defn arc-shape
-  ([^Arc2D a x y w h start extent type]
-   (.setArc a (- ^double x (* ^double w 0.5)) (- ^double y (* ^double h 0.5)) w h
-            (m/degrees (double start)) (- (m/degrees (double extent)))
-            (case type
-              :chord Arc2D/CHORD
-              :pie Arc2D/PIE
-              Arc2D/OPEN))
-   a)
-  ([x y w h start extent type]
-   (arc-shape (Arc2D$Double.) x y w h start extent type))
-  ([x y w h start extent]
-   (arc-shape x y w h start extent :open))
-  ([[x y] w h start extent]
-   (arc-shape x y w h start extent)))
+  ([canvas x y w h stroke?]
+   (shape canvas (sh/ellipse x y w h) stroke?))
+  ([canvas x y w h] (ellipse canvas x y w h false))
+  ([canvas [x y] w h] (ellipse canvas x y w h)))
 
 (defn arc
   "Draw arc with middle at `(x,y)` position with width `w` and height `h`.
@@ -1210,32 +1088,11 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   * `:open` - default
   * `:pie`
   * `:chord`"
-  {:metadoc/categories #{:draw}}
-  ([^Canvas canvas x y w h start extent type stroke?]
-   (shape canvas (arc-shape (.arc-obj canvas) x y w h start extent type) stroke?)
-   canvas)
-  ([canvas x y w h start extent type]
-   (arc canvas x y w h start extent type true))
-  ([canvas x y w h start extent]
-   (arc canvas x y w h start extent :open))
-  ([canvas [x y] w h start extent]
-   (arc canvas x y w h start extent)))
-
-(defn rarc-shape
-  ([^Arc2D a x y r start extent type]
-   (.setArcByCenter a x y r
-                    (m/degrees (double start)) (- (m/degrees (double extent)))
-                    (case type
-                      :chord Arc2D/CHORD
-                      :pie Arc2D/PIE
-                      Arc2D/OPEN))
-   a)
-  ([x y r start extent type]
-   (rarc-shape (Arc2D$Double.) x y r start extent type))
-  ([x y r start extent]
-   (rarc-shape x y r start extent :open))
-  ([[x y] r start extent]
-   (rarc-shape x y r start extent)))
+  ([canvas x y w h start extent type stroke?]
+   (shape canvas (sh/arc x y w h start extent type) stroke?))
+  ([canvas x y w h start extent type] (arc canvas x y w h start extent type true))
+  ([canvas x y w h start extent] (arc canvas x y w h start extent :open))
+  ([canvas [x y] w h start extent] (arc canvas x y w h start extent)))
 
 (defn rarc
   "Draw arc with middle at `(x,y)` with radius `r`.
@@ -1247,39 +1104,18 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   * `:open`
   * `:pie`
   * `:chord`"
-  {:metadoc/categories #{:draw}}
-  ([^Canvas canvas x y r start extent type stroke?]
-   (shape canvas (rarc-shape (.arc-obj canvas) x y r start extent type) stroke?)
-   canvas)
-  ([canvas x y r start extent type]
-   (rarc canvas x y r start extent type true))
-  ([canvas x y r start extent]
-   (rarc canvas x y r start extent :open))
-  ([canvas [x y] r start extent]
-   (rarc canvas x y r start extent)))
-
-(defn triangle-shape
-  ([x1 y1 x2 y2 x3 y3]
-   (let [^Path2D p (Path2D$Double.)]
-     (doto p
-       (.moveTo x1 y1)
-       (.lineTo x2 y2)
-       (.lineTo x3 y3)
-       (.closePath))
-     p))
-  ([[x1 y1] [x2 y2] [x3 y3]]
-   (triangle-shape x1 y1 x2 y2 x3 y3)))
+  ([canvas x y r start extent type stroke?]
+   (shape canvas (sh/rarc x y r start extent type) stroke?))
+  ([canvas x y r start extent type] (rarc canvas x y r start extent type true))
+  ([canvas x y r start extent] (rarc canvas x y r start extent :open))
+  ([canvas [x y] r start extent] (rarc canvas x y r start extent)))
 
 (defn triangle
   "Draw triangle with corners at 3 positions."
-  {:metadoc/categories #{:draw}}
-  ([^Canvas canvas x1 y1 x2 y2 x3 y3 stroke?]
-   (shape canvas (triangle-shape x1 y1 x2 y2 x3 y3) stroke?)
-   canvas)
-  ([canvas x1 y1 x2 y2 x3 y3]
-   (triangle canvas x1 y1 x2 y2 x3 y3 false))
-  ([canvas [x1 y1] [x2 y2] [x3 y3]]
-   (triangle canvas x1 y1 x2 y2 x3 y3)))
+  ([canvas x1 y1 x2 y2 x3 y3 stroke?]
+   (shape canvas (sh/triangle x1 y1 x2 y2 x3 y3) stroke?))
+  ([canvas x1 y1 x2 y2 x3 y3] (triangle canvas x1 y1 x2 y2 x3 y3 false))
+  ([canvas [x1 y1] [x2 y2] [x3 y3]] (triangle canvas x1 y1 x2 y2 x3 y3)))
 
 (defn triangle-strip
   "Draw triangle strip. Implementation of `Processing` `STRIP` shape.
@@ -1287,7 +1123,6 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   Input: list of vertices as vectors.
 
   See also: [[triangle-fan]]."
-  {:metadoc/categories #{:draw}}
   ([canvas vs stroke?]
    (when (> (count vs) 2)
      (loop [v1 (first vs)
@@ -1298,8 +1133,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
            (triangle canvas (first v2) (second v2) (first v3) (second v3) (first v1) (second v1) stroke?)
            (recur v2 v3 (next vss))))))
    canvas)
-  ([canvas vs]
-   (triangle-strip canvas vs false)))
+  ([canvas vs] (triangle-strip canvas vs false)))
 
 (defn triangle-fan
   "Draw triangle fan. Implementation of `Processing` `FAN` shape.
@@ -1309,7 +1143,6 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   Input: list of vertices as vectors.
 
   See also: [[triangle-strip]]."
-  {:metadoc/categories #{:draw}}
   ([canvas vs stroke?]
    (when (> (count vs) 2)
      (let [v1 (first vs)]
@@ -1320,21 +1153,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
              (triangle canvas (first v1) (second v1) (first v2) (second v2) (first v3) (second v3) stroke?)
              (recur v3 (next vss)))))))
    canvas)
-  ([canvas vs]
-   (triangle-strip canvas vs false)))
-
-(defn path-shape
-  "Create shape object out of path."
-  (^Path2D [vs] (path-shape vs true))
-  (^Path2D [vs close?]
-   (when (seq vs)
-     (let [^Path2D p (Path2D$Double.)
-           m (first vs)]
-       (.moveTo p (first m) (second m))
-       (doseq [v (next vs)]
-         (.lineTo p (first v) (second v)))
-       (when close? (.closePath p))
-       p))))
+  ([canvas vs] (triangle-strip canvas vs false)))
 
 (defn path
   "Draw path from lines.
@@ -1342,72 +1161,10 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   Input: list of points as vectors, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).
 
   See also [[path-bezier]]."
-  {:metadoc/categories #{:draw}}
-  ([^Canvas canvas vs close? stroke?]
-   (when-let [^Path2D p (path-shape vs (or (not stroke?) close?))]
-     (shape canvas p stroke?))
-   canvas)
+  ([canvas vs close? stroke?]
+   (shape canvas (sh/path vs (or (not stroke?) close?)) stroke?))
   ([canvas vs close?] (path canvas vs close? true))
   ([canvas vs] (path canvas vs false true)))
-
-(defn- calculate-bezier-control-points
-  "Calculate bezier spline control points. http://www.antigrain.com/research/bezier_interpolation/index.html"
-  [v0 v1 v2 v3]
-  (let [c1 (v/mult (v/add v0 v1) 0.5)
-        c2 (v/mult (v/add v1 v2) 0.5)
-        c3 (v/mult (v/add v2 v3) 0.5)
-        len1 (v/mag c1)
-        len2 (v/mag c2)
-        len3 (v/mag c3)
-        k1 (/ len1 (+ len1 len2))
-        k2 (/ len2 (+ len2 len3))
-        m1 (v/add c1 (v/mult (v/sub c2 c1) k1))
-        m2 (v/add c2 (v/mult (v/sub c3 c2) k2))
-        cp1 (-> c2
-                (v/sub m1)
-                (v/add m1)
-                (v/add v1)
-                (v/sub m1))
-        cp2 (-> c2
-                (v/sub m2)
-                (v/add m2)
-                (v/add v2)
-                (v/sub m2))]
-    [cp1 cp2]))
-
-(defn path-bezier-shape
-  ([vs] (path-bezier-shape vs false))
-  ([vs close?]
-   (when (> (count vs) 3)
-     (let [^Path2D p (Path2D$Double.)
-           m0 (first vs)
-           m1 (second vs)
-           m2 (nth vs 2) 
-           f0 (if close? m0 m0)
-           f1 (if close? m1 m0)
-           f2 (if close? m2 m1)
-           f3 (if close? (nth vs 3) m2)
-           vs (if close? (next vs) vs)]
-       (.moveTo p (f1 0) (f1 1))
-       (loop [v0 f0
-              v1 f1
-              v2 f2
-              v3 f3
-              nvs (drop 3 vs)]
-         (let [[cp1 cp2] (calculate-bezier-control-points v0 v1 v2 v3)]
-           (.curveTo p (cp1 0) (cp1 1) (cp2 0) (cp2 1) (v2 0) (v2 1))
-           (if-not (empty? nvs)
-             (recur v1 v2 v3 (first nvs) (next nvs))
-             (if close?
-               (let [[cp1 cp2] (calculate-bezier-control-points v1 v2 v3 m0)
-                     [cp3 cp4] (calculate-bezier-control-points v2 v3 m0 m1)
-                     [cp5 cp6] (calculate-bezier-control-points v3 m0 m1 m2)]
-                 (.curveTo p (cp1 0) (cp1 1) (cp2 0) (cp2 1) (v3 0) (v3 1))
-                 (.curveTo p (cp3 0) (cp3 1) (cp4 0) (cp4 1) (m0 0) (m0 1))
-                 (.curveTo p (cp5 0) (cp5 1) (cp6 0) (cp6 1) (m1 0) (m1 1)))
-               (let [[cp1 cp2] (calculate-bezier-control-points v1 v2 v3 v3)]
-                 (.curveTo p (cp1 0) (cp1 1) (cp2 0) (cp2 1) (v3 0) (v3 1)))))))
-       p))))
 
 (defn path-bezier
   "Draw path from quad curves.
@@ -1415,77 +1172,32 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   Input: list of points as vectors, close? - close path or not (default: false), stroke? - draw lines or filled shape (default true - lines).
 
   See also [[path]]."
-  {:metadoc/categories #{:draw}}  
-  ([^Canvas canvas vs close? stroke?]
-   (when-let [p (path-bezier-shape vs (or (not stroke?) close?))]
-     (shape canvas p stroke?))
-   canvas)
+  ([canvas vs close? stroke?]
+   (shape canvas (sh/path-bezier vs (or (not stroke?) close?)) stroke?))
   ([canvas vs close?] (path-bezier canvas vs close? true))
   ([canvas vs] (path-bezier canvas vs false true)))
 
-(defn bezier-shape
-  ([x1 y1 x2 y2 x3 y3 x4 y4]
-   (let [^Path2D p (Path2D$Double.)]
-     (doto p
-       (.moveTo x1 y1)
-       (.curveTo x2 y2 x3 y3 x4 y4))
-     p))
-  ([[x1 y1] [x2 y2] [x3 y3] [x4 y4]]
-   (bezier-shape x1 y1 x2 y2 x3 y3 x4 y4)))
-
 (defn bezier
   "Draw bezier curve with 4 sets of coordinates."
-  {:metadoc/categories #{:draw}}  
-  ([^Canvas canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
-   (shape canvas (bezier-shape x1 y1 x2 y2 x3 y3 x4 y4) stroke?))
-  ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
-   (bezier canvas x1 y1 x2 y2 x3 y3 x4 y4 true))
-  ([canvas [x1 y1] [x2 y2] [x3 y3] [x4 y4]]
-   (bezier canvas x1 y1 x2 y2 x3 y3 x4 y4)))
-
-(defn curve-shape
-  ([x1 y1 x2 y2 x3 y3]
-   (let [^Path2D p (Path2D$Double.)]
-     (doto p
-       (.moveTo x1 y1)
-       (.quadTo x2 y2 x3 y3))
-     p))
-  ([[x1 y1] [x2 y2] [x3 y3]]
-   (curve-shape x1 y1 x2 y2 x3 y3)))
+  ([canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
+   (shape canvas (sh/bezier x1 y1 x2 y2 x3 y3 x4 y4) stroke?))
+  ([canvas x1 y1 x2 y2 x3 y3 x4 y4] (bezier canvas x1 y1 x2 y2 x3 y3 x4 y4 true))
+  ([canvas [x1 y1] [x2 y2] [x3 y3] [x4 y4]] (bezier canvas x1 y1 x2 y2 x3 y3 x4 y4)))
 
 (defn curve
   "Draw quadratic curve with 3 sets of coordinates."
-  {:metadoc/categories #{:draw}}  
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 stroke?]
-   (shape canvas (curve-shape x1 y1 x2 y2 x3 y3) stroke?))
-  ([canvas x1 y1 x2 y2 x3 y3]
-   (curve canvas x1 y1 x2 y2 x3 y3 true))
-  ([canvas [x1 y1] [x2 y2] [x3 y3]]
-   (curve canvas x1 y1 x2 y2 x3 y3)))
-
-(defn quad-shape
-  ([x1 y1 x2 y2 x3 y3 x4 y4]
-   (let [^Path2D p (Path2D$Double.)]
-     (doto p
-       (.moveTo x1 y1)
-       (.lineTo x2 y2)
-       (.lineTo x3 y3)
-       (.lineTo x4 y4)
-       (.closePath))
-     p))
-  ([[x1 y1] [x2 y2] [x3 y3] [x4 y4]]
-   (quad-shape x1 y1 x2 y2 x3 y3 x4 y4)))
+   (shape canvas (sh/curve x1 y1 x2 y2 x3 y3) stroke?))
+  ([canvas x1 y1 x2 y2 x3 y3] (curve canvas x1 y1 x2 y2 x3 y3 true))
+  ([canvas [x1 y1] [x2 y2] [x3 y3]] (curve canvas x1 y1 x2 y2 x3 y3)))
 
 (defn quad
   "Draw quad with corners at 4 positions."
   {:metadoc/categories #{:draw}}
   ([^Canvas canvas x1 y1 x2 y2 x3 y3 x4 y4 stroke?]
-   (shape canvas (quad-shape x1 y1 x2 y2 x3 y3 x4 y4) stroke?)
-   canvas)
-  ([canvas x1 y1 x2 y2 x3 y3 x4 y4]
-   (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false))
-  ([canvas [x1 y1] [x2 y2] [x3 y3] [x4 y4]]
-   (quad canvas x1 y1 x2 y2 x3 y3 x4 y4)))
+   (shape canvas (sh/quad x1 y1 x2 y2 x3 y3 x4 y4) stroke?))
+  ([canvas x1 y1 x2 y2 x3 y3 x4 y4] (quad canvas x1 y1 x2 y2 x3 y3 x4 y4 false))
+  ([canvas [x1 y1] [x2 y2] [x3 y3] [x4 y4]] (quad canvas x1 y1 x2 y2 x3 y3 x4 y4)))
 
 (defn quad-strip
   "Draw quad strip. Implementation of `Processing` shape.
@@ -1499,73 +1211,44 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    (doseq [[[x0 y0] [x1 y1] [x2 y2] [x3 y3]] (partition 4 2 vs)]
      (quad canvas x0 y0 x1 y1 x3 y3 x2 y2 stroke?))
    canvas)
-  ([canvas vs]
-   (quad-strip canvas vs false)))
-
+  ([canvas vs] (quad-strip canvas vs false)))
 
 ;; hex
 
-(defn pointy-hex-shape
-  ([x y size]
-   (path-shape (grid/pointy-hex-corners size x y) true))
-  ([[x y] size]
-   (pointy-hex-shape x y size)))
-
 (defn pointy-hex
   "Draw pointy topped hex."
-  {:metadoc/categories #{:draw}}
   ([canvas x y size stroke?]
-   (shape canvas (pointy-hex-shape x y size) stroke?))
-  ([canvas x y size]
-   (pointy-hex canvas x y size false))
-  ([canvas [x y] size]
-   (pointy-hex canvas x y size)))
-
-(defn flat-hex-shape
-  ([x y size]
-   (path-shape (grid/flat-hex-corners size x y) true))
-  ([[x y] size]
-   (flat-hex-shape x y size)))
+   (shape canvas (sh/pointy-hex x y size) stroke?))
+  ([canvas x y size] (pointy-hex canvas x y size false))
+  ([canvas [x y] size] (pointy-hex canvas x y size)))
 
 (defn flat-hex
   "Draw flat topped hex."
   {:metadoc/categories #{:draw}}
   ([canvas x y size stroke?]
-   (shape canvas (flat-hex-shape x y size) stroke?))
-  ([canvas x y size]
-   (flat-hex canvas x y size false))
-  ([canvas [x y] size]
-   (flat-hex canvas x y size)))
+   (shape canvas (sh/flat-hex x y size) stroke?))
+  ([canvas x y size] (flat-hex canvas x y size false))
+  ([canvas [x y] size] (flat-hex canvas x y size)))
 
 ;; grid
 
-(defn grid-cell-shape
-  ([grid x y]
-   (path-shape (grid/corners grid [x y]) true))
-  ([grid x y scale]
-   (path-shape (grid/corners grid x y scale) true)))
-
 (defn grid-cell
   "Draw grid cell for given grid in screen (x,y) coordinates. For cell coordinates, see [[grid-qr-cell]]."
-  {:metadoc/categories #{:draw}}
   ([canvas grid x y stroke?]
-   (shape canvas (grid-cell-shape grid x y) stroke?))
-  ([canvas grid x y]
-   (grid-cell canvas grid x y false))
+   (shape canvas (sh/grid-cell grid x y) stroke?))
+  ([canvas grid x y] (grid-cell canvas grid x y false))
   ([canvas grid x y scale stroke?]
-   (shape canvas (grid-cell-shape grid x y scale) stroke?)))
+   (shape canvas (sh/grid-cell grid x y scale) stroke?)))
 
 (defn grid-qr-cell
   "Draw grid cell for given grid in cell (q,r) coordinates. For screen coordinates, see [[grid-cell]]."
-  {:metadoc/categories #{:draw}}
   ([canvas grid q r stroke?]
    (let [[x y] (grid/cell->anchor grid q r)]
-     (shape canvas (grid-cell-shape grid x y) stroke?)))
-  ([canvas grid q r]
-   (grid-qr-cell canvas grid q r false))
+     (shape canvas (sh/grid-cell grid x y) stroke?)))
+  ([canvas grid q r] (grid-qr-cell canvas grid q r false))
   ([canvas grid q r scale stroke?]
    (let [[x y] (grid/cell->anchor grid q r)]
-     (shape canvas (grid-cell-shape grid x y scale) stroke?))))
+     (shape canvas (grid-cell grid x y scale) stroke?))))
 
 ;;
 
@@ -1577,96 +1260,75 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 (defn load-font
   "Load font from file or url. Only TrueType and OpenTrueType fonts are supported."
-  {:metadoc/categories #{:write}}
   [font-file-or-url]
   (Font/createFont Font/TRUETYPE_FONT (io/input-stream font-file-or-url)))
 
 (defn set-font
   "Set font by name or actual font."
-  {:metadoc/categories #{:write}}
-  [^Canvas canvas font-or-fontname]
+  [canvas font-or-fontname]
   (let [f (if (string? font-or-fontname) (Font/decode font-or-fontname) font-or-fontname)]
-    (.setFont ^Graphics2D (.graphics canvas) f)
+    (.setFont ^Graphics2D (pr/graphics2d canvas) f)
     canvas))
 
 (defn set-font-attributes
   "Set current font size and attributes.
 
   Attributes are: `:bold`, `:italic`, `:bold-italic`."
-  {:metadoc/categories #{:write}}
-  ([^Canvas canvas ^double size style]
+  ([canvas ^double size style]
    (let [s (case style :bold 1 :italic 2 :bold-italic 3 0)
-         f (.deriveFont ^Font (.getFont ^Graphics2D (.graphics canvas)) (int s) (float size))]
-     (.setFont ^Graphics2D (.graphics canvas) f)
+         f (.deriveFont ^Font (.getFont ^Graphics2D (pr/graphics2d canvas)) (int s) (float size))]
+     (.setFont ^Graphics2D (pr/graphics2d canvas) f)
      canvas))
-  ([^Canvas canvas ^double size]
-   (let [f (.deriveFont ^Font (.getFont ^Graphics2D (.graphics canvas)) (float size))]
-     (.setFont ^Graphics2D (.graphics canvas) f)
+  ([canvas ^double size]
+   (let [f (.deriveFont ^Font (.getFont ^Graphics2D (pr/graphics2d canvas)) (float size))]
+     (.setFont ^Graphics2D (pr/graphics2d canvas) f)
      canvas)))
 
 (defn char-width
   "Returns font width from metrics. Should be called within graphical context."
-  {:metadoc/categories #{:write}}
-  ^long [^Canvas canvas chr]
-  (.charWidth (.getFontMetrics ^Graphics2D (.graphics canvas)) ^char chr))
+  ^long [canvas chr]
+  (.charWidth (.getFontMetrics ^Graphics2D (pr/graphics2d canvas)) (char chr)))
 
 (defn font-height
   "Returns font width from metrics. Should be called within context."
-  {:metadoc/categories #{:write}}
-  ^long [^Canvas canvas]
-  (.getHeight (.getFontMetrics ^Graphics2D (.graphics canvas))))
+  ^long [canvas]
+  (.getHeight (.getFontMetrics ^Graphics2D (pr/graphics2d canvas))))
 
 (defn font-ascent
   "Returns font width from metrics. Should be called within context."
-  {:metadoc/categories #{:write}}
-  ^long [^Canvas canvas]
-  (.getAscent (.getFontMetrics ^Graphics2D (.graphics canvas))))
+  ^long [canvas]
+  (.getAscent (.getFontMetrics ^Graphics2D (pr/graphics2d canvas))))
 
 (defn text-width
   "Returns width of the provided string. Should be called within context."
-  {:metadoc/categories #{:write}}
-  ^long [^Canvas canvas txt]
-  (.stringWidth (.getFontMetrics ^Graphics2D (.graphics canvas)) (str txt)))
+  ^long [canvas txt]
+  (.stringWidth (.getFontMetrics ^Graphics2D (pr/graphics2d canvas)) (str txt)))
 
 (defn text-bounding-box
   "Returns bounding box [x,y,w,h] for given text. `[x,y]` position is relative to base line."
   {:metadoc/categories #{:write}}
-  [^Canvas canvas txt]
-  (let [^Graphics2D g (.graphics canvas)]
-    (rectangle2d->box (.getStringBounds (.getFontMetrics g) (str txt) g))))
+  [canvas txt]
+  (let [^Graphics2D g (pr/graphics2d canvas)]
+    (sh/rectangle2d->box (.getStringBounds (.getFontMetrics g) (str txt) g))))
 
 (defn text
   "Draw text for given position and alignment.
 
   Possible alignments are: `:right`, `:center`, `:left`."
   {:metadoc/categories #{:write}}
-  ([^Canvas canvas s x y align]
+  ([canvas s x y align]
    (let [x (float x)
          y (float y)
          s (str s)]
      (case align
-       :right (let [w (.stringWidth (.getFontMetrics ^Graphics2D (.graphics canvas)) s)]
-                (.drawString ^Graphics2D (.graphics canvas) s (- x w) y))
-       :center (let [w (/ (.stringWidth (.getFontMetrics ^Graphics2D (.graphics canvas)) s) 2.0)]
-                 (.drawString ^Graphics2D (.graphics canvas) s (float (- x w)) y))
-       :left (.drawString ^Graphics2D (.graphics canvas) s x y)
-       (.drawString ^Graphics2D (.graphics canvas) s x y))) 
+       :right (let [w (.stringWidth (.getFontMetrics ^Graphics2D (pr/graphics2d canvas)) s)]
+                (.drawString ^Graphics2D (pr/graphics2d canvas) s (- x w) y))
+       :center (let [w (/ (.stringWidth (.getFontMetrics ^Graphics2D (pr/graphics2d canvas)) s) 2.0)]
+                 (.drawString ^Graphics2D (pr/graphics2d canvas) s (float (- x w)) y))
+       :left (.drawString ^Graphics2D (pr/graphics2d canvas) s x y)
+       (.drawString ^Graphics2D (pr/graphics2d canvas) s x y))) 
    canvas)
-  ([canvas s x y]
-   (text canvas s x y :left)))
-
-(defn- get-glyph-vector
-  ^GlyphVector [^Canvas canvas ^String txt]
-  (let [^Graphics2D g (.graphics canvas)]
-    (.createGlyphVector (.getFont g) (.getFontRenderContext g) txt)))
-
-(defn text-shape
-  "Returns shape for given text. Should be called withing context."
-  {:metadoc/categories #{:write}}
-  ([^Canvas canvas txt]
-   (.getOutline (get-glyph-vector canvas txt)))
-  ([^Canvas canvas txt x y]
-   (.getOutline (get-glyph-vector canvas txt) (float x) (float y))))
+  ([canvas s x y] (text canvas s x y :left)))
 
 ;; ### Color
 
@@ -1686,22 +1348,20 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
 (defn set-awt-color
   "Set color with valid java `Color` object. Use it when you're sure you pass `java.awt.Color` object."
-  {:metadoc/categories #{:draw}}
-  [^Canvas canvas ^java.awt.Color c]
-  (.setColor ^Graphics2D (.graphics canvas) c)
+  [canvas ^java.awt.Color c]
+  (.setColor ^Graphics2D (pr/graphics2d canvas) c)
   canvas)
 
 (defn set-awt-background
   "Set background color. Expects valid `java.awt.Color` object."
-  {:metadoc/categories #{:draw}}
-  ([^Canvas canvas c]
-   (let [^Graphics2D g (.graphics canvas)
+  ([canvas c]
+   (let [^Graphics2D g (pr/graphics2d canvas)
          ^Color currc (.getColor g)]
      (push-matrix canvas)
      (reset-matrix canvas)
-     (.setColor g (c/awt-color c))
      (doto g
-       (.fillRect 0 0 (.w canvas) (.h canvas))
+       (.setColor(c/awt-color c))
+       (.fillRect 0 0 (pr/width canvas) (pr/height canvas))
        (.setColor currc))
      (pop-matrix canvas))
    canvas))
@@ -1711,9 +1371,8 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 
   To revert call [[paint-mode]]."
   {:metadoc/categories #{:draw}}
-  [^Canvas canvas c]
-  (let [^Graphics2D g (.graphics canvas)]
-    (.setXORMode g c))
+  [canvas c]
+  (.setXORMode ^Graphics2D (pr/graphics2d canvas) c)
   canvas)
 
 ;; Set color for primitive
@@ -1750,8 +1409,8 @@ See [[set-color]]."
   
   See [[gradient-mode]] or [[xor-mode]] for other types."
   {:metadoc/categories #{:draw}}
-  [^Canvas canvas]
-  (.setPaintMode ^Graphics2D (.graphics canvas))
+  [canvas]
+  (.setPaintMode ^Graphics2D (pr/graphics2d canvas))
   canvas)
 
 (defn set-composite
@@ -1763,10 +1422,10 @@ See [[set-color]]."
 
   Call witout parameters to revert to default: `java.awt.AlphaComposite/SrcOver`."
   {:metadoc/categories #{:draw}}
-  ([^Canvas canvas composite]
-   (.setComposite ^Graphics2D (.graphics canvas) composite)
+  ([canvas composite]
+   (.setComposite ^Graphics2D (pr/graphics2d canvas) composite)
    canvas)
-  ([^Canvas canvas] (set-composite canvas java.awt.AlphaComposite/SrcOver)))
+  ([canvas] (set-composite canvas java.awt.AlphaComposite/SrcOver)))
 
 ;;;
 
@@ -1790,13 +1449,12 @@ See [[set-color]]."
   "Set paint mode to gradient.
 
   To revert call [[paint-mode]]"
-  {:metadoc/categories #{:draw}}
-  ([^Canvas canvas x1 y1 color1 x2 y2 color2]
+  ([canvas x1 y1 color1 x2 y2 color2]
    (gradient-mode canvas x1 y1 color1 x2 y2 color2 false))
-  ([^Canvas canvas x1 y1 color1 x2 y2 color2 cyclic?]
+  ([canvas x1 y1 color1 x2 y2 color2 cyclic?]
    (let [gp (java.awt.GradientPaint. x1 y1 (c/awt-color color1) x2 y2 (c/awt-color color2)
                                      (boolean cyclic?))
-         ^Graphics2D g (.graphics canvas)]
+         ^Graphics2D g (pr/graphics2d canvas)]
      (.setPaint g gp)
      canvas)))
 
@@ -1826,11 +1484,11 @@ See [[set-color]]."
   "Set paint to radial gradient.
 
   To revert call [[paint-mode]]"
-  ([^Canvas canvas cx cy radius fractions-or-cnt colors-or-gradient]
+  ([canvas cx cy radius fractions-or-cnt colors-or-gradient]
    (radial-gradient-mode canvas cx cy radius cx cy fractions-or-cnt colors-or-gradient :no-cycle))
-  ([^Canvas canvas cx cy radius fractions-or-cnt colors-or-gradient cycle-method]
+  ([canvas cx cy radius fractions-or-cnt colors-or-gradient cycle-method]
    (radial-gradient-mode canvas cx cy radius cx cy fractions-or-cnt colors-or-gradient cycle-method))
-  ([^Canvas canvas cx cy radius fx fy fractions-or-cnt colors-or-gradient cycle-method]
+  ([canvas cx cy radius fx fy fractions-or-cnt colors-or-gradient cycle-method]
    (let [[fractions colors] (infer-fractions-colors fractions-or-cnt colors-or-gradient)
          gp (java.awt.RadialGradientPaint. (float cx) (float cy)
                                            (float radius)
@@ -1838,7 +1496,7 @@ See [[set-color]]."
                                            ^floats fractions
                                            ^"[Ljava.awt.Color;" colors
                                            (multiple-gradient-method cycle-method))
-         ^Graphics2D g (.graphics canvas)]
+         ^Graphics2D g (pr/graphics2d canvas)]
      (.setPaint g gp)
      canvas)))
 
@@ -1846,16 +1504,16 @@ See [[set-color]]."
   "Set paint to linear multiple gradient.
 
   To revert call [[paint-mode]]"
-  ([^Canvas canvas sx sy ex ey fractions-or-cnt colors-or-gradient]
+  ([canvas sx sy ex ey fractions-or-cnt colors-or-gradient]
    (linear-gradient-mode canvas sx sy ex ey fractions-or-cnt colors-or-gradient :no-cycle))
-  ([^Canvas canvas sx sy ex ey fractions-or-cnt colors-or-gradient cycle-method]
+  ([canvas sx sy ex ey fractions-or-cnt colors-or-gradient cycle-method]
    (let [[fractions colors] (infer-fractions-colors fractions-or-cnt colors-or-gradient)
          gp (java.awt.LinearGradientPaint. (float sx) (float sy)
                                            (float ex) (float ey)
                                            ^floats fractions
                                            ^"[Ljava.awt.Color;" colors
                                            (multiple-gradient-method cycle-method))
-         ^Graphics2D g (.graphics canvas)]
+         ^Graphics2D g (pr/graphics2d canvas)]
      (.setPaint g gp)
      canvas)))
 
@@ -1867,18 +1525,17 @@ See [[set-color]]."
   Default anchor is set to `(0,0)`. Default width and height are the same as texture dimensions.
 
   To revert call [[paint-mode]]"
-  {:metadoc/categories #{:draw}}
   ([canvas image]
    (let [^BufferedImage image (pr/get-image image)]
      (pattern-mode canvas image 0 0 (.getWidth image) (.getHeight image))))
   ([canvas image w h]
    (let [^BufferedImage image (pr/get-image image)]
      (pattern-mode canvas image 0 0 w h))) 
-  ([^Canvas canvas image anchor-x anchor-y w h]
+  ([canvas image anchor-x anchor-y w h]
    (let [image (pr/get-image image)
          rect (Rectangle2D$Double. anchor-x anchor-y w h)
          texture (java.awt.TexturePaint. image rect)
-         ^Graphics2D g (.graphics canvas)]
+         ^Graphics2D g (pr/graphics2d canvas)]
      (.setPaint g texture)
      canvas)))
 
@@ -1889,12 +1546,12 @@ See [[set-color]]."
 
   You can specify position and size of the image. Default it's placed on whole canvas."
   {:metadoc/categories #{:draw}}
-  ([^Canvas canvas img x y w h]
-   (.drawImage ^Graphics2D (.graphics canvas) (pr/get-image img) x y w h nil)
+  ([canvas img x y w h]
+   (.drawImage ^Graphics2D (pr/graphics2d canvas) (pr/get-image img) x y w h nil)
    canvas)
-  ([^Canvas canvas img]
-   (image canvas img 0 0 (.w canvas) (.h canvas)))
-  ([^Canvas canvas img x y]
+  ([canvas img]
+   (image canvas img 0 0 (pr/width canvas) (pr/height canvas)))
+  ([canvas img x y]
    (image canvas img x y (pr/width img) (pr/height img))))
 
 ;; SVG
@@ -1904,7 +1561,6 @@ See [[set-color]]."
   {:metadoc/categories #{:image}}
   ^TranscoderInput  [^String filename-or-url]
   (TranscoderInput. filename-or-url))
-
 
 (defn transcode-svg
   "Convert transcoder input into BufferedImage. See [[load-svg]]."
@@ -1918,6 +1574,45 @@ See [[set-color]]."
     (.addTranscodingHint transcoder ImageTranscoder/KEY_HEIGHT (float h))
     (.transcode transcoder input nil)
     @img))
+
+#_(defrecord SVGCanvas [^SVGGraphics2D graphics
+                        transform-stack
+                        font]
+    pr/CanvasProto
+    (graphics2d [_] graphics)
+    (transform-stack-atom [_] transform-stack)
+    pr/ImageProto
+    (get-image [_ w h] (transcode-svg (TranscoderInput. (.getDOMFactory graphics)) w h))
+    (save [c n] (if (str/ends-with? n ".svg")
+                  (let [^SVGGraphics2D g2c-copy (.create graphics)
+                        out (java.io.StringWriter.)]
+                    (.stream g2c-copy out)
+                    (spit n out))
+                  (pr/save (pr/get-image c) n))
+      c))
+
+#_(defn svg-canvas []
+    (let [di (org.apache.batik.dom.GenericDOMImplementation/getDOMImplementation)
+          doc (.createDocument di org.apache.batik.util.SVGConstants/SVG_NAMESPACE_URI "svg" nil)
+          g2d (org.apache.batik.svggen.SVGGraphics2D. doc)]
+      (SVGCanvas. g2d (atom []) nil)))
+
+#_(-> (svg-canvas)
+      (line 10 10 30 300)
+      (line 20 20 100 30)                     
+      (save "some.svg")
+      (line 20 20 110 30)
+      #_  (pr/get-image 200 200)
+      (save "some2.svg"))
+
+#_(let [di (org.apache.batik.dom.GenericDOMImplementation/getDOMImplementation)
+        doc (.createDocument di org.apache.batik.util.SVGConstants/SVG_NAMESPACE_URI "svg" nil)
+        g2d (org.apache.batik.svggen.SVGGraphics2D. doc)
+        out (java.io.StringWriter.)]
+    (.setPaint g2d Color/red)
+    (.fill g2d (ellipse-shape 10 40 20 20))
+    (.stream g2d out)
+    (str out))
 
 ;; Display window
 

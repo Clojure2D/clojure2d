@@ -1,10 +1,8 @@
 (ns clojure2d.color.rgb
   (:require [clojure2d.color.whitepoints :as wp]
-            [fastmath.vector :as v]
             [fastmath.matrix :as mat]
             [fastmath.core :as m])
-  (:import [fastmath.vector Vec2 Vec3 Vec4]
-           [fastmath.matrix Mat3x3]))
+  (:import [fastmath.matrix Mat3x3]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -113,7 +111,7 @@
                       red-y   green-y   blue-y
                       (m/- 1.0 red-x red-y) (m/- 1.0 green-x green-y)  (m/- 1.0 blue-x blue-y))
         wp (wp/tristimulus whitepoint)
-        coeffs (mat/diagonal (mat/mulv (mat/inverse rgbt) wp))
+        coeffs (apply mat/mat3x3 (mat/mulv (mat/inverse rgbt) wp))
         m (mat/mulm rgbt coeffs)]
     [m (mat/inverse m)]))
 

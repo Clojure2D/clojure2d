@@ -1,8 +1,13 @@
 (ns clojure2d.protocols)
 
+(defprotocol CanvasProto
+  "Returns canvas specific attributes"
+  (graphics2d [c])
+  (transform-stack-atom [c]))
+
 (defprotocol ImageProto
   "Image Protocol"
-  (get-image [i] "Return BufferedImage")
+  (get-image [i] [i w h] "Return BufferedImage")
   (width [i] "Width of the image.")
   (height [i] "Height of the image.")
   (save [i n] "Save image `i` to a file `n`.")

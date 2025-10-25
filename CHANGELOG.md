@@ -1,6 +1,12 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## 1.5.0-alpha1
+
+### Changed
+
+* [breaking] all shapes creating functions moved to separate namespace: `clojure2d.core.shape`
+
 ## 1.5.0-SNAPSHOT
 
 Moved to `fastmath 3.x`
