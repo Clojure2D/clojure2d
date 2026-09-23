@@ -3,7 +3,7 @@
             [clojure.java.io :as io]
             [clojure.xml :as xml]
             [clojure.data.json :as json]
-            [clojure.string :as str]))
+            [palettes.matplotlib :as matplotlib]))
 
 (require '[clojisr.v1.r :as r]
          '[tech.v3.dataset :as ds])
@@ -274,6 +274,12 @@
   (swap! all-palettes merge pals)
   (spit "resources/palettes/c2d_docc.edn" (with-out-str (pr pals))))
 
+;; matplotlib twilight palette
+
+(let [pals matplotlib/matplotlib-pal]
+  (swap! all-palettes merge pals)
+  (spit "resources/palettes/c2d_matplotlib.edn" (with-out-str (pr pals))))
+
 ;;
 
 
@@ -300,4 +306,3 @@
       (io/input-stream)
       (slurp)
       (read-string)))
-
