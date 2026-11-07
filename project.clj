@@ -1,8 +1,8 @@
 (defproject clojure2d "1.5.0-alpha3-SNAPSHOT"
   :description "Creative coding / glitch library backed by Java2D"
   :url "https://github.com/Clojure2D/clojure2d"
-  :license {:name "MIT"
-            :url "https://opensource.org/licenses/MIT"}
+  :license {:name "EPL-1.0"
+            :url "https://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[generateme/fastmath "3.0.0-alpha10-SNAPSHOT"]
                  [com.scrtwpns/mixbox "2.0.0"]
                  [org.apache.xmlgraphics/batik-transcoder "1.20"]]

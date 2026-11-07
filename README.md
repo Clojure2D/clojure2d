@@ -146,8 +146,8 @@ Or just Pull Request.
 ## License
 
 Copyright © 2016-2023 GenerateMe
-Distributed under the MIT Licence
+Distributed under the Eclipse Public License 1.0
 
 [`mixbox`](https://github.com/scrtwpns/mixbox) is provided under the CC BY-NC 4.0 license for non-commercial use only.
 
-`clojure2d.color.munsell` and `resources/color/munsell_renotation.edn` are ported from [colour-science](https://github.com/colour-science/colour) (`colour.notation.munsell`), Copyright 2013 Colour Developers, BSD-3-Clause; that code includes The Munsell and Kubelka-Munk Toolbox: Copyright 2010-2018 Paul Centore (Gales Ferry, CT 06335, USA), used by permission. The Munsell Renotation data comes from the Munsell Color Science Laboratory, RIT. The full BSD-3-Clause notice is in `LICENSE` and in the source header of `clojure2d.color.munsell`.
+Munsell conversion (`clojure2d.color.munsell`) is ported from [`colour`](https://github.com/colour-science/colour) and is provided under the BSD-3-Clause license (see `LICENSE`).
