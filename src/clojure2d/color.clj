@@ -64,6 +64,8 @@
   NOTE 2: be aware that converting function do not clamp any values to/from expected range.
 
   Color space conversion functions are collected in two maps [[colorspaces]] for raw and [[colorspaces*]] for normalized functions. Keys are color space names as `keyword` and values are vectors with `to-` fn as first and `from-` fn as second element.
+
+  Munsell colours, given as a notation like `4.2YR 8.1/5.3` or as a specification, can be converted with [[munsell-to-Yxy]] and [[munsell-to-sRGB]]. Parsing, Munsell value scales and conversion details are in `clojure2d.color.munsell`.
     
   ## Palettes / gradients
 
@@ -128,6 +130,7 @@
             [clojure2d.protocols :as pr]
             [clojure2d.color.whitepoints :as wp]
             [clojure2d.color.rgb :as rgb]
+            [clojure2d.color.munsell :as munsell]
             [clojure.java.io :refer [input-stream resource]]
             [clojure.edn :as edn]
             [fastmath.matrix :as mat])
@@ -1982,6 +1985,49 @@
                      (m/mnorm (.y c) 0.0 255.0 0.0 0.640074499456775)
                      (m/mnorm (.z c) 0.0 255.0 0.0 0.6000000000000001)
                      (.w c)))))
+
+;; ### Munsell
+
+(defn munsell-to-Yxy
+  "Converts a Munsell colour to `Yxy` (by default chromatically adapted to D65).
+
+  Parameters:
+
+  - `munsell`: notation string, for example `4.2YR 8.1/5.3` or `N5`, or a specification `[hue value chroma code]`; see `clojure2d.color.munsell/munsell-spec`.
+  - `options` (map, optional):
+      - `:whitepoint` - white point (a `Vec4` from `clojure2d.color.whitepoints`) of the result, default `wp/CIE-2-D65`. Use `wp/CIE-2-C` for the Illuminant C values of the Munsell Renotation data.
+      - `:adaptation` - chromatic adaptation method, default `:bradford`.
+      - `:scale` - Munsell value scale of `Y`, default `:astm`; see `clojure2d.color.munsell/luminance`.
+
+  Returns a `Vec4` `[Y x y 255.0]`, `Y` in `0-100`, directly usable with [[from-Yxy]] for the default white point. Chroma beyond the Munsell Renotation data is clamped to the maximum for the hue and value.
+
+  Throws `ex-info` for an invalid notation or specification.
+
+  See also [[munsell-to-sRGB]], `clojure2d.color.munsell/munsell-to-Yxy` (Illuminant C by default)."
+  {:metadoc/categories meta-conv}
+  (^Vec4 [munsell] (munsell-to-Yxy munsell nil))
+  (^Vec4 [munsell options]
+   (munsell/munsell-to-Yxy munsell (merge {:whitepoint wp/CIE-2-D65} options))))
+
+(defn munsell-to-sRGB
+  "Converts a Munsell colour to sRGB.
+
+  The Illuminant C colour of the Munsell Renotation data is adapted to D65 and converted with [[from-Yxy]].
+
+  Parameters:
+
+  - `munsell`: notation string or specification, see [[munsell-to-Yxy]].
+  - `options` (map, optional): `:adaptation` (default `:bradford`) and `:scale` (default `:astm`) as in [[munsell-to-Yxy]]. The white point is always D65.
+
+  Returns a `Vec4` sRGB colour with channels in `0-255` and alpha `255`. Values are not clamped: many Munsell colours lie outside the sRGB gamut and give channels below `0` or above `255`.
+
+  Throws `ex-info` for an invalid notation or specification.
+
+  See also [[munsell-to-Yxy]]."
+  {:metadoc/categories meta-conv}
+  (^Vec4 [munsell] (munsell-to-sRGB munsell nil))
+  (^Vec4 [munsell options]
+   (from-Yxy (munsell-to-Yxy munsell (assoc options :whitepoint wp/CIE-2-D65)))))
 
 ;; UVW, https://en.wikipedia.org/wiki/CIE_1964_color_space
 
@@ -4956,10 +5002,11 @@
                  :warm (gradient-cubehelix [(Vec4. -100.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0)])
                  :cool (gradient-cubehelix [(Vec4. 260.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0)])
                  :rainbow (fn [^double t] (let [ts (m/abs (- t 0.5))]
-                                           (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
-                                                                  (- 1.5 (* 1.5 ts))
-                                                                  (- 0.8 (* 0.9 ts))
-                                                                  255.0))))
+                                           (v/fmap (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
+                                                                          (- 1.5 (* 1.5 ts))
+                                                                          (- 0.8 (* 0.9 ts))
+                                                                          255.0))
+                                                   clamp255)))
                  :black-body (fn [^double t] (temperature (m/mlerp 1000 15000 t)))})))
 
 (defn- get-gradient-from-file-

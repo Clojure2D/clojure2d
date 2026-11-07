@@ -105,16 +105,22 @@
      :bianco2010-pc [bianco2010-pc (mat/inverse bianco2010-pc)]}))
 
 (defn chromatic-adaptation-matrix
-  "Von-Kries convertion between two different white points. Returns forward and inverse conversion 3x3 matrices.
+  "Von-Kries type chromatic adaptation matrix between two white points.
 
-  Adaptation method can be one of: `:xyz-scaling`, `:bradford`, `:von-kries` (default), `:sharp`, `:fairchild`, `:cat97`, `:cat2000`, `:cat02`, `:cat02brill2008`, `:cat16`, `bianco2010`, `:bianco2010-pc`."
+  Parameters:
+
+  - `adaptation-method` (keyword, required): one of `:xyz-scaling`, `:bradford`, `:von-kries`, `:sharp`, `:fairchild`, `:cat97`, `:cat97s`, `:cat2000`, `:cat02`, `:cat02brill2008`, `:cat16`, `:bianco2010`, `:bianco2010-pc`.
+  - `source-wp`, `destination-wp` (`Vec4`): white points, for example `CIE-2-C` or `CIE-2-D65`.
+
+  Returns a `Mat3x3` converting XYZ under the source white point to XYZ under the destination white point."
   (^Mat3x3 [adaptation-method source-wp destination-wp]
    (let [ws (tristimulus source-wp)
          wd (tristimulus destination-wp)
          [Ma Ma-1] (chromatic-adaptation-methods adaptation-method)
          s (mat/mulv Ma ws)
          d (mat/mulv Ma wd)
-         diag (mat/diagonal (v/ediv d s))
+         ^Vec3 r (v/ediv d s)
+         diag (mat/diagonal (.x r) (.y r) (.z r))
          M (mat/mulm Ma-1 (mat/mulm diag Ma))]
      M)))
 

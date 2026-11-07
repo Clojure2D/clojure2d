@@ -1,10 +1,15 @@
 (ns clojure2d.color-test
-  (:require [clojure.test :refer [deftest is are]]
+  (:require [clojure.test :refer [deftest is are testing]]
+            [clojure.edn]
+            [clojure.java.io]
             [clojure2d.color :as c]
             [clojure2d.color.blend :as b]
+            [clojure2d.color.munsell :as mu]
+            [clojure2d.color.whitepoints :as wp]
             [fastmath.core :as m]
             [fastmath.random :as r]
-            [fastmath.vector :as v]))
+            [fastmath.vector :as v])
+  (:import [fastmath.vector Vec4]))
 
 ;; color protocol
 
@@ -249,3 +254,51 @@
 ;; test paletton generator
 
 ;; test nearest color distance
+
+;; Munsell (oracles generated in utils/munsell/, see clojure2d.color.munsell-test)
+
+(defn- munsell-reference [name]
+  (-> (str "munsell/" name) clojure.java.io/resource slurp clojure.edn/read-string))
+
+(defn- max-abs-diff [as bs]
+  (reduce max (map (fn [a b] (m/abs (- (double a) (double b)))) as bs)))
+
+(deftest munsell-to-Yxy-test
+  (is (= (mu/munsell-to-Yxy "4.2YR 8.1/5.3" {:whitepoint wp/CIE-2-D65})
+         (c/munsell-to-Yxy "4.2YR 8.1/5.3")))
+  (is (= (mu/munsell-to-Yxy [3.3 4.4 5.5 6] {:whitepoint wp/CIE-2-D65 :scale :newhall})
+         (c/munsell-to-Yxy [3.3 4.4 5.5 6] {:scale :newhall})))
+  (is (= (mu/munsell-to-Yxy "5R 5/4") (c/munsell-to-Yxy "5R 5/4" {:whitepoint wp/CIE-2-C}))))
+
+(deftest munsell-to-sRGB-test
+  (testing "colour Bradford C -> D65 XYZ through from-XYZ (sRGB matrix belongs to from-XYZ): 1e-9 on 0-255"
+    (doseq [[h v ch code _ _ _ X Y Z] (:adapted-d65 (munsell-reference "colour_reference.edn"))]
+      (is (< (max-abs-diff (c/from-XYZ (v/vec4 X Y Z 255.0)) (c/munsell-to-sRGB [h v ch code]))
+             1e-9)
+          [h v ch code])))
+  (testing "munsellinterpol MunsellTosRGB, in-gamut grid points: 0.25 on 0-255 (its adaptation starts from NBS Illuminant C 0.3101/0.3163 and it averages neutrals; the D65/sRGB matrix convention accounts for at most 0.08)"
+    (let [{:keys [srgb-names srgb]} (munsell-reference "munsellinterpol_reference.edn")]
+      (doseq [[n rgb] (map vector srgb-names srgb)]
+        (is (< (max-abs-diff rgb (take 3 (c/munsell-to-sRGB n))) 0.25) n))))
+  (testing "not clamped, alpha 255, :whitepoint ignored"
+    (let [rgb (c/munsell-to-sRGB "5PB 3/12")]
+      (is (neg? (.x ^Vec4 rgb)))
+      (is (== 255.0 (.w ^Vec4 rgb)))
+      (is (= rgb (c/munsell-to-sRGB "5PB 3/12" {:whitepoint wp/CIE-2-C}))))))
+
+(deftest XYZ-to-XYZ-adaptation-test
+  ;; colour: Bradford C -> D65 with clojure2d white points; XYZ under C rebuilt from colour's xyY: 1e-10
+  (let [d (munsell-reference "colour_reference.edn")
+        xyY-C (into {} (map (fn [[h v ch code & xyY]] [[h v ch code] xyY])
+                            (concat (:xyY-grid d) (:xyY-random d) (:xyY-edges d))))
+        adapt (c/->XYZ-to-XYZ wp/CIE-2-C wp/CIE-2-D65)]
+    (doseq [[h v ch code _ _ _ X Y Z] (:adapted-d65 d)
+            :let [[x y Yc] (xyY-C [h v ch code])]
+            :when (pos? Yc)]
+      (is (< (max-abs-diff [X Y Z] (take 3 (adapt (v/vec4 (/ (* x Yc) y) Yc (/ (* (- 1.0 x y) Yc) y) 255.0))))
+             1e-10)
+          [h v ch code]))))
+
+(deftest rainbow-gradient-range-test
+  (let [g (c/gradient :rainbow)]
+    (is (every? (fn [t] (every? #(<= 0.0 % 255.0) (take 3 (g (/ t 1000.0))))) (range 1001)))))

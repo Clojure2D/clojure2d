@@ -1,0 +1,78 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+Clojure2D: a JVM-only (no ClojureScript) generative-art / glitch library built directly on Java2D. All math comes from `generateme/fastmath` (3.x); colors are fastmath vectors (`Vec4` RGBA, channels as doubles in `[0,255]`).
+
+## Commands (Leiningen)
+
+- `lein test` — run all tests
+- `lein test clojure2d.color-test` — one namespace
+- `lein test :only clojure2d.color-test/type-conversion-test` — one test
+- `lein check` — compile/reflection check (CI runs `lein do clean, check, test`, under xvfb because windowing code needs a display)
+- `lein with-profile +eastwood eastwood` — lint with performance/boxed-math linters
+- `lein with-profile +dev-codox codox` — build API docs into `docs/codox/`
+- `lein javac` — recompile Java sources (also runs automatically via `:prep-tasks`, after AOT-compiling `fastmath.vector`)
+
+Java sources are compiled with `--release 8`; keep Java code Java-8 compatible.
+
+## Architecture
+
+- `src/clojure2d/protocols.clj` — central protocols (`ColorProto`, `PixelsProto`, `ImageProto`, `CanvasProto`, mouse/key event protos, `ShapeProto`, `RendererProto`). Most cross-namespace polymorphism (e.g. "anything convertible to a color", "anything with pixels") goes through these; `extend` implementations live in the consuming namespaces.
+- `clojure2d.core` — image load/save (`save-file-type` multimethod per format), `Canvas` (wraps `BufferedImage` + `Graphics2D`; drawing happens inside `with-canvas`/`with-oriented-canvas` macros, orientation via the `orient-canvas` multimethod), windows/displays (JFrame; display repaints a canvas in its own thread, decoupled from drawing; `draw-fn` and event handlers receive and return a per-window state instead of using global atoms; events dispatch via `key-pressed`/`custom-event` etc. multimethods), and session handling (logger, sequential filenames).
+- `clojure2d.core.shape` — shape construction (moved out of core in 1.5.0-alpha1; breaking).
+- `clojure2d.pixels` — immutable-ish `Pixels` type (planar channel arrays) plus filters, compositing, parallel channel ops, log-density renderers. Heavy lifting is in Java: `src/clojure2d/java/Pixels.java`, `filter/*`, `reconstruction/*` (renderer filter kernels), `LogDensity`/`GradientDensity`.
+- `clojure2d.color` (largest ns) — color representations/conversion via `to-color`, dozens of color spaces (`to-XXX`/`from-XXX` raw, `to-XXX*`/`from-XXX*` normalized to `[0,255]`), distances/deltas, palettes and gradients. Subnamespaces: `blend`, `cssgram`, `munsell`, `rgb`, `whitepoints`.
+- `clojure2d.extra.*` — higher-level effects: `glitch`, `overlays`, `segmentation`, `signal` (sonification, uses `java/signal/Converter.java`), `utils` (visualizers), `raymarching` (abandoned).
+
+### Palettes, gradients, named colors
+
+These are data, not code, under `resources/`:
+- `resources/palettes/*.edn` and `resources/gradients/*.edn` — one file per source/package, each a map of namespaced keywords (e.g. `#:MetBrewer{:Signac [...]}`). A keyword's namespace selects the file to lazily load (`get-palette-or-gradient` in `color.clj`); integer keys go to `colourlovers`. Gradient entries are either a color vector or `{:c colors :p positions}`.
+- `all-palettes.edn` / `all-gradients.edn` — index of all available names; must be updated when adding entries, otherwise `palette`/`gradient` random selection and listings won't see them.
+- Non-namespaced gradients (`:rainbow1`, `:iq-1`, `:cubehelix`, ...) are defined in code (`basic-gradients-delay` in `color.clj`).
+- `resources/color_presets.edn` — named colors; `resources/color/*.edn` — illuminants, white points, CMFs.
+- `utils/palettes/` is a separate Lein project that generates these EDN files (from paletteer, matplotlib, thi.ng, colourlovers, etc.) by `spit`-ing into `resources/` — run it from the repo root context so relative paths resolve.
+- `docs/static/{palettes,gradients}/*.html` are generated preview pages committed alongside new palettes/gradients.
+
+### Docs and examples
+
+- Docstrings use `:metadoc/categories` metadata to group functions in generated docs; keep it on new public vars in the main namespaces.
+- `metadoc/clojure2d/*_example.clj` — examples attached to docs (metadoc).
+- `notebooks/color.clj` + `dev/clerk/` — Clerk notebook for color documentation (`:dev` profile adds Clerk and Clay).
+- `generateme/` — personal sketches, not part of the library.
+
+### clj-kondo
+
+`resources/clj-kondo.exports/clojure2d/clojure2d/` ships config and macroexpand hooks for library users (`with-oriented-canvas`, `with-oriented-canvas->`, `make-set-color-fn`, `whitepoints/gen-whitepoints`). Update the hooks when changing or adding such macros.
+
+## Data, generators, tests, notes
+
+- `resources/` — datasets used by the library at runtime: external data and anything precalculated (lookup tables). Loaded lazily (`delay`).
+- `test/resources/` — oracle/reference data for tests only; must not ship in the package (as in fastmath). Needs a test-only resource path in `project.clj` (not configured yet).
+- `utils/` — every generator script: dataset converters and oracle-value generators.
+- Tests compare against independent oracles (colour/Python, R, Julia, mpmath) and are constructed as in fastmath (see the `fastmath-testing` skill).
+- Oracle toolkits (installing any needed packages is allowed):
+  - `Rscript` — R packages
+  - `/home/ts/.juliaup/bin/julia` — Julia packages
+  - `uv` in `/home/ts/penv` (venv `/home/ts/penv/.venv`) — Python packages
+  - `octave` — Octave/MATLAB packages
+- Record step notes in the Obsidian vault (`/home/ts/notes`) under `Topics/Clojure2D/` (as `Topics/Fastmath/` for fastmath).
+
+## Conventions
+
+- Performance-critical code uses primitive type hints (`^double`, `^long`, `^Vec4`) and avoids reflection/boxed math; eastwood's `:boxed-math` linter is enabled.
+- Record user-visible changes in `CHANGELOG.md` (keepachangelog style; mark breaking changes with `[breaking]`).
+
+## Code style (shared with fastmath)
+
+- Boolean options use Clojure truthiness; don't validate them. An `:rng` option is always an RNG object, never a seed.
+- Functional style (seqs, `map`, `reduce`) is for code off the hot path; on hot paths imperative code with `double-array` buffers is fine — measure rather than assume.
+- `ex-data` may carry small values (option name, offending value, bounds), never big sequences (whole inputs/results).
+- In computational code call `fastmath.core` (`m/abs`, `m/hypot`, `m/nan?`, ...) instead of `Math/...` / `Double/isNaN`; use `Array/aget`/`Array/aset` on arrays; reuse `m/MACHINE-EPSILON*`, `m/TWO_PI` etc. instead of literals or constant formulas (otherwise a private `^:const`).
+- When clj-kondo reports a type mismatch on `m/+`, `m/-`, ... with longs, use `m/long-add`, `m/long-sub`, ...; don't add clj-kondo ignores or wrapper fns.
+- Hint parameters (`^double x`) instead of coercing inside the body; `m/` ops coerce themselves. `(double ...)` only for boxed values from user input or collections. If a primitive-hinted fn would need more than 4 args, pass a `deftype`/`Vec2`-`Vec4`/state array instead of dropping hints.
+- Return fixed groups of numbers as `Vec2`/`Vec3`/`Vec4`, not double arrays; read deftype fields as `(.field x)`; don't define the same helper twice.
+- Initialise long loop vars explicitly: `(loop [i (long 0)] ...)`.

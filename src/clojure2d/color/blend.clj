@@ -18,6 +18,7 @@
   (:import [fastmath.vector Vec4]))
 
 (set! *unchecked-math* :warn-on-boxed)
+(set! *warn-on-reflection* true)
 (m/use-primitive-operators)
 
 (defmacro ^:private clamp255 [v] `(m/constrain ~v 0.0 255.0))
@@ -431,3 +432,5 @@
 (defn ch0 ([colorspace cb cs] (cs-op colorspace cb cs 0)) ([cb cs] (ch0 :RGB cb cs)))
 (defn ch1 ([colorspace cb cs] (cs-op colorspace cb cs 1)) ([cb cs] (ch1 :RGB cb cs)))
 (defn ch2 ([colorspace cb cs] (cs-op colorspace cb cs 2)) ([cb cs] (ch2 :RGB cb cs)))
+
+(m/unuse-primitive-operators)

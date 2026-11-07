@@ -1,11 +1,11 @@
-(defproject clojure2d "1.5.0-alpha2"
+(defproject clojure2d "1.5.0-alpha3-SNAPSHOT"
   :description "Creative coding / glitch library backed by Java2D"
   :url "https://github.com/Clojure2D/clojure2d"
   :license {:name "MIT"
             :url "https://opensource.org/licenses/MIT"}
-  :dependencies [[generateme/fastmath "3.0.0-alpha9"]
+  :dependencies [[generateme/fastmath "3.0.0-alpha10-SNAPSHOT"]
                  [com.scrtwpns/mixbox "2.0.0"]
-                 [org.apache.xmlgraphics/batik-transcoder "1.19"]]
+                 [org.apache.xmlgraphics/batik-transcoder "1.20"]]
   :resource-path "resources/"
   :java-source-paths ["src"]
   :javac-options ["--release" "8"]
@@ -20,7 +20,9 @@
                         :eastwood {:add-linters [:performance :boxed-math]
                                    :exclude-namespaces [notebooks.color]}}
              :dev {:source-paths ["dev"]
-                   :dependencies [[org.clojure/clojure "1.12.5"]
+                   ;; test-only reference data (oracle values generated in utils/)
+                   :resource-paths ["test/resources"]
+                   :dependencies [[org.clojure/clojure "1.13.0-alpha11"]
                                   [io.github.nextjournal/clerk "0.13.842"]
                                   [org.scicloj/clay "2-beta23"]]}
              :dev-codox {:codox {:source-uri "https://github.com/Clojure2D/clojure2d/blob/master/{filepath}#L{line}"
