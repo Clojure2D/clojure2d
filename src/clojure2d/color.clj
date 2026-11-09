@@ -18,9 +18,9 @@
   * fastmath `Vec2` - gray with alpha
   * `java.awt.Color` - Java AWT representation. Creators are [[awt-color]], [[awt-gray]]. Use [[to-awt-color]] to convert to this representation.
   * `keyword` - one of the defined names (see [[named-colors-list]])
-  * `Integer` - packed ARGB value. If value is less than `0xff000000`, alpha is set to `0xff`. Example: `0xffaa01`.
-  * `String` - CSS (`#rgb` or `#rgba`) or string containg hexadecimal representation (\"ffaa01\")
-  * any `seqable` - list, vector containing 2-4 elements. Conversion is done by applying content to [[color]] function.
+  * `Integer` or `Long` - packed ARGB value `0xAARRGGBB`. When the top byte is 0 the color is opaque (alpha 255), so `0xffaa01` is opaque orange; a fully transparent packed color cannot be expressed. See [[pack]].
+  * `String` - hex notation `#rgb`, `#rrggbb` or `#rrggbbaa`, case-insensitive, `#` optional; one or two hex digits give a gray (`ab` is `#ababab`). See [[format-hex]].
+  * any `seqable` (list, vector) or `double`, `int`, `long` array - 0 elements: black; 1: gray; 2: gray and alpha; 3: RGB; 4 or more: RGBA (the first four).
 
   To create color from individual channel values use [[color]] function. To create gray for given intensity call [[gray]].
 
@@ -160,7 +160,11 @@
                          [k (pr/to-color v)]) (read-edn "color_presets.edn")))))
 
 (defn named-colors-list
-  "Return list of the named colors."
+  "Returns the names of all predefined colors.
+
+  The names are keywords: the 148 CSS Color 4 names (e.g. `:red`, `:rebeccapurple`), hyphenated variants of the multi-word CSS names (e.g. `:dark-blue`), `:amber` (a clojure2d-specific color, `#b28c00`) and `:docc/...` colors from A Dictionary of Colour Combinations by Sanzo Wada (via mattdesl/dictionary-of-colour-combinations). Every name can be used wherever a color is expected.
+
+  Returns an unordered sequence of keywords. See also [[to-color]], [[palette]]."
   {:metadoc/categories #{:pal}}
   [] (keys @color-presets-delay))
 
@@ -223,9 +227,11 @@
                   (< (long v) 0x01000000))))))
 
 (defn possible-palette?
-  "Check if given argument can be considered as palette.
+  "Checks by type whether `c` looks like a palette, a sequence of colors.
 
-  Check is done by analyzing type of the argument."
+  - `c` any value
+
+  Returns true for a seqable value which is not a color according to [[possible-color?]] and not a function (gradients are functions). The elements are not converted. See also [[possible-color?]], [[valid-color?]]."
   {:metadoc/categories #{:pal}}
   [c]
   (and (seqable? c)
@@ -254,7 +260,11 @@
   ^Vec4 [c] (pr/to-color c))
 
 (defn to-awt-color
-  "Convert any color representation to `java.awt.Color`."
+  "Converts any color representation to `java.awt.Color`.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Channels and alpha are rounded and clamped to integers in `[0,255]`. See also [[awt-color]], [[to-color]]."
   {:metadoc/categories meta-ops}
   ^java.awt.Color [c] (pr/to-awt-color c))
 
@@ -280,17 +290,29 @@
     (luma-fn (.x c) (.y c) (.z c))))
 
 (defn red
-  "Returns red (first channel) value."
+  "Returns the first channel value (red for RGB colors).
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a double, not clamped. For a `Vec4` holding another colorspace (e.g. from `to-LAB`) it is that colorspace's first channel. Same as [[ch0]]; see also [[set-red]]."
   {:metadoc/categories meta-ops}
   ^double [c] (pr/red c))
 
 (defn green
-  "Returns green (second channel) value."
+  "Returns the second channel value (green for RGB colors).
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a double, not clamped. For a `Vec4` holding another colorspace (e.g. from `to-LAB`) it is that colorspace's second channel. Same as [[ch1]]; see also [[set-green]]."
   {:metadoc/categories meta-ops}
   ^double [c] (pr/green c))
 
 (defn blue
-  "Returns blue (third channel) value."
+  "Returns the third channel value (blue for RGB colors).
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a double, not clamped. For a `Vec4` holding another colorspace (e.g. from `to-LAB`) it is that colorspace's third channel. Same as [[ch2]]; see also [[set-blue]]."
   {:metadoc/categories meta-ops}
   ^double [c] (pr/blue c))
 
@@ -300,24 +322,40 @@
   ^double [c] (pr/alpha c))
 
 (defn ch0
-  "Returns first channel value. Same as [[red]]."
+  "Returns the first channel value (red for RGB colors).
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a double, not clamped. For a `Vec4` holding another colorspace (e.g. from `to-LAB`) it is that colorspace's first channel. Same as [[red]]; see also [[set-ch0]], [[get-channel]]."
   {:metadoc/categories meta-ops}
   ^double [c] (pr/red c))
 
 (defn ch1
-  "Returns second channel value. Same as [[green]]."
+  "Returns the second channel value (green for RGB colors).
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a double, not clamped. For a `Vec4` holding another colorspace (e.g. from `to-LAB`) it is that colorspace's second channel. Same as [[green]]; see also [[set-ch1]], [[get-channel]]."
   {:metadoc/categories meta-ops}
   ^double [c] (pr/green c))
 
 (defn ch2
-  "Returns third channel value. Same as [[blue]]."
+  "Returns the third channel value (blue for RGB colors).
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a double, not clamped. For a `Vec4` holding another colorspace (e.g. from `to-LAB`) it is that colorspace's third channel. Same as [[blue]]; see also [[set-ch2]], [[get-channel]]."
   {:metadoc/categories meta-ops}
   ^double [c] (pr/blue c))
 
 (defn hue-polar
-  "Hue value of color (any representation). Returns angle (0-360).
-  
-  Uses polar transformation. See also [[hue]]."
+  "Returns the hue of a color in degrees, using the polar (circular) model.
+
+  Formula: `atan2(sqrt(3)/2 * (g - b), r - (g + b)/2)`, mapped to `[0,360)`. It equals the hexagonal [[hue]] at primary and secondary colors and differs slightly between them.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a double; grays (equal channels) give 0. See also [[hue]]."
   {:metadoc/categories meta-ops}
   ^double [c]
   (let [^Vec4 c (pr/to-color c)
@@ -329,64 +367,108 @@
 (declare to-HC)
 
 (defn hue
-  "Hue value of color (any representation). Returns angle (0-360).
-  
-  Uses hexagonal transformation. See also [[hue-polar]]."
+  "Returns the hue of a color in degrees, using the hexagonal model of HSV and HSL.
+
+  The hue is the position on the hexagon spanned by the primaries and secondaries: red 0, yellow 60, green 120, cyan 180, blue 240, magenta 300.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a double from 0 to 360; grays (equal channels) give 0. See also [[hue-polar]], [[to-HSV]]."
   {:metadoc/categories meta-ops}
   ^double [c]
   (let [^Vec4 ret (to-HC (pr/to-color c))] (.x ret)))
 
 (defn set-alpha
-  "Set alpha channel and return new color"
+  "Returns the color with alpha set to `a`.
+
+  - `c` color, any type accepted by [[to-color]]
+  - `a` new alpha, not clamped
+
+  Returns a `Vec4`. See also [[alpha]], [[color]] (clamping), [[set-awt-alpha]]."
   {:metadoc/categories meta-ops}
   ^Vec4 [c a]
   (let [^Vec4 v (pr/to-color c)]
     (Vec4. (.x v) (.y v) (.z v) a)))
 
 (defn set-red
-  "Set red channel and return new color."
+  "Returns the color with the first channel (red for RGB colors) set to `val`.
+
+  - `c` color, any type accepted by [[to-color]]
+  - `val` new channel value, not clamped
+
+  Returns a `Vec4`. See also [[red]], [[set-ch0]], [[set-channel]]."
   {:metadoc/categories meta-ops}
   ^Vec4 [c val]
   (let [^Vec4 v (pr/to-color c)]
     (Vec4. val (.y v) (.z v) (.w v))))
 
 (defn set-green
-  "Set green channel and return new color."
+  "Returns the color with the second channel (green for RGB colors) set to `val`.
+
+  - `c` color, any type accepted by [[to-color]]
+  - `val` new channel value, not clamped
+
+  Returns a `Vec4`. See also [[green]], [[set-ch1]], [[set-channel]]."
   {:metadoc/categories meta-ops}
   ^Vec4 [c val]
   (let [^Vec4 v (pr/to-color c)]
     (Vec4. (.x v) val (.z v) (.w v))))
 
 (defn set-blue
-  "Set blue channel and return new color"
+  "Returns the color with the third channel (blue for RGB colors) set to `val`.
+
+  - `c` color, any type accepted by [[to-color]]
+  - `val` new channel value, not clamped
+
+  Returns a `Vec4`. See also [[blue]], [[set-ch2]], [[set-channel]]."
   {:metadoc/categories meta-ops}
   ^Vec4 [c val]
   (let [^Vec4 v (pr/to-color c)]
     (Vec4. (.x v) (.y v) val (.w v))))
 
 (defn set-ch0
-  "Set red channel and return new color."
+  "Returns the color with the first channel (red for RGB colors) set to `val`.
+
+  - `c` color, any type accepted by [[to-color]]
+  - `val` new channel value, not clamped
+
+  Returns a `Vec4`. See also [[ch0]], [[set-red]], [[set-channel]]."
   {:metadoc/categories meta-ops}
   ^Vec4 [c val]
   (let [^Vec4 v (pr/to-color c)]
     (Vec4. val (.y v) (.z v) (.w v))))
 
 (defn set-ch1
-  "Set green channel and return new color."
+  "Returns the color with the second channel (green for RGB colors) set to `val`.
+
+  - `c` color, any type accepted by [[to-color]]
+  - `val` new channel value, not clamped
+
+  Returns a `Vec4`. See also [[ch1]], [[set-green]], [[set-channel]]."
   {:metadoc/categories meta-ops}
   ^Vec4 [c val]
   (let [^Vec4 v (pr/to-color c)]
     (Vec4. (.x v) val (.z v) (.w v))))
 
 (defn set-ch2
-  "Set blue channel and return new color"
+  "Returns the color with the third channel (blue for RGB colors) set to `val`.
+
+  - `c` color, any type accepted by [[to-color]]
+  - `val` new channel value, not clamped
+
+  Returns a `Vec4`. See also [[ch2]], [[set-blue]], [[set-channel]]."
   {:metadoc/categories meta-ops}
   ^Vec4 [c val]
   (let [^Vec4 v (pr/to-color c)]
     (Vec4. (.x v) (.y v) val (.w v))))
 
 (defn set-awt-alpha
-  "Set alpha channel and return `Color` representation."
+  "Returns the color as `java.awt.Color` with alpha set to `a`.
+
+  - `c` color, any type accepted by [[to-color]]
+  - `a` new alpha, rounded and clamped to `[0,255]`
+
+  See also [[set-alpha]], [[awt-color]]."
   {:metadoc/categories meta-ops}
   ^Color [c a]
   (let [^Color cc (pr/to-awt-color c)]
@@ -396,9 +478,16 @@
             (lclamp255 a))))
 
 (defn awt-color
-  "Create java.awt.Color object.
+  "Creates a `java.awt.Color`.
 
-  See also [[color]], [[gray]]."
+  Arities:
+
+  - `[c]` converts any color, as [[to-awt-color]]
+  - `[c a]` converts any color and sets alpha `a`, as [[set-awt-alpha]]
+  - `[r g b]` from channel values, alpha 255
+  - `[r g b a]` from channel values and alpha
+
+  Channel values and alpha are rounded and clamped to integers in `[0,255]`. See also [[awt-gray]], [[color]]."
   {:metadoc/categories meta-ops}
   (^Color [c]
    (pr/to-awt-color c))
@@ -442,19 +531,33 @@
           (clamp255 a))))
 
 (defn clamp
-  "Clamp all color channels to `[0-255]` range."
+  "Clamps all channels, alpha included, to `[0,255]`.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. See also [[lclamp]]."
   {:metadoc/categories meta-ops}
-  [c]
-  ^Vec4 (v/fmap (pr/to-color c) clamp255))
+  ^Vec4 [c]
+  (v/fmap (pr/to-color c) clamp255))
 
 (defn lclamp
-  "Clamp all color channels to `[0-255]` range. Round if necessary."
+  "Clamps all channels, alpha included, to `[0,255]` and rounds them to integers (half up).
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with integer-valued doubles. See also [[clamp]]."
   {:metadoc/categories meta-ops}
   ^Vec4 [c]
   (v/fmap (pr/to-color c) lclamp255))
 
 (defn scale
-  "Multiply color channels by given value, do not change alpha channel by default"
+  "Multiplies the channels of a color by `v`.
+
+  - `c` color, any type accepted by [[to-color]]
+  - `v` factor
+  - `alpha?` (optional, default false) when truthy alpha is multiplied too
+
+  Returns a `Vec4`, not clamped. See also [[scale-down]], [[scale-up]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [c ^double v] (scale c v false))
   (^Vec4 [c ^double v alpha?]
@@ -465,13 +568,23 @@
             (if alpha? (* v (.w c)) (.w c))))))
 
 (defn scale-down
-  "Divide color channels by 255.0"
+  "Divides the channels by 255: an RGB color goes to the `[0,1]` scale.
+
+  - `c` color, any type accepted by [[to-color]]
+  - `alpha?` (optional, default false) when truthy alpha is divided too
+
+  Returns a `Vec4`. See also [[scale-up]], [[scale]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [c] (scale-down c false))
   (^Vec4 [c alpha?] (scale c (/ 255.0) alpha?)))
 
 (defn scale-up
-  "Multiply color channels by 255.0"
+  "Multiplies the channels by 255: a color on the `[0,1]` scale goes to `[0,255]`.
+
+  - `c` color, any type accepted by [[to-color]]
+  - `alpha?` (optional, default false) when truthy alpha is multiplied too
+
+  Returns a `Vec4`. See also [[scale-down]], [[scale]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [c] (scale-up c false))
   (^Vec4 [c alpha?] (scale c 255.0 alpha?)))
@@ -485,9 +598,12 @@
   (^Vec4 [^double v ^double a] (color v v v a)))
 
 (defn awt-gray
-  "Create grayscale color based on intensity `v`. Optional parameter alpha `a`.
+  "Creates a gray `java.awt.Color`.
 
-  AWT version of [[gray]]. See also [[awt-color]]"
+  - `v` intensity, used for all three channels
+  - `a` alpha (optional, default 255)
+
+  Values are rounded and clamped to `[0,255]`. See also [[gray]], [[awt-color]]."
   {:metadoc/categories meta-ops}
   (^Color [^double v] (awt-color v v v))
   (^Color [^double v ^double a] (awt-color v v v a)))
@@ -683,9 +799,11 @@
 ;;
 
 (defn format-hex
-  "Convert color to hex string (css).
+  "Formats a color as a CSS hex string.
 
-  When alpha is lower than 255.0, #rgba is returned."
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns lowercase `#rrggbb`, or `#rrggbbaa` when the rounded alpha is below 255. Channels and alpha are rounded and clamped to `[0,255]`. [[to-color]] reads the result back. See also [[pack]]."
   {:metadoc/categories meta-ops}
   ^String [c]
   (let [^Vec4 c (pr/to-color c)
@@ -696,7 +814,11 @@
     (if (< a 255) (str s (format "%02x" a)) s)))
 
 (defn pack
-  "Pack color to ARGB 32bit integer."
+  "Packs a color into a 32-bit ARGB integer, `0xAARRGGBB`.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Channels and alpha are rounded and clamped to `[0,255]`; the result is an `int`, negative when alpha is 128 or more. [[to-color]] reads an integer whose top byte is 0 as an opaque color, so a fully transparent color does not round-trip. See also [[format-hex]], [[quil]]."
   {:metadoc/categories meta-ops}
   [c]
   (unchecked-int (bit-or (m/<< (lclamp255 (pr/alpha c)) 24)
@@ -704,11 +826,15 @@
                          (m/<< (lclamp255 (pr/green c)) 8)
                          (lclamp255 (pr/blue c)))))
 
-(def ^{:doc "Convert color to `quil` color type (ie. ARGB Integer). Alias to [[pack]]."
+(def ^{:doc "Packs a color into a 32-bit ARGB integer, the color type of Quil and Processing. Alias of [[pack]]."
        :metadoc/categories meta-ops} quil pack)
 
 (defn black?
-  "Check if color is black"
+  "Checks whether a color is black: red, green and blue, clamped to `[0,255]`, are all 0.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Alpha is ignored; negative channels count as 0. See also [[not-black?]]."
   [c]
   (let [^Vec4 v (clamp c)]
     (and (zero? (.x v))
@@ -716,7 +842,11 @@
          (zero? (.z v)))))
 
 (defn not-black?
-  "Check if color is not black"
+  "Checks whether a color is not black: any of red, green and blue, clamped to `[0,255]`, is above 0.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Alpha is ignored. See also [[black?]]."
   [c]
   (let [^Vec4 v (clamp c)]
     (or (pos? (.x v))

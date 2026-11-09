@@ -46,14 +46,14 @@
 
 ;; Define `ColorProto` for representation conversions.
 (defprotocol ColorProto
-  "Basic color operations"
-  (to-color [c] "Convert any color representation to `Vec4` vector.")
-  (to-awt-color [c] "Convert any color representation to `java.awt.Color`.") 
-  (luma [c] "Returns luma")
-  (red [c] "Returns red (first channel) value. See also [[ch0]].")
-  (green [c] "Returns green (second channel) value. See also [[ch1]].") 
-  (blue [c] "Returns blue (third channel) value. See also [[ch2]].")
-  (alpha [c] "Returns alpha value."))
+  "Color representations: conversion to `Vec4` (RGBA, channels as doubles) and `java.awt.Color`, and channel access. Implemented in `clojure2d.color` for vectors, numbers, strings, keywords, sequences, arrays and `java.awt.Color`; use the public functions there."
+  (to-color [c] "Converts the color to `Vec4` (RGBA). See `clojure2d.color/to-color`.")
+  (to-awt-color [c] "Converts the color to `java.awt.Color`, channels rounded and clamped. See `clojure2d.color/to-awt-color`.")
+  (luma [c] "Returns the luma of the color, `[0,255]` for RGB colors. See `clojure2d.color/luma`.")
+  (red [c] "Returns the first channel (red). See `clojure2d.color/red`.")
+  (green [c] "Returns the second channel (green). See `clojure2d.color/green`.")
+  (blue [c] "Returns the third channel (blue). See `clojure2d.color/blue`.")
+  (alpha [c] "Returns alpha. See `clojure2d.color/alpha`."))
 
 (defprotocol PixelsProto
   "Functions for accessing and setting channel values or colors. PixelsProto is used in following types:
