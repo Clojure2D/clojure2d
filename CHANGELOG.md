@@ -38,6 +38,11 @@ All notable changes to this project will be documented in this file. This change
 * `wavelength-to-XYZ` (and `wavelength`) used CIE 1964 10° for every observer other than `:CIE-2`; now supports all four observers and throws for an unknown one
 * `:cat97` chromatic adaptation used a transposed Bradford matrix with a sign error (copied misprint, also in colour-science); now the Bradford matrix as defined for CMCCAT97 / CIECAM97s; the former matrix stays available as `:cat97-colour` (colour-science compatibility)
 * An unknown chromatic adaptation method in `chromatic-adaptation-matrix`, `->XYZ-to-XYZ`, `->XYZ-to-LMS`, `->LMS-to-XYZ` and `->RGB-to-RGB` (white points differ) failed with an unrelated `IllegalArgumentException` (LMS builders only when called); now throws `ex-info` with `{:method k}` when the converter is built
+* `clojure2d.color.blend/softburn` and `msoftburn`: the branch for `a + b > 255` used `0.5 - (1 - a) / b` instead of the pegtop formula `1 - (1 - a) / (2 * b)`, so values jumped at `a + b = 255`
+* `clojure2d.color.blend/linearlight` and `mlinearlight` had the layers swapped (`2 * a + b - 1`); now Photoshop's `a + 2 * b - 1` (same values as `stamp`, `mstamp`)
+* `clojure2d.color.blend/pinlight` had the layers swapped (clamped the blend into `[2a - 1, 2a]`); now clamps the base into `[2b - 1, 2b]`
+* `clojure2d.color.blend` modulus modes (`madd`, `mdodge`, ...) returned values in `(255, 256]`; now wrapped with mod 256 and capped at 255 (integer-valued results unchanged)
+* `clojure2d.color.blend/nor`, `nand`, `xnor` were missing from `blends` (and `blends-list`); registered, so `blends-list` changes and seeded `glitch` results may differ
 
 ## 1.5.0-alpha1
 

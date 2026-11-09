@@ -19,13 +19,10 @@ Sections ({mode [value ...]} in the order of :grid followed by :random):
   pegtop.net, Photoshop): 0/0 singular points take the zero-numerator value (as W3C color-dodge
   and color-burn), x/0 with x > 0 is infinite before clamping
 * :modulus  the author's modulus family: unclamped base formula with the clojure2d guard
-  max(1e-10, denominator), reduced mod 256 by the test (stored unwrapped)
+  max(1e-10, denominator), stored unwrapped; the test wraps with mod 256 and caps at 255
 * :bitwise  logical modes on the channel values truncated to integers, low 8 bits
 * :pillow  Pillow ImageChops on the integer points only ({mode [byte ...]} in the order of
   :pillow-points)
-
-Modes whose formula is changed in G2 (softburn, msoftburn, linearlight, mlinearlight, pinlight) are
-not generated yet.
 """
 
 import numpy as np
@@ -99,6 +96,8 @@ FORMULA = {
     "divide": clamp(div(a, b)),
     "vividlight": clamp(np.where(b < 0.5, 1.0 - div(1.0 - a, 2.0 * b), div(a, 2.0 * (1.0 - b)))),
     "hardmix": np.where(a + b >= 1.0, 255.0, 0.0),
+    "linearlight": clamp(a + 2.0 * b - 1.0),
+    "pinlight": np.where(b < 0.5, np.minimum(a, 2.0 * b), np.maximum(a, 2.0 * b - 1.0)) * 255.0,
     # Photoshop soft light as given by pegtop.net
     "softlight": np.where(b < 0.5, a - (1.0 - 2.0 * b) * a * (1.0 - a),
                           a + (2.0 * b - 1.0) * (np.sqrt(a) - a)) * 255.0,
@@ -106,6 +105,7 @@ FORMULA = {
     "pegtoplight": ((1.0 - 2.0 * b) * a * a + 2.0 * a * b) * 255.0,
     "inversedodge": clamp(dodge(b, a)),
     "inverseburn": clamp(burn(b, a)),
+    "softburn": clamp(np.where(a + b <= 1.0, div(0.5 * b, 1.0 - a), 1.0 - div(0.5 * (1.0 - a), b))),
     "softdodge": clamp(np.where(a + b <= 1.0, div(0.5 * a, 1.0 - b), 1.0 - div(0.5 * (1.0 - b), a))),
     "reflect": clamp(div(a * a, 1.0 - b)),
     "glow": clamp(div(b * b, 1.0 - a)),
@@ -127,10 +127,13 @@ MODULUS = {
     "msubtract": A - B,
     "mlinearburn": A + B - 255.0,
     "mstamp": A + 2.0 * B - 255.0,
+    "mlinearlight": A + 2.0 * B - 255.0,
     "mdodge": 255.0 * A / guard(255.0 - B),
     "minversedodge": 255.0 * B / guard(255.0 - A),
     "msoftdodge": np.where(A + B <= 255.0, 127.5 * A / guard(255.0 - B),
                            255.0 - 127.5 * (255.0 - B) / guard(A)),
+    "msoftburn": np.where(A + B <= 255.0, 127.5 * B / guard(255.0 - A),
+                          255.0 - 127.5 * (255.0 - A) / guard(B)),
     "mburn": 255.0 * (1.0 - (255.0 - A) / guard(B)),
     "minverseburn": 255.0 * (1.0 - (255.0 - B) / guard(A)),
     "mdivide": 255.0 * A / guard(B),

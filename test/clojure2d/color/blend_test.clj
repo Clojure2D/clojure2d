@@ -18,12 +18,11 @@
 
 ;; G1: existing per-channel modes
 
-(def ^:private formula-changed-in-G2 #{:softburn :msoftburn :linearlight :mlinearlight :pinlight})
-
 (deftest coverage-test
+  ;; every registered mode is checked against the oracle; nor, nand, xnor registered (B4)
   (let [{:keys [formula modulus bitwise]} @reference]
-    (is (= (set (concat (keys b/blends) [:nor :nand :xnor]))
-           (set (concat (keys formula) (keys modulus) (keys bitwise) formula-changed-in-G2))))))
+    (is (= (set (keys b/blends)) (set (concat (keys formula) (keys modulus) (keys bitwise)))))
+    (is (every? (set (keys b/blends)) [:nor :nand :xnor]))))
 
 (deftest formula-modes-test
   ;; W3C, Photoshop and pegtop formulas on the grid and random pairs: 1e-12 relative to max(1, |expected|)
@@ -32,21 +31,46 @@
           [[x y] e] (map vector @points expected)]
     (is (rel-close? 1.0e-12 e (f x y)) (str k " " x " " y))))
 
-(defn- circular-distance
-  "Distance between `x` and `y` on the circle of length 256."
-  ^double [^double x ^double y]
-  (let [d (m/mod (m/- x y) 256.0)] (m/min d (m/- 256.0 d))))
+(defn- wrapped-close?
+  "Is `v` the author's wrap (mod 256, capped at 255) of the unwrapped oracle value `u`? The unwrapped
+  values reach 1e18 at guarded divisions, so the tolerance is 1e-12 relative to max(1, |u|); within it
+  of a multiple of 256 both 0 and the cap 255 are accepted."
+  [^double u ^double v]
+  (let [tol (m/* 1.0e-12 (m/max 1.0 (m/abs u)))
+        r (m/mod u 256.0)]
+    (or (m/<= (m/abs (m/- v (m/min r 255.0))) tol)
+        (and (or (m/<= r tol) (m/>= r (m/- 256.0 tol)))
+             (or (m/<= v tol) (== v 255.0))))))
 
 (deftest modulus-modes-test
-  ;; author's formula reduced mod 256; the unwrapped values reach 1e18 at guarded divisions, so the
-  ;; tolerance is 1e-12 relative to max(1, |unwrapped|), measured around the circle
+  ;; author's unwrapped formula, wrapped with mod 256 and capped at 255 (B6); results in [0, 255]
   (doseq [[k unwrapped] (:modulus @reference)
           :let [f (mode k)]
           [[x y] u] (map vector @points unwrapped)
           :let [v (f x y)]]
-    (is (m/<= 0.0 v 256.0) (str k " " x " " y))
-    (is (m/<= (circular-distance (m/mod u 256.0) v) (m/* 1.0e-12 (m/max 1.0 (m/abs u))))
-        (str k " " x " " y))))
+    (is (m/<= 0.0 v 255.0) (str k " " x " " y))
+    (is (wrapped-close? u v) (str k " " x " " y))))
+
+(deftest modulus-cap-test
+  (testing "B6: results in (255, 256) are capped, integer-valued results equal plain mod 256"
+    (is (== 255.0 (b/madd 200.0 55.5) (b/msubtract 0.0 1.0e-14)))
+    (is (== 0.0 (b/madd 200.0 56.0)))
+    (is (== 44.0 (b/madd 200.0 100.0)))))
+
+(deftest G2-fixes-test
+  (let [grid (range 0.0 256.0)]
+    (testing "B1: soft burn continuous at a + b = 255 (value 127.5)"
+      (doseq [a (butlast grid) :let [b (- 255.0 a)]] ; a = 255, b = 0 is the 0/0 corner (value 0)
+        (is (m/<= (m/abs (m/- 127.5 (b/softburn a b))) 1.0e-12) (str a))
+        (is (m/<= (m/abs (m/- (b/softburn a b) (b/softburn a (+ b 1.0e-9)))) 1.0e-6) (str a))))
+    (testing "B2: linear light = stamp"
+      (doseq [a grid bl grid]
+        (is (== (b/stamp a bl) (b/linearlight a bl)))
+        (is (== (b/mstamp a bl) (b/mlinearlight a bl)))))
+    (testing "B3: pin light keeps the base inside [2b - 255, 2b]"
+      (is (== 100.0 (b/pinlight 200.0 50.0)))
+      (is (== 145.0 (b/pinlight 100.0 200.0)))
+      (is (== 120.0 (b/pinlight 120.0 127.5))))))
 
 (deftest bitwise-modes-test
   ;; low 8 bits of the truncated channel values, exact

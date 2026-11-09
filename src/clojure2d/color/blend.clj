@@ -9,7 +9,7 @@
   Per-channel modes, all `(f a b)` returning a double, are collected in [[blends]] (keyword to function) and [[blends-list]]:
 
   - clamped modes, results clamped to `[0,255]`; sources: W3C Compositing Level 1 ([[normal]], [[multiply]], [[screen]], [[overlay]], [[hardlight]], [[darken]], [[lighten]], [[dodge]], [[burn]], [[difference]], [[exclusion]]), Photoshop ([[add]], [[subtract]], [[linearburn]], [[linearlight]], [[vividlight]], [[pinlight]], [[hardmix]], [[divide]], [[softlight]]) and pegtop.net ([[inversedodge]], [[inverseburn]], [[softdodge]], [[softburn]], [[reflect]], [[glow]], [[freeze]], [[heat]], [[stamp]], [[negation]], [[pegtoplight]], [[average]])
-  - modulus modes, prefixed with `m` ([[madd]], [[mdodge]], ...): the author's artistic family, the unclamped formula of the clamped mode wrapped with mod 256
+  - modulus modes, prefixed with `m` ([[madd]], [[mdodge]], ...): the author's artistic family, the unclamped formula of the clamped mode wrapped with mod 256 and capped at 255 (results in `[0,255]`; integer-valued results equal plain mod 256)
   - bitwise modes ([[or]], [[and]], [[xor]], [[nor]], [[nand]], [[xnor]]) on the channel values truncated to integers
 
   Division by zero: a zero numerator gives 0, as for W3C `color-dodge` and `color-burn`; otherwise the clamped modes saturate and the modulus modes divide by `EPSILON` (1e-10) before wrapping.
@@ -27,7 +27,9 @@
 (set! *warn-on-reflection* true)
 
 (defmacro ^:private clamp255 [v] `(m/constrain ~v 0.0 255.0))
-(defmacro ^:private mod255 [v] `(m/mod ~v 256.0))
+(defmacro ^:private wrap256
+  "Wraps `v` with mod 256 and caps the result at 255."
+  [v] `(m/min (m/mod ~v 256.0) 255.0))
 
 (def ^{:const true :private true :tag 'double} r255 (m// 255.0))
 (def ^{:const true :private true :tag 'double} r255-2 (m// (m/* 255.0 255.0)))
@@ -59,14 +61,14 @@
 (defn madd
   "Modulus add mode.
 
-  Formula on the 0-255 scale: `a + b`, mod 256. Pillow `ImageChops.add_modulo` for integer values. Part of the author's modulus family.
+  Formula on the 0-255 scale: `a + b`, mod 256, capped at 255. Pillow `ImageChops.add_modulo` for integer values. Part of the author's modulus family.
 
   - `a` base (backdrop) channel value, `[0,255]`
   - `b` blend (source) channel value, `[0,255]`
 
-  Returns the value wrapped into `[0,256)`. See also [[add]], [[msubtract]]."
+  Returns the wrapped value in `[0,255]`. See also [[add]], [[msubtract]]."
   ^double [^double a ^double b]
-  (mod255 (m/+ a b)))
+  (wrap256 (m/+ a b)))
 
 (defn subtract
   "Subtract mode.
@@ -83,14 +85,14 @@
 (defn msubtract
   "Modulus subtract mode.
 
-  Formula on the 0-255 scale: `a - b`, mod 256. Pillow `ImageChops.subtract_modulo` for integer values. Part of the author's modulus family.
+  Formula on the 0-255 scale: `a - b`, mod 256, capped at 255. Pillow `ImageChops.subtract_modulo` for integer values. Part of the author's modulus family.
 
   - `a` base (backdrop) channel value, `[0,255]`
   - `b` blend (source) channel value, `[0,255]`
 
-  Returns the value wrapped into `[0,256)`. See also [[subtract]], [[madd]]."
+  Returns the wrapped value in `[0,255]`. See also [[subtract]], [[madd]]."
   ^double [^double a ^double b]
-  (mod255 (m/- a b)))
+  (wrap256 (m/- a b)))
 
 (defn linearburn
   "Linear burn mode (Photoshop).
@@ -107,14 +109,14 @@
 (defn mlinearburn
   "Modulus linear burn mode.
 
-  Formula on the 0-255 scale: `a + b - 255`, mod 256. Part of the author's modulus family.
+  Formula on the 0-255 scale: `a + b - 255`, mod 256, capped at 255. Part of the author's modulus family.
 
   - `a` base (backdrop) channel value, `[0,255]`
   - `b` blend (source) channel value, `[0,255]`
 
-  Returns the value wrapped into `[0,256)`. See also [[linearburn]]."
+  Returns the wrapped value in `[0,255]`. See also [[linearburn]]."
   ^double [^double a ^double b]
-  (mod255 (m/- (m/+ a b) 255.0)))
+  (wrap256 (m/- (m/+ a b) 255.0)))
 
 (defn darken
   "Darken mode: the darker value.
@@ -181,14 +183,14 @@
 (defn mdodge
   "Modulus color dodge mode.
 
-  Formula on the 0-255 scale: `255 * a / (255 - b)`, mod 256. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
+  Formula on the 0-255 scale: `255 * a / (255 - b)`, mod 256, capped at 255. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
 
   - `a` base (backdrop) channel value, `[0,255]`
   - `b` blend (source) channel value, `[0,255]`
 
-  Returns the value wrapped into `[0,256)`. See also [[dodge]]."
+  Returns the wrapped value in `[0,255]`. See also [[dodge]]."
   ^double [^double a ^double b]
-  (mod255 (m// (m/* 255.0 a) (m/max m/EPSILON (m/- 255.0 b)))))
+  (wrap256 (m// (m/* 255.0 a) (m/max m/EPSILON (m/- 255.0 b)))))
 
 (defn inversedodge
   "Inverse color dodge mode (pegtop.net): color dodge with the layers swapped.
@@ -205,14 +207,14 @@
 (defn minversedodge
   "Modulus inverse color dodge mode.
 
-  Formula on the 0-255 scale: `255 * b / (255 - a)`, mod 256. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
+  Formula on the 0-255 scale: `255 * b / (255 - a)`, mod 256, capped at 255. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
 
   - `a` base (backdrop) channel value, `[0,255]`
   - `b` blend (source) channel value, `[0,255]`
 
-  Returns the value wrapped into `[0,256)`. See also [[inversedodge]]."
+  Returns the wrapped value in `[0,255]`. See also [[inversedodge]]."
   ^double [^double a ^double b]
-  (mod255 (m// (m/* 255.0 b) (m/max m/EPSILON (m/- 255.0 a)))))
+  (wrap256 (m// (m/* 255.0 b) (m/max m/EPSILON (m/- 255.0 a)))))
 
 (defn softdodge
   "Soft dodge mode (pegtop.net): a softer color dodge.
@@ -231,16 +233,16 @@
 (defn msoftdodge
   "Modulus soft dodge mode.
 
-  Formula on the 0-255 scale: `127.5 * a / (255 - b)` when `a + b <= 255`, else `255 - 127.5 * (255 - b) / a`, mod 256. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
+  Formula on the 0-255 scale: `127.5 * a / (255 - b)` when `a + b <= 255`, else `255 - 127.5 * (255 - b) / a`, mod 256, capped at 255. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
 
   - `a` base (backdrop) channel value, `[0,255]`
   - `b` blend (source) channel value, `[0,255]`
 
-  Returns the value wrapped into `[0,256)`. See also [[softdodge]]."
+  Returns the wrapped value in `[0,255]`. See also [[softdodge]]."
   ^double [^double a ^double b]
   (if (m/<= (m/+ a b) 255.0)
-    (mod255 (m// (m/* 127.5 a) (m/max m/EPSILON (m/- 255.0 b))))
-    (mod255 (m/- 255.0 (m/* 127.5 (m// (m/- 255.0 b) (m/max m/EPSILON a)))))))
+    (wrap256 (m// (m/* 127.5 a) (m/max m/EPSILON (m/- 255.0 b))))
+    (wrap256 (m/- 255.0 (m/* 127.5 (m// (m/- 255.0 b) (m/max m/EPSILON a)))))))
 
 (defn burn
   "Color burn mode: darkens the base by the blend.
@@ -257,14 +259,14 @@
 (defn mburn
   "Modulus color burn mode.
 
-  Formula on the 0-255 scale: `255 * (1 - (255 - a) / b)`, mod 256. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
+  Formula on the 0-255 scale: `255 * (1 - (255 - a) / b)`, mod 256, capped at 255. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
 
   - `a` base (backdrop) channel value, `[0,255]`
   - `b` blend (source) channel value, `[0,255]`
 
-  Returns the value wrapped into `[0,256)`. See also [[burn]]."
+  Returns the wrapped value in `[0,255]`. See also [[burn]]."
   ^double [^double a ^double b]
-  (mod255 (m/* 255.0 (m/- 1.0 (m// (m/- 255.0 a) (m/max m/EPSILON b))))))
+  (wrap256 (m/* 255.0 (m/- 1.0 (m// (m/- 255.0 a) (m/max m/EPSILON b))))))
 
 (defn inverseburn
   "Inverse color burn mode (pegtop.net): color burn with the layers swapped.
@@ -281,28 +283,42 @@
 (defn minverseburn
   "Modulus inverse color burn mode.
 
-  Formula on the 0-255 scale: `255 * (1 - (255 - b) / a)`, mod 256. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
+  Formula on the 0-255 scale: `255 * (1 - (255 - b) / a)`, mod 256, capped at 255. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
 
   - `a` base (backdrop) channel value, `[0,255]`
   - `b` blend (source) channel value, `[0,255]`
 
-  Returns the value wrapped into `[0,256)`. See also [[inverseburn]]."
+  Returns the wrapped value in `[0,255]`. See also [[inverseburn]]."
   ^double [^double a ^double b]
-  (mod255 (m/* 255.0 (m/- 1.0 (m// (m/- 255.0 b) (m/max m/EPSILON a))))))
+  (wrap256 (m/* 255.0 (m/- 1.0 (m// (m/- 255.0 b) (m/max m/EPSILON a))))))
 
 (defn softburn
-  "Soft burn mode (clamped)."
+  "Soft burn mode (pegtop.net): a softer color burn.
+
+  Formula: `b / (2 * (1 - a))` when `a + b <= 1`, else `1 - (1 - a) / (2 * b)`, clamped; continuous at `a + b = 1` (value 0.5), 0 when `b = 0`.
+
+  - `a` base (backdrop) channel value, `[0,255]`
+  - `b` blend (source) channel value, `[0,255]`
+
+  Returns the blended value in `[0,255]`. See also [[msoftburn]], [[burn]], [[softdodge]]."
   ^double [^double a ^double b]
   (if (m/<= (m/+ a b) 255.0)
     (clamp255 (m/* 127.5 (m// b (m/max m/EPSILON (m/- 255.0 a)))))
-    (clamp255 (m/* 255.0 (m/- 0.5 (m// (m/- 255.0 a) (m/max m/EPSILON b)))))))
+    (clamp255 (m/- 255.0 (m/* 127.5 (m// (m/- 255.0 a) (m/max m/EPSILON b)))))))
 
 (defn msoftburn
-  "Soft burn mode (mod 255)."
+  "Modulus soft burn mode.
+
+  Formula on the 0-255 scale: `127.5 * b / (255 - a)` when `a + b <= 255`, else `255 - 127.5 * (255 - a) / b`, mod 256, capped at 255. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
+
+  - `a` base (backdrop) channel value, `[0,255]`
+  - `b` blend (source) channel value, `[0,255]`
+
+  Returns the wrapped value in `[0,255]`. See also [[softburn]]."
   ^double [^double a ^double b]
   (if (m/<= (m/+ a b) 255.0)
-    (mod255 (m/* 127.5 (m// b (m/max m/EPSILON (m/- 255.0 a)))))
-    (mod255 (m/* 255.0 (m/- 0.5 (m// (m/- 255.0 a) (m/max m/EPSILON b)))))))
+    (wrap256 (m/* 127.5 (m// b (m/max m/EPSILON (m/- 255.0 a)))))
+    (wrap256 (m/- 255.0 (m/* 127.5 (m// (m/- 255.0 a) (m/max m/EPSILON b)))))))
 
 (defn hardmix
   "Hard mix mode (Photoshop): posterizes to 0 or 255.
@@ -318,14 +334,28 @@
     (if (< a t) 0.0 255.0)))
 
 (defn linearlight
-  "Linear light mode (clamped)."
+  "Linear light mode (Photoshop): linear burn or linear dodge depending on the blend.
+
+  Formula: `a + 2 * b - 1`, clamped. Same values as [[stamp]].
+
+  - `a` base (backdrop) channel value, `[0,255]`
+  - `b` blend (source) channel value, `[0,255]`
+
+  Returns the blended value in `[0,255]`. See also [[mlinearlight]], [[linearburn]], [[add]]."
   ^double [^double a ^double b]
-  (clamp255 (m/- (m/+ b a a) 255.0)))
+  (clamp255 (m/- (m/+ a b b) 255.0)))
 
 (defn mlinearlight
-  "Linear light mode (mod 255)."
+  "Modulus linear light mode.
+
+  Formula on the 0-255 scale: `a + 2 * b - 255`, mod 256, capped at 255. Same values as [[mstamp]]. Part of the author's modulus family.
+
+  - `a` base (backdrop) channel value, `[0,255]`
+  - `b` blend (source) channel value, `[0,255]`
+
+  Returns the wrapped value in `[0,255]`. See also [[linearlight]]."
   ^double [^double a ^double b]
-  (mod255 (m/- (m/+ b a a) 255.0)))
+  (wrap256 (m/- (m/+ a b b) 255.0)))
 
 (defn stamp
   "Stamp mode (pegtop.net).
@@ -342,14 +372,14 @@
 (defn mstamp
   "Modulus stamp mode.
 
-  Formula on the 0-255 scale: `a + 2 * b - 255`, mod 256. Part of the author's modulus family.
+  Formula on the 0-255 scale: `a + 2 * b - 255`, mod 256, capped at 255. Part of the author's modulus family.
 
   - `a` base (backdrop) channel value, `[0,255]`
   - `b` blend (source) channel value, `[0,255]`
 
-  Returns the value wrapped into `[0,256)`. See also [[stamp]]."
+  Returns the wrapped value in `[0,255]`. See also [[stamp]]."
   ^double [^double a ^double b]
-  (mod255 (m/- (m/+ b b a) 255.0)))
+  (wrap256 (m/- (m/+ b b a) 255.0)))
 
 (defn difference
   "Difference mode.
@@ -378,14 +408,14 @@
 (defn mdivide
   "Modulus divide mode.
 
-  Formula on the 0-255 scale: `255 * a / b`, mod 256. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
+  Formula on the 0-255 scale: `255 * a / b`, mod 256, capped at 255. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
 
   - `a` base (backdrop) channel value, `[0,255]`
   - `b` blend (source) channel value, `[0,255]`
 
-  Returns the value wrapped into `[0,256)`. See also [[divide]]."
+  Returns the wrapped value in `[0,255]`. See also [[divide]]."
   ^double [^double a ^double b]
-  (mod255 (m/* 255.0 (m// a (m/max m/EPSILON b)))))
+  (wrap256 (m/* 255.0 (m// a (m/max m/EPSILON b)))))
 
 (defn or
   "Bitwise `or` of the channel values.
@@ -473,12 +503,17 @@
     (m/- (m/+ a b) (m/+ ab ab))))
 
 (defn pinlight
-  "Pin light mode."
+  "Pin light mode (Photoshop): darken or lighten depending on the blend.
+
+  Formula: the base clamped into `[2 * b - 1, 2 * b]`, i.e. `min(a, 2 * b)` when `b < 0.5`, else `max(a, 2 * b - 1)`.
+
+  - `a` base (backdrop) channel value, `[0,255]`
+  - `b` blend (source) channel value, `[0,255]`
+
+  Returns the blended value in `[0,255]`. See also [[darken]], [[lighten]]."
   ^double [^double a ^double b]
-  (let [c (m/- (m/+ a a) 255.0)]
-    (cond (m/< b c) c
-          (clojure.core/and (m/<= c b) (m/< b (m/+ c 255.0))) b
-          :else (m/+ c 255.0))))
+  (let [b2 (m/+ b b)]
+    (m/constrain a (m/- b2 255.0) b2)))
 
 (defn average
   "Average mode.
@@ -519,14 +554,14 @@
 (defn mreflect
   "Modulus reflect mode.
 
-  Formula on the 0-255 scale: `a * a / (255 - b)`, mod 256. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
+  Formula on the 0-255 scale: `a * a / (255 - b)`, mod 256, capped at 255. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
 
   - `a` base (backdrop) channel value, `[0,255]`
   - `b` blend (source) channel value, `[0,255]`
 
-  Returns the value wrapped into `[0,256)`. See also [[reflect]]."
+  Returns the wrapped value in `[0,255]`. See also [[reflect]]."
   ^double [^double a ^double b]
-  (mod255 (m// (m/* a a) (m/max m/EPSILON (m/- 255.0 b)))))
+  (wrap256 (m// (m/* a a) (m/max m/EPSILON (m/- 255.0 b)))))
 
 (defn glow
   "Glow mode (pegtop.net): reflect with the layers swapped.
@@ -543,14 +578,14 @@
 (defn mglow
   "Modulus glow mode.
 
-  Formula on the 0-255 scale: `b * b / (255 - a)`, mod 256. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
+  Formula on the 0-255 scale: `b * b / (255 - a)`, mod 256, capped at 255. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
 
   - `a` base (backdrop) channel value, `[0,255]`
   - `b` blend (source) channel value, `[0,255]`
 
-  Returns the value wrapped into `[0,256)`. See also [[glow]]."
+  Returns the wrapped value in `[0,255]`. See also [[glow]]."
   ^double [^double a ^double b]
-  (mod255 (m// (m/* b b) (m/max m/EPSILON (m/- 255.0 a)))))
+  (wrap256 (m// (m/* b b) (m/max m/EPSILON (m/- 255.0 a)))))
 
 (defn freeze
   "Freeze mode (pegtop.net): strong darkening of dark blend values.
@@ -567,14 +602,14 @@
 (defn mfreeze
   "Modulus freeze mode.
 
-  Formula on the 0-255 scale: `255 - (255 - a) * (255 - a) / b`, mod 256. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
+  Formula on the 0-255 scale: `255 - (255 - a) * (255 - a) / b`, mod 256, capped at 255. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
 
   - `a` base (backdrop) channel value, `[0,255]`
   - `b` blend (source) channel value, `[0,255]`
 
-  Returns the value wrapped into `[0,256)`. See also [[freeze]]."
+  Returns the wrapped value in `[0,255]`. See also [[freeze]]."
   ^double [^double a ^double b]
-  (mod255 (m/- 255.0 (m// (m/sq (m/- 255.0 a)) (m/max m/EPSILON b)))))
+  (wrap256 (m/- 255.0 (m// (m/sq (m/- 255.0 a)) (m/max m/EPSILON b)))))
 
 (defn heat
   "Heat mode (pegtop.net): freeze with the layers swapped.
@@ -591,14 +626,14 @@
 (defn mheat
   "Modulus heat mode.
 
-  Formula on the 0-255 scale: `255 - (255 - b) * (255 - b) / a`, mod 256. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
+  Formula on the 0-255 scale: `255 - (255 - b) * (255 - b) / a`, mod 256, capped at 255. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
 
   - `a` base (backdrop) channel value, `[0,255]`
   - `b` blend (source) channel value, `[0,255]`
 
-  Returns the value wrapped into `[0,256)`. See also [[heat]]."
+  Returns the wrapped value in `[0,255]`. See also [[heat]]."
   ^double [^double a ^double b]
-  (mod255 (m/- 255.0 (m// (m/sq (m/- 255.0 b)) (m/max m/EPSILON a)))))
+  (wrap256 (m/- 255.0 (m// (m/sq (m/- 255.0 b)) (m/max m/EPSILON a)))))
 
 (defn overlay
   "Overlay mode: hard light with the layers swapped.
@@ -673,16 +708,16 @@
 (defn mvividlight
   "Modulus vivid light mode.
 
-  Formula on the 0-255 scale: `255 - 255 * (255 - a) / (2 * b)` when `b < 127.5`, else `255 * a / (2 * (255 - b))`, mod 256. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
+  Formula on the 0-255 scale: `255 - 255 * (255 - a) / (2 * b)` when `b < 127.5`, else `255 * a / (2 * (255 - b))`, mod 256, capped at 255. The denominator is guarded by `EPSILON`, so a zero denominator gives a value about 1e10 times the numerator before wrapping. Part of the author's modulus family.
 
   - `a` base (backdrop) channel value, `[0,255]`
   - `b` blend (source) channel value, `[0,255]`
 
-  Returns the value wrapped into `[0,256)`. See also [[vividlight]]."
+  Returns the wrapped value in `[0,255]`. See also [[vividlight]]."
   ^double [^double a ^double b]
   (if (m/< b 127.5)
-    (mod255 (m/- 255.0 (m// (m/* 255.0 (m/- 255.0 a)) (m/max m/EPSILON (m/+ b b)))))
-    (mod255 (m// (m/* 255.0 a) (m/max m/EPSILON (m/* 2.0 (m/- 255.0 b)))))))
+    (wrap256 (m/- 255.0 (m// (m/* 255.0 (m/- 255.0 a)) (m/max m/EPSILON (m/+ b b)))))
+    (wrap256 (m// (m/* 255.0 a) (m/max m/EPSILON (m/* 2.0 (m/- 255.0 b)))))))
 
 (def blends {:normal normal
              :add add
@@ -718,6 +753,9 @@
              :or or
              :and and
              :xor xor
+             :nor nor
+             :nand nand
+             :xnor xnor
              :exclusion exclusion
              :pinlight pinlight
              :average average
