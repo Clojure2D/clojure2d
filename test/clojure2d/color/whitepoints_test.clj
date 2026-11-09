@@ -248,3 +248,58 @@
       (is (throws-data? {:extrapolation e} #(wp/->spectrum-to-XYZ1 :CIE-2 :D65 {:extrapolation e})) (str e)))
     (is (throws-data? {:observer :nope} #(wp/->spectrum-to-XYZ1 :nope :D65)))
     (is (throws-data? {:illuminant :nope} #(wp/->spectrum-to-XYZ1 :CIE-2 :nope)))))
+
+;; G4: white point data
+
+(def ^:private d-series-keys
+  #{:CIE-2-D50 :CIE-2-D55 :CIE-2-D60 :CIE-2-D75
+    :CIE-10-D50 :CIE-10-D55 :CIE-10-D60 :CIE-10-D65 :CIE-10-D75})
+
+(defn- wp-xy [k] (let [^Vec4 w (wp/whitepoints k)] [(.z w) (.w w)]))
+
+(deftest whitepoints-keys-test
+  (is (= 359 (count wp/whitepoints)))
+  (is (= 236 (count (filter #(re-find #"\*$" (name %)) (keys wp/whitepoints)))))
+  (testing "every key has a var with the same value and a docstring"
+    (doseq [k (keys wp/whitepoints)
+            :let [v (ns-resolve 'clojure2d.color.whitepoints (symbol (name k)))]]
+      (is (= (wp/whitepoints k) @v) (str k))
+      (is (seq (:doc (meta v))) (str k)))))
+
+(deftest whitepoints-consistency-test
+  ;; [X Z x y] describe the same white: tabulated X, Z = xy->XZ (exact), computed xy = XZ->xy (1e-15)
+  (doseq [[k ^Vec4 w] wp/whitepoints]
+    (if (re-find #"\*$" (name k))
+      (is (vec-close? 1.0e-15 [(.z w) (.w w)] (vec (wp/XZ->xy (.x w) (.y w)))) (str k))
+      (when-not (d-series-keys k)
+        (is (= [(.x w) (.y w)] (vec (wp/xy->XZ (.z w) (.w w)))) (str k))))))
+
+(deftest whitepoints-tabulated-test
+  ;; colour CCS_ILLUMINANTS, exact; D-series replaced by integrations; CIE-2-D65 kept
+  (let [ccs (:ccs @colour)]
+    (is (= 123 (count ccs)))
+    (doseq [[k xy] ccs
+            :when (not (or (d-series-keys k) (= :CIE-2-D65 k)))]
+      (is (= xy (wp-xy k)) (str k))))
+  (is (= [0.312727 0.329023] (wp-xy :CIE-2-D65))))
+
+(deftest whitepoints-d-series-test
+  ;; colour sd_to_XYZ of the CIE D-series spectra (300-830 nm, linear, 1 nm): 1e-12
+  (doseq [[k XYZ] (:d-series @colour)
+          :when (not= :CIE-2-D65 k)
+          :let [^Vec4 w (wp/whitepoints k)]]
+    (is (vec-close? 1.0e-12 (xy XYZ) (wp-xy k)) (str k))
+    (is (vec-close? 1.0e-12 [(first XYZ) (last XYZ)] [(.x w) (.y w)]) (str k)))
+  (testing "CIE-2-D65 is the CIE D65 integration rounded to 6 decimals"
+    (let [[x y] (xy (get-in @colour [:d-series :CIE-2-D65]))]
+      (is (= [0.312727 0.329023] [(m/approx x 6) (m/approx y 6)])))))
+
+(deftest whitepoints-computed-test
+  ;; colour sd_to_XYZ Integration of a perfect reflector (= ->spectrum-to-XYZ1 defaults): 1e-12
+  (doseq [[[o i] XYZ] (:spectrum-white @colour)
+          :let [k (keyword (str (name o) "-" (name i) "*"))
+                ^Vec4 w (wp/whitepoints k)
+                [X Y Z] XYZ]]
+    (is (vec-close? 1.0e-12 [(/ X Y) (/ Z Y)] [(.x w) (.y w)]) (str k))
+    (is (vec-close? 1.0e-12 (xy XYZ) (wp-xy k)) (str k))
+    (is (vec-close? 1.0e-12 (wp-xy k) (xy (vec ((wp/->spectrum-to-XYZ1 o i) flat-400-700)))) (str k))))

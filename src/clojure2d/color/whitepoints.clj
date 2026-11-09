@@ -96,15 +96,72 @@
   (^Vec3 [^Vec2 XZ ^double Y]
    (Vec3. (.x XZ) Y (.y XZ))))
 
-(def whitepoints (into {}
-                     (map (fn [[k v]] [k (v/vec4 v)]))
-                     (read-edn "color/whitepoints.edn")))
+(def ^{:doc "All white points as a map from keyword to `Vec4` `[X Z x y]` (`Y = 1`).
+
+  Keys are `:<observer>-<illuminant>` with an optional `*` suffix, for example `:CIE-2-D65` or `:CIE-2015-10-FL2*`; each key is also available as a var of the same name, for example `CIE-2-D65`. Values without a star are tabulated chromaticities, except the D-series entries (D50, D55, D60, D65, D75) which are 1 nm integrations of the CIE spectra; values with a star are computed from the illuminant spectrum and the observer's color matching functions, as [[->spectrum-to-XYZ1]] does with default options.
+
+  Data generated with colour-science (`utils/whitepoints/gen_resources.py`).
+
+  See also [[coordinates]], [[tristimulus]]."}
+  whitepoints
+  (into {}
+        (map (fn [[k v]] [k (v/vec4 v)]))
+        (read-edn "color/whitepoints.edn")))
+
+(def ^:private observer-names {"2" "CIE 1931 2°" "10" "CIE 1964 10°"
+                               "2015-2" "CIE 2015 2°" "2015-10" "CIE 2015 10°"})
+
+(def ^:private illuminant-names
+  {"A" "CIE standard illuminant A (incandescent, 2856 K)"
+   "B" "CIE illuminant B (direct sunlight, obsolete)"
+   "C" "CIE illuminant C (average daylight, obsolete)"
+   "D50" "CIE illuminant D50 (horizon daylight, 5003 K)"
+   "D55" "CIE illuminant D55 (mid-morning daylight, 5503 K)"
+   "D60" "CIE illuminant D60 (daylight, 6004 K)"
+   "D65" "CIE standard illuminant D65 (noon daylight, 6504 K)"
+   "D75" "CIE illuminant D75 (north sky daylight, 7504 K)"
+   "E" "the equal-energy illuminant E"
+   "ID50" "CIE indoor daylight illuminant ID50"
+   "ID65" "CIE indoor daylight illuminant ID65"
+   "ISO-PD" "ISO 7589 photographic daylight"
+   "ISO-PF" "ISO 7589 photoflood"
+   "ISO-SD" "ISO 7589 sensitometric daylight"
+   "ISO-SP" "ISO 7589 sensitometric printer"
+   "ISO-SPF" "ISO 7589 sensitometric photoflood"
+   "ISO-SST" "ISO 7589 sensitometric studio tungsten"
+   "ISO-ST" "ISO 7589 studio tungsten"
+   "ACES" "the ACES white point (about D60)"
+   "BLACKMAGIC-WG" "the Blackmagic Wide Gamut white point"
+   "DCI-P3" "the DCI-P3 projector white point"
+   "ICC-D50" "the ICC profile connection space D50 white"
+   "PLASA" "the PLASA ANSI E1.54 white point"})
+
+(defn- illuminant-name
+  [^String illuminant]
+  (or (illuminant-names illuminant)
+      (when-let [[_ n] (re-matches #"FL3-(\d+)" illuminant)] (str "CIE fluorescent illuminant FL3." n))
+      (when (re-matches #"FL\d+" illuminant) (str "CIE fluorescent illuminant " illuminant))
+      (when (re-matches #"HP\d" illuminant) (str "CIE high pressure discharge lamp illuminant " illuminant))
+      (when (re-matches #"LED-.+" illuminant) (str "CIE LED illuminant " illuminant))
+      illuminant))
+
+(defn- whitepoint-doc
+  [k]
+  (let [[_ observer illuminant computed] (re-matches #"CIE-(2015-2|2015-10|2|10)-(.+?)(\*)?" (name k))
+        provenance (cond
+                     computed "Computed: 1 nm sum of the illuminant spectrum and the observer's color matching functions over the observer's range (as [[->spectrum-to-XYZ1]] with default options)."
+                     (= k :CIE-2-D65) "Tabulated: 1 nm integration of the CIE D65 spectrum rounded to 6 decimals, (0.312727, 0.329023)."
+                     (#{"D50" "D55" "D60" "D65" "D75"} illuminant) "Tabulated: 1 nm integration of the CIE spectrum (300-830 nm, linear interpolation), full precision."
+                     :else "Tabulated chromaticity (colour-science).")]
+    (str "White point `[X Z x y]` (`Y = 1`) of " (illuminant-name illuminant)
+         " for the " (observer-names observer) " observer.\n\n  " provenance
+         "\n\n  See also [[whitepoints]], [[tristimulus]].")))
 
 (defmacro ^:private gen-whitepoints [wp]
   `(do
      ~@(for [k wp
              :let [[X Z x y] (whitepoints k)]]
-         `(def ~(symbol (name k)) (Vec4. ~X ~Z ~x ~y)))))
+         `(def ~(with-meta (symbol (name k)) {:doc (whitepoint-doc k)}) (Vec4. ~X ~Z ~x ~y)))))
 
 (gen-whitepoints [:CIE-10-FL3-3 :CIE-2-FL3-4 :CIE-2-FL11* :CIE-2015-10-D60* :CIE-10-FL7 :CIE-10-D75 :CIE-2-FL3-9 :CIE-2-HP1 :CIE-2-ID50* :CIE-2015-10-ID50* :CIE-10-LED-BH1* :CIE-2-FL3-13 :CIE-10-FL3-6 :CIE-10-LED-B3 :CIE-2-ISO-PD :CIE-10-FL3-14 :CIE-2015-2-ID65* :CIE-10-HP3* :CIE-2-FL12 :CIE-2-HP4 :CIE-2015-10-FL10* :CIE-2-LED-BH1* :CIE-10-FL3-8 :CIE-2015-2-FL10* :CIE-2-FL2 :CIE-10-A :CIE-10-D60* :CIE-10-FL3-13 :CIE-10-FL3-11* :CIE-10-FL10* :CIE-2-E* :CIE-2-FL8 :CIE-2-ISO-SP :CIE-2015-2-A* :CIE-10-LED-RGB1 :CIE-2015-2-FL4* :CIE-2-FL4 :CIE-10-FL12 :CIE-2015-10-FL2* :CIE-2-FL3-7* :CIE-2-FL3-13* :CIE-2-FL3-4* :CIE-2-FL3-5* :CIE-2015-2-LED-V2* :CIE-10-ISO-SST* :CIE-2015-10-HP4* :CIE-2015-10-FL3-13* :CIE-10-B* :CIE-10-FL3-5* :CIE-2-FL3* :CIE-2015-2-FL3-13* :CIE-2-FL7* :CIE-2-E :CIE-2015-2-E* :CIE-10-FL12* :CIE-2015-10-FL6* :CIE-2015-10-FL3-14* :CIE-2015-10-ISO-ST* :CIE-2-FL3-8* :CIE-10-LED-B1 :CIE-10-FL6* :CIE-10-LED-V2 :CIE-10-C* :CIE-2-FL9* :CIE-2015-2-LED-BH1* :CIE-2-LED-B4* :CIE-10-LED-B2 :CIE-10-D65 :CIE-2015-10-FL11* :CIE-2015-2-LED-V1* :CIE-2015-2-FL3-2* :CIE-10-ISO-SD :CIE-2015-2-FL9* :CIE-2-D50 :CIE-10-FL3-12 :CIE-10-FL3-1* :CIE-2-BLACKMAGIC-WG :CIE-2-FL3-12* :CIE-2-FL3-2 :CIE-2015-10-FL1* :CIE-2015-2-D60* :CIE-2015-2-FL3-10* :CIE-2015-2-ISO-SP* :CIE-2-HP3* :CIE-2015-2-ISO-SST* :CIE-10-HP2* :CIE-10-FL4 :CIE-2-FL3-11 :CIE-10-LED-V1 :CIE-2015-2-HP2* :CIE-10-FL3-15 :CIE-10-LED-B5* :CIE-10-FL11 :CIE-10-ISO-ST* :CIE-10-HP1* :CIE-2-ISO-PF :CIE-2-LED-V2* :CIE-2015-10-LED-V1* :CIE-2015-10-FL4* :CIE-2-ISO-SD :CIE-2-C :CIE-10-FL8* :CIE-2015-10-ISO-SP* :CIE-2-B :CIE-2-ID65 :CIE-2-FL3-3 :CIE-2-ISO-PF* :CIE-10-FL3-2* :CIE-10-FL1 :CIE-10-E :CIE-2015-10-ISO-SPF* :CIE-2015-2-FL1* :CIE-10-FL3-8* :CIE-2015-10-ISO-PF* :CIE-2-D75 :CIE-2-D65* :CIE-2015-10-FL3-12* :CIE-2-FL3-5 :CIE-2-FL3-15* :CIE-10-ID50* :CIE-2-C* :CIE-2015-2-D75* :CIE-2015-10-D75* :CIE-10-LED-BH1 :CIE-2-HP3 :CIE-10-ISO-SP* :CIE-2-FL1 :CIE-2015-10-LED-V2* :CIE-2-ISO-PD* :CIE-10-FL3-7 :CIE-2015-10-HP3* :CIE-10-LED-B2* :CIE-2015-2-LED-B3* :CIE-2-FL11 :CIE-2015-2-FL5* :CIE-2015-10-ISO-SD* :CIE-2015-2-LED-B5* :CIE-10-ISO-PD* :CIE-10-FL3-7* :CIE-2015-10-FL3-7* :CIE-10-LED-B4 :CIE-10-LED-B5 :CIE-2015-2-ISO-PD* :CIE-2-FL3-14 :CIE-10-LED-RGB1* :CIE-2-ISO-ST :CIE-2015-10-B* :CIE-2-HP2* :CIE-10-HP2 :CIE-2015-10-A* :CIE-10-FL3-9* :CIE-2-D50* :CIE-10-FL11* :CIE-10-ISO-PF :CIE-2-ID50 :CIE-10-HP4* :CIE-2-FL3-6* :CIE-2-LED-V1* :CIE-2-LED-B4 :CIE-2-ISO-SST* :CIE-2-FL3-14* :CIE-2015-2-HP1* :CIE-2015-2-LED-B4* :CIE-2-A :CIE-10-E* :CIE-2-FL8* :CIE-2-HP5 :CIE-10-D65* :CIE-2-FL5* :CIE-2015-10-FL3-3* :CIE-2-FL3-11* :CIE-2-ACES :CIE-2015-10-FL12* :CIE-2015-10-HP5* :CIE-2015-10-FL8* :CIE-2-FL2* :CIE-2015-10-FL3-11* :CIE-2015-2-D55* :CIE-2-D65 :CIE-2-FL3 :CIE-2015-2-ISO-PF* :CIE-10-D60 :CIE-2015-2-FL3-15* :CIE-2015-2-FL3-7* :CIE-2-FL3-10* :CIE-2-FL3-7 :CIE-2015-2-LED-B1* :CIE-2-LED-RGB1 :CIE-2015-10-LED-BH1* :CIE-10-FL3-14* :CIE-2-D60 :CIE-2015-10-FL3-2* :CIE-2-FL12* :CIE-2015-2-D50* :CIE-10-ID65 :CIE-2015-2-FL3-3* :CIE-10-D55 :CIE-2015-2-FL2* :CIE-2015-10-FL3* :CIE-10-D55* :CIE-10-FL3* :CIE-2-FL10* :CIE-2-ICC-D50 :CIE-2-A* :CIE-2015-2-FL11* :CIE-2015-2-C* :CIE-2-LED-B5 :CIE-2015-10-D50* :CIE-2015-2-FL3-8* :CIE-10-D75* :CIE-2015-10-FL7* :CIE-2015-10-FL3-10* :CIE-10-A* :CIE-10-FL2* :CIE-2-FL3-2* :CIE-2015-2-FL3-11* :CIE-2-LED-V1 :CIE-2015-10-LED-B5* :CIE-10-ISO-SP :CIE-2-HP5* :CIE-2-LED-BH1 :CIE-2-FL9 :CIE-2015-10-FL9* :CIE-2015-10-ISO-PD* :CIE-10-ISO-PF* :CIE-2-FL1* :CIE-2-LED-B3 :CIE-10-ISO-SPF* :CIE-2-ISO-SD* :CIE-10-ISO-SPF :CIE-2-ISO-SST :CIE-2015-2-FL6* :CIE-2-FL3-9* :CIE-2015-10-FL5* :CIE-2-ISO-SPF* :CIE-10-FL2 :CIE-2-HP2 :CIE-2015-2-FL3* :CIE-10-ID50 :CIE-2-FL7 :CIE-10-LED-B1* :CIE-10-FL4* :CIE-2015-10-C* :CIE-2-FL5 :CIE-10-FL3-4* :CIE-2015-2-FL3-1* :CIE-10-FL3-12* :CIE-2-PLASA :CIE-10-FL3-4 :CIE-10-LED-B3* :CIE-2015-2-LED-B2* :CIE-2015-2-HP4* :CIE-10-LED-V2* :CIE-2015-10-LED-B2* :CIE-2015-2-FL3-5* :CIE-2015-10-FL3-5* :CIE-10-B :CIE-10-D50 :CIE-2-DCI-P3 :CIE-2-FL6* :CIE-10-ISO-SD* :CIE-10-FL3-10 :CIE-2015-2-FL12* :CIE-10-HP3 :CIE-2015-2-ID50* :CIE-2-ID65* :CIE-10-FL3-3* :CIE-10-FL9* :CIE-2015-10-E* :CIE-2015-2-FL3-9* :CIE-10-FL7* :CIE-10-FL5 :CIE-2015-10-FL3-15* :CIE-10-HP5 :CIE-2015-2-FL7* :CIE-2-LED-RGB1* :CIE-2-FL3-8 :CIE-2-ISO-SP* :CIE-10-LED-B4* :CIE-2015-10-FL3-8* :CIE-2-ISO-ST* :CIE-10-FL3-9 :CIE-2-LED-B5* :CIE-2015-10-LED-B3* :CIE-2-LED-B1 :CIE-10-HP5* :CIE-2-FL3-1* :CIE-2015-2-ISO-ST* :CIE-2-FL4* :CIE-2015-10-ID65* :CIE-10-FL3-11 :CIE-10-HP1 :CIE-2-HP1* :CIE-2-FL3-3* :CIE-2015-2-HP5* :CIE-2015-10-LED-RGB1* :CIE-2-D55* :CIE-2-D75* :CIE-2-FL6 :CIE-2015-10-D65* :CIE-2-FL3-10 :CIE-2-FL3-15 :CIE-2-ISO-SPF :CIE-2015-10-FL3-9* :CIE-10-FL3-5 :CIE-10-FL5* :CIE-10-FL3-13* :CIE-2015-10-D55* :CIE-2015-10-FL3-1* :CIE-10-FL6 :CIE-2-HP4* :CIE-10-FL3-10* :CIE-10-FL3-1 :CIE-2015-2-LED-RGB1* :CIE-2015-2-FL3-14* :CIE-2-FL3-12 :CIE-2-LED-B2* :CIE-2015-2-FL3-4* :CIE-2015-10-LED-B4* :CIE-2-FL3-1 :CIE-2-LED-B1* :CIE-2015-2-D65* :CIE-10-HP4 :CIE-10-FL3-2 :CIE-2015-2-FL8* :CIE-10-C :CIE-2-FL10 :CIE-2-FL3-6 :CIE-2015-2-ISO-SD* :CIE-2-LED-B2 :CIE-10-FL8 :CIE-2015-10-FL3-4* :CIE-10-ISO-SST :CIE-10-FL3 :CIE-10-D50* :CIE-10-FL3-15* :CIE-10-ID65* :CIE-2015-2-FL3-6* :CIE-2015-2-HP3* :CIE-2-LED-B3* :CIE-2-LED-V2 :CIE-2015-2-ISO-SPF* :CIE-10-FL1* :CIE-10-ISO-ST :CIE-10-FL9 :CIE-2015-10-FL3-6* :CIE-10-FL10 :CIE-2015-10-LED-B1* :CIE-2-D60* :CIE-10-FL3-6* :CIE-2-D55 :CIE-2015-2-FL3-12* :CIE-10-ISO-PD :CIE-2015-10-HP1* :CIE-2015-2-B* :CIE-2015-10-HP2* :CIE-2-B* :CIE-10-LED-V1* :CIE-2015-10-ISO-SST*])
 
