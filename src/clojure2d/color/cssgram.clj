@@ -235,7 +235,7 @@
 
 (def ^:private ch-operators {:hue cb/hue
                            :saturation cb/saturation
-                           :luminocity cb/luminocity
+                           :luminosity cb/luminosity
                            :color cb/color
                            :ch0 cb/ch0
                            :ch1 cb/ch1
@@ -262,7 +262,7 @@
       - `:matrix` - feColorMatrix definition, [see here](https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feColorMatrix)
       - `:blend` for blending two colors, parameters are blednding operator and a color (see below)
 
-  Bleding operators are defined in `clojure2d.color.blend/blends-list` plus `:hue`, `:saturation`, `:luminocity` and `:color` which copies one/two channels between colors in HSB color space. [see here](https://www.w3.org/TR/compositing-1/#blending).
+  Bleding operators are defined in `clojure2d.color.blend/blends-list` plus `:hue`, `:saturation`, `:luminosity` and `:color` which copies one/two channels between colors in HSB color space. [see here](https://www.w3.org/TR/compositing-1/#blending).
 
   Note: CSS `brightness` is defined as `:exposure` which multiplies channels by given amount. `:brightness` changes channels by adding a percentage of the original value.
 

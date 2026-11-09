@@ -15,12 +15,14 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color.rgb`: transfer functions `to-`/`from-BT709`, `-ROMM` (ProPhoto), `-SMPTE240M`, `-BT1886` (optional display white/black luminance), `-PQ` (SMPTE ST 2084, 1.0 = 10000 cd/m²), `-HLG` (ITU-R BT.2100 OETF); RGB spaces `:ITU-R-BT709`, `:Display-P3`, `:P3-D65`, `:DCI-P3`, `:SMPTE-240M`, `:ProPhoto-RGB` (alias `:ROMM-RGB`)
 * `clojure2d.color.rgb`: `rgb-space` (space lookup, throws `ex-info` for an unknown name), `rgb-spaces-list`; docstrings for the namespace, transfer functions, `rgb-data->matrix`, `rgb-data->map`, `rgbs`
 * Data generator `utils/whitepoints/gen_resources.py` (replaces `utils/colors/cie.clj`) and CIE D-series basis data `resources/color/illuminant_d_series_basis.edn`
+* `clojure2d.color.blend`: docstrings for the namespace, every per-channel mode (formula, source, argument roles), `blends`, `blends-list`, `alpha-blending`, `blend-colors`, `blend-palettes`, `blend-gradients`, `hue`, `saturation`, `luminosity`, `color`, `ch0`-`ch2`
 
 ### Changed
 
 * `spectrum` and `->spectrum-to-XYZ1` moved to `clojure2d.color.whitepoints`; `clojure2d.color` keeps aliases
 * `->spectrum-to-XYZ1` / `->spectrum-to-XYZ`: `:extrapolation` accepts `:constant` (new default) or `:zero`; `:trim` and `nil` are removed (they threw under fastmath 3.0.0-alpha10) and now throw `ex-info`; unknown observer or illuminant throws `ex-info`
 * `->spectrum-to-XYZ1` / `->spectrum-to-XYZ`: `:interpolation` now applies to the spectrum only, default `:auto` (Sprague for uniform data, not-a-knot cubic spline otherwise, as colour-science); new `:illuminant-interpolation` (default `:linear`); color matching functions always use `:auto`
+* [breaking] `clojure2d.color.blend/luminocity` renamed to `luminosity` (no alias); `cssgram` `custom-filter` operator `:luminocity` renamed to `:luminosity`
 
 ### Fixed
 
@@ -43,6 +45,7 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color.blend/pinlight` had the layers swapped (clamped the blend into `[2a - 1, 2a]`); now clamps the base into `[2b - 1, 2b]`
 * `clojure2d.color.blend` modulus modes (`madd`, `mdodge`, ...) returned values in `(255, 256]`; now wrapped with mod 256 and capped at 255 (integer-valued results unchanged)
 * `clojure2d.color.blend/nor`, `nand`, `xnor` were missing from `blends` (and `blends-list`); registered, so `blends-list` changes and seeded `glitch` results may differ
+* `clojure2d.color.blend/alpha-blending` (and `blend-colors`, `hue`, `saturation`, `luminosity`, `color`, `ch0`-`ch2`) returned `NaN` channels when both colors were fully transparent; now the blended channels with alpha 0
 
 ## 1.5.0-alpha1
 

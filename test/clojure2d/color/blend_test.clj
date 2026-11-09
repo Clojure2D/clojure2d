@@ -6,7 +6,9 @@
             [clojure.edn :as edn]
             [clojure.java.io :as io]
             [fastmath.core :as m]
+            [clojure2d.color :as c]
             [clojure2d.color.blend :as b]
+            [fastmath.vector :as v]
             [clojure2d.test-predicates :refer [rel-close?]]))
 
 (def reference (delay (-> "blend/blend_reference.edn" io/resource slurp edn/read-string)))
@@ -100,3 +102,80 @@
   (let [doc (:doc (meta (find-ns 'clojure2d.color.blend)))]
     (is (re-find #"backdrop" doc))
     (is (re-find #"mod 256" doc))))
+
+;; G3: combinators and colorspace blends
+
+(defn- vec-close? [tol expected actual]
+  (every? true? (map (partial rel-close? tol) expected actual)))
+
+(deftest alpha-blending-test
+  ;; W3C source-over with blending, unpremultiplied, semi-transparent and transparent inputs:
+  ;; 1e-9 relative to max(1, |expected|)
+  (let [{:keys [cb cs] :as comp} (:compositing @reference)]
+    (doseq [k [:multiply :screen]
+            [x y e] (map vector cb cs (comp k))]
+      (is (vec-close? 1.0e-9 e (b/blend-colors (mode k) (c/color x) (c/color y))) (str k " " x " " y)))))
+
+(deftest blend-colors-test
+  (testing "opaque colors: blended channels, alpha 255; a mode per channel"
+    (is (= (v/vec4 (b/multiply 200.0 100.0) (b/screen 50.0 60.0) (b/darken 10.0 20.0) 255.0)
+           (b/blend-colors b/multiply b/screen b/darken (c/color 200 50 10) (c/color 100 60 20)))))
+  (testing "transparent source keeps the backdrop, transparent backdrop gives the source"
+    (is (vec-close? 1.0e-12 [200 50 10 255] (b/blend-colors b/multiply (c/color 200 50 10) (c/color 100 60 20 0))))
+    (is (vec-close? 1.0e-12 [100 60 20 255] (b/blend-colors b/multiply (c/color 200 50 10 0) (c/color 100 60 20))))))
+
+(deftest transparent-pair-test
+  ;; B5: no NaN on an alpha grid including 0; both alphas 0 give the blended channels with alpha 0
+  (let [alphas [0.0 1.0e-12 1.0 128.0 255.0]]
+    (doseq [ab alphas as alphas
+            f [b/multiply b/screen b/overlay]
+            :let [r (b/blend-colors f (c/color 200 50 10 ab) (c/color 100 60 20 as))]]
+      (is (not-any? m/nan? r) (str ab " " as))
+      (is (m/<= 0.0 (r 3) 255.0))))
+  (is (= (v/vec4 (b/multiply 200.0 100.0) (b/multiply 50.0 60.0) (b/multiply 10.0 20.0) 0.0)
+         (b/blend-colors b/multiply (c/color 200 50 10 0) (c/color 100 60 20 0))))
+  (is (not-any? m/nan? (b/hue (c/color 200 50 10 0) (c/color 20 120 220 0))))
+  (is (zero? ((b/ch0 (c/color 200 50 10 0) (c/color 20 120 220 0)) 3))))
+
+(deftest blend-palettes-test
+  (let [p1 [:red :green :blue]
+        p2 [:white :gray]]
+    (is (= (mapv (partial b/blend-colors b/multiply) (c/palette p1) (c/palette p2))
+           (b/blend-palettes b/multiply p1 p2)))
+    (is (= 2 (count (b/blend-palettes b/multiply p1 p2))))
+    (is (= (mapv (partial b/blend-colors b/add b/darken b/screen) (c/palette p1) (c/palette p2))
+           (b/blend-palettes b/add b/darken b/screen p1 p2)))))
+
+(deftest blend-gradients-test
+  (let [g1 (c/gradient [:black :white])
+        g2 (c/gradient [:red :blue])
+        g (b/blend-gradients b/screen g1 g2)
+        g3 (b/blend-gradients b/add b/darken b/screen g1 g2)]
+    (doseq [t [0.0 0.25 0.5 1.0]]
+      (is (= (b/blend-colors b/screen (g1 t) (g2 t)) (g t)))
+      (is (= (b/blend-colors b/add b/darken b/screen (g1 t) (g2 t)) (g3 t))))))
+
+(def ^:private hsb-pairs
+  ;; saturated, not dark colors: the HSB round trip keeps all three channels
+  [[[200 50 30] [20 120 220]] [[90 200 120] [240 200 40]] [[60 40 180] [250 120 200]]])
+
+(deftest hsb-blends-test
+  ;; HSB channel(s) of the result come from the right color: 1e-9 relative
+  (doseq [[x y] hsb-pairs
+          :let [hb (c/to-HSB (c/color x)) hs (c/to-HSB (c/color y))]]
+    (is (vec-close? 1.0e-9 [(hs 0) (hb 1) (hb 2)] (c/to-HSB (b/hue x y))) (str x y))
+    (is (vec-close? 1.0e-9 [(hb 0) (hs 1) (hb 2)] (c/to-HSB (b/saturation x y))) (str x y))
+    (is (vec-close? 1.0e-9 [(hb 0) (hb 1) (hs 2)] (c/to-HSB (b/luminosity x y))) (str x y))
+    (is (vec-close? 1.0e-9 [(hs 0) (hs 1) (hb 2)] (c/to-HSB (b/color x y))) (str x y))
+    (is (== 255.0 ((b/hue x y) 3)))))
+
+(deftest channel-blends-test
+  (let [x (c/color 200 50 30) y (c/color 20 120 220)]
+    (is (vec-close? 1.0e-12 [20 50 30 255] (b/ch0 x y)))
+    (is (vec-close? 1.0e-12 [200 120 30 255] (b/ch1 x y)))
+    (is (vec-close? 1.0e-12 [200 50 220 255] (b/ch2 :RGB x y)))
+    (is (vec-close? 1.0e-9 (c/to-HSB (b/hue x y)) (c/to-HSB (b/ch0 :HSB x y))))))
+
+(deftest luminosity-rename-test
+  (is (nil? (ns-resolve 'clojure2d.color.blend 'luminocity)))
+  (is (fn? b/luminosity)))

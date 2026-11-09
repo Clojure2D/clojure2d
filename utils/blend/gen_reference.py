@@ -23,6 +23,9 @@ Sections ({mode [value ...]} in the order of :grid followed by :random):
 * :bitwise  logical modes on the channel values truncated to integers, low 8 bits
 * :pillow  Pillow ImageChops on the integer points only ({mode [byte ...]} in the order of
   :pillow-points)
+* :compositing  {:cb [[r g b a] ...] :cs [...] mode [[r g b a] ...]}: W3C Compositing Level 1 source-over
+  with blending, unpremultiplied result, for multiply and screen; 300 color pairs (seed 20261110),
+  alphas from {0, 1, 128, 254, 255} or uniform, pairs with both alphas 0 excluded
 """
 
 import numpy as np
@@ -179,6 +182,33 @@ def pillow(op):
     return list(op(img_a, img_b).tobytes())
 
 
+def compositing():
+    rng = np.random.default_rng(20261110)
+    n = 300
+
+    def alphas():
+        fixed = rng.choice([0.0, 1.0, 128.0, 254.0, 255.0], n)
+        return np.where(rng.uniform(size=n) < 0.5, fixed, rng.uniform(0.0, 255.0, n))
+
+    cb = np.column_stack([rng.uniform(0.0, 255.0, (n, 3)), alphas()])
+    cs = np.column_stack([rng.uniform(0.0, 255.0, (n, 3)), alphas()])
+    keep = (cb[:, 3] > 0.0) | (cs[:, 3] > 0.0)
+    cb, cs = cb[keep], cs[keep]
+    ab, as_ = cb[:, 3:] / 255.0, cs[:, 3:] / 255.0
+    Cb, Cs = cb[:, :3] / 255.0, cs[:, :3] / 255.0
+    out = {}
+    for name, f in (("multiply", multiply), ("screen", screen)):
+        cs_mixed = (1.0 - ab) * Cs + ab * f(Cb, Cs)          # W3C: Cs = (1 - ab) Cs + ab B(Cb, Cs)
+        ao = as_ + ab * (1.0 - as_)                           # source-over alpha
+        co = (as_ * cs_mixed + (1.0 - as_) * ab * Cb) / ao    # unpremultiplied
+        out[name] = np.column_stack([co * 255.0, ao * 255.0])
+    return cb, cs, out
+
+
+def rows(m):
+    return "[" + " ".join(vec(r) for r in m) + "]"
+
+
 def num(x):
     x = float(x)
     if x == np.inf:
@@ -209,7 +239,10 @@ def main():
            section("bitwise", BITWISE, lambda v: "[" + " ".join(str(int(x)) for x in v) + "]"),
            " :pillow-points " + "[" + " ".join(f"{x} {y}" for x, y in PILLOW_POINTS) + "]",
            section("pillow", {k: pillow(op) for k, op in PILLOW_OPS.items()},
-                   lambda v: "[" + " ".join(str(x) for x in v) + "]") + "}"]
+                   lambda v: "[" + " ".join(str(x) for x in v) + "]")]
+    cb, cs, comp = compositing()
+    out.append(" :compositing {:cb " + rows(cb) + "\n               :cs " + rows(cs) + "\n"
+               + "\n".join(f"               :{k} {rows(v)}" for k, v in comp.items()) + "}}")
     with open(OUT, "w") as f:
         f.write("\n".join(out) + "\n")
 

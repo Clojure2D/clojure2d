@@ -16,7 +16,7 @@
 
   [[blend-colors]] blends two colors channel by channel (one mode for all channels or one mode per channel) and composites the result with the colors' alpha as in [W3C Compositing Level 1](https://www.w3.org/TR/compositing-1/#blending) ([[alpha-blending]]). [[blend-palettes]] and [[blend-gradients]] apply it to palettes and gradients.
 
-  Colorspace blends [[hue]], [[saturation]], [[luminocity]] and [[color]] take one HSB channel from one color and the others from the second color; [[ch0]], [[ch1]] and [[ch2]] do the same for a channel of any colorspace."
+  Colorspace blends [[hue]], [[saturation]], [[luminosity]] and [[color]] take one HSB channel from one color and the others from the second color; [[ch0]], [[ch1]] and [[ch2]] do the same for a channel of any colorspace."
   (:refer-clojure :exclude [or and])
   (:require [fastmath.core :as m]
             [fastmath.vector :as v]
@@ -719,83 +719,102 @@
     (wrap256 (m/- 255.0 (m// (m/* 255.0 (m/- 255.0 a)) (m/max m/EPSILON (m/+ b b)))))
     (wrap256 (m// (m/* 255.0 a) (m/max m/EPSILON (m/* 2.0 (m/- 255.0 b)))))))
 
-(def blends {:normal normal
-             :add add
-             :madd madd
-             :subtract subtract
-             :msubtract msubtract
-             :linearburn linearburn
-             :mlinearburn mlinearburn
-             :darken darken
-             :lighten lighten
-             :multiply multiply
-             :screen screen
-             :dodge dodge
-             :mdodge mdodge
-             :inversedodge inversedodge
-             :minversedodge minversedodge
-             :softdodge softdodge
-             :msoftdodge msoftdodge
-             :burn burn
-             :mburn mburn
-             :inverseburn inverseburn
-             :minverseburn minverseburn
-             :softburn softburn
-             :msoftburn msoftburn
-             :hardmix hardmix
-             :linearlight linearlight
-             :mlinearlight mlinearlight
-             :stamp stamp
-             :mstamp mstamp
-             :difference difference
-             :divide divide
-             :mdivide mdivide
-             :or or
-             :and and
-             :xor xor
-             :nor nor
-             :nand nand
-             :xnor xnor
-             :exclusion exclusion
-             :pinlight pinlight
-             :average average
-             :negation negation
-             :reflect reflect
-             :mreflect mreflect
-             :glow glow
-             :mglow mglow
-             :freeze freeze
-             :mfreeze mfreeze
-             :heat heat
-             :mheat mheat
-             :overlay overlay
-             :hardlight hardlight
-             :softlight softlight
-             :pegtoplight pegtoplight
-             :vividlight vividlight
-             :mvividlight mvividlight})
+(def ^{:doc "Per-channel modes by name: keyword to `(f a b)` (see the namespace docstring). Use with [[blend-colors]], `clojure2d.pixels` and `clojure2d.color.cssgram`."}
+  blends {:normal normal
+           :add add
+           :madd madd
+           :subtract subtract
+           :msubtract msubtract
+           :linearburn linearburn
+           :mlinearburn mlinearburn
+           :darken darken
+           :lighten lighten
+           :multiply multiply
+           :screen screen
+           :dodge dodge
+           :mdodge mdodge
+           :inversedodge inversedodge
+           :minversedodge minversedodge
+           :softdodge softdodge
+           :msoftdodge msoftdodge
+           :burn burn
+           :mburn mburn
+           :inverseburn inverseburn
+           :minverseburn minverseburn
+           :softburn softburn
+           :msoftburn msoftburn
+           :hardmix hardmix
+           :linearlight linearlight
+           :mlinearlight mlinearlight
+           :stamp stamp
+           :mstamp mstamp
+           :difference difference
+           :divide divide
+           :mdivide mdivide
+           :or or
+           :and and
+           :xor xor
+           :nor nor
+           :nand nand
+           :xnor xnor
+           :exclusion exclusion
+           :pinlight pinlight
+           :average average
+           :negation negation
+           :reflect reflect
+           :mreflect mreflect
+           :glow glow
+           :mglow mglow
+           :freeze freeze
+           :mfreeze mfreeze
+           :heat heat
+           :mheat mheat
+           :overlay overlay
+           :hardlight hardlight
+           :softlight softlight
+           :pegtoplight pegtoplight
+           :vividlight vividlight
+           :mvividlight mvividlight})
 
-(def ^{:doc "List of all blending functions."} blends-list (sort (keys blends)))
+(def ^{:doc "Sorted list of the per-channel mode names (keywords of [[blends]])."} blends-list (sort (keys blends)))
 
 (defn alpha-blending
-  [^Vec4 cb ^Vec4 cs ^Vec4 blend]
+  "Composites a blended color over the backdrop with the colors' alpha (W3C Compositing Level 1 source-over with blending).
+
+  With `ab`, `as` the alphas of `cb` and `cs` on the 0-1 scale, each channel of the result is `(as * (1 - ab) * cs + as * ab * blend + (1 - as) * ab * cb) / ao`, where `ao = as + ab * (1 - as)`. Colors are not premultiplied.
+
+  - `cb` backdrop color, `Vec4` with channels and alpha in `[0,255]`
+  - `cs` source color, `Vec4`
+  - `blend` the blended color B(cb, cs), `Vec4`; its alpha is ignored
+
+  Returns a `Vec4` with the composited channels and alpha `255 * ao`. When both alphas are 0, returns the channels of `blend` with alpha 0.
+
+  See also [[blend-colors]]."
+  ^Vec4 [^Vec4 cb ^Vec4 cs ^Vec4 blend]
   (let [ab (m/* r255 (.w cb))
         as (m/* r255 (.w cs))
         a1 (m/* as (m/- 1.0 ab))
         a2 (m/* as ab)
         a3 (m/* (m/- 1.0 as) ab)
         a0 (m/+ as a3)]
-    (Vec4. (m// (m/+ (m/* a1 (.x cs)) (m/* a2 (.x blend)) (m/* a3 (.x cb))) a0)
-           (m// (m/+ (m/* a1 (.y cs)) (m/* a2 (.y blend)) (m/* a3 (.y cb))) a0)
-           (m// (m/+ (m/* a1 (.z cs)) (m/* a2 (.z blend)) (m/* a3 (.z cb))) a0)
-           (m/* 255.0 a0))))
+    (if (m/zero? a0)
+      (Vec4. (.x blend) (.y blend) (.z blend) 0.0)
+      (Vec4. (m// (m/+ (m/* a1 (.x cs)) (m/* a2 (.x blend)) (m/* a3 (.x cb))) a0)
+             (m// (m/+ (m/* a1 (.y cs)) (m/* a2 (.y blend)) (m/* a3 (.y cb))) a0)
+             (m// (m/+ (m/* a1 (.z cs)) (m/* a2 (.z blend)) (m/* a3 (.z cb))) a0)
+             (m/* 255.0 a0)))))
 
 (defn blend-colors
-  "Blend two colors using simple alpha composing.
+  "Blends two colors channel by channel and composites the result with their alpha.
 
-  Each channel can be blended using different function.
+  - `blend-fn` per-channel mode `(f a b)` used for all three channels, e.g. [[multiply]] or `(blends :multiply)`
+  - `blend-fn1`, `blend-fn2`, `blend-fn3` modes for the first, second and third channel
+  - `cb` backdrop (base) color, anything accepted by `clojure2d.color/to-color`
+  - `cs` source (blend) color, anything accepted by `clojure2d.color/to-color`
 
-  Formula from [w3.org spec](https://www.w3.org/TR/compositing-1/#blending)."
+  Returns a `Vec4`. When both colors are opaque, the result is the blended channels with alpha 255; otherwise they are composited with [[alpha-blending]]. Channels are blended as stored, so colors in another colorspace are blended channel-wise as well.
+
+  See also [[blend-palettes]], [[blend-gradients]]."
   (^Vec4 [blend-fn cb cs] (blend-colors blend-fn blend-fn blend-fn cb cs))
   (^Vec4 [blend-fn1 blend-fn2 blend-fn3 cb cs]
    (let [cb (c/to-color cb)
@@ -810,33 +829,111 @@
        (alpha-blending cb cs blend)))))
 
 (defn blend-palettes
-  "Blend two palettes.
+  "Blends two palettes color by color with [[blend-colors]].
 
-  Each channel can be blended using different function."
+  - `blend-fn` or `blend-fn1`, `blend-fn2`, `blend-fn3` per-channel modes, as in [[blend-colors]]
+  - `pal1` backdrop palette, anything accepted by `clojure2d.color/palette`
+  - `pal2` source palette, anything accepted by `clojure2d.color/palette`
+
+  Returns a vector of `Vec4` colors, as long as the shorter palette.
+
+  See also [[blend-gradients]]."
   ([blend-fn pal1 pal2] (blend-palettes blend-fn blend-fn blend-fn pal1 pal2))
   ([blend-fn1 blend-fn2 blend-fn3 pal1 pal2] (mapv (partial blend-colors blend-fn1 blend-fn2 blend-fn3) (c/palette pal1) (c/palette pal2))))
 
 (defn blend-gradients
-  "Blend two gradients.
-  
-  Each channel can be blended using different function."
+  "Blends two gradients with [[blend-colors]].
+
+  - `blend-fn` or `blend-fn1`, `blend-fn2`, `blend-fn3` per-channel modes, as in [[blend-colors]]
+  - `g1` backdrop gradient, a function of `t` in `[0,1]` returning a color (e.g. from `clojure2d.color/gradient`)
+  - `g2` source gradient, a function of `t`
+
+  Returns a gradient: a function of `t` returning the blend of `(g1 t)` and `(g2 t)`.
+
+  See also [[blend-palettes]]."
   ([blend-fn g1 g2] (blend-gradients blend-fn blend-fn blend-fn g1 g2))
   ([blend-fn1 blend-fn2 blend-fn3 g1 g2] (fn [^double t] (blend-colors blend-fn1 blend-fn2 blend-fn3 (g1 t) (g2 t)))))
 
 ;;
 
 (defn- cs-op
+  "Channel `ch` of `cs` with the other channels of `cb` in `colorspace`, composited with [[alpha-blending]]."
   [colorspace cb cs ch]
   (let [[to from] (c/colorspaces colorspace)
         b (to cb)
         s (to cs)]
     (alpha-blending (c/to-color cb) (c/to-color cs) (from (c/set-channel b ch (c/get-channel s ch))))))
 
-(defn hue [cb cs] (cs-op :HSB cb cs 0))
-(defn saturation [cb cs] (cs-op :HSB cb cs 1))
-(defn luminocity [cb cs] (cs-op :HSB cb cs 2))
-(defn color [cb cs] (cs-op :HSB cs cb 2))
+(defn hue
+  "HSB hue blend: the hue of the source with the saturation and brightness of the backdrop.
 
-(defn ch0 ([colorspace cb cs] (cs-op colorspace cb cs 0)) ([cb cs] (ch0 :RGB cb cs)))
-(defn ch1 ([colorspace cb cs] (cs-op colorspace cb cs 1)) ([cb cs] (ch1 :RGB cb cs)))
-(defn ch2 ([colorspace cb cs] (cs-op colorspace cb cs 2)) ([cb cs] (ch2 :RGB cb cs)))
+  Unlike the W3C `hue` mode, it keeps HSB brightness (the largest channel), not luminance. The result is composited with the colors' alpha by [[alpha-blending]].
+
+  - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
+  - `cs` source color, anything accepted by `clojure2d.color/to-color`
+
+  Returns a `Vec4`. See also [[saturation]], [[luminosity]], [[color]], [[ch0]]."
+  [cb cs] (cs-op :HSB cb cs 0))
+
+(defn saturation
+  "HSB saturation blend: the saturation of the source with the hue and brightness of the backdrop.
+
+  Unlike the W3C `saturation` mode, it keeps HSB brightness (the largest channel), not luminance. The result is composited with the colors' alpha by [[alpha-blending]].
+
+  - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
+  - `cs` source color, anything accepted by `clojure2d.color/to-color`
+
+  Returns a `Vec4`. See also [[hue]], [[luminosity]], [[color]], [[ch1]]."
+  [cb cs] (cs-op :HSB cb cs 1))
+
+(defn luminosity
+  "HSB brightness blend: the brightness of the source with the hue and saturation of the backdrop.
+
+  Unlike the W3C `luminosity` mode, it uses HSB brightness (the largest channel), not luminance. The result is composited with the colors' alpha by [[alpha-blending]].
+
+  - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
+  - `cs` source color, anything accepted by `clojure2d.color/to-color`
+
+  Returns a `Vec4`. See also [[color]], [[hue]], [[saturation]], [[ch2]]."
+  [cb cs] (cs-op :HSB cb cs 2))
+
+(defn color
+  "HSB color blend: the hue and saturation of the source with the brightness of the backdrop.
+
+  The inverse of [[luminosity]]. Unlike the W3C `color` mode, it uses HSB brightness (the largest channel), not luminance. The result is composited with the colors' alpha by [[alpha-blending]].
+
+  - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
+  - `cs` source color, anything accepted by `clojure2d.color/to-color`
+
+  Returns a `Vec4`. See also [[luminosity]], [[hue]], [[saturation]]."
+  [cb cs] (cs-op :HSB cs cb 2))
+
+(defn ch0
+  "Channel blend: channel 0 of the source with channels 1 and 2 of the backdrop, in a colorspace.
+
+  - `colorspace` keyword of `clojure2d.color/colorspaces` (raw ranges), default `:RGB`
+  - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
+  - `cs` source color, anything accepted by `clojure2d.color/to-color`
+
+  Returns a `Vec4` composited with the colors' alpha by [[alpha-blending]]. See also [[ch1]], [[ch2]], [[hue]]."
+  ([colorspace cb cs] (cs-op colorspace cb cs 0)) ([cb cs] (ch0 :RGB cb cs)))
+
+(defn ch1
+  "Channel blend: channel 1 of the source with channels 0 and 2 of the backdrop, in a colorspace.
+
+  - `colorspace` keyword of `clojure2d.color/colorspaces` (raw ranges), default `:RGB`
+  - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
+  - `cs` source color, anything accepted by `clojure2d.color/to-color`
+
+  Returns a `Vec4` composited with the colors' alpha by [[alpha-blending]]. See also [[ch0]], [[ch2]], [[saturation]]."
+  ([colorspace cb cs] (cs-op colorspace cb cs 1)) ([cb cs] (ch1 :RGB cb cs)))
+
+(defn ch2
+  "Channel blend: channel 2 of the source with channels 0 and 1 of the backdrop, in a colorspace.
+
+  - `colorspace` keyword of `clojure2d.color/colorspaces` (raw ranges), default `:RGB`
+  - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
+  - `cs` source color, anything accepted by `clojure2d.color/to-color`
+
+  Returns a `Vec4` composited with the colors' alpha by [[alpha-blending]]. See also [[ch0]], [[ch1]], [[luminosity]]."
+  ([colorspace cb cs] (cs-op colorspace cb cs 2)) ([cb cs] (ch2 :RGB cb cs)))
