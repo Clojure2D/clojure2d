@@ -210,18 +210,27 @@
   ^long [^double a]
   (m/constrain (m/round a) 0 255))
 
+(def ^:private color-array-classes
+  "Array classes accepted by [[to-color]]: `double`, `float`, `int`, `long`."
+  #{(Class/forName "[D") (Class/forName "[F") (Class/forName "[I") (Class/forName "[J")})
+
+(defn- color-array?
+  "Is `c` an array of a type [[to-color]] accepts?"
+  [c]
+  (contains? color-array-classes (class c)))
+
 (defn possible-color?
   "Checks by type whether `c` looks like a single color.
 
   - `c` any value
 
-  Returns true for strings, keywords, packed integers (`Long`, `Integer`), `Vec2`, `Vec3`, `Vec4` and `java.awt.Color`, and for a sequence or array of 1 to 4 numbers, each within `[-255,255]`. The value is not converted, so an unknown name or an invalid hex string also passes. A short sequence of small numbers is ambiguous: `[16 32]` is a gray with alpha, not a palette of two packed colors. See also [[valid-color?]], [[possible-palette?]]."
+  Returns true for strings, keywords, packed integers (`Long`, `Integer`), `Vec2`, `Vec3`, `Vec4` and `java.awt.Color`, and for a sequential collection (vector, list, sequence) or a `double`, `float`, `int`, `long` array of 1 to 4 numbers, each within `[-255,255]`. Other collections (sets, maps, Java collections) are not colors. The value is not converted, so an unknown name or an invalid hex string also passes. A short sequence of small numbers is ambiguous: `[16 32]` is a gray with alpha, not a palette of two packed colors. See also [[valid-color?]], [[possible-palette?]]."
   {:metadoc/categories #{:pal}}
   [c]
   (cond
     (or (string? c) (keyword? c) (instance? Long c) (instance? Integer c)
         (instance? Vec2 c) (instance? Vec3 c) (instance? Vec4 c) (instance? Color c)) true
-    (seqable? c) (let [s (take 5 c)
+    (or (sequential? c) (color-array? c)) (let [s (take 5 c)
                        n (count s)]
                    (and (<= 1 n 4)
                         (every? #(and (number? %) (<= (m/abs (double %)) 255.0)) s)))
@@ -232,12 +241,13 @@
 
   - `c` any value
 
-  Returns true for a seqable value which is not a color according to [[possible-color?]] and not a function (gradients are functions). The elements are not converted. See also [[possible-color?]], [[valid-color?]]."
+  Returns true for a non-empty sequential collection (vector, list, sequence) which is not itself a color according to [[possible-color?]] and whose every element is a possible color. nil, maps, sets, strings and functions (gradients) are not palettes. The elements are not converted. See also [[possible-color?]], [[valid-color?]], [[palette]]."
   {:metadoc/categories #{:pal}}
   [c]
-  (and (seqable? c)
+  (and (sequential? c)
+       (boolean (seq c))
        (not (possible-color? c))
-       (not (fn? c))))
+       (every? possible-color? c)))
 
 (defn valid-color?
   "Checks whether `c` is a valid color by converting it.
@@ -374,7 +384,7 @@
 (defn hue-polar
   "Returns the hue of a color in degrees, using the polar (circular) model.
 
-  Formula: `atan2(sqrt(3)/2 * (g - b), r - (g + b)/2)`, mapped to `[0,360)`. It equals the hexagonal [[hue]] at primary and secondary colors and differs slightly between them.
+  Formula: `atan2(sqrt(3)/2 * (g - b), r - (g + b)/2)`, mapped to the range from 0 to 360 (a tiny negative angle rounds to 360). It equals the hexagonal [[hue]] at primary and secondary colors and differs slightly between them.
 
   - `c` color, any type accepted by [[to-color]]
 
@@ -396,7 +406,7 @@
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a double from 0 to 360; grays (equal channels) give 0. See also [[hue-polar]], [[to-HSV]]."
+  Returns a double from 0 to 360 (a tiny negative hexagon position rounds to 360); grays (equal channels) give 0. See also [[hue-polar]], [[to-HSV]]."
   {:metadoc/categories meta-ops}
   ^double [c]
   (let [^Vec4 ret (to-HC (pr/to-color c))] (.x ret)))
@@ -807,7 +817,7 @@
   (green ^double [c] (pr/green (pr/to-color c)))
   (blue ^double [c] (pr/blue (pr/to-color c)))
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
-  (luma [c] ^double (pr/luma (pr/to-color c)))
+  (luma ^double [c] (pr/luma (pr/to-color c)))
   Seqable
   (to-color ^Vec4 [c] (pr/to-color (seq c)))
   (alpha ^double [c] (pr/alpha (seq c)))
@@ -815,7 +825,7 @@
   (green ^double [c] (pr/green (seq c)))
   (blue ^double [c] (pr/blue (seq c)))
   (to-awt-color ^Color [c] (pr/to-awt-color (seq c)))
-  (luma [c] ^double (pr/luma (seq c))))
+  (luma ^double [c] (pr/luma (seq c))))
 
 (extend-type (Class/forName "[D")
   pr/ColorProto
@@ -830,7 +840,7 @@
   (green ^double [c] (pr/green (pr/to-color c)))
   (blue ^double [c] (pr/blue (pr/to-color c)))
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
-  (luma [c] ^double (pr/luma (pr/to-color c))))
+  (luma ^double [c] (pr/luma (pr/to-color c))))
 
 (extend-type (Class/forName "[I")
   pr/ColorProto
@@ -845,7 +855,7 @@
   (green ^double [c] (pr/green (pr/to-color c)))
   (blue ^double [c] (pr/blue (pr/to-color c)))
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
-  (luma [c] ^double (pr/luma (pr/to-color c))))
+  (luma ^double [c] (pr/luma (pr/to-color c))))
 
 (extend-type (Class/forName "[F")
   pr/ColorProto
@@ -860,7 +870,7 @@
   (green ^double [c] (pr/green (pr/to-color c)))
   (blue ^double [c] (pr/blue (pr/to-color c)))
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
-  (luma [c] ^double (pr/luma (pr/to-color c))))
+  (luma ^double [c] (pr/luma (pr/to-color c))))
 
 (extend-type (Class/forName "[J")
   pr/ColorProto
@@ -875,7 +885,7 @@
   (green ^double [c] (pr/green (pr/to-color c)))
   (blue ^double [c] (pr/blue (pr/to-color c)))
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
-  (luma [c] ^double (pr/luma (pr/to-color c))))
+  (luma ^double [c] (pr/luma (pr/to-color c))))
 
 ;;
 

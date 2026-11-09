@@ -36,6 +36,9 @@
 
 (deftest hue-test
   ;; hexagonal hue vs colorsys, polar hue vs atan2 formula: 1e-12 relative to max(1, |expected|)
+  (testing "a tiny negative angle rounds to 360"
+    (is (m/<= 0.0 (c/hue (c/color 255 0 1.0e-14)) 360.0))
+    (is (m/<= 0.0 (c/hue-polar (c/color 255 0 1.0e-14)) 360.0)))
   (let [{:keys [colors hue hue-polar]} @reference]
     (doseq [[col h hp] (map vector colors hue hue-polar)]
       (is (rel-close? 1.0e-12 h (c/hue col)) (str col))
@@ -197,7 +200,7 @@
       (is (rel-close? 1.0e-12 e (c/relative-luma col)) (str col))
       (is (rel-close? 1.0e-12 (* 2.55 ((c/to-XYZ col) 1)) (c/relative-luma col)) (str col))))
   (testing "luma: the same weights on the encoded channels"
-    (is (rel-close? 1.0e-15 (+ (* 0.21267285140562248 255.0)) (c/luma :red)))
+    (is (rel-close? 1.0e-15 (* 0.21267285140562248 255.0) (c/luma :red)))
     (is (rel-close? 1.0e-15 255.0 (c/luma :white)))
     (is (== 100.0 (c/luma (c/gray 100))) "gray: weights sum to 1")))
 
@@ -235,11 +238,14 @@
                [1] [1 2] [1 2 3] [1 2 3 4] [-255 255 0] '(1 2 3) (double-array [1 2 3])]]
       (is (c/possible-color? x) (pr-str x))))
   (testing "not colors: palettes, empty, too long, out of range, non-numbers, other types"
-    (doseq [x [nil [] [1 2 3 4 5] [0xff0000 0x00ff00] [0x0000ff 0x00ff00] [:red :green] [256 0 0] 1.5 identity]]
+    (doseq [x [nil [] [1 2 3 4 5] [0xff0000 0x00ff00] [0x0000ff 0x00ff00] [:red :green] [256 0 0] 1.5 identity
+               #{1 2 3} {:a 1} (java.util.ArrayList. [1 2 3])]]
       (is (not (c/possible-color? x)) (pr-str x))))
-  (testing "palettes"
-    (is (c/possible-palette? [0xff0000 0x00ff00]))
-    (is (c/possible-palette? [:red :green])))
+  (testing "palettes: non-empty sequential collections of possible colors"
+    (doseq [x [[0xff0000 0x00ff00] [:red :green] '(:red "#fff") [[1 2 3] [4 5 6]] (map identity [:red])]]
+      (is (c/possible-palette? x) (pr-str x)))
+    (doseq [x [nil [] {:a 1} #{:red} "#fff" :red [1 2 3] identity [:red 1.5] (java.util.ArrayList. [:red])]]
+      (is (not (c/possible-palette? x)) (pr-str x))))
   (testing "ambiguous: two small numbers are a gray with alpha"
     (is (c/possible-color? [16 32]))))
 
