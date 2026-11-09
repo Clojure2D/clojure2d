@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color.blend`: per-channel modes `w3c-softlight` (W3C/CSS soft light), `grainextract`, `grainmerge` (GIMP), `phoenix`, `interpolation` (pegtop.net), registered in `blends` (`blends-list` changes, seeded `glitch` results may differ)
 * `clojure2d.color.blend`: W3C non-separable modes `w3c-hue`, `w3c-saturation`, `w3c-color`, `w3c-luminosity` (luminance-preserving, as in CSS) and whole-color modes `darker-color`, `lighter-color`
 * `clojure2d.color.blend/blend-fn` (mode lookup by name, throws `ex-info` for an unknown name) and `opacity` (mode mixed with the base)
+* `clojure2d.color.blend/color-blends`: whole-color modes by name (HSB, W3C non-separable, darker/lighter color, channel copies); `cssgram/custom-filter` resolves whole-color modes through it
 * `clojure2d.color.cssgram`: filters `brannan` and `perpetua` (gradient approximated); `filter-definitions` (filters as data: overlays, filter steps, approximation notes); docstrings for the namespace, every filter, `filters`, `filters-list`, `custom-filter`; `custom-filter` accepts the W3C whole-color modes and `:darker-color`, `:lighter-color`
 
 ### Changed
@@ -37,6 +38,8 @@ All notable changes to this project will be documented in this file. This change
 * White point values (`resources/color/whitepoints.edn` regenerated):
 * `clojure2d.color.cssgram/lark` overlay gray 248 instead of CSSgram's 242; `willow` applied the invalid CSS `::before` overlay (ignored by browsers), lacked the `::after` color overlay rgb(216, 205, 203) and used contrast 0.85 instead of 0.95
 * `clojure2d.color.cssgram/custom-filter`: a function step replaced all previous steps (now composed); an unknown operator or blend mode was silently ignored or replaced by `normal` (now throws `ex-info` with `{:operator op}` or `{:blend mode}`)
+* `clojure2d.color.blend/blend-colors`, `blend-palettes`, `blend-gradients` with a mode keyword (e.g. `:multiply`) silently acted as `normal` (the keyword was called as a lookup); keywords now resolve through `blend-fn`, an unknown one throws `ex-info` with `{:blend mode}`
+* `clojure2d.color.blend/ch0`, `ch1`, `ch2` with an unknown colorspace threw a `NullPointerException`; now `ex-info` with `{:colorspace colorspace}`
   - D-series `CIE-2-D50`, `CIE-2-D55`, `CIE-2-D60`, `CIE-2-D75`, `CIE-10-D50`, `CIE-10-D55`, `CIE-10-D60`, `CIE-10-D65`, `CIE-10-D75` are now full precision 1 nm integrations of the CIE spectra (xy change 1e-5 to 3e-5; the former values were the CIE 15:2004 Table T.3 values, 5 nm sums over 380-780 nm, which the new values match to 4 decimals); `CIE-2-D65` is unchanged; RGB spaces based on `CIE-2-D50` (Adobe Wide Gamut, Best, Beta, ColorMatch, Don, Ekta Space PS5, ECI v2, Xtreme) change by less than 0.01 on 0-255
   - computed (`*`) white points recomputed with the fixed integration: `*-ISO-SP*` were off by about 0.24 in xy, `CIE-2015-*-E*` were not 1/3, other ISO 7589 entries off by about 8e-4, the rest by about 2e-7
 * `clojure2d.color.whitepoints/chromatic-adaptation-matrix` (and `->XYZ-to-XYZ`) failed with a `ClassCastException` mixing `RealMatrix` and `Mat3x3`

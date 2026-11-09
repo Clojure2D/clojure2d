@@ -8,7 +8,7 @@
 
   Per-channel modes, all `(f a b)` returning a double, are collected in [[blends]] (keyword to function) and [[blends-list]]:
 
-  - clamped modes, results clamped to `[0,255]`; sources: W3C Compositing Level 1 ([[normal]], [[multiply]], [[screen]], [[overlay]], [[hardlight]], [[darken]], [[lighten]], [[dodge]], [[burn]], [[difference]], [[exclusion]]), Photoshop ([[add]], [[subtract]], [[linearburn]], [[linearlight]], [[vividlight]], [[pinlight]], [[hardmix]], [[divide]], [[softlight]]) W3C `soft-light` ([[w3c-softlight]]), GIMP ([[grainextract]], [[grainmerge]]) and pegtop.net ([[inversedodge]], [[inverseburn]], [[softdodge]], [[softburn]], [[reflect]], [[glow]], [[freeze]], [[heat]], [[stamp]], [[negation]], [[pegtoplight]], [[average]], [[phoenix]], [[interpolation]])
+  - clamped modes, results clamped to `[0,255]`; sources: W3C Compositing Level 1 ([[normal]], [[multiply]], [[screen]], [[overlay]], [[hardlight]], [[darken]], [[lighten]], [[dodge]], [[burn]], [[difference]], [[exclusion]]), Photoshop ([[add]], [[subtract]], [[linearburn]], [[linearlight]], [[vividlight]], [[pinlight]], [[hardmix]], [[divide]], [[softlight]]), W3C `soft-light` ([[w3c-softlight]]), GIMP ([[grainextract]], [[grainmerge]]) and pegtop.net ([[inversedodge]], [[inverseburn]], [[softdodge]], [[softburn]], [[reflect]], [[glow]], [[freeze]], [[heat]], [[stamp]], [[negation]], [[pegtoplight]], [[average]], [[phoenix]], [[interpolation]])
   - modulus modes, prefixed with `m` ([[madd]], [[mdodge]], ...): the author's artistic family, the unclamped formula of the clamped mode wrapped with mod 256 and capped at 255 (results in `[0,255]`; integer-valued results equal plain mod 256)
   - bitwise modes ([[or]], [[and]], [[xor]], [[nor]], [[nand]], [[xnor]]) on the channel values truncated to integers
 
@@ -18,10 +18,9 @@
 
   [[blend-colors]] blends two colors channel by channel (one mode for all channels or one mode per channel) and composites the result with the colors' alpha as in [W3C Compositing Level 1](https://www.w3.org/TR/compositing-1/#blending) ([[alpha-blending]]). [[blend-palettes]] and [[blend-gradients]] apply it to palettes and gradients.
 
-  Colorspace blends [[hue]], [[saturation]], [[luminosity]] and [[color]] take one HSB channel from one color and the others from the second color; [[ch0]], [[ch1]] and [[ch2]] do the same for a channel of any colorspace. [[w3c-hue]], [[w3c-saturation]], [[w3c-color]] and [[w3c-luminosity]] are the W3C non-separable modes, which keep luminance (`0.3 r + 0.59 g + 0.11 b`) instead of HSB brightness; [[darker-color]] and [[lighter-color]] pick the whole color with the lower or higher luminance."
+  Colorspace blends [[hue]], [[saturation]], [[luminosity]] and [[color]] take one HSB channel from one color and the others from the second color; [[ch0]], [[ch1]] and [[ch2]] do the same for a channel of any colorspace. [[w3c-hue]], [[w3c-saturation]], [[w3c-color]] and [[w3c-luminosity]] are the W3C non-separable modes, which keep luminance (`0.3 r + 0.59 g + 0.11 b`) instead of HSB brightness; [[darker-color]] and [[lighter-color]] pick the whole color with the lower or higher luminance. These whole-color modes are collected in [[color-blends]]."
   (:refer-clojure :exclude [or and])
   (:require [fastmath.core :as m]
-            [fastmath.vector :as v]
             [clojure2d.color :as c])
   (:import [fastmath.vector Vec4]))
 
@@ -228,7 +227,7 @@
 
   Returns the blended value in `[0,255]`. See also [[msoftdodge]], [[dodge]], [[softburn]]."
   ^double [^double a ^double b]
-  (if (<= (m/+ a b) 255.0)
+  (if (m/<= (m/+ a b) 255.0)
     (clamp255 (m// (m/* 127.5 a) (m/max m/EPSILON (m/- 255.0 b))))
     (clamp255 (m/- 255.0 (m/* 127.5 (m// (m/- 255.0 b) (m/max m/EPSILON a)))))))
 
@@ -333,7 +332,7 @@
   Returns the blended value in `[0,255]`. See also [[vividlight]]."
   ^double [^double a ^double b]
   (let [t (m/- 255.0 b)]
-    (if (< a t) 0.0 255.0)))
+    (if (m/< a t) 0.0 255.0)))
 
 (defn linearlight
   "Linear light mode (Photoshop): linear burn or linear dodge depending on the blend.
@@ -909,21 +908,24 @@
 (defn blend-colors
   "Blends two colors channel by channel and composites the result with their alpha.
 
-  - `blend-fn` per-channel mode `(f a b)` used for all three channels, e.g. [[multiply]] or `(blends :multiply)`
-  - `blend-fn1`, `blend-fn2`, `blend-fn3` modes for the first, second and third channel
+  - `mode` per-channel mode used for all three channels: a keyword of [[blends]] or a function `(f a b)`, e.g. `:multiply` or [[multiply]]
+  - `mode1`, `mode2`, `mode3` modes for the first, second and third channel
   - `cb` backdrop (base) color, anything accepted by `clojure2d.color/to-color`
   - `cs` source (blend) color, anything accepted by `clojure2d.color/to-color`
 
-  Returns a `Vec4`. When both colors are opaque, the result is the blended channels with alpha 255; otherwise they are composited with [[alpha-blending]]. Channels are blended as stored, so colors in another colorspace are blended channel-wise as well.
+  Returns a `Vec4`. When both colors are opaque, the result is the blended channels with alpha 255; otherwise they are composited with [[alpha-blending]]. Channels are blended as stored, so colors in another colorspace are blended channel-wise as well. Throws `ex-info` with `{:blend mode}` for an unknown mode (see [[blend-fn]]).
 
   See also [[blend-palettes]], [[blend-gradients]]."
-  (^Vec4 [blend-fn cb cs] (blend-colors blend-fn blend-fn blend-fn cb cs))
-  (^Vec4 [blend-fn1 blend-fn2 blend-fn3 cb cs]
-   (let [cb (c/to-color cb)
+  (^Vec4 [mode cb cs] (blend-colors mode mode mode cb cs))
+  (^Vec4 [mode1 mode2 mode3 cb cs]
+   (let [f1 (blend-fn mode1)
+         f2 (blend-fn mode2)
+         f3 (blend-fn mode3)
+         cb (c/to-color cb)
          cs (c/to-color cs)
-         blend (Vec4. (blend-fn1 (.x cb) (.x cs))
-                      (blend-fn2 (.y cb) (.y cs))
-                      (blend-fn3 (.z cb) (.z cs))
+         blend (Vec4. (f1 (.x cb) (.x cs))
+                      (f2 (.y cb) (.y cs))
+                      (f3 (.z cb) (.z cs))
                       255.0)]
      (if (clojure.core/and (m/>= (.w cb) 255.0)
                            (m/>= (.w cs) 255.0))
@@ -933,35 +935,41 @@
 (defn blend-palettes
   "Blends two palettes color by color with [[blend-colors]].
 
-  - `blend-fn` or `blend-fn1`, `blend-fn2`, `blend-fn3` per-channel modes, as in [[blend-colors]]
+  - `mode` or `mode1`, `mode2`, `mode3` per-channel modes, as in [[blend-colors]]
   - `pal1` backdrop palette, anything accepted by `clojure2d.color/palette`
   - `pal2` source palette, anything accepted by `clojure2d.color/palette`
 
   Returns a vector of `Vec4` colors, as long as the shorter palette.
 
   See also [[blend-gradients]]."
-  ([blend-fn pal1 pal2] (blend-palettes blend-fn blend-fn blend-fn pal1 pal2))
-  ([blend-fn1 blend-fn2 blend-fn3 pal1 pal2] (mapv (partial blend-colors blend-fn1 blend-fn2 blend-fn3) (c/palette pal1) (c/palette pal2))))
+  ([mode pal1 pal2] (blend-palettes mode mode mode pal1 pal2))
+  ([mode1 mode2 mode3 pal1 pal2]
+   (mapv (partial blend-colors (blend-fn mode1) (blend-fn mode2) (blend-fn mode3)) (c/palette pal1) (c/palette pal2))))
 
 (defn blend-gradients
   "Blends two gradients with [[blend-colors]].
 
-  - `blend-fn` or `blend-fn1`, `blend-fn2`, `blend-fn3` per-channel modes, as in [[blend-colors]]
+  - `mode` or `mode1`, `mode2`, `mode3` per-channel modes, as in [[blend-colors]]
   - `g1` backdrop gradient, a function of `t` in `[0,1]` returning a color (e.g. from `clojure2d.color/gradient`)
   - `g2` source gradient, a function of `t`
 
   Returns a gradient: a function of `t` returning the blend of `(g1 t)` and `(g2 t)`.
 
   See also [[blend-palettes]]."
-  ([blend-fn g1 g2] (blend-gradients blend-fn blend-fn blend-fn g1 g2))
-  ([blend-fn1 blend-fn2 blend-fn3 g1 g2] (fn [^double t] (blend-colors blend-fn1 blend-fn2 blend-fn3 (g1 t) (g2 t)))))
+  ([mode g1 g2] (blend-gradients mode mode mode g1 g2))
+  ([mode1 mode2 mode3 g1 g2]
+   (let [f1 (blend-fn mode1)
+         f2 (blend-fn mode2)
+         f3 (blend-fn mode3)]
+     (fn [^double t] (blend-colors f1 f2 f3 (g1 t) (g2 t))))))
 
 ;;
 
 (defn- cs-op
   "Channel `ch` of `cs` with the other channels of `cb` in `colorspace`, composited with [[alpha-blending]]."
   [colorspace cb cs ch]
-  (let [[to from] (c/colorspaces colorspace)
+  (let [[to from] (clojure.core/or (c/colorspaces colorspace)
+                                   (throw (ex-info (str "Unknown colorspace: " colorspace) {:colorspace colorspace})))
         b (to cb)
         s (to cs)]
     (alpha-blending (c/to-color cb) (c/to-color cs) (from (c/set-channel b ch (c/get-channel s ch))))))
@@ -1017,7 +1025,7 @@
   - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
   - `cs` source color, anything accepted by `clojure2d.color/to-color`
 
-  Returns a `Vec4` composited with the colors' alpha by [[alpha-blending]]. See also [[ch1]], [[ch2]], [[hue]]."
+  Returns a `Vec4` composited with the colors' alpha by [[alpha-blending]]. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[ch1]], [[ch2]], [[hue]]."
   ([colorspace cb cs] (cs-op colorspace cb cs 0)) ([cb cs] (ch0 :RGB cb cs)))
 
 (defn ch1
@@ -1027,7 +1035,7 @@
   - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
   - `cs` source color, anything accepted by `clojure2d.color/to-color`
 
-  Returns a `Vec4` composited with the colors' alpha by [[alpha-blending]]. See also [[ch0]], [[ch2]], [[saturation]]."
+  Returns a `Vec4` composited with the colors' alpha by [[alpha-blending]]. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[ch0]], [[ch2]], [[saturation]]."
   ([colorspace cb cs] (cs-op colorspace cb cs 1)) ([cb cs] (ch1 :RGB cb cs)))
 
 (defn ch2
@@ -1037,7 +1045,7 @@
   - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
   - `cs` source color, anything accepted by `clojure2d.color/to-color`
 
-  Returns a `Vec4` composited with the colors' alpha by [[alpha-blending]]. See also [[ch0]], [[ch1]], [[luminosity]]."
+  Returns a `Vec4` composited with the colors' alpha by [[alpha-blending]]. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[ch0]], [[ch1]], [[luminosity]]."
   ([colorspace cb cs] (cs-op colorspace cb cs 2)) ([cb cs] (ch2 :RGB cb cs)))
 
 ;; W3C non-separable modes and whole-color modes
@@ -1163,3 +1171,20 @@
   Returns a `Vec4`. See also [[darker-color]], [[lighten]] (per channel)."
   [cb cs]
   (whole-color-op (fn [cb cs] (if (m/> (lum cs) (lum cb)) cs cb)) cb cs))
+
+(def ^{:doc "Whole-color modes by name: keyword to `(f cb cs)` returning a composited `Vec4`.
+
+  HSB channel blends `:hue`, `:saturation`, `:luminosity`, `:color`; W3C non-separable modes `:w3c-hue`, `:w3c-saturation`, `:w3c-color`, `:w3c-luminosity`; `:darker-color`, `:lighter-color`; channel copies `:ch0`, `:ch1`, `:ch2` (these also take a colorspace as the first argument). Per-channel modes are in [[blends]]."}
+  color-blends {:hue hue
+                :saturation saturation
+                :luminosity luminosity
+                :color color
+                :w3c-hue w3c-hue
+                :w3c-saturation w3c-saturation
+                :w3c-color w3c-color
+                :w3c-luminosity w3c-luminosity
+                :darker-color darker-color
+                :lighter-color lighter-color
+                :ch0 ch0
+                :ch1 ch1
+                :ch2 ch2})

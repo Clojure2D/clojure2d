@@ -229,3 +229,25 @@
     (is (== (b/multiply x y) ((b/opacity b/multiply 1.0) x y)))
     (is (rel-close? 1.0e-12 (+ x (* 0.3 (- (b/screen x y) x))) ((b/opacity :screen 0.3) x y))))
   (is (throws-data? {:blend :nope} #(b/opacity :nope 0.5))))
+
+;; Review fixes
+
+(deftest keyword-modes-test
+  ;; blend-colors, blend-palettes, blend-gradients resolve keywords with blend-fn (a keyword used to act as normal)
+  (let [x (c/color 200 50 10) y (c/color 100 60 20)
+        g1 (c/gradient [:black :white]) g2 (c/gradient [:red :blue])]
+    (is (= (b/blend-colors b/multiply x y) (b/blend-colors :multiply x y)))
+    (is (= (b/blend-colors b/add b/darken b/screen x y) (b/blend-colors :add :darken :screen x y)))
+    (is (= (b/blend-palettes b/multiply [x] [y]) (b/blend-palettes :multiply [x] [y])))
+    (is (= ((b/blend-gradients b/screen g1 g2) 0.3) ((b/blend-gradients :screen g1 g2) 0.3)))
+    (is (throws-data? {:blend :nope} #(b/blend-colors :nope x y)))
+    (is (throws-data? {:blend :nope} #(b/blend-gradients :nope g1 g2)))))
+
+(deftest color-blends-test
+  (is (= #{:hue :saturation :luminosity :color :w3c-hue :w3c-saturation :w3c-color :w3c-luminosity
+           :darker-color :lighter-color :ch0 :ch1 :ch2}
+         (set (keys b/color-blends))))
+  (is (empty? (filter (set (keys b/blends)) (keys b/color-blends)))))
+
+(deftest unknown-colorspace-test
+  (is (throws-data? {:colorspace :nope} #(b/ch0 :nope (c/color 1 2 3) (c/color 4 5 6)))))

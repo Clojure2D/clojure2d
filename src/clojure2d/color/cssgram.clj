@@ -15,7 +15,8 @@
   * Info: https://alistapart.com/article/finessing-fecolormatrix/
   * Source: https://github.com/una/CSSgram
   * Licence: MIT"
-  (:require [clojure2d.color :as c]
+  (:require [fastmath.core :as m]
+            [clojure2d.color :as c]
             [clojure2d.color.blend :as cb]))
 
 (set! *unchecked-math* :warn-on-boxed)
@@ -34,24 +35,10 @@
                                 :temperature (fn [temp amount] (fn [c] (c/adjust-temperature c temp amount)))
                                 :tint c/tinter})
 
-(def ^:private whole-color-blends {:hue cb/hue
-                                   :saturation cb/saturation
-                                   :luminosity cb/luminosity
-                                   :color cb/color
-                                   :w3c-hue cb/w3c-hue
-                                   :w3c-saturation cb/w3c-saturation
-                                   :w3c-color cb/w3c-color
-                                   :w3c-luminosity cb/w3c-luminosity
-                                   :darker-color cb/darker-color
-                                   :lighter-color cb/lighter-color
-                                   :ch0 cb/ch0
-                                   :ch1 cb/ch1
-                                   :ch2 cb/ch2})
-
 (defn- blend-step
   "Filter step blending the filtered color (backdrop) with an overlay color (source)."
   [[mode c2 c3]]
-  (if-let [f (whole-color-blends mode)]
+  (if-let [f (cb/color-blends mode)]
     (if c3
       (fn [c] (f c2 c c3))
       (fn [c] (f c c2)))
@@ -76,7 +63,7 @@
   - `[:sepia amount]`, `[:contrast amount]`, `[:exposure amount]`, `[:brightness amount]`, `[:grayscale amount]`, `[:hue-rotate degrees]`, `[:saturation amount]`, `[:tint color]`: color operations of `clojure2d.color`
   - `[:temperature kelvins amount]`: shifts towards the color of a light source, amount in `[0,1]`
   - `[:matrix m]`: an SVG `feColorMatrix` definition, [see here](https://developer.mozilla.org/en-US/docs/Web/SVG/Element/feColorMatrix)
-  - `[:blend mode color]`: blends the filtered color (backdrop) with `color` (source, its alpha acts as the CSS opacity); `mode` is a keyword of `clojure2d.color.blend/blends` or a per-channel function, or a whole-color mode `:hue`, `:saturation`, `:luminosity`, `:color` (HSB), `:w3c-hue`, `:w3c-saturation`, `:w3c-color`, `:w3c-luminosity`, `:darker-color`, `:lighter-color`
+  - `[:blend mode color]`: blends the filtered color (backdrop) with `color` (source, its alpha acts as the CSS opacity); `mode` is a keyword of `clojure2d.color.blend/blends` or a per-channel function, or a keyword of `clojure2d.color.blend/color-blends` (whole-color modes: HSB `:hue`, `:saturation`, `:luminosity`, `:color`, W3C `:w3c-hue`, `:w3c-saturation`, `:w3c-color`, `:w3c-luminosity`, `:darker-color`, `:lighter-color`)
   - `[:blend :ch0 colorspace color]` (also `:ch1`, `:ch2`): takes that channel of `color` in `colorspace`; without `colorspace` RGB is used
 
   CSS `brightness` corresponds to `:exposure`, which multiplies the channels; `:brightness` adds a percentage of the original value.
@@ -95,7 +82,7 @@
 (defn- css-color
   "CSS `rgba` color with an extra CSS opacity folded into the alpha."
   ([r g b] (c/color r g b))
-  ([r g b ^double alpha] (c/color r g b (* 255.0 alpha))))
+  ([r g b ^double alpha] (c/color r g b (m/* 255.0 alpha))))
 
 (def ^{:doc "CSSgram filters as data: filter name to a map with:
 
@@ -103,7 +90,7 @@
   - `:filters` CSS filter list as [[custom-filter]] steps
   - `:approximation` (optional) why the filter is not exact, e.g. a gradient replaced by one color
 
-  Each public filter function is `(apply custom-filter (concat overlays filters))` of its entry."}
+  Each public filter function is `(apply custom-filter (concat (map #(into [:blend] %) overlays) filters))` of its entry."}
   filter-definitions
   {:y1977 {:overlays [[:screen (css-color 243 106 188 0.3)]]
            :filters [[:contrast 1.1] [:exposure 1.1] [:saturation 1.3]]}
