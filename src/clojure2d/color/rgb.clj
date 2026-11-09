@@ -1,4 +1,22 @@
 (ns clojure2d.color.rgb
+  "RGB color space definitions and their transfer functions, used by the RGB conversions of [[clojure2d.color]].
+
+  An RGB space is a map (see [[rgbs]] for the predefined ones, [[rgb-data->map]] to build one) with keys:
+
+  - `:red`, `:green`, `:blue` - `[x y]` chromaticity coordinates of the primaries,
+  - `:whitepoint` - white point `Vec4` from `clojure2d.color.whitepoints`,
+  - `:rgb-to-xyz`, `:xyz-to-rgb` - `Mat3x3` matrices between linear RGB (0-1) and XYZ (`Y` 0-1),
+  - `:to` - transfer function encoding a linear channel value to the space's encoded value,
+  - `:from` - transfer function decoding an encoded value to a linear one.
+
+  Transfer functions work on single channel values, linear and encoded values both nominally in 0-1 (values outside are accepted). Encoding functions are named `to-...` (and `linear-to-srgb`), decoding functions `from-...` (and `srgb-to-linear`):
+
+  - sRGB: [[linear-to-srgb]], [[srgb-to-linear]],
+  - power law: [[->gamma]],
+  - CIE L*: [[to-L*]], [[from-L*]],
+  - ACES log: [[to-ACEScc]], [[from-ACEScc]], [[to-ACEScct]], [[from-ACEScct]],
+  - Blackmagic Film Generation 5: [[to-Blackmagic-WG]], [[from-Blackmagic-WG]],
+  - ITU-R BT.2020: [[to-BT2020]], [[from-BT2020]]."
   (:require [clojure2d.color.whitepoints :as wp]
             [fastmath.matrix :as mat]
             [fastmath.core :as m])
@@ -8,21 +26,37 @@
 (set! *unchecked-math* :warn-on-boxed)
 
 (defn srgb-to-linear
-  "Gamma correction (gamma=2.4), darken"
+  "Decodes an sRGB encoded channel value to a linear one (sRGB EOTF, IEC 61966-2-1).
+
+  `v / 12.92` for `v <= 0.040449936`, `((v + 0.055) / 1.055)^2.4` otherwise. The threshold is the intersection of both segments; the standard's 0.04045 differs by less than 3e-9 in the result. Negative values use the linear segment.
+
+  See also [[linear-to-srgb]]."
   ^double [^double v]
   (if (m/> v 0.040449936)
     (m/pow (m// (m/+ 0.055 v) 1.055) 2.4)
     (m// v 12.92)))
 
 (defn linear-to-srgb
-  "Gamma correction (gamma=1/2.4), lighten"
+  "Encodes a linear channel value to sRGB (inverse sRGB EOTF, IEC 61966-2-1).
+
+  `12.92 v` for `v <= 0.0031308`, `1.055 v^(1/2.4) - 0.055` otherwise. Negative values use the linear segment.
+
+  See also [[srgb-to-linear]]."
   ^double [^double v]
   (if (m/> v 0.0031308)
     (m/- (m/* 1.055 (m/pow v 0.4166666666666667)) 0.055)
     (m/* v 12.92)))
 
 (defn ->gamma
-  "Create gamma correction function"
+  "Creates a power law transfer function `x^e`, symmetric around 0 (`-(-x)^e` for negative `x`).
+
+  Parameters:
+
+  - `e` (double): exponent; `1/γ` encodes, `γ` decodes a gamma `γ` space, for example `(->gamma (/ 2.2))` and `(->gamma 2.2)`.
+
+  Returns a function of one double.
+
+  See also [[rgbs]]."
   [^double e]
   (fn ^double [^double x]
     (m/spow x e)))
@@ -34,14 +68,18 @@
 (def ^{:private true :const true :tag 'double} CIEK (/ 24389.0 27.0))
 
 (defn to-L*
-  "CIE correction, L*"
+  "Encodes a linear channel value with the CIE L* curve, scaled to 0-1 (as ECI RGB v2).
+
+  `(116 cbrt(v) - 16) / 100` for `v > 216/24389`, `v · 24389/27 / 100` otherwise (also for negative `v`).
+
+  See also [[from-L*]]."
   ^double [^double v]
   (m// (if (> v CIEEpsilon)
          (m/- (m/* 116.0 (m/cbrt v)) 16.0)
          (* v CIEK)) 100.0))
 
 (defn from-L*
-  "Inverse CIE correction, L*"
+  "Decodes a CIE L* encoded channel value (0-1) to a linear one; inverse of [[to-L*]]."
   ^double [^double v]
   (let [v (m// (m/+ (m/* v 100.0) 16.0) 116.0)
         v3 (* v v v)]
@@ -50,6 +88,11 @@
       (/ (- (* 116.0 v) 16.0) CIEK))))
 
 (defn to-ACEScc
+  "Encodes a linear (ACES AP1) channel value with the ACEScc logarithmic curve (Academy S-2014-003).
+
+  `(log2(v) + 9.72) / 17.52` for `v >= 2^-15`, `(log2(2^-16 + v/2) + 9.72) / 17.52` below, and the constant `(-16 + 9.72) / 17.52` for `v <= 0`, so non-positive values do not round-trip.
+
+  See also [[from-ACEScc]], [[to-ACEScct]]."
   ^double [^double v]
   (cond
     (m/not-pos? v) -0.35844748858447484
@@ -57,6 +100,9 @@
     :else (m// (m/+ (m/log2 (m/+ 1.52587890625E-5 (m/* 0.5 v))) 9.72) 17.52)))
 
 (defn from-ACEScc
+  "Decodes an ACEScc channel value to a linear one (Academy S-2014-003); results are capped at 65504 (the largest half float), reached at `(log2(65504) + 9.72) / 17.52`.
+
+  See also [[to-ACEScc]]."
   ^double [^double v]
   (cond
     (m/<= v -0.3013698630136986) (m/* 2.0 (m/- (m/pow 2.0 (m/- (m/* v 17.52) 9.72)) 1.52587890625E-5))
@@ -64,12 +110,18 @@
     :else (m/pow 2.0 (m/- (m/* v 17.52) 9.72))))
 
 (defn to-ACEScct
+  "Encodes a linear (ACES AP1) channel value with the ACEScct curve (Academy S-2016-001): the ACEScc logarithm above `2^-7`, a linear toe `10.5402377416545 v + 0.0729055341958355` below (also for negative `v`).
+
+  See also [[from-ACEScct]], [[to-ACEScc]]."
   ^double [^double v]
   (if (m/<= v 0.0078125)
     (m/+ (m/* v 10.5402377416545) 0.0729055341958355)
     (m// (m/+ (m/log2 v) 9.72) 17.52)))
 
 (defn from-ACEScct
+  "Decodes an ACEScct channel value to a linear one (Academy S-2016-001); results are capped at 65504 (the largest half float), as the ACES documentation specifies.
+
+  See also [[to-ACEScct]]."
   ^double [^double v]
   (cond
     (m/<= v 0.155251141552511) (m// (m/- v 0.0729055341958355) 10.5402377416545)
@@ -77,24 +129,36 @@
     :else (m/pow 2.0 (m/- (m/* v 17.52) 9.72))))
 
 (defn to-Blackmagic-WG
+  "Encodes a linear channel value with the Blackmagic Film Generation 5 log curve (the transfer function of Blackmagic Wide Gamut).
+
+  Linear segment `8.283605932402494 v + 0.09246575342465753` below `v = 0.005`, logarithm above.
+
+  See also [[from-Blackmagic-WG]]."
   ^double [^double v]
   (if (m/< v 0.005)
     (m/+ (m/* v 8.283605932402494) 0.09246575342465753)
     (m/+ 0.5300133392291939 (m/* 0.08692876065491224 (m/log (m/+ v 0.005494072432257808))))))
 
 (defn from-Blackmagic-WG
+  "Decodes a Blackmagic Film Generation 5 log value to a linear one; inverse of [[to-Blackmagic-WG]]. Large inputs overflow to `##Inf`."
   ^double [^double v]
   (if (m/< v 0.13388378308667)
     (m// (m/- v 0.09246575342465753) 8.283605932402494)
     (m/- (m/exp (m// (m/- v 0.5300133392291939) 0.08692876065491224)) 0.005494072432257808)))
 
 (defn to-BT2020
+  "Encodes a linear channel value with the ITU-R BT.2020 OETF, with the double precision constants `α = 1.09929682680944`, `β = 0.018053968510807`.
+
+  `4.5 v` for `v < β`, `α v^0.45 - (α - 1)` otherwise.
+
+  See also [[from-BT2020]]."
   ^double [^double v]
   (if (m/< v 0.018053968510807)
     (m/* 4.5 v)
     (m/- (m/* 1.09929682680944 (m/spow v 0.45)) 0.09929682680944)))
 
 (defn from-BT2020
+  "Decodes an ITU-R BT.2020 encoded value to a linear one; inverse of [[to-BT2020]] (inverse OETF)."
   ^double [^double v]
   (if (m/< v 0.08124285829863397)
     (m// v 4.5)
