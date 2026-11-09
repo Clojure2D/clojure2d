@@ -30,6 +30,7 @@ All notable changes to this project will be documented in this file. This change
 * `->spectrum-to-XYZ1` / `->spectrum-to-XYZ` integrated over the wrong range (the intersection or the union of the illuminant, sample and observer ranges); now over the observer's range with the illuminant and sample extended, as CIE 15 (`:ISO-SP`, 2015 observers with `:E` were wrong)
 * `->spectrum-to-XYZ1` docstring named the spectrum key `:values` (the key is `:value`) and the converter was hinted as `Vec4` (returns `Vec3`)
 * `wavelength-to-XYZ` (and `wavelength`) used CIE 1964 10° for every observer other than `:CIE-2`; now supports all four observers and throws for an unknown one
+* `:cat97` chromatic adaptation used a transposed Bradford matrix with a sign error (copied misprint, also in colour-science); now the Bradford matrix as defined for CMCCAT97 / CIECAM97s; the former matrix stays available as `:cat97-colour` (colour-science compatibility)
 * An unknown chromatic adaptation method in `chromatic-adaptation-matrix`, `->XYZ-to-XYZ`, `->XYZ-to-LMS`, `->LMS-to-XYZ` and `->RGB-to-RGB` (white points differ) failed with an unrelated `IllegalArgumentException` (LMS builders only when called); now throws `ex-info` with `{:method k}` when the converter is built
 
 ## 1.5.0-alpha1

@@ -308,15 +308,11 @@
 (def ^:private whitepoints-colour
   (delay (-> "whitepoints/colour_reference.edn" clojure.java.io/resource slurp clojure.edn/read-string)))
 
-(defn- throws-method?
-  [k f]
+(defn- throws-data?
+  "Calls `f`, expects `ex-info` with exactly `m` as data."
+  [m f]
   (try (f) false
-       (catch clojure.lang.ExceptionInfo e (= {:method k} (ex-data e)))))
-
-(defn- throws-observer?
-  [k f]
-  (try (f) false
-       (catch clojure.lang.ExceptionInfo e (= {:observer k} (ex-data e)))))
+       (catch clojure.lang.ExceptionInfo e (= m (ex-data e)))))
 
 (deftest XYZ-to-XYZ-cat16-test
   ;; colour matrix_chromatic_adaptation_VonKries CAT16 C -> D65 applied to XYZ (0-100): 1e-12 relative to 100
@@ -327,7 +323,7 @@
                   ^Vec4 res (adapt (v/vec4 X Y Z 128.0))]]
       (is (< (max-abs-diff expected (take 3 res)) 1e-10) (str [X Y Z]))
       (is (== 128.0 (.w res)))))
-  (is (throws-method? :nope #(c/->XYZ-to-XYZ :nope wp/CIE-2-C wp/CIE-2-D65))))
+  (is (throws-data? {:method :nope} #(c/->XYZ-to-XYZ :nope wp/CIE-2-C wp/CIE-2-D65))))
 
 (deftest XYZ-LMS-test
   ;; LMS = Ma . XYZ vs colour, XYZ in 0-110: 1e-12; round trip 1e-12
@@ -339,8 +335,8 @@
     (is (< (max-abs-diff [L M S] (take 3 lms)) 1e-12) (str k [X Y Z]))
     (is (== 7.0 (.w lms)))
     (is (< (max-abs-diff [X Y Z] (take 3 (->xyz lms))) 1e-12) (str k [X Y Z])))
-  (is (throws-method? :nope #(c/->XYZ-to-LMS :nope)))
-  (is (throws-method? :nope #(c/->LMS-to-XYZ :nope))))
+  (is (throws-data? {:method :nope} #(c/->XYZ-to-LMS :nope)))
+  (is (throws-data? {:method :nope} #(c/->LMS-to-XYZ :nope))))
 
 (deftest RGB-to-RGB-test
   ;; colour RGB_to_RGB with colourspaces built from clojure2d primaries, white points and transfer
@@ -363,7 +359,7 @@
     (let [c (v/vec4 10.0 120.0 230.0 255.0)]
       (is (= ((c/->RGB-to-RGB :sRGB :Adobe-Wide-Gamut-RGB :bradford) c)
              ((c/->RGB-to-RGB :sRGB :Adobe-Wide-Gamut-RGB) c)))))
-  (is (throws-method? :nope #(c/->RGB-to-RGB :sRGB :Adobe-Wide-Gamut-RGB :nope))))
+  (is (throws-data? {:method :nope} #(c/->RGB-to-RGB :sRGB :Adobe-Wide-Gamut-RGB :nope))))
 
 ;; spectral wrappers, oracle: test/resources/whitepoints (utils/whitepoints/gen_reference.py)
 
@@ -391,7 +387,7 @@
   (is (not= (c/wavelength-to-XYZ 550.0 :CIE-10) (c/wavelength-to-XYZ 550.0 :CIE-2015-10)))
   (is (= [0.0 0.0 0.0] (take 3 (c/wavelength-to-XYZ 385.0 :CIE-2015-2))))
   (is (= [0.0 0.0 0.0] (take 3 (c/wavelength-to-XYZ 900.0))))
-  (is (throws-observer? :nope #(c/wavelength-to-XYZ 550.0 :nope))))
+  (is (throws-data? {:observer :nope} #(c/wavelength-to-XYZ 550.0 :nope))))
 
 (deftest wavelength-test
   ;; ripple of wavelength-to-XYZ: sRGB of the colour XYZ, clamped

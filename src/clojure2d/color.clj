@@ -1302,7 +1302,7 @@
 
   Parameters:
 
-  - `adaptation-method` (keyword, optional): `:bradford` (default), `:xyz-scaling`, `:von-kries`, `:sharp`, `:fairchild`, `:cat97`, `:cat97s`, `:cat2000`, `:cat02`, `:cat02brill2008`, `:cat16`, `:bianco2010` or `:bianco2010-pc`; see `clojure2d.color.whitepoints/chromatic-adaptation-methods`.
+  - `adaptation-method` (keyword, optional): `:bradford` (default), `:xyz-scaling`, `:von-kries`, `:sharp`, `:fairchild`, `:cat97`, `:cat97-colour`, `:cat97s`, `:cat2000`, `:cat02`, `:cat02brill2008`, `:cat16`, `:bianco2010` or `:bianco2010-pc`; see `clojure2d.color.whitepoints/chromatic-adaptation-methods`.
   - `source-wp`, `destination-wp` (`Vec4`): white points from `clojure2d.color.whitepoints`, for example `CIE-2-C` or `CIE-2-D65`.
 
   Returns a function of one XYZ color (any value accepted by [[to-color]], any scale, for example 0-100 as [[to-XYZ]]) returning the adapted XYZ as `Vec4`; alpha is kept.

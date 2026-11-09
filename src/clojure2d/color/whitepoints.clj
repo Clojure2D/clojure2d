@@ -3,12 +3,12 @@
 
   A white point is stored as a `Vec4` `[X Z x y]`: the `X` and `Z` tristimulus values of the white normalised to `Y = 1`, followed by its `x`, `y` chromaticity coordinates. Both pairs describe the same white, so either can be used without recomputation.
 
-  White points are available as the `whitepoints` map (keyword keys) and as vars named `<observer>-<illuminant>`, for example `CIE-2-D65`, `CIE-10-A` or `CIE-2015-2-FL2*`. The observer is `CIE-2` (1931 2°), `CIE-10` (1964 10°), `CIE-2015-2` or `CIE-2015-10` (2015 cone fundamental based). Names without a star are tabulated values; names ending with `*` are computed by integrating the illuminant spectrum with the observer's color matching functions.
+  White points are available as the `whitepoints` map (keyword keys) and as vars named `<observer>-<illuminant>`, for example `CIE-2-D65`, `CIE-10-A` or `CIE-2015-2-FL2*`. The observer is `CIE-2` (1931 2°), `CIE-10` (1964 10°), `CIE-2015-2` or `CIE-2015-10` (2015 cone fundamental based). Names ending with `*` are computed by integrating the illuminant spectrum with the observer's color matching functions; names without a star are tabulated chromaticities, except the D-series (D50, D55, D60, D65, D75) of the 1931 and 1964 observers, which are 1 nm integrations of CIE daylight spectra (see [[whitepoints]]).
 
   Contents:
 
   - coordinate helpers: [[xy->XZ]], [[XZ->xy]], [[xy->coordinates]], [[XZ->coordinates]], [[coordinates]], [[tristimulus]],
-  - chromatic adaptation: [[chromatic-adaptation-methods]] (13 von Kries type cone response matrices), [[chromatic-adaptation-transform]] and [[chromatic-adaptation-matrix]],
+  - chromatic adaptation: [[chromatic-adaptation-methods]] (14 von Kries type cone response matrices), [[chromatic-adaptation-transform]] and [[chromatic-adaptation-matrix]],
   - spectral data: [[color-matching-functions-data]], [[illuminants-spectrum-data]], color matching functions [[cmf]] (and `cmf-cie2-*`, `cmf-cie10-*`),
   - spectrum to XYZ: [[spectrum]], [[->spectrum-to-XYZ1]],
   - white point lookup: [[whitepoint]],
@@ -101,7 +101,7 @@
 
 (def ^{:doc "All white points as a map from keyword to `Vec4` `[X Z x y]` (`Y = 1`).
 
-  Keys are `:<observer>-<illuminant>` with an optional `*` suffix, for example `:CIE-2-D65` or `:CIE-2015-10-FL2*`; each key is also available as a var of the same name, for example `CIE-2-D65`. Values without a star are tabulated chromaticities, except the D-series entries (D50, D55, D60, D65, D75) which are 1 nm integrations of the CIE spectra; values with a star are computed from the illuminant spectrum and the observer's color matching functions, as [[->spectrum-to-XYZ1]] does with default options.
+  Keys are `:<observer>-<illuminant>` with an optional `*` suffix, for example `:CIE-2-D65` or `:CIE-2015-10-FL2*`; each key is also available as a var of the same name, for example `CIE-2-D65`. Values without a star are tabulated chromaticities, except the D-series entries (D50, D55, D60, D65, D75) which are 1 nm integrations of CIE daylight spectra (`CIE-2-D65` rounded to 6 decimals, see each var for the spectrum); values with a star are computed from the illuminant spectrum and the observer's color matching functions, as [[->spectrum-to-XYZ1]] does with default options.
 
   Data generated with colour-science (`utils/whitepoints/gen_resources.py`).
 
@@ -156,7 +156,9 @@
         provenance (cond
                      computed "Computed: 1 nm sum of the illuminant spectrum and the observer's color matching functions over the observer's range (as [[->spectrum-to-XYZ1]] with default options)."
                      (= k :CIE-2-D65) "Tabulated: 1 nm integration of the CIE D65 spectrum rounded to 6 decimals, (0.312727, 0.329023)."
-                     (#{"D50" "D55" "D60" "D65" "D75"} illuminant) "Tabulated: 1 nm integration of the CIE spectrum (300-830 nm, linear interpolation), full precision."
+                     (#{"D50" "D65"} illuminant) "1 nm integration of the official CIE spectrum (300-830 nm, linear interpolation), full precision."
+                     (#{"D55" "D75"} illuminant) "1 nm integration of the CIE 15 table (to 780 nm, colour-science) completed to 830 nm with the CIE daylight basis (linear interpolation), full precision."
+                     (= "D60" illuminant) "1 nm integration of the D-series spectrum computed from the CIE daylight basis (colour-science, 300-830 nm, linear interpolation), full precision."
                      :else "Tabulated chromaticity (colour-science).")]
     (str "White point `[X Z x y]` (`Y = 1`) of " (illuminant-name illuminant)
          " for the " (observer-names observer) " observer.\n\n  " provenance
@@ -231,7 +233,8 @@
   - `:von-kries` - von Kries, Hunt-Pointer-Estevez normalised to D65,
   - `:sharp` - Sharp (Süsstrunk, Holm and Finlayson 2001),
   - `:fairchild` - Fairchild 2001 revision of CMCCAT97,
-  - `:cat97` - CMCCAT97,
+  - `:cat97` - CMCCAT97 (CIECAM97s), the same matrix as `:bradford`; the nonlinear blue channel exponent of the full model is not applied,
+  - `:cat97-colour` - the CMCCAT97 matrix of colour-science (`CAT_CMCCAT97`, after Westland et al. 2012): the Bradford matrix transposed with one sign changed, a misprint kept for compatibility with colour-science,
   - `:cat97s` - the same matrix as `:fairchild`,
   - `:cat2000` - CMCCAT2000,
   - `:cat02` - CIECAM02,
@@ -246,7 +249,7 @@
         von-kries (mat/mat3x3 0.40024 0.7076 -0.08081 -0.2263 1.16532 0.0457 0.0 0.0 0.9182200)
         sharp (mat/mat3x3 1.2694 -0.0988 -0.1706 -0.8364 1.8006 0.0357 0.0297 -0.0315 1.0018)
         fairchild (mat/mat3x3 0.8562 0.3372 -0.1934 -0.8360 1.8327 0.0033 0.0357 -0.0469 1.0112)
-        cat97 (mat/mat3x3 0.8951 -0.7502 0.0389 0.2664 1.7135 0.0685 -0.1614 0.0367 1.0296)
+        cat97-colour (mat/mat3x3 0.8951 -0.7502 0.0389 0.2664 1.7135 0.0685 -0.1614 0.0367 1.0296)
         cat97s (mat/mat3x3 0.8562 0.3372 -0.1934 -0.8360 1.8327 0.0033 0.0357 -0.0469 1.0112)
         cat2000 (mat/mat3x3  0.7982 0.3389 -0.1371 -0.5918 1.5512 0.0406 0.0008 0.0239 0.9753)
         cat02 (mat/mat3x3  0.7328 0.4296 -0.1624 -0.7036 1.6975 0.0061 0.0030 0.0136 0.9834)
@@ -259,7 +262,8 @@
      :von-kries   [von-kries (mat/inverse von-kries)]
      :sharp       [sharp (mat/inverse sharp)]
      :fairchild   [fairchild (mat/inverse fairchild)]
-     :cat97       [cat97 (mat/inverse cat97)]
+     :cat97       [bradford (mat/inverse bradford)]
+     :cat97-colour [cat97-colour (mat/inverse cat97-colour)]
      :cat97s       [cat97s (mat/inverse cat97s)]
      :cat2000     [cat2000 (mat/inverse cat2000)]
      :cat02       [cat02 (mat/inverse cat02)]
@@ -292,7 +296,7 @@
 
   Parameters:
 
-  - `adaptation-method` (keyword, required): a key of [[chromatic-adaptation-methods]]: `:xyz-scaling`, `:bradford`, `:von-kries`, `:sharp`, `:fairchild`, `:cat97`, `:cat97s`, `:cat2000`, `:cat02`, `:cat02brill2008`, `:cat16`, `:bianco2010`, `:bianco2010-pc`.
+  - `adaptation-method` (keyword, required): a key of [[chromatic-adaptation-methods]]: `:xyz-scaling`, `:bradford`, `:von-kries`, `:sharp`, `:fairchild`, `:cat97`, `:cat97-colour`, `:cat97s`, `:cat2000`, `:cat02`, `:cat02brill2008`, `:cat16`, `:bianco2010`, `:bianco2010-pc`.
   - `source-wp`, `destination-wp` (`Vec4`): white points `[X Z x y]`, for example `CIE-2-C` or `CIE-2-D65`.
 
   Returns a `Mat3x3` converting XYZ under the source white point to XYZ under the destination white point; equal white points give the identity.
@@ -455,9 +459,9 @@
                                                              {:range (:range observer-data)
                                                               :lambda (:lambda observer-data)
                                                               :value (k observer-data)}))
-         x (observer-interpolator :x)
-         y (observer-interpolator :y)
-         z (observer-interpolator :z)
+         [x y z] (if (map? observer)
+                   [(observer-interpolator :x) (observer-interpolator :y) (observer-interpolator :z)]
+                   (cmf observer))
          illuminant-interpolator (spectrum-interpolator illuminant-interpolation extrapolation illuminant-data)
          lambdas (double-array n)
          wx (double-array n) wy (double-array n) wz (double-array n)]
@@ -509,18 +513,23 @@
   [method]
   (throw (ex-info (str "Unknown method: " method) {:method method})))
 
+(defn- cct-domain-error
+  [method cct lo hi]
+  (ex-info (str "Correlated color temperature " cct " K outside the domain of " method ": [" lo ", " hi "]")
+           {:method method :cct cct}))
+
 (defn- check-cct-domain!
   [method ^double cct ^double lo ^double hi]
   (when-not (m/<= lo cct hi)
-    (throw (ex-info (str "Correlated color temperature " cct " K outside the domain of " method ": [" lo ", " hi "]")
-                    {:method method :cct cct}))))
+    (throw (cct-domain-error method cct lo hi))))
 
 (def ^{:private true :const true :tag 'double} INVERSE-DOMAIN-RTOL 1.0e-9)
 
 (defn- check-inverse-cct-domain!
   "Domain check of a numerically found CCT: accepts results within the minimiser accuracy of a boundary."
   [method ^double cct ^double lo ^double hi]
-  (check-cct-domain! method cct (m/* lo (m/- 1.0 INVERSE-DOMAIN-RTOL)) (m/* hi (m/+ 1.0 INVERSE-DOMAIN-RTOL))))
+  (when-not (m/<= (m/* lo (m/- 1.0 INVERSE-DOMAIN-RTOL)) cct (m/* hi (m/+ 1.0 INVERSE-DOMAIN-RTOL)))
+    (throw (cct-domain-error method cct lo hi))))
 
 (defn- CCT->xy-cie-d-unchecked
   ^Vec2 [^double cct]
@@ -623,9 +632,9 @@
 
   - `method` (keyword, optional):
       - `:cie-d` (default) - CCT of the nearest point (in xy) of the CIE daylight locus, found numerically; the result must be in 4000-25000 K (up to a relative 1e-9),
-      - `:mccamy` - McCamy 1992 cubic approximation, accurate near the Planckian locus for about 2000-12500 K,
+      - `:mccamy` - McCamy 1992 cubic approximation, accurate to about 2 K near the Planckian locus between 2856 K (A) and 6504 K (D65); the error grows outside (about 20 K at 2000 K, 120 K at 10000 K for blackbody chromaticities),
       - `:hernandez` - Hernández-Andrés et al. 1999 exponential approximation, for about 3000-800000 K.
-  - `xy` (`Vec2`) or `x`, `y` (doubles): chromaticity coordinates (CIE 1931 2° observer). A 2-arity call with a keyword as the first argument is `[method xy]`.
+  - `xy` (`Vec2`) or `x`, `y` (doubles): chromaticity coordinates (CIE 1931 2° observer). A 2-arity call with a number as the first argument is `[x y]`, otherwise `[method xy]`.
 
   Returns the CCT in K as a double. `:mccamy` and `:hernandez` are closed forms and do not check their accuracy range.
 
@@ -634,9 +643,9 @@
   See also [[CCT->xy]], [[uv->CCT]]."
   (^double [^Vec2 xy] (xy->CCT-cie-d (.x xy) (.y xy)))
   (^double [a b]
-   (if (keyword? a)
-     (let [^Vec2 xy b] (xy->CCT-dispatch a (.x xy) (.y xy)))
-     (xy->CCT-cie-d (double a) (double b))))
+   (if (number? a)
+     (xy->CCT-cie-d (double a) (double b))
+     (let [^Vec2 xy b] (xy->CCT-dispatch a (.x xy) (.y xy)))))
   (^double [method ^double x ^double y] (xy->CCT-dispatch method x y)))
 
 (defn- CCT->uv-krystek-unchecked
@@ -679,7 +688,7 @@
   Parameters:
 
   - `method` (keyword, optional): `:krystek` (default) - CCT of the nearest point (in uv) of the Krystek 1985 Planckian locus, found numerically; the result must be in 1000-15000 K (up to a relative 1e-9).
-  - `uv` (`Vec2`) or `u`, `v` (doubles): CIE 1960 UCS coordinates. A 2-arity call with a keyword as the first argument is `[method uv]`.
+  - `uv` (`Vec2`) or `u`, `v` (doubles): CIE 1960 UCS coordinates. A 2-arity call with a number as the first argument is `[u v]`, otherwise `[method uv]`.
 
   Returns the CCT in K as a double.
 
@@ -688,9 +697,9 @@
   See also [[CCT->uv]], [[xy->CCT]]."
   (^double [^Vec2 uv] (uv->CCT-krystek (.x uv) (.y uv)))
   (^double [a b]
-   (if (keyword? a)
-     (let [^Vec2 uv b] (uv->CCT a (.x uv) (.y uv)))
-     (uv->CCT-krystek (double a) (double b))))
+   (if (number? a)
+     (uv->CCT-krystek (double a) (double b))
+     (let [^Vec2 uv b] (uv->CCT a (.x uv) (.y uv)))))
   (^double [method ^double u ^double v]
    (case method
      :krystek (uv->CCT-krystek u v)

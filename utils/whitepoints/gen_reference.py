@@ -73,9 +73,11 @@ def XZ_rows(rng):
     return [[X, Z, *colour.XYZ_to_xy(np.array([X, 1.0, Z]))] for X, Z in XZs]
 
 
-# clojure2d method -> colour transform; :cat97s is the Fairchild (2001 revised CMCCAT97) matrix
+# clojure2d method -> colour transform; :cat97s is the Fairchild (2001 revised CMCCAT97) matrix;
+# :cat97 is the Bradford matrix (CIECAM97s, eq. 2.2 of the CIE TC 1-34 draft): colour's CAT_CMCCAT97
+# is a transposed misprint (Westland 2012), the oracle of :cat97-colour
 CAT = {"xyz-scaling": "XYZ Scaling", "bradford": "Bradford", "von-kries": "Von Kries",
-       "sharp": "Sharp", "fairchild": "Fairchild", "cat97": "CMCCAT97", "cat97s": "Fairchild",
+       "sharp": "Sharp", "fairchild": "Fairchild", "cat97": "Bradford", "cat97-colour": "CMCCAT97", "cat97s": "Fairchild",
        "cat2000": "CMCCAT2000", "cat02": "CAT02", "cat02brill2008": "CAT02 Brill 2008",
        "cat16": "CAT16", "bianco2010": "Bianco 2010", "bianco2010-pc": "Bianco PC 2010"}
 PAIRS = [("CIE-2-C", "CIE-2-D65"), ("CIE-2-A", "CIE-2-D50"), ("CIE-2-D65", "CIE-2-E")]

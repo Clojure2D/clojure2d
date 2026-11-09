@@ -2,7 +2,8 @@
   "White point helpers, adaptation and spectral data checked against oracles generated in `utils/whitepoints/`:
 
   - colour-science 0.4.7 (`colour_reference.edn`) - primary oracle,
-  - R spacesXYZ 1.6.0 (`spacesxyz_reference.edn`) - second oracle for adaptation matrices."
+  - R spacesXYZ 1.6.0 (`spacesxyz_reference.edn`) - second oracle for adaptation matrices,
+  - R colorSpec 1.8.0 (`colorspec_reference.edn`) - independent oracle for the D-series white points."
   (:require [clojure.test :refer [deftest is testing]]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
@@ -15,12 +16,19 @@
 
 (def colour (delay (reference "colour_reference.edn")))
 (def spacesxyz (delay (reference "spacesxyz_reference.edn")))
+(def colorspec (delay (reference "colorspec_reference.edn")))
 
 (defn- rel-close?
   "Absolute difference within `tol`, scaled by `max(1, |b|)`."
   [^double tol a b]
   (let [a (double a) b (double b)]
     (m/<= (m/abs (m/- a b)) (m/* tol (m/max 1.0 (m/abs b))))))
+
+(defn- throws-data?
+  "Calls `f`, expects `ex-info` with exactly `m` as data."
+  [m f]
+  (try (f) false
+       (catch clojure.lang.ExceptionInfo e (= m (ex-data e)))))
 
 (defn- vec-close?
   [tol as bs]
@@ -83,37 +91,34 @@
 
 ;; G2: chromatic adaptation
 
-(defn- throws-method?
-  [k f]
-  (try (f) false
-       (catch clojure.lang.ExceptionInfo e (= {:method k} (ex-data e)))))
-
-(def ^:private methods-13 [:xyz-scaling :bradford :von-kries :sharp :fairchild :cat97 :cat97s :cat2000
+(def ^:private adaptation-methods [:xyz-scaling :bradford :von-kries :sharp :fairchild :cat97 :cat97-colour :cat97s :cat2000
                            :cat02 :cat02brill2008 :cat16 :bianco2010 :bianco2010-pc])
 
 (deftest chromatic-adaptation-methods-test
-  (is (= (set methods-13) (set (keys wp/chromatic-adaptation-methods))))
-  (testing "cone response matrices equal colour CHROMATIC_ADAPTATION_TRANSFORMS (:cat97s is Fairchild)"
+  (is (= (set adaptation-methods) (set (keys wp/chromatic-adaptation-methods))))
+  (testing ":cat97 is the Bradford matrix (CIECAM97s); colour's CMCCAT97 is a transposed misprint"
+    (is (= (wp/chromatic-adaptation-methods :bradford) (wp/chromatic-adaptation-methods :cat97))))
+  (testing "cone response matrices equal colour CHROMATIC_ADAPTATION_TRANSFORMS (:cat97 is Bradford, :cat97-colour is CMCCAT97, :cat97s is Fairchild)"
     (doseq [[k expected] (:cat-matrices @colour)]
       (is (= expected (mat/mat->seq (first (wp/chromatic-adaptation-methods k)))) (str k))))
   (testing "inverse: M * M^-1 = I (1e-12)"
-    (doseq [k methods-13
+    (doseq [k adaptation-methods
             :let [[M M-1] (wp/chromatic-adaptation-methods k)]]
       (is (vec-close? 1.0e-12 (mat/mat->seq (mat/eye 3)) (mat/mat->seq (mat/mulm M M-1))) (str k)))))
 
 (deftest chromatic-adaptation-transform-test
-  (doseq [k methods-13]
+  (doseq [k adaptation-methods]
     (is (identical? (wp/chromatic-adaptation-methods k) (wp/chromatic-adaptation-transform k))))
-  (is (throws-method? :nope #(wp/chromatic-adaptation-transform :nope)))
-  (is (throws-method? nil #(wp/chromatic-adaptation-transform nil))))
+  (is (throws-data? {:method :nope} #(wp/chromatic-adaptation-transform :nope)))
+  (is (throws-data? {:method nil} #(wp/chromatic-adaptation-transform nil))))
 
 (defn- wp-var [k] @(ns-resolve 'clojure2d.color.whitepoints (symbol (name k))))
 
 (deftest chromatic-adaptation-matrix-test
-  ;; 13 methods x (C -> D65, A -> D50, D65 -> E), same formula as colour
+  ;; 14 methods x (C -> D65, A -> D50, D65 -> E), same formula as colour
   ;; matrix_chromatic_adaptation_VonKries: 1e-12 (observed differences are a few ulps)
   (testing "colour"
-    (is (= 39 (count (:adaptation @colour))))
+    (is (= 42 (count (:adaptation @colour))))
     (doseq [[[k s d] expected] (:adaptation @colour)]
       (is (vec-close? 1.0e-12 expected (mat/mat->seq (wp/chromatic-adaptation-matrix k (wp-var s) (wp-var d))))
           (str [k s d]))))
@@ -123,26 +128,21 @@
       (is (vec-close? 1.0e-12 expected (mat/mat->seq (wp/chromatic-adaptation-matrix k (wp-var s) (wp-var d))))
           (str [k s d]))))
   (testing "equal white points give the identity"
-    (doseq [k methods-13]
+    (doseq [k adaptation-methods]
       (is (vec-close? 1.0e-15 (mat/mat->seq (mat/eye 3))
                       (mat/mat->seq (wp/chromatic-adaptation-matrix k wp/CIE-2-D65 wp/CIE-2-D65)))
           (str k))))
   (testing "maps the source white to the destination white"
-    (doseq [k methods-13]
+    (doseq [k adaptation-methods]
       (is (vec-close? 1.0e-12 (vec (wp/tristimulus wp/CIE-2-D50))
                       (vec (mat/mulv (wp/chromatic-adaptation-matrix k wp/CIE-2-A wp/CIE-2-D50)
                                      (wp/tristimulus wp/CIE-2-A))))
           (str k))))
-  (is (throws-method? :nope #(wp/chromatic-adaptation-matrix :nope wp/CIE-2-C wp/CIE-2-D65))))
+  (is (throws-data? {:method :nope} #(wp/chromatic-adaptation-matrix :nope wp/CIE-2-C wp/CIE-2-D65))))
 
 ;; G3: spectral data and spectrum -> XYZ
 
 (def ^:private observers [:CIE-2 :CIE-10 :CIE-2015-2 :CIE-2015-10])
-
-(defn- throws-data?
-  [m f]
-  (try (f) false
-       (catch clojure.lang.ExceptionInfo e (= m (ex-data e)))))
 
 (defn- xy [[^double X ^double Y ^double Z]] (let [s (m/+ X Y Z)] [(m// X s) (m// Y s)]))
 
@@ -290,6 +290,14 @@
           :let [^Vec4 w (wp/whitepoints k)]]
     (is (vec-close? 1.0e-12 (xy XYZ) (wp-xy k)) (str k))
     (is (vec-close? 1.0e-12 [(first XYZ) (last XYZ)] [(.x w) (.y w)]) (str k)))
+  (testing "colorSpec (own observer data, official CIE D65/D50, daylight basis): D50, D60, D65 1e-12;
+            D55, D75 2e-7 (CIE 15 5 nm table vs basis-computed spectrum)"
+    (doseq [[k XYZ] (:d-series @colorspec)
+            :when (not= :CIE-2-D65 k)
+            :let [tol (if (#{:CIE-2-D55 :CIE-10-D55 :CIE-2-D75 :CIE-10-D75} k) 2.0e-7 1.0e-12)]]
+      (is (vec-close? tol (xy XYZ) (wp-xy k)) (str k)))
+    (let [[x y] (xy (get-in @colorspec [:d-series :CIE-2-D65]))]
+      (is (= [0.312727 0.329023] [(m/approx x 6) (m/approx y 6)]))))
   (testing "CIE-2-D65 is the CIE D65 integration rounded to 6 decimals"
     (let [[x y] (xy (get-in @colour [:d-series :CIE-2-D65]))]
       (is (= [0.312727 0.329023] [(m/approx x 6) (m/approx y 6)])))))
@@ -353,6 +361,9 @@
       (is (rel-close? 1.0e-8 t (wp/xy->CCT (wp/CCT->xy t))) (str t))))
   (testing "errors"
     (is (throws-data? {:method :nope} #(wp/xy->CCT :nope 0.3 0.3)))
+    (is (throws-data? {:method nil} #(wp/xy->CCT nil (Vec2. 0.31 0.33))))
+    (is (throws-data? {:method nil} #(wp/uv->CCT nil (Vec2. 0.2 0.3))))
+    (is (re-find #"\[4000\.0, 25000\.0\]" (try (wp/xy->CCT 0.5 0.41) "" (catch clojure.lang.ExceptionInfo e (ex-message e)))))
     (is (= :cie-d (:method (try (wp/xy->CCT 0.5 0.41) (catch clojure.lang.ExceptionInfo e (ex-data e))))))
     (is (< (:cct (ex-data (try (wp/xy->CCT 0.5 0.41) (catch clojure.lang.ExceptionInfo e e)))) 4000.0))))
 

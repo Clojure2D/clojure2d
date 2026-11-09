@@ -7,7 +7,7 @@ Generators for the data of `clojure2d.color.whitepoints` and its test oracles. R
 | `export_cie_spectra.R` | R with `colorSpec` (1.8.0) | `utils/whitepoints/data/cie_spectra.csv` (official CIE D65 1 nm and D50 5 nm spectra, generator input) |
 | `gen_resources.py` | colour-science 0.4.7 in `/home/ts/penv` | `resources/color/whitepoints.edn`, `illuminants.edn`, `cmfs_standard_observer.edn`, `illuminant_d_series_basis.edn` (library data) |
 | `gen_reference.py` | colour-science 0.4.7 in `/home/ts/penv` | `test/resources/whitepoints/colour_reference.edn` |
-| `gen_reference.R` | R with `spacesXYZ` (1.6.0) | `test/resources/whitepoints/spacesxyz_reference.edn` |
+| `gen_reference.R` | R with `spacesXYZ` (1.6.0) and `colorSpec` (1.8.0) | `test/resources/whitepoints/spacesxyz_reference.edn`, `colorspec_reference.edn` (D-series white points computed independently of colour-science) |
 
 ```
 Rscript utils/whitepoints/export_cie_spectra.R
