@@ -7,11 +7,14 @@ All notable changes to this project will be documented in this file. This change
 
 * Munsell colours: `clojure2d.color/munsell-to-Yxy` (D65 by default) and `clojure2d.color/munsell-to-sRGB` (not clamped)
 * `clojure2d.color.munsell` namespace (port of colour-science, BSD-3-Clause): `munsell-spec`, `munsell-to-Yxy` (Illuminant C by default), `munsell-value` and `luminance` with `:astm`, `:newhall`, `:osa`, `:priest`, `:munsell`, `:moon`, `:saunderson`, `:ladd`, `:mccamy` value scales
+* `clojure2d.color.whitepoints/chromatic-adaptation-transform`: cone response matrices of an adaptation method, throws for an unknown one
+* Docstrings for `clojure2d.color.whitepoints` (namespace, coordinate helpers, adaptation), `->XYZ-to-LMS`, `->LMS-to-XYZ`, `->RGB-to-RGB`
 
 ### Fixed
 
 * `clojure2d.color.whitepoints/chromatic-adaptation-matrix` (and `->XYZ-to-XYZ`) failed with a `ClassCastException` mixing `RealMatrix` and `Mat3x3`
 * `:rainbow` gradient returned channel values above 255 (now clamped like other gradients)
+* An unknown chromatic adaptation method in `chromatic-adaptation-matrix`, `->XYZ-to-XYZ`, `->XYZ-to-LMS`, `->LMS-to-XYZ` and `->RGB-to-RGB` (white points differ) failed with an unrelated `IllegalArgumentException` (LMS builders only when called); now throws `ex-info` with `{:method k}` when the converter is built
 
 ## 1.5.0-alpha1
 

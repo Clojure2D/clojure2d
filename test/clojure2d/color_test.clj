@@ -302,3 +302,60 @@
 (deftest rainbow-gradient-range-test
   (let [g (c/gradient :rainbow)]
     (is (every? (fn [t] (every? #(<= 0.0 % 255.0) (take 3 (g (/ t 1000.0))))) (range 1001)))))
+
+;; chromatic adaptation wrappers, oracle: test/resources/whitepoints (utils/whitepoints/gen_reference.py)
+
+(def ^:private whitepoints-colour
+  (delay (-> "whitepoints/colour_reference.edn" clojure.java.io/resource slurp clojure.edn/read-string)))
+
+(defn- throws-method?
+  [k f]
+  (try (f) false
+       (catch clojure.lang.ExceptionInfo e (= {:method k} (ex-data e)))))
+
+(deftest XYZ-to-XYZ-cat16-test
+  ;; colour matrix_chromatic_adaptation_VonKries CAT16 C -> D65 applied to XYZ (0-100): 1e-12 relative to 100
+  (let [M (partition 3 (get-in @whitepoints-colour [:adaptation [:cat16 :CIE-2-C :CIE-2-D65]]))
+        adapt (c/->XYZ-to-XYZ :cat16 wp/CIE-2-C wp/CIE-2-D65)]
+    (doseq [[X Y Z] (map (partial take 3) (get-in @whitepoints-colour [:lms :cat16]))
+            :let [expected (map (fn [row] (reduce + (map * row [X Y Z]))) M)
+                  ^Vec4 res (adapt (v/vec4 X Y Z 128.0))]]
+      (is (< (max-abs-diff expected (take 3 res)) 1e-10) (str [X Y Z]))
+      (is (== 128.0 (.w res)))))
+  (is (throws-method? :nope #(c/->XYZ-to-XYZ :nope wp/CIE-2-C wp/CIE-2-D65))))
+
+(deftest XYZ-LMS-test
+  ;; LMS = Ma . XYZ vs colour, XYZ in 0-110: 1e-12; round trip 1e-12
+  (doseq [[k rows] (:lms @whitepoints-colour)
+          :let [->lms (c/->XYZ-to-LMS k)
+                ->xyz (c/->LMS-to-XYZ k)]
+          [X Y Z L M S] rows
+          :let [^Vec4 lms (->lms (v/vec4 X Y Z 7.0))]]
+    (is (< (max-abs-diff [L M S] (take 3 lms)) 1e-12) (str k [X Y Z]))
+    (is (== 7.0 (.w lms)))
+    (is (< (max-abs-diff [X Y Z] (take 3 (->xyz lms))) 1e-12) (str k [X Y Z])))
+  (is (throws-method? :nope #(c/->XYZ-to-LMS :nope)))
+  (is (throws-method? :nope #(c/->LMS-to-XYZ :nope))))
+
+(deftest RGB-to-RGB-test
+  ;; colour RGB_to_RGB with colourspaces built from clojure2d primaries, white points and transfer
+  ;; functions (0-255): sRGB -> Adobe RGB 1998 (same white point), sRGB -> Adobe Wide Gamut RGB
+  ;; (D65 -> D50, Bradford).
+  ;; Linear target values (decoded with the target transfer function): 1e-12 on 0-255.
+  ;; Encoded values: 1e-9, except channels below 1e-3 where the gamma slope (infinite at 0)
+  ;; amplifies 1e-17 linear rounding noise to ~1e-5 (pure red/blue into Adobe RGB).
+  (doseq [[[s t k] rows] (:rgb-to-rgb @whitepoints-colour)
+          :let [f (c/->RGB-to-RGB s t k)
+                linear (c/->RGB-to-linear-RGB t)]
+          [r g b & expected] rows
+          :let [actual (f (v/vec4 r g b 255.0))]]
+    (is (< (max-abs-diff (take 3 (linear (apply v/vec4 (concat expected [255.0])))) (take 3 (linear actual))) 1e-12)
+        (str [s t r g b]))
+    (is (every? (fn [[e a]] (or (< (abs (double e)) 1e-3) (< (abs (- (double e) (double a))) 1e-9)))
+                (map vector expected actual))
+        (str [s t r g b])))
+  (testing "default method is :bradford"
+    (let [c (v/vec4 10.0 120.0 230.0 255.0)]
+      (is (= ((c/->RGB-to-RGB :sRGB :Adobe-Wide-Gamut-RGB :bradford) c)
+             ((c/->RGB-to-RGB :sRGB :Adobe-Wide-Gamut-RGB) c)))))
+  (is (throws-method? :nope #(c/->RGB-to-RGB :sRGB :Adobe-Wide-Gamut-RGB :nope))))

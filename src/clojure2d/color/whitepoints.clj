@@ -8,7 +8,7 @@
   Contents:
 
   - coordinate helpers: [[xy->XZ]], [[XZ->xy]], [[xy->coordinates]], [[XZ->coordinates]], [[coordinates]], [[tristimulus]],
-  - chromatic adaptation: [[chromatic-adaptation-methods]] (13 von Kries type cone response matrices) and [[chromatic-adaptation-matrix]],
+  - chromatic adaptation: [[chromatic-adaptation-methods]] (13 von Kries type cone response matrices), [[chromatic-adaptation-transform]] and [[chromatic-adaptation-matrix]],
   - spectral data: [[color-matching-functions-data]], [[illuminants-spectrum-data]] and interpolated color matching functions."
   (:require [fastmath.core :as m]
             [fastmath.vector :as v]
@@ -140,7 +140,25 @@
 
 ;; http://www.brucelindbloom.com/index.html?Eqn_ChromAdapt.html
 
-(def chromatic-adaptation-methods
+(def ^{:doc "Cone response matrices of the von Kries type chromatic adaptation transforms, keyed by method.
+
+  Each value is a pair `[Ma Ma-1]` of `Mat3x3`: `Ma` converts XYZ to cone response (LMS like) space, `Ma-1` is its inverse. Methods:
+
+  - `:xyz-scaling` - identity, scaling in XYZ,
+  - `:bradford` - Bradford (Lam 1985),
+  - `:von-kries` - von Kries, Hunt-Pointer-Estevez normalised to D65,
+  - `:sharp` - Sharp (Süsstrunk, Holm and Finlayson 2001),
+  - `:fairchild` - Fairchild 2001 revision of CMCCAT97,
+  - `:cat97` - CMCCAT97,
+  - `:cat97s` - the same matrix as `:fairchild`,
+  - `:cat2000` - CMCCAT2000,
+  - `:cat02` - CIECAM02,
+  - `:cat02brill2008` - CAT02 with the Brill and Süsstrunk 2008 correction,
+  - `:cat16` - CAM16,
+  - `:bianco2010`, `:bianco2010-pc` - Bianco and Schettini 2010, plain and with a positivity constraint.
+
+  See also [[chromatic-adaptation-transform]], [[chromatic-adaptation-matrix]]."}
+  chromatic-adaptation-methods
   (let [I         (mat/eye 3)
         bradford  (mat/mat3x3 0.8951 0.2664 -0.1614 -0.7502 1.7135 0.0367 0.0389 -0.0685  1.0296)
         von-kries (mat/mat3x3 0.40024 0.7076 -0.08081 -0.2263 1.16532 0.0457 0.0 0.0 0.9182200)
@@ -168,19 +186,42 @@
      :bianco2010  [bianco2010 (mat/inverse bianco2010)]
      :bianco2010-pc [bianco2010-pc (mat/inverse bianco2010-pc)]}))
 
-(defn chromatic-adaptation-matrix
-  "Von-Kries type chromatic adaptation matrix between two white points.
+(defn chromatic-adaptation-transform
+  "Returns the cone response matrices of a chromatic adaptation method.
 
   Parameters:
 
-  - `adaptation-method` (keyword, required): one of `:xyz-scaling`, `:bradford`, `:von-kries`, `:sharp`, `:fairchild`, `:cat97`, `:cat97s`, `:cat2000`, `:cat02`, `:cat02brill2008`, `:cat16`, `:bianco2010`, `:bianco2010-pc`.
-  - `source-wp`, `destination-wp` (`Vec4`): white points, for example `CIE-2-C` or `CIE-2-D65`.
+  - `adaptation-method` (keyword): a key of [[chromatic-adaptation-methods]], for example `:bradford` or `:cat16`.
 
-  Returns a `Mat3x3` converting XYZ under the source white point to XYZ under the destination white point."
+  Returns a pair `[Ma Ma-1]` of `Mat3x3`: XYZ to cone response and its inverse.
+
+  Throws `ex-info` with `{:method adaptation-method}` for an unknown method.
+
+  See also [[chromatic-adaptation-matrix]]."
+  [adaptation-method]
+  (or (chromatic-adaptation-methods adaptation-method)
+      (throw (ex-info (str "Unknown chromatic adaptation method: " adaptation-method)
+                      {:method adaptation-method}))))
+
+(defn chromatic-adaptation-matrix
+  "Calculates the von Kries type chromatic adaptation matrix between two white points.
+
+  The matrix is `Ma-1 · diag(Ma · wd / Ma · ws) · Ma`, where `ws` and `wd` are the white point tristimulus values (with `Y = 1`) and `Ma` the cone response matrix of the method.
+
+  Parameters:
+
+  - `adaptation-method` (keyword, required): a key of [[chromatic-adaptation-methods]]: `:xyz-scaling`, `:bradford`, `:von-kries`, `:sharp`, `:fairchild`, `:cat97`, `:cat97s`, `:cat2000`, `:cat02`, `:cat02brill2008`, `:cat16`, `:bianco2010`, `:bianco2010-pc`.
+  - `source-wp`, `destination-wp` (`Vec4`): white points `[X Z x y]`, for example `CIE-2-C` or `CIE-2-D65`.
+
+  Returns a `Mat3x3` converting XYZ under the source white point to XYZ under the destination white point; equal white points give the identity.
+
+  Throws `ex-info` with `{:method adaptation-method}` for an unknown method.
+
+  See also [[chromatic-adaptation-transform]], [[tristimulus]]."
   (^Mat3x3 [adaptation-method source-wp destination-wp]
    (let [ws (tristimulus source-wp)
          wd (tristimulus destination-wp)
-         [Ma Ma-1] (chromatic-adaptation-methods adaptation-method)
+         [Ma Ma-1] (chromatic-adaptation-transform adaptation-method)
          s (mat/mulv Ma ws)
          d (mat/mulv Ma wd)
          ^Vec3 r (v/ediv d s)

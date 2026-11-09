@@ -1,17 +1,20 @@
 (ns clojure2d.color.whitepoints-test
   "White point helpers, adaptation and spectral data checked against oracles generated in `utils/whitepoints/`:
 
-  - colour-science 0.4.7 (`colour_reference.edn`) - primary oracle."
+  - colour-science 0.4.7 (`colour_reference.edn`) - primary oracle,
+  - R spacesXYZ 1.6.0 (`spacesxyz_reference.edn`) - second oracle for adaptation matrices."
   (:require [clojure.test :refer [deftest is testing]]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
             [fastmath.core :as m]
+            [fastmath.matrix :as mat]
             [clojure2d.color.whitepoints :as wp])
   (:import [fastmath.vector Vec2 Vec3 Vec4]))
 
 (defn- reference [name] (-> (str "whitepoints/" name) io/resource slurp edn/read-string))
 
 (def colour (delay (reference "colour_reference.edn")))
+(def spacesxyz (delay (reference "spacesxyz_reference.edn")))
 
 (defn- rel-close?
   "Absolute difference within `tol`, scaled by `max(1, |b|)`."
@@ -77,3 +80,57 @@
     (is (re-find #"\[X Z x y\]" doc))
     (is (re-find #"<observer>-<illuminant>" doc))
     (is (re-find #"\*" doc))))
+
+;; G2: chromatic adaptation
+
+(defn- throws-method?
+  [k f]
+  (try (f) false
+       (catch clojure.lang.ExceptionInfo e (= {:method k} (ex-data e)))))
+
+(def ^:private methods-13 [:xyz-scaling :bradford :von-kries :sharp :fairchild :cat97 :cat97s :cat2000
+                           :cat02 :cat02brill2008 :cat16 :bianco2010 :bianco2010-pc])
+
+(deftest chromatic-adaptation-methods-test
+  (is (= (set methods-13) (set (keys wp/chromatic-adaptation-methods))))
+  (testing "cone response matrices equal colour CHROMATIC_ADAPTATION_TRANSFORMS (:cat97s is Fairchild)"
+    (doseq [[k expected] (:cat-matrices @colour)]
+      (is (= expected (mat/mat->seq (first (wp/chromatic-adaptation-methods k)))) (str k))))
+  (testing "inverse: M * M^-1 = I (1e-12)"
+    (doseq [k methods-13
+            :let [[M M-1] (wp/chromatic-adaptation-methods k)]]
+      (is (vec-close? 1.0e-12 (mat/mat->seq (mat/eye 3)) (mat/mat->seq (mat/mulm M M-1))) (str k)))))
+
+(deftest chromatic-adaptation-transform-test
+  (doseq [k methods-13]
+    (is (identical? (wp/chromatic-adaptation-methods k) (wp/chromatic-adaptation-transform k))))
+  (is (throws-method? :nope #(wp/chromatic-adaptation-transform :nope)))
+  (is (throws-method? nil #(wp/chromatic-adaptation-transform nil))))
+
+(defn- wp-var [k] @(ns-resolve 'clojure2d.color.whitepoints (symbol (name k))))
+
+(deftest chromatic-adaptation-matrix-test
+  ;; 13 methods x (C -> D65, A -> D50, D65 -> E), same formula as colour
+  ;; matrix_chromatic_adaptation_VonKries: 1e-12 (observed differences are a few ulps)
+  (testing "colour"
+    (is (= 39 (count (:adaptation @colour))))
+    (doseq [[[k s d] expected] (:adaptation @colour)]
+      (is (vec-close? 1.0e-12 expected (mat/mat->seq (wp/chromatic-adaptation-matrix k (wp-var s) (wp-var d))))
+          (str [k s d]))))
+  (testing "spacesXYZ (:xyz-scaling, :bradford, :von-kries, :cat02, :bianco2010)"
+    (is (= 15 (count (:adaptation @spacesxyz))))
+    (doseq [[[k s d] expected] (:adaptation @spacesxyz)]
+      (is (vec-close? 1.0e-12 expected (mat/mat->seq (wp/chromatic-adaptation-matrix k (wp-var s) (wp-var d))))
+          (str [k s d]))))
+  (testing "equal white points give the identity"
+    (doseq [k methods-13]
+      (is (vec-close? 1.0e-15 (mat/mat->seq (mat/eye 3))
+                      (mat/mat->seq (wp/chromatic-adaptation-matrix k wp/CIE-2-D65 wp/CIE-2-D65)))
+          (str k))))
+  (testing "maps the source white to the destination white"
+    (doseq [k methods-13]
+      (is (vec-close? 1.0e-12 (vec (wp/tristimulus wp/CIE-2-D50))
+                      (vec (mat/mulv (wp/chromatic-adaptation-matrix k wp/CIE-2-A wp/CIE-2-D50)
+                                     (wp/tristimulus wp/CIE-2-A))))
+          (str k))))
+  (is (throws-method? :nope #(wp/chromatic-adaptation-matrix :nope wp/CIE-2-C wp/CIE-2-D65))))

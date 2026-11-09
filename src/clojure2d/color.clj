@@ -1298,9 +1298,18 @@
 ;; ### XYZ
 
 (defn ->XYZ-to-XYZ
-  "Create XYZ converter between different white points and given adaptation method.
+  "Creates a chromatic adaptation converter of XYZ colors between two white points.
 
-  Adaptation method can be one of: `:xyz-scaling`, `:bradford` (default), `:von-kries`, `:sharp`, `:fairchild`, `:cat97`, `:cat2000`, `:cat02`, `:cat02brill2008`, `:cat16`, `bianco2010`, `:bianco2010-pc`."
+  Parameters:
+
+  - `adaptation-method` (keyword, optional): `:bradford` (default), `:xyz-scaling`, `:von-kries`, `:sharp`, `:fairchild`, `:cat97`, `:cat97s`, `:cat2000`, `:cat02`, `:cat02brill2008`, `:cat16`, `:bianco2010` or `:bianco2010-pc`; see `clojure2d.color.whitepoints/chromatic-adaptation-methods`.
+  - `source-wp`, `destination-wp` (`Vec4`): white points from `clojure2d.color.whitepoints`, for example `CIE-2-C` or `CIE-2-D65`.
+
+  Returns a function of one XYZ color (any value accepted by [[to-color]], any scale, for example 0-100 as [[to-XYZ]]) returning the adapted XYZ as `Vec4`; alpha is kept.
+
+  Throws `ex-info` with `{:method adaptation-method}` for an unknown method.
+
+  See also `clojure2d.color.whitepoints/chromatic-adaptation-matrix`, [[->RGB-to-RGB]]."
   ([source-wp destination-wp] (->XYZ-to-XYZ :bradford source-wp destination-wp))
   ([adaptation-method source-wp destination-wp]
    (let [M (wp/chromatic-adaptation-matrix adaptation-method source-wp destination-wp)]
@@ -2107,9 +2116,19 @@
 ;; ### LMS - normalized D65
 
 (defn ->XYZ-to-LMS
-  ""
+  "Creates a converter from XYZ to the cone response (LMS) space of a chromatic adaptation method.
+
+  Parameters:
+
+  - `method` (keyword): a key of `clojure2d.color.whitepoints/chromatic-adaptation-methods`, for example `:bradford`, `:von-kries` or `:cat16`.
+
+  Returns a function of one XYZ color (any value accepted by [[to-color]]) returning `Vec4` `[L M S alpha]` = `Ma · XYZ`, in the scale of the input. No white point normalisation is applied.
+
+  Throws `ex-info` with `{:method method}` for an unknown method.
+
+  See also [[->LMS-to-XYZ]], [[to-LMS]] (fixed von Kries matrix, from RGB)."
   [method]
-  (let [m (first (wp/chromatic-adaptation-methods method))]
+  (let [m (first (wp/chromatic-adaptation-transform method))]
     (fn XYZ-to-LMS ^Vec4 [xyz]
       (let [^Vec4 xyz (pr/to-color xyz)]
         (v/vec4 (mat/mulv m (Vec3. (.x xyz) (.y xyz) (.z xyz))) (.w xyz))))))
@@ -2137,9 +2156,19 @@
            (.w cc))))
 
 (defn ->LMS-to-XYZ
-  ""
+  "Creates a converter from the cone response (LMS) space of a chromatic adaptation method back to XYZ.
+
+  Parameters:
+
+  - `method` (keyword): a key of `clojure2d.color.whitepoints/chromatic-adaptation-methods`, for example `:bradford`, `:von-kries` or `:cat16`.
+
+  Returns a function of one LMS color (any value accepted by [[to-color]]) returning `Vec4` `[X Y Z alpha]` = `Ma-1 · LMS`; inverse of [[->XYZ-to-LMS]] for the same method.
+
+  Throws `ex-info` with `{:method method}` for an unknown method.
+
+  See also [[->XYZ-to-LMS]], [[from-LMS]]."
   [method]
-  (let [m (second (wp/chromatic-adaptation-methods method))]
+  (let [m (second (wp/chromatic-adaptation-transform method))]
     (fn LMS-to-XYZ ^Vec4 [lms]
       (let [^Vec4 lms (pr/to-color lms)]
         (v/vec4 (mat/mulv m (Vec3. (.x lms) (.y lms) (.z lms))) (.w lms))))))
@@ -3564,6 +3593,18 @@
         (XYZ1-to-XYZ (Vec4. (.x c3) (.y c3) (.z c3) (.w c)))))))
 
 (defn ->RGB-to-RGB
+  "Creates a converter between two RGB color spaces, with chromatic adaptation when their white points differ.
+
+  Parameters:
+
+  - `source-rgb-data-or-name`, `target-rgb-data-or-name`: a key of `clojure2d.color.rgb/rgbs` (for example `:sRGB`, `:Adobe-RGB-1998`, `:Adobe-Wide-Gamut-RGB`) or an RGB space map of the same form.
+  - `adaptation-method` (keyword, optional): `:bradford` (default) or another key of `clojure2d.color.whitepoints/chromatic-adaptation-methods`; used only when the white points differ.
+
+  Returns a function of one color in the source space (any value accepted by [[to-color]], channels 0-255, transfer function encoded) returning the color in the target space as `Vec4` (0-255, encoded, alpha kept). Values outside the target gamut are not clamped.
+
+  Throws `ex-info` with `{:method adaptation-method}` for an unknown method when the white points differ.
+
+  See also [[->XYZ-to-XYZ]], [[->RGB-to-XYZ]], [[->XYZ-to-RGB]]."
   ([source-rgb-data-or-name target-rgb-data-or-name]
    (->RGB-to-RGB source-rgb-data-or-name target-rgb-data-or-name :bradford))
   ([source-rgb-data-or-name target-rgb-data-or-name adaptation-method]
