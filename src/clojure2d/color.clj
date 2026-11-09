@@ -798,7 +798,11 @@
 ;; ### sRGB
 
 (defn to-sRGB
-  "linear RGB -> sRGB"
+  "Encodes linear RGB to sRGB: each channel `255 · linear-to-srgb(c / 255)`, channels 0-255; alpha is kept.
+
+  The input is taken as linear RGB (0-255). This is also the `:sRGB` entry of [[colorspaces]]: unlike the other `to-...` conversions, which take sRGB input, `:sRGB` treats its input as linear and encodes it, so it is the inverse of `:linearRGB`, not an identity.
+
+  See also [[from-sRGB]], `clojure2d.color.rgb/linear-to-srgb`, [[->linear-RGB-to-RGB]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [linear-rgb]
   (let [^Vec4 c (pr/to-color linear-rgb)]
@@ -809,7 +813,11 @@
             (.w c))))
 
 (defn from-sRGB
-  "sRGB -> linear RGB"
+  "Decodes sRGB to linear RGB: each channel `255 · srgb-to-linear(c / 255)`, channels 0-255; alpha is kept.
+
+  Also available as [[to-linearRGB]] (the `:linearRGB` entry of [[colorspaces]]).
+
+  See also [[to-sRGB]], `clojure2d.color.rgb/srgb-to-linear`, [[->RGB-to-linear-RGB]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [^Vec4 c (pr/to-color srgb)]
@@ -820,6 +828,11 @@
             (.w c))))
 
 (defn RGB-to-RGB1
+  "Scales RGB channels from 0-255 to 0-1; alpha is kept (0-255).
+
+  Accepts any value accepted by [[to-color]]. Returns `Vec4`.
+
+  See also [[RGB1-to-RGB]]."
   ^Vec4 [rgb]
   (let [^Vec4 c (pr/to-color rgb)]
     (Vec4. (/ (.x c) 255.0)
@@ -828,6 +841,11 @@
            (.w c))))
 
 (defn RGB1-to-RGB
+  "Scales RGB channels from 0-1 to 0-255; alpha is kept.
+
+  Accepts any value accepted by [[to-color]]. Returns `Vec4`.
+
+  See also [[RGB-to-RGB1]]."
   ^Vec4 [rgb1]
   (let [^Vec4 c (pr/to-color rgb1)]
     (Vec4. (* (.x c) 255.0)
@@ -1319,6 +1337,11 @@
          (Vec4. (.x c3) (.y c3) (.z c3) (.w c)))))))
 
 (defn XYZ-to-XYZ1
+  "Scales XYZ from the 0-100 range (`Y` of white = 100, as [[to-XYZ]]) to 0-1; alpha is kept.
+
+  Accepts any value accepted by [[to-color]]. Returns `Vec4`.
+
+  See also [[XYZ1-to-XYZ]]."
   ^Vec4 [xyz]
   (let [^Vec4 c (pr/to-color xyz)]
     (Vec4. (* 0.01 (.x c))
@@ -1327,6 +1350,11 @@
            (.w c))))
 
 (defn XYZ1-to-XYZ
+  "Scales XYZ from the 0-1 range to 0-100 (as [[to-XYZ]]); alpha is kept.
+
+  Accepts any value accepted by [[to-color]]. Returns `Vec4`.
+
+  See also [[XYZ-to-XYZ1]]."
   ^Vec4 [xyz1]
   (let [^Vec4 c (pr/to-color xyz1)]
     (Vec4. (* 100.0 (.x c))
@@ -3573,47 +3601,69 @@
 ;; Other RGB
 
 (defn ->XYZ-to-RGB
-  [rgb-data-or-name]
-  (let [rgb-data (get rgb/rgbs rgb-data-or-name rgb-data-or-name)
-        to (rgb-data :to)
-        m (rgb-data :xyz-to-rgb)]
+  "Creates a converter from XYZ to an RGB space.
+
+  Parameters:
+
+  - `space`: a key of `clojure2d.color.rgb/rgbs` (for example `:sRGB`, `:Adobe-RGB-1998`, `:ACEScg`) or an RGB space map (see `clojure2d.color.rgb/rgb-data->map`).
+
+  Returns a function of one XYZ color (`Y` 0-100, as [[to-XYZ]], relative to the space's white point; any value accepted by [[to-color]]) returning `Vec4` RGB with channels 0-255, encoded with the space's transfer function; alpha is kept. Values outside the gamut are not clamped. No chromatic adaptation is applied.
+
+  For `:sRGB` the result differs from [[from-XYZ]] by at most about 6e-4 (0-255), see [[->RGB-to-XYZ]].
+
+  Throws `ex-info` with `{:space space}` for an unknown space name.
+
+  See also [[->RGB-to-XYZ]], [[->RGB-to-RGB]], `clojure2d.color.rgb/rgb-space`."
+  [space]
+  (let [{to :to m :xyz-to-rgb} (rgb/rgb-space space)]
     (fn ^Vec4 [xyz]
       (let [^Vec4 c (XYZ-to-XYZ1 xyz)
             ^Vec3 c3 (v/fmap (mat/mulv m (Vec3. (.x c) (.y c) (.z c))) to)]
         (RGB1-to-RGB (Vec4. (.x c3) (.y c3) (.z c3) (.w c)))))))
 
 (defn ->RGB-to-XYZ
-  [rgb-data-or-name]
-  (let [rgb-data (get rgb/rgbs rgb-data-or-name rgb-data-or-name)
-        from (rgb-data :from)
-        m (rgb-data :rgb-to-xyz)]
+  "Creates a converter from an RGB space to XYZ.
+
+  Parameters:
+
+  - `space`: a key of `clojure2d.color.rgb/rgbs` or an RGB space map (see `clojure2d.color.rgb/rgb-data->map`).
+
+  Returns a function of one RGB color (channels 0-255, encoded with the space's transfer function; any value accepted by [[to-color]]) returning `Vec4` XYZ (`Y` 0-100, as [[to-XYZ]], relative to the space's white point); alpha is kept. No chromatic adaptation is applied.
+
+  For `:sRGB` the result differs from [[to-XYZ]] by at most about 2.2e-4 (0-100): the space's matrix is derived from the primaries and `CIE-2-D65`, [[to-XYZ]] uses fixed (Lindbloom) matrices.
+
+  Throws `ex-info` with `{:space space}` for an unknown space name.
+
+  See also [[->XYZ-to-RGB]], [[->RGB-to-RGB]], `clojure2d.color.rgb/rgb-space`."
+  [space]
+  (let [{from :from m :rgb-to-xyz} (rgb/rgb-space space)]
     (fn ^Vec4 [rgb]
       (let [^Vec4 c (RGB-to-RGB1 rgb)
             ^Vec3 c3 (mat/mulv m (v/fmap (Vec3. (.x c) (.y c) (.z c)) from))]
         (XYZ1-to-XYZ (Vec4. (.x c3) (.y c3) (.z c3) (.w c)))))))
 
 (defn ->RGB-to-RGB
-  "Creates a converter between two RGB color spaces, with chromatic adaptation when their white points differ.
+  "Creates a converter between two RGB spaces, with chromatic adaptation when their white points differ.
 
   Parameters:
 
-  - `source-rgb-data-or-name`, `target-rgb-data-or-name`: a key of `clojure2d.color.rgb/rgbs` (for example `:sRGB`, `:Adobe-RGB-1998`, `:Adobe-Wide-Gamut-RGB`) or an RGB space map of the same form.
+  - `source-space`, `target-space`: keys of `clojure2d.color.rgb/rgbs` (for example `:sRGB`, `:Adobe-RGB-1998`, `:Adobe-Wide-Gamut-RGB`) or RGB space maps (see `clojure2d.color.rgb/rgb-data->map`).
   - `adaptation-method` (keyword, optional): `:bradford` (default) or another key of `clojure2d.color.whitepoints/chromatic-adaptation-methods`; used only when the white points differ.
 
   Returns a function of one color in the source space (any value accepted by [[to-color]], channels 0-255, transfer function encoded) returning the color in the target space as `Vec4` (0-255, encoded, alpha kept). Values outside the target gamut are not clamped.
 
-  Throws `ex-info` with `{:method adaptation-method}` for an unknown method when the white points differ.
+  Throws `ex-info` with `{:space space}` for an unknown space name and `{:method adaptation-method}` for an unknown method when the white points differ.
 
   See also [[->XYZ-to-XYZ]], [[->RGB-to-XYZ]], [[->XYZ-to-RGB]]."
-  ([source-rgb-data-or-name target-rgb-data-or-name]
-   (->RGB-to-RGB source-rgb-data-or-name target-rgb-data-or-name :bradford))
-  ([source-rgb-data-or-name target-rgb-data-or-name adaptation-method]
-   (let [source-rgb-data (get rgb/rgbs source-rgb-data-or-name source-rgb-data-or-name)
-         target-rgb-data (get rgb/rgbs target-rgb-data-or-name target-rgb-data-or-name)
-         ->xyz (->RGB-to-XYZ source-rgb-data)
-         <-xyz (->XYZ-to-RGB target-rgb-data)
-         swp (source-rgb-data :whitepoint)
-         twp (target-rgb-data :whitepoint)
+  ([source-space target-space]
+   (->RGB-to-RGB source-space target-space :bradford))
+  ([source-space target-space adaptation-method]
+   (let [source (rgb/rgb-space source-space)
+         target (rgb/rgb-space target-space)
+         ->xyz (->RGB-to-XYZ source)
+         <-xyz (->XYZ-to-RGB target)
+         swp (:whitepoint source)
+         twp (:whitepoint target)
          adaptation-matrix (when (not= swp twp)
                              (wp/chromatic-adaptation-matrix adaptation-method swp twp))]
      (fn ^Vec4 [rgb] (if adaptation-matrix
@@ -3623,16 +3673,38 @@
                       (-> rgb ->xyz <-xyz))))))
 
 (defn ->RGB-to-linear-RGB
-  [rgb-data-or-name]
-  (let [from (:from (get rgb/rgbs rgb-data-or-name rgb-data-or-name))]
+  "Creates a converter decoding the transfer function of an RGB space: encoded RGB to linear RGB, both with channels 0-255.
+
+  Parameters:
+
+  - `space`: a key of `clojure2d.color.rgb/rgbs` or an RGB space map.
+
+  Returns a function of one color (any value accepted by [[to-color]]) returning `Vec4`, each channel `255 · from(c / 255)` with the space's `:from` function; alpha is kept. For `:sRGB` it equals [[from-sRGB]].
+
+  Throws `ex-info` with `{:space space}` for an unknown space name.
+
+  See also [[->linear-RGB-to-RGB]]."
+  [space]
+  (let [from (:from (rgb/rgb-space space))]
     (fn ^Vec4 [rgb]
       (let [^Vec4 c (RGB-to-RGB1 rgb)
             ^Vec3 c3 (v/fmap (Vec3. (.x c) (.y c) (.z c)) from)]
         (RGB1-to-RGB (Vec4. (.x c3) (.y c3) (.z c3) (.w c)))))))
 
 (defn ->linear-RGB-to-RGB
-  [rgb-data-or-name]
-  (let [to (:from (get rgb/rgbs rgb-data-or-name rgb-data-or-name))]
+  "Creates a converter encoding with the transfer function of an RGB space: linear RGB to encoded RGB, both with channels 0-255.
+
+  Parameters:
+
+  - `space`: a key of `clojure2d.color.rgb/rgbs` or an RGB space map.
+
+  Returns a function of one color (any value accepted by [[to-color]]) returning `Vec4`, each channel `255 · to(c / 255)` with the space's `:to` function; alpha is kept. Inverse of [[->RGB-to-linear-RGB]]; for `:sRGB` it equals [[to-sRGB]].
+
+  Throws `ex-info` with `{:space space}` for an unknown space name.
+
+  See also [[->RGB-to-linear-RGB]]."
+  [space]
+  (let [to (:to (rgb/rgb-space space))]
     (fn ^Vec4 [rgb]
       (let [^Vec4 c (RGB-to-RGB1 rgb)
             ^Vec3 c3 (v/fmap (Vec3. (.x c) (.y c) (.z c)) to)]

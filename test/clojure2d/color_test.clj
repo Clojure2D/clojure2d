@@ -6,6 +6,8 @@
             [clojure2d.color.blend :as b]
             [clojure2d.color.munsell :as mu]
             [clojure2d.color.whitepoints :as wp]
+            [clojure2d.color.rgb]
+            [fastmath.matrix]
             [fastmath.core :as m]
             [fastmath.random :as r]
             [fastmath.vector :as v])
@@ -397,3 +399,88 @@
                          (take 3 (c/wavelength l k)))
            1e-9)
         (str k " " l))))
+
+;; RGB audit G3: builders and sRGB functions, oracle test/resources/rgb (utils/rgb/gen_reference.py)
+
+(def ^:private rgb-colour
+  (delay (-> "rgb/colour_reference.edn" clojure.java.io/resource slurp clojure.edn/read-string)))
+
+(defn- rel-diff-ok?
+  "Every |a - b| within `tol` scaled by max(1, |b|)."
+  [tol as bs]
+  (every? (fn [[a b]] (<= (abs (- (double a) (double b))) (* tol (max 1.0 (abs (double b))))))
+          (map vector as bs)))
+
+(deftest RGB-to-XYZ-builders-test
+  ;; colour RGB_to_XYZ / XYZ_to_RGB with clojure2d white points and transfer functions,
+  ;; every space, 30 samples with channels >= 5 (0-255): XYZ 1e-9 (0-100), RGB 1e-9 (0-255)
+  (let [{:keys [samples rgb->xyz]} (:builders @rgb-colour)]
+    (doseq [[k xyzs] rgb->xyz
+            :let [->xyz (c/->RGB-to-XYZ k)
+                  ->rgb (c/->XYZ-to-RGB k)]
+            [rgb xyz] (map vector samples xyzs)]
+      (is (rel-diff-ok? 1e-9 xyz (take 3 (->xyz (apply v/vec4 (conj rgb 255.0))))) (str k " " rgb))
+      (is (rel-diff-ok? 1e-9 rgb (take 3 (->rgb (apply v/vec4 (conj xyz 255.0))))) (str k " " xyz)))))
+
+(deftest RGB-to-RGB-builders-test
+  ;; colour RGB_to_RGB (Bradford) for 6 pairs (same white point, D65 -> D50, D65 -> ACES,
+  ;; D50 -> D65, ACES -> D65, C -> D65): linear target values 1e-12, encoded 1e-9 except channels
+  ;; below 1e-3 (infinite slope of power-law encodings at 0)
+  (let [{:keys [samples rgb->rgb]} (:builders @rgb-colour)]
+    (doseq [[[s t] expected] rgb->rgb
+            :let [f (c/->RGB-to-RGB s t)
+                  linear (c/->RGB-to-linear-RGB t)]
+            [rgb e] (map vector samples expected)
+            :let [actual (f (apply v/vec4 (conj rgb 255.0)))]]
+      (is (rel-diff-ok? 1e-12 (take 3 (linear (apply v/vec4 (conj e 255.0)))) (take 3 (linear actual)))
+          (str [s t] rgb))
+      (is (every? (fn [[x y]] (or (< (abs (double x)) 1e-3) (< (abs (- (double x) (double y))) 1e-9)))
+                  (map vector e actual))
+          (str [s t] rgb)))))
+
+(deftest linear-RGB-builders-test
+  (testing "B1: linear -> RGB encodes (was decoding twice); RGB -> linear -> RGB round trip 1e-9"
+    (doseq [k [:sRGB :Adobe-RGB-1998 :ECI-RGB-v2 :ITU-R-BT2020 :ACEScct]
+            rgb [[30.0 120.0 200.0] [5.0 250.0 128.0] [255.0 255.0 255.0]]
+            :let [c (apply v/vec4 (conj rgb 255.0))]]
+      (is (rel-diff-ok? 1e-9 rgb (take 3 ((c/->linear-RGB-to-RGB k) ((c/->RGB-to-linear-RGB k) c)))) (str k rgb))))
+  (testing "sRGB builders equal to-sRGB / from-sRGB"
+    (let [c (v/vec4 30.0 120.0 200.0 128.0)]
+      (is (= (c/from-sRGB c) ((c/->RGB-to-linear-RGB :sRGB) c)))
+      (is (= (c/to-sRGB c) ((c/->linear-RGB-to-RGB :sRGB) c)))))
+  (testing "space map accepted"
+    (let [c (v/vec4 30.0 120.0 200.0 255.0)]
+      (is (= ((c/->RGB-to-XYZ :Adobe-RGB-1998) c) ((c/->RGB-to-XYZ (clojure2d.color.rgb/rgbs :Adobe-RGB-1998)) c))))))
+
+(deftest RGB-builders-unknown-space-test
+  ;; B2: unknown space throws ex-info at build time (was NullPointerException on call)
+  (doseq [f [c/->RGB-to-XYZ c/->XYZ-to-RGB c/->RGB-to-linear-RGB c/->linear-RGB-to-RGB
+             #(c/->RGB-to-RGB % :sRGB) #(c/->RGB-to-RGB :sRGB %)]]
+    (is (throws-data? {:space :nope} #(f :nope)))))
+
+(deftest sRGB-functions-test
+  ;; colour eotf_inverse_sRGB / eotf_sRGB x 255 on 0-1 (grid avoids the 0.040449936-0.04045 gap): 1e-9
+  (doseq [[x enc dec] (get-in @rgb-colour [:transfer :sRGB])
+          :when (<= 0.0 x 1.0)
+          :let [c (v/vec4 (* 255.0 x) (* 255.0 x) (* 255.0 x) 200.0)]]
+    (is (rel-diff-ok? 1e-9 (repeat 3 (* 255.0 enc)) (take 3 (c/to-sRGB c))) (str x))
+    (is (rel-diff-ok? 1e-9 (repeat 3 (* 255.0 dec)) (take 3 (c/from-sRGB c))) (str x))
+    (is (== 200.0 (.w ^Vec4 (c/to-sRGB c)))))
+  (testing ":sRGB colorspace entry is [to-sRGB from-sRGB], inverse of :linearRGB"
+    (is (= [c/to-sRGB c/from-sRGB] (c/colorspaces :sRGB)))
+    (is (= [c/from-sRGB c/to-sRGB] (c/colorspaces :linearRGB)))))
+
+(deftest sRGB-matrix-consistency-test
+  ;; to-XYZ1 (fixed Lindbloom matrix) vs rgbs :sRGB (derived from primaries and CIE-2-D65):
+  ;; matrix entries within 2.2e-6; XYZ (0-100) within 2.2e-4 and RGB (0-255) within 6e-4, measured
+  ;; 2.14e-4 (pure red) and 5.81e-4 over an 18^3 sRGB grid including 255
+  (let [M (fastmath.matrix/mat->seq (:rgb-to-xyz (clojure2d.color.rgb/rgbs :sRGB)))
+        cols (for [rgb [[255 0 0] [0 255 0] [0 0 255]]] (take 3 (c/to-XYZ1 rgb)))
+        L (apply interleave cols)]
+    (is (every? #(< (abs (double %)) 2.2e-6) (map - M L))))
+  (let [->xyz (c/->RGB-to-XYZ :sRGB)
+        ->rgb (c/->XYZ-to-RGB :sRGB)]
+    (doseq [rgb [[255 255 255] [30 120 200] [255 0 0] [0 0 255] [0 255 0] [128 128 128]]
+            :let [xyz (c/to-XYZ rgb)]]
+      (is (< (max-abs-diff (take 3 xyz) (take 3 (->xyz rgb))) 2.2e-4) (str rgb))
+      (is (< (max-abs-diff (take 3 (c/from-XYZ xyz)) (take 3 (->rgb xyz))) 6e-4) (str rgb)))))
