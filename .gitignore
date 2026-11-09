@@ -24,3 +24,4 @@ utils/palettes/target
 /playground
 /.clerk
 __pycache__/
+.eastwood
