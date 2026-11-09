@@ -1,4 +1,15 @@
 (ns clojure2d.color.whitepoints
+  "White points, chromatic adaptation and CIE colorimetric data used by [[clojure2d.color]].
+
+  A white point is stored as a `Vec4` `[X Z x y]`: the `X` and `Z` tristimulus values of the white normalised to `Y = 1`, followed by its `x`, `y` chromaticity coordinates. Both pairs describe the same white, so either can be used without recomputation.
+
+  White points are available as the `whitepoints` map (keyword keys) and as vars named `<observer>-<illuminant>`, for example `CIE-2-D65`, `CIE-10-A` or `CIE-2015-2-FL2*`. The observer is `CIE-2` (1931 2°), `CIE-10` (1964 10°), `CIE-2015-2` or `CIE-2015-10` (2015 cone fundamental based). Names without a star are tabulated values; names ending with `*` are computed by integrating the illuminant spectrum with the observer's color matching functions.
+
+  Contents:
+
+  - coordinate helpers: [[xy->XZ]], [[XZ->xy]], [[xy->coordinates]], [[XZ->coordinates]], [[coordinates]], [[tristimulus]],
+  - chromatic adaptation: [[chromatic-adaptation-methods]] (13 von Kries type cone response matrices) and [[chromatic-adaptation-matrix]],
+  - spectral data: [[color-matching-functions-data]], [[illuminants-spectrum-data]] and interpolated color matching functions."
   (:require [fastmath.core :as m]
             [fastmath.vector :as v]
             [fastmath.matrix :as mat]
@@ -15,28 +26,64 @@
 (defn- read-edn [n] (-> (resource n) input-stream slurp edn/read-string))
 
 (defn xy->XZ
-  "Convert xy chroma coordinates (from Yxy) to XZ coordinates (from XYZ)."
+  "Converts `x`, `y` chromaticity coordinates to `X`, `Z` tristimulus values normalised to `Y = 1`.
+
+  Parameters:
+
+  - `xy` (`Vec2`): chromaticity coordinates `[x y]`.
+  - `x`, `y` (doubles): chromaticity coordinates as separate arguments.
+
+  Returns `Vec2` `[X Z]` where `X = x / y` and `Z = (1 - x - y) / y`. For `y = 0` the result is infinite or `NaN`.
+
+  See also [[XZ->xy]], [[xy->coordinates]], [[tristimulus]]."
   (^Vec2 [^Vec2 xy] (xy->XZ (.x xy) (.y xy)))
   (^Vec2 [^double x ^double y]
    (-> (Vec2. x (- 1.0 x y))
        (v/div y))))
 
 (defn xy->coordinates
-  "Convert xy chroma coordinates to XZxy whitepoint definition."
+  "Creates a white point definition `[X Z x y]` from chromaticity coordinates.
+
+  Parameters:
+
+  - `xy` (`Vec2`): chromaticity coordinates `[x y]`.
+  - `x`, `y` (doubles): chromaticity coordinates as separate arguments.
+
+  Returns `Vec4` `[X Z x y]` with `X`, `Z` computed by [[xy->XZ]] (normalised to `Y = 1`). For `y = 0` the `X`, `Z` entries are infinite or `NaN`.
+
+  See also [[XZ->coordinates]], [[coordinates]]."
   (^Vec4 [^Vec2 xy] (xy->coordinates (.x xy) (.y xy)))
   (^Vec4 [^double x ^double y]
    (let [^Vec2 XZ (xy->XZ x y)]
      (Vec4. (.x XZ) (.y XZ) x y))))
 
 (defn XZ->xy
-  "Convert XZ coordinates (from XYZ) to xy coordinates (from Yxy). "
+  "Converts `X`, `Z` tristimulus values (with `Y = 1`) to `x`, `y` chromaticity coordinates.
+
+  Parameters:
+
+  - `XZ` (`Vec2`): tristimulus values `[X Z]`.
+  - `X`, `Z` (doubles): tristimulus values as separate arguments.
+
+  Returns `Vec2` `[x y]` where `x = X / (1 + X + Z)` and `y = 1 / (1 + X + Z)`. For `X + Z = -1` the result is infinite or `NaN`.
+
+  See also [[xy->XZ]], [[XZ->coordinates]]."
   (^Vec2 [^Vec2 XZ] (XZ->xy (.x XZ) (.y XZ)))
   (^Vec2 [^double X ^double Z]
    (-> (Vec2. X 1.0)
        (v/div (+ 1.0 X Z)))))
 
 (defn XZ->coordinates
-  "Convert XZ coordinates to XZxy whitepoint definition."
+  "Creates a white point definition `[X Z x y]` from `X`, `Z` tristimulus values (with `Y = 1`).
+
+  Parameters:
+
+  - `XZ` (`Vec2`): tristimulus values `[X Z]`.
+  - `X`, `Z` (doubles): tristimulus values as separate arguments.
+
+  Returns `Vec4` `[X Z x y]` with `x`, `y` computed by [[XZ->xy]].
+
+  See also [[xy->coordinates]], [[coordinates]]."
   (^Vec4 [^Vec2 XZ] (XZ->coordinates (.x XZ) (.y XZ)))
   (^Vec4 [^double X ^double Z]
    (let [^Vec2 xy (XZ->xy X Z)]
@@ -44,7 +91,7 @@
 
 (defn- add-Y
   (^Vec3 [XZ] (add-Y XZ 1.0))
-  (^Vec3 [^Vec2 XZ Y]
+  (^Vec3 [^Vec2 XZ ^double Y]
    (Vec3. (.x XZ) Y (.y XZ))))
 
 (def whitepoints (into {}
@@ -60,14 +107,31 @@
 (gen-whitepoints [:CIE-10-FL3-3 :CIE-2-FL3-4 :CIE-2-FL11* :CIE-2015-10-D60* :CIE-10-FL7 :CIE-10-D75 :CIE-2-FL3-9 :CIE-2-HP1 :CIE-2-ID50* :CIE-2015-10-ID50* :CIE-10-LED-BH1* :CIE-2-FL3-13 :CIE-10-FL3-6 :CIE-10-LED-B3 :CIE-2-ISO-PD :CIE-10-FL3-14 :CIE-2015-2-ID65* :CIE-10-HP3* :CIE-2-FL12 :CIE-2-HP4 :CIE-2015-10-FL10* :CIE-2-LED-BH1* :CIE-10-FL3-8 :CIE-2015-2-FL10* :CIE-2-FL2 :CIE-10-A :CIE-10-D60* :CIE-10-FL3-13 :CIE-10-FL3-11* :CIE-10-FL10* :CIE-2-E* :CIE-2-FL8 :CIE-2-ISO-SP :CIE-2015-2-A* :CIE-10-LED-RGB1 :CIE-2015-2-FL4* :CIE-2-FL4 :CIE-10-FL12 :CIE-2015-10-FL2* :CIE-2-FL3-7* :CIE-2-FL3-13* :CIE-2-FL3-4* :CIE-2-FL3-5* :CIE-2015-2-LED-V2* :CIE-10-ISO-SST* :CIE-2015-10-HP4* :CIE-2015-10-FL3-13* :CIE-10-B* :CIE-10-FL3-5* :CIE-2-FL3* :CIE-2015-2-FL3-13* :CIE-2-FL7* :CIE-2-E :CIE-2015-2-E* :CIE-10-FL12* :CIE-2015-10-FL6* :CIE-2015-10-FL3-14* :CIE-2015-10-ISO-ST* :CIE-2-FL3-8* :CIE-10-LED-B1 :CIE-10-FL6* :CIE-10-LED-V2 :CIE-10-C* :CIE-2-FL9* :CIE-2015-2-LED-BH1* :CIE-2-LED-B4* :CIE-10-LED-B2 :CIE-10-D65 :CIE-2015-10-FL11* :CIE-2015-2-LED-V1* :CIE-2015-2-FL3-2* :CIE-10-ISO-SD :CIE-2015-2-FL9* :CIE-2-D50 :CIE-10-FL3-12 :CIE-10-FL3-1* :CIE-2-BLACKMAGIC-WG :CIE-2-FL3-12* :CIE-2-FL3-2 :CIE-2015-10-FL1* :CIE-2015-2-D60* :CIE-2015-2-FL3-10* :CIE-2015-2-ISO-SP* :CIE-2-HP3* :CIE-2015-2-ISO-SST* :CIE-10-HP2* :CIE-10-FL4 :CIE-2-FL3-11 :CIE-10-LED-V1 :CIE-2015-2-HP2* :CIE-10-FL3-15 :CIE-10-LED-B5* :CIE-10-FL11 :CIE-10-ISO-ST* :CIE-10-HP1* :CIE-2-ISO-PF :CIE-2-LED-V2* :CIE-2015-10-LED-V1* :CIE-2015-10-FL4* :CIE-2-ISO-SD :CIE-2-C :CIE-10-FL8* :CIE-2015-10-ISO-SP* :CIE-2-B :CIE-2-ID65 :CIE-2-FL3-3 :CIE-2-ISO-PF* :CIE-10-FL3-2* :CIE-10-FL1 :CIE-10-E :CIE-2015-10-ISO-SPF* :CIE-2015-2-FL1* :CIE-10-FL3-8* :CIE-2015-10-ISO-PF* :CIE-2-D75 :CIE-2-D65* :CIE-2015-10-FL3-12* :CIE-2-FL3-5 :CIE-2-FL3-15* :CIE-10-ID50* :CIE-2-C* :CIE-2015-2-D75* :CIE-2015-10-D75* :CIE-10-LED-BH1 :CIE-2-HP3 :CIE-10-ISO-SP* :CIE-2-FL1 :CIE-2015-10-LED-V2* :CIE-2-ISO-PD* :CIE-10-FL3-7 :CIE-2015-10-HP3* :CIE-10-LED-B2* :CIE-2015-2-LED-B3* :CIE-2-FL11 :CIE-2015-2-FL5* :CIE-2015-10-ISO-SD* :CIE-2015-2-LED-B5* :CIE-10-ISO-PD* :CIE-10-FL3-7* :CIE-2015-10-FL3-7* :CIE-10-LED-B4 :CIE-10-LED-B5 :CIE-2015-2-ISO-PD* :CIE-2-FL3-14 :CIE-10-LED-RGB1* :CIE-2-ISO-ST :CIE-2015-10-B* :CIE-2-HP2* :CIE-10-HP2 :CIE-2015-10-A* :CIE-10-FL3-9* :CIE-2-D50* :CIE-10-FL11* :CIE-10-ISO-PF :CIE-2-ID50 :CIE-10-HP4* :CIE-2-FL3-6* :CIE-2-LED-V1* :CIE-2-LED-B4 :CIE-2-ISO-SST* :CIE-2-FL3-14* :CIE-2015-2-HP1* :CIE-2015-2-LED-B4* :CIE-2-A :CIE-10-E* :CIE-2-FL8* :CIE-2-HP5 :CIE-10-D65* :CIE-2-FL5* :CIE-2015-10-FL3-3* :CIE-2-FL3-11* :CIE-2-ACES :CIE-2015-10-FL12* :CIE-2015-10-HP5* :CIE-2015-10-FL8* :CIE-2-FL2* :CIE-2015-10-FL3-11* :CIE-2015-2-D55* :CIE-2-D65 :CIE-2-FL3 :CIE-2015-2-ISO-PF* :CIE-10-D60 :CIE-2015-2-FL3-15* :CIE-2015-2-FL3-7* :CIE-2-FL3-10* :CIE-2-FL3-7 :CIE-2015-2-LED-B1* :CIE-2-LED-RGB1 :CIE-2015-10-LED-BH1* :CIE-10-FL3-14* :CIE-2-D60 :CIE-2015-10-FL3-2* :CIE-2-FL12* :CIE-2015-2-D50* :CIE-10-ID65 :CIE-2015-2-FL3-3* :CIE-10-D55 :CIE-2015-2-FL2* :CIE-2015-10-FL3* :CIE-10-D55* :CIE-10-FL3* :CIE-2-FL10* :CIE-2-ICC-D50 :CIE-2-A* :CIE-2015-2-FL11* :CIE-2015-2-C* :CIE-2-LED-B5 :CIE-2015-10-D50* :CIE-2015-2-FL3-8* :CIE-10-D75* :CIE-2015-10-FL7* :CIE-2015-10-FL3-10* :CIE-10-A* :CIE-10-FL2* :CIE-2-FL3-2* :CIE-2015-2-FL3-11* :CIE-2-LED-V1 :CIE-2015-10-LED-B5* :CIE-10-ISO-SP :CIE-2-HP5* :CIE-2-LED-BH1 :CIE-2-FL9 :CIE-2015-10-FL9* :CIE-2015-10-ISO-PD* :CIE-10-ISO-PF* :CIE-2-FL1* :CIE-2-LED-B3 :CIE-10-ISO-SPF* :CIE-2-ISO-SD* :CIE-10-ISO-SPF :CIE-2-ISO-SST :CIE-2015-2-FL6* :CIE-2-FL3-9* :CIE-2015-10-FL5* :CIE-2-ISO-SPF* :CIE-10-FL2 :CIE-2-HP2 :CIE-2015-2-FL3* :CIE-10-ID50 :CIE-2-FL7 :CIE-10-LED-B1* :CIE-10-FL4* :CIE-2015-10-C* :CIE-2-FL5 :CIE-10-FL3-4* :CIE-2015-2-FL3-1* :CIE-10-FL3-12* :CIE-2-PLASA :CIE-10-FL3-4 :CIE-10-LED-B3* :CIE-2015-2-LED-B2* :CIE-2015-2-HP4* :CIE-10-LED-V2* :CIE-2015-10-LED-B2* :CIE-2015-2-FL3-5* :CIE-2015-10-FL3-5* :CIE-10-B :CIE-10-D50 :CIE-2-DCI-P3 :CIE-2-FL6* :CIE-10-ISO-SD* :CIE-10-FL3-10 :CIE-2015-2-FL12* :CIE-10-HP3 :CIE-2015-2-ID50* :CIE-2-ID65* :CIE-10-FL3-3* :CIE-10-FL9* :CIE-2015-10-E* :CIE-2015-2-FL3-9* :CIE-10-FL7* :CIE-10-FL5 :CIE-2015-10-FL3-15* :CIE-10-HP5 :CIE-2015-2-FL7* :CIE-2-LED-RGB1* :CIE-2-FL3-8 :CIE-2-ISO-SP* :CIE-10-LED-B4* :CIE-2015-10-FL3-8* :CIE-2-ISO-ST* :CIE-10-FL3-9 :CIE-2-LED-B5* :CIE-2015-10-LED-B3* :CIE-2-LED-B1 :CIE-10-HP5* :CIE-2-FL3-1* :CIE-2015-2-ISO-ST* :CIE-2-FL4* :CIE-2015-10-ID65* :CIE-10-FL3-11 :CIE-10-HP1 :CIE-2-HP1* :CIE-2-FL3-3* :CIE-2015-2-HP5* :CIE-2015-10-LED-RGB1* :CIE-2-D55* :CIE-2-D75* :CIE-2-FL6 :CIE-2015-10-D65* :CIE-2-FL3-10 :CIE-2-FL3-15 :CIE-2-ISO-SPF :CIE-2015-10-FL3-9* :CIE-10-FL3-5 :CIE-10-FL5* :CIE-10-FL3-13* :CIE-2015-10-D55* :CIE-2015-10-FL3-1* :CIE-10-FL6 :CIE-2-HP4* :CIE-10-FL3-10* :CIE-10-FL3-1 :CIE-2015-2-LED-RGB1* :CIE-2015-2-FL3-14* :CIE-2-FL3-12 :CIE-2-LED-B2* :CIE-2015-2-FL3-4* :CIE-2015-10-LED-B4* :CIE-2-FL3-1 :CIE-2-LED-B1* :CIE-2015-2-D65* :CIE-10-HP4 :CIE-10-FL3-2 :CIE-2015-2-FL8* :CIE-10-C :CIE-2-FL10 :CIE-2-FL3-6 :CIE-2015-2-ISO-SD* :CIE-2-LED-B2 :CIE-10-FL8 :CIE-2015-10-FL3-4* :CIE-10-ISO-SST :CIE-10-FL3 :CIE-10-D50* :CIE-10-FL3-15* :CIE-10-ID65* :CIE-2015-2-FL3-6* :CIE-2015-2-HP3* :CIE-2-LED-B3* :CIE-2-LED-V2 :CIE-2015-2-ISO-SPF* :CIE-10-FL1* :CIE-10-ISO-ST :CIE-10-FL9 :CIE-2015-10-FL3-6* :CIE-10-FL10 :CIE-2015-10-LED-B1* :CIE-2-D60* :CIE-10-FL3-6* :CIE-2-D55 :CIE-2015-2-FL3-12* :CIE-10-ISO-PD :CIE-2015-10-HP1* :CIE-2015-2-B* :CIE-2015-10-HP2* :CIE-2-B* :CIE-10-LED-V1* :CIE-2015-10-ISO-SST*])
 
 (defn coordinates
-  "Create whitepoint 4 element vector containing X, Z and x,y chroma coordinates"
+  "Creates a white point definition `[X Z x y]`.
+
+  Parameters:
+
+  - `X`, `Z`, `x`, `y` (doubles): all four entries, stored as given without a consistency check.
+  - `x`, `y` (doubles): chromaticity coordinates only, `X` and `Z` are computed as in [[xy->coordinates]].
+
+  Returns `Vec4` `[X Z x y]`.
+
+  See also [[XZ->coordinates]], [[tristimulus]]."
   (^Vec4 [^double X ^double Z ^double x ^double y] (Vec4. X Z x y))
   (^Vec4 [^double x ^double y] (xy->coordinates x y)))
 
 (defn tristimulus
-  "Create XYZ color for given white point as predifined var or x,y coordinates.
+  "Returns the XYZ tristimulus values of a white point, normalised to `Y = 1`.
 
-  Default is `CIE-2-D65`."
+  Parameters:
+
+  - no arguments: the white point `CIE-2-D65`.
+  - `coords` (`Vec4`): a white point definition `[X Z x y]`, for example `CIE-2-C`; only `X` and `Z` are read.
+  - `x`, `y` (doubles): chromaticity coordinates, converted by [[xy->XZ]].
+
+  Returns `Vec3` `[X 1.0 Z]`. For `y = 0` the `X`, `Z` entries are infinite or `NaN`.
+
+  See also [[coordinates]], [[chromatic-adaptation-matrix]]."
   ([] (tristimulus CIE-2-D65))
   ([^Vec4 coords]
    (Vec3. (.x coords) 1.0 (.y coords)))
