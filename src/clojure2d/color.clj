@@ -284,7 +284,7 @@
 (defn luma
   "Returns the luma of a color: the luminance weights applied to the gamma-encoded channels.
 
-  Formula: `0.2126729 r + 0.7151522 g + 0.0721750 b` (the Y row of the sRGB to XYZ matrix of [[to-XYZ]], Rec. 709 primaries) on the channels as given, without linearization.
+  Formula: `0.2126740 r + 0.7151511 g + 0.0721750 b` (the Y row of the sRGB to XYZ matrix of [[to-XYZ]], from the sRGB primaries and the CIE 1931 2° D65 white) on the channels as given, without linearization.
 
   - `c` color, any type accepted by [[to-color]]
 
@@ -292,23 +292,46 @@
   {:metadoc/categories meta-ops}
   ^double [c] (pr/luma c))
 
-(def ^{:private true :const true :tag 'double} srgb-y-r 0.21267285140562248)
-(def ^{:private true :const true :tag 'double} srgb-y-g 0.715152155287818)
-(def ^{:private true :const true :tag 'double} srgb-y-b 0.07217499330655958)
+(def ^:private srgb-to-xyz-matrix
+  "sRGB (linear) to XYZ matrix of `(rgb/rgbs :sRGB)`, derived from the sRGB primaries and `wp/CIE-2-D65`; read once into the constants below."
+  (vec (mat/mat->seq (:rgb-to-xyz (rgb/rgbs :sRGB)))))
+
+(def ^:private xyz-to-srgb-matrix
+  "Inverse of [[srgb-to-xyz-matrix]], from `(rgb/rgbs :sRGB)`."
+  (vec (mat/mat->seq (:xyz-to-rgb (rgb/rgbs :sRGB)))))
+
+(def ^{:private true :const true :tag 'double} srgb->xyz-00 (srgb-to-xyz-matrix 0))
+(def ^{:private true :const true :tag 'double} srgb->xyz-01 (srgb-to-xyz-matrix 1))
+(def ^{:private true :const true :tag 'double} srgb->xyz-02 (srgb-to-xyz-matrix 2))
+(def ^{:private true :const true :tag 'double} srgb->xyz-10 (srgb-to-xyz-matrix 3))
+(def ^{:private true :const true :tag 'double} srgb->xyz-11 (srgb-to-xyz-matrix 4))
+(def ^{:private true :const true :tag 'double} srgb->xyz-12 (srgb-to-xyz-matrix 5))
+(def ^{:private true :const true :tag 'double} srgb->xyz-20 (srgb-to-xyz-matrix 6))
+(def ^{:private true :const true :tag 'double} srgb->xyz-21 (srgb-to-xyz-matrix 7))
+(def ^{:private true :const true :tag 'double} srgb->xyz-22 (srgb-to-xyz-matrix 8))
+(def ^{:private true :const true :tag 'double} xyz->srgb-00 (xyz-to-srgb-matrix 0))
+(def ^{:private true :const true :tag 'double} xyz->srgb-01 (xyz-to-srgb-matrix 1))
+(def ^{:private true :const true :tag 'double} xyz->srgb-02 (xyz-to-srgb-matrix 2))
+(def ^{:private true :const true :tag 'double} xyz->srgb-10 (xyz-to-srgb-matrix 3))
+(def ^{:private true :const true :tag 'double} xyz->srgb-11 (xyz-to-srgb-matrix 4))
+(def ^{:private true :const true :tag 'double} xyz->srgb-12 (xyz-to-srgb-matrix 5))
+(def ^{:private true :const true :tag 'double} xyz->srgb-20 (xyz-to-srgb-matrix 6))
+(def ^{:private true :const true :tag 'double} xyz->srgb-21 (xyz-to-srgb-matrix 7))
+(def ^{:private true :const true :tag 'double} xyz->srgb-22 (xyz-to-srgb-matrix 8))
 
 (defn- luma-fn
-  "Weighted sum of channels with the Y row of the sRGB to XYZ matrix of [[to-XYZ]]."
+  "Weighted sum of channels with the Y row of the sRGB to XYZ matrix of [[to-XYZ]] (from `(rgb/rgbs :sRGB)`)."
   ^double [^double r ^double g ^double b]
-  (+ (* srgb-y-r r)
-     (* srgb-y-g g)
-     (* srgb-y-b b)))
+  (+ (* srgb->xyz-10 r)
+     (* srgb->xyz-11 g)
+     (* srgb->xyz-12 b)))
 
 (declare from-sRGB)
 
 (defn relative-luma
   "Returns the relative luminance of an sRGB color, scaled to `[0,255]`.
 
-  The channels are linearized (sRGB transfer function) and weighted with the Y row of the sRGB to XYZ matrix: `0.2126729 r + 0.7151522 g + 0.0721750 b`. Equals the Y of [[to-XYZ]] times 2.55; divide by 255 for the WCAG relative luminance.
+  The channels are linearized (sRGB transfer function) and weighted with the Y row of the sRGB to XYZ matrix: `0.2126740 r + 0.7151511 g + 0.0721750 b`. Equals the Y of [[to-XYZ]] times 2.55; divide by 255 for the WCAG relative luminance.
 
   - `c` color, any type accepted by [[to-color]]
 
@@ -953,7 +976,13 @@
 ;; ### CMY
 
 (defn to-CMY
-  "RGB -> CMY"
+  "Converts an sRGB color to CMY, the subtractive complement of RGB.
+
+  `C = 255 - R`, `M = 255 - G`, `Y = 255 - B`; the conversion is its own inverse.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: C, M, Y in `[0,255]`. See also [[from-CMY]], [[to-CMY*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -962,20 +991,20 @@
            (- 255.0 (.z c))
            (.w c))))
 
-(def ^{:doc "CMY -> RGB" :metadoc/categories meta-conv} from-CMY to-CMY)
-(def ^{:doc "CMY -> RGB, alias for [[to-CMY]]" :metadoc/categories meta-conv} to-CMY* to-CMY)
-(def ^{:doc "CMY -> RGB, alias for [[from-CMY]]" :metadoc/categories meta-conv} from-CMY* to-CMY)
+(def ^{:doc "CMY to sRGB, the same function as [[to-CMY]] (the conversion is its own inverse)." :metadoc/categories meta-conv} from-CMY to-CMY)
+(def ^{:doc "The same as [[to-CMY]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} to-CMY* to-CMY)
+(def ^{:doc "The same as [[from-CMY]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} from-CMY* to-CMY)
 
 ;; ### OHTA
 
 (defn to-OHTA
-  "sRGB -> OHTA
+  "Converts an sRGB color to the Ohta I1I2I3 space (Ohta, Kanade and Sakai 1980).
 
-  Returned ranges:
+  `I1 = (R + G + B) / 3`, `I2 = (R - B) / 2`, `I3 = (2G - R - B) / 4`, on the 0-255 scale.
 
-  * I1: 0.0 - 255.0
-  * I2: -127.5 - 127.5
-  * I3: -127.5 - 127.5"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: I1 0 to 255, I2 -127.5 to 127.5, I3 -127.5 to 127.5. See also [[from-OHTA]], [[to-OHTA*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb] 
   (let [^Vec4 c (pr/to-color srgb)
@@ -987,7 +1016,13 @@
 (def ^:private ^:const ohta-s (Vec4. 0.0 127.5 127.5 0.0))
 
 (defn to-OHTA*
-  "RGB -> OHTA, normalized"
+  "Converts an sRGB color to OHTA with channels mapped to `[0,255]`.
+
+  The channels of [[to-OHTA]] with 127.5 added to the two chroma channels. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-OHTA*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (v/add (to-OHTA srgb) ohta-s))
@@ -996,9 +1031,11 @@
 (def ^{:private true :const true :tag 'double} c43 (/ 4.0 3.0))
 
 (defn from-OHTA
-  "OHTA -> RGB
+  "Converts OHTA to sRGB, the inverse of [[to-OHTA]].
 
-  For ranges, see [[to-OHTA]]."
+  - `c` OHTA color, any type accepted by [[to-color]], with channels in the ranges of [[to-OHTA]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-OHTA*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [ohta]
   (let [^Vec4 c (pr/to-color ohta)
@@ -1011,7 +1048,11 @@
     (Vec4. r g b (.w c))))
 
 (defn from-OHTA*
-  "OHTA -> RGB, normalized"
+  "Converts OHTA with channels in `[0,255]`, as produced by [[to-OHTA*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-OHTA]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [ohta*]
   (from-OHTA (v/sub (pr/to-color ohta*) ohta-s)))
@@ -1586,12 +1627,18 @@
 (defn- to-XYZ-
   "Pure RGB->XYZ conversion without corrections."
   ^Vec3 [^Vec3 c]
-  (Vec3. (+ (* (.x c) 0.4124564390896921) (* (.y c) 0.357576077643909) (* (.z c) 0.18043748326639894))
-         (+ (* (.x c) srgb-y-r) (* (.y c) srgb-y-g) (* (.z c) srgb-y-b))
-         (+ (* (.x c) 0.019333895582329317) (* (.y c) 0.119192025881303) (* (.z c) 0.9503040785363677))))
+  (Vec3. (+ (* (.x c) srgb->xyz-00) (* (.y c) srgb->xyz-01) (* (.z c) srgb->xyz-02))
+         (+ (* (.x c) srgb->xyz-10) (* (.y c) srgb->xyz-11) (* (.z c) srgb->xyz-12))
+         (+ (* (.x c) srgb->xyz-20) (* (.y c) srgb->xyz-21) (* (.z c) srgb->xyz-22))))
 
 (defn to-XYZ1
-  "sRGB -> XYZ (CIE2 D65), scaled to range 0-1"
+  "Converts an sRGB color to CIE XYZ on the 0-1 scale (Y of white 1).
+
+  Linear sRGB (channels decoded with `clojure2d.color.rgb/srgb-to-linear`) times the matrix of `(clojure2d.color.rgb/rgbs :sRGB)`, derived from the sRGB primaries and the CIE 1931 2° D65 white `wp/CIE-2-D65`; white maps exactly to that white point.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`; ranges for colors in the sRGB gamut: X 0 to 0.9505, Y 0 to 1, Z 0 to 1.0888. See also [[to-XYZ]], [[from-XYZ1]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [^Vec4 c (pr/to-color srgb)
@@ -1601,19 +1648,25 @@
     (v/vec4 xyz-raw (.w c))))
 
 (defn to-XYZ
-  "sRGB -> XYZ (CIE2 D65)
+  "Converts an sRGB color to CIE XYZ on the 0-100 scale (Y of white 100).
 
-  Returned ranges (D65):
+  Linear sRGB (channels decoded with `clojure2d.color.rgb/srgb-to-linear`) times the matrix of `(clojure2d.color.rgb/rgbs :sRGB)`, derived from the sRGB primaries and the CIE 1931 2° D65 white `wp/CIE-2-D65`; white maps exactly to that white point. All XYZ-based colorspaces (LAB, LUV, Yxy, ...) start here.
 
-  * X: 0.0 - 95.047
-  * Y: 0.0 - 100.0
-  * Z: 0.0 - 108.883"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`; ranges for colors in the sRGB gamut: X 0 to 95.047, Y 0 to 100, Z 0 to 108.883. See also [[from-XYZ]], [[to-XYZ*]], [[->RGB-to-XYZ]] (other RGB spaces)."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (XYZ1-to-XYZ (to-XYZ1 srgb)))
 
 (defn to-XYZ*
-  "sRGB -> XYZ (CIE2 D65), normalized"
+  "Converts an sRGB color to XYZ with channels mapped to `[0,255]`.
+
+  Each channel of [[to-XYZ]] is mapped linearly from 0 to the white point value (95.047, 100, 108.883) to `[0,255]`, so white maps to 255. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-XYZ*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-XYZ srgb)]
@@ -1622,32 +1675,42 @@
            (m/mnorm (.z cc) 0.0 108.8829656285427 0.0 255.0)
            (.w cc))))
 
-(def ^{:doc "sRGB -> XYZ (CIE2 D65), normalized" :metadoc/categories meta-conv} to-XYZ1* to-XYZ*)
+(def ^{:doc "Alias of [[to-XYZ*]]: XYZ with channels mapped to `[0,255]`." :metadoc/categories meta-conv} to-XYZ1* to-XYZ*)
 
 (defn- from-XYZ-
   "Pure XYZ->RGB conversion."
   ^Vec3 [^Vec3 v]
-  (Vec3. (+ (* (.x v) 3.2404541621141054) (* (.y v) -1.5371385127977166) (* (.z v) -0.4985314095560162))
-         (+ (* (.x v) -0.9692660305051868) (* (.y v)  1.8760108454466942) (* (.z v)  0.04155601753034984))
-         (+ (* (.x v)  0.05564343095911469) (* (.y v) -0.20402591351675387) (* (.z v) 1.0572251882231791))))
+  (Vec3. (+ (* (.x v) xyz->srgb-00) (* (.y v) xyz->srgb-01) (* (.z v) xyz->srgb-02))
+         (+ (* (.x v) xyz->srgb-10) (* (.y v) xyz->srgb-11) (* (.z v) xyz->srgb-12))
+         (+ (* (.x v) xyz->srgb-20) (* (.y v) xyz->srgb-21) (* (.z v) xyz->srgb-22))))
 
 (defn from-XYZ1
-  "XYZ (CIE2 D65) -> sRGB, from range 0-1"
+  "Converts CIE XYZ on the 0-1 scale to sRGB, the inverse of [[to-XYZ1]].
+
+  - `c` XYZ color, any type accepted by [[to-color]], Y of white 1
+
+  Returns an RGB `Vec4`, not clamped: colors outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-XYZ]]."
   ^Vec4 [xyz1]
   (let [^Vec4 c (pr/to-color xyz1)
         rgb-raw (v/mult (v/fmap (from-XYZ- (Vec3. (.x c) (.y c) (.z c))) rgb/linear-to-srgb) 255.0)]
     (v/vec4 rgb-raw (.w c))))
 
 (defn from-XYZ
-  "XYZ (CIE2 D65) -> sRGB
+  "Converts CIE XYZ on the 0-100 scale to sRGB, the inverse of [[to-XYZ]].
 
-  For ranges, see [[to-XYZ]]"
+  - `c` XYZ color, any type accepted by [[to-color]], Y of white 100
+
+  Returns an RGB `Vec4`, not clamped: colors outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-XYZ*]], [[->XYZ-to-RGB]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [xyz1] 
   (from-XYZ1 (XYZ-to-XYZ1 xyz1)))
 
 (defn from-XYZ*
-  "XYZ (CIE2 D65) -> sRGB, normalized"
+  "Converts XYZ with channels in `[0,255]`, as produced by [[to-XYZ*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-XYZ]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [xyz*]
   (let [^Vec4 c (pr/to-color xyz*)
@@ -1656,7 +1719,7 @@
         z (m/mnorm (.z c) 0.0 255.0 0.0 108.8829656285427)]
     (from-XYZ (Vec4. x y z (.w c)))))
 
-(def ^{:doc "XYZ (CIE2 D65) -> sRGB, normalized" :metadoc/categories meta-conv} from-XYZ1* from-XYZ*)
+(def ^{:doc "Alias of [[from-XYZ*]]." :metadoc/categories meta-conv} from-XYZ1* from-XYZ*)
 
 ;; https://en.wikipedia.org/wiki/CIE_1960_color_space#Relation_to_CIE_XYZ
 
@@ -1670,17 +1733,25 @@
            (.w c))))
 
 (defn to-UCS
-  "sRGB -> UCS
+  "Converts an sRGB color to the CIE 1960 UCS tristimulus values U, V, W.
 
-  * U: 0.0 - 0.63
-  * V: 0.0 - 1.0
-  * W: 0.0 - 1.57"
+  `U = 2X / 3`, `V = Y`, `W = (-X + 3Y + Z) / 2`, from [[to-XYZ]] scaled to 0-1.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: U 0 to 0.634, V 0 to 1, W 0 to 1.569. See also [[from-UCS]], [[to-UCS*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (-> srgb to-XYZ XYZ-to-UCS))
 
 (defn to-UCS*
-  "sRGB -> UCS, normalized"
+  "Converts an sRGB color to UCS with channels mapped to `[0,255]`.
+
+  Each channel of [[to-UCS]] is mapped linearly from its range (U 0 to 0.634, V 0 to 1, W 0 to 1.569) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-UCS*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [^Vec4 cc (to-UCS srgb)]
@@ -1700,13 +1771,21 @@
                         (.w c)))))
 
 (defn from-UCS
-  "UCS -> sRGB"
+  "Converts UCS to sRGB, the inverse of [[to-UCS]].
+
+  - `c` UCS color, any type accepted by [[to-color]], with channels in the ranges of [[to-UCS]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-UCS*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [ucs]
   (-> ucs UCS-to-XYZ from-XYZ))
 
 (defn from-UCS*
-  "UCS -> sRGB, normalized"
+  "Converts UCS with channels in `[0,255]`, as produced by [[to-UCS*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-UCS]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [ucs*]
   (let [^Vec4 cc (pr/to-color ucs*)]
@@ -1722,11 +1801,13 @@
   (-> m (max 0.0) m/cbrt (+ -0.15595420054924863)))
 
 (defn to-XYB
-  "sRGB -> XYB
+  "Converts an sRGB color to XYB, the JPEG XL color space.
 
-  * X: -0.015386116472573375 - 0.02810008316127735
-  * Y: 0.0 - 0.8453085619621623
-  * B: 0.0 - 0.8453085619621623"
+  libjxl `LinearRGBToXYB`: opsin absorbance matrix on linear RGB, bias 0.0037930732552754493, cube root; `X = (L - M) / 2`, `Y = (L + M) / 2`, `B = S`. B is the raw third channel, not the B - Y of the scaled XYB used for encoding.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: X -0.0154 to 0.0281, Y 0 to 0.845, B 0 to 0.845. See also [[from-XYB]], [[to-XYB*]]."
   ^Vec4 [srgb]
   (let [^Vec4 c (from-sRGB srgb)
         r (convert-mix (m/muladd 0.001176470588235294 (.x c)
@@ -1744,7 +1825,13 @@
     (Vec4. (* 0.5 (- r g)) (* 0.5 (+ r g)) b (.w c))))
 
 (defn to-XYB*
-  "sRGB -> XYB, normalized"
+  "Converts an sRGB color to XYB with channels mapped to `[0,255]`.
+
+  Each channel of [[to-XYB]] is mapped linearly from its range (X -0.0154 to 0.0281, Y 0 to 0.845, B 0 to 0.845) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-XYB*]]."
   ^Vec4 [srgb]
   (let [^Vec4 c (to-XYB srgb)]
     (Vec4. (m/mnorm (.x c) -0.015386116472573375 0.02810008316127735 0.0 255.0)
@@ -1753,7 +1840,11 @@
            (.w c))))
 
 (defn from-XYB
-  "XYB -> sRGB"
+  "Converts XYB to sRGB, the inverse of [[to-XYB]].
+
+  - `c` XYB color, any type accepted by [[to-color]], with channels in the ranges of [[to-XYB]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-XYB*]]."
   ^Vec4 [xyb]
   (let [^Vec4 c (pr/to-color xyb)
         gamma-r (- (+ (.y c) (.x c)) -0.15595420054924863)
@@ -1768,7 +1859,11 @@
     (to-sRGB (Vec4. r g b (.w c)))))
 
 (defn from-XYB*
-  "XYB -> sRGB, normalized"
+  "Converts XYB with channels in `[0,255]`, as produced by [[to-XYB*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-XYB]]."
   ^Vec4 [xyb*]
   (let [^Vec4 c (pr/to-color xyb*)]
     (from-XYB (Vec4. (m/mnorm (.x c) 0.0 255.0 -0.015386116472573375 0.02810008316127735)
@@ -1780,7 +1875,13 @@
 ;; https://web.archive.org/web/20120302090118/http://www.insanit.net/tag/rgb-to-ryb/
 
 (defn to-RYB
-  "sRGB -> RYB"
+  "Converts an sRGB color to RYB, red-yellow-blue.
+
+  Arah J. Leonard's algorithm (2009, insanit.net): removes the white, takes yellow from red and green, splits the remaining green, rescales and adds the white back. A heuristic, not a paint mixing model; `from-RYB` is its exact inverse.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: R, Y, B in `[0,255]`. See also [[from-RYB]], [[to-RYB*]]."
   ^Vec4 [srgb]
   (let [^Vec4 c (pr/to-color srgb)
         w (min (.x c) (.y c) (.z c))
@@ -1804,10 +1905,14 @@
            (m/muladd b n w)
            (.w c))))
 
-(def ^{:doc "sRGB -> RYB, normalized" :metadoc/categories meta-conv} to-RYB* to-RYB)
+(def ^{:doc "The same as [[to-RYB]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} to-RYB* to-RYB)
 
 (defn from-RYB
-  "RYB -> sRGB"
+  "Converts RYB to sRGB, the inverse of [[to-RYB]].
+
+  - `c` RYB color, any type accepted by [[to-color]], with channels in the ranges of [[to-RYB]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-RYB*]]."
   ^Vec4 [ryb]
   (let [^Vec4 c (pr/to-color ryb)
         w (min (.x c) (.y c) (.z c))
@@ -1831,7 +1936,7 @@
            (m/muladd b n w)
            (.w c))))
 
-(def ^{:doc "RYB -> sRGB, normalized" :metadoc/categories meta-conv} from-RYB* from-RYB)
+(def ^{:doc "The same as [[from-RYB]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} from-RYB* from-RYB)
 
 ;; ### LAB
 
@@ -1859,19 +1964,25 @@
      (Vec4. L a b (.w xyz)))))
 
 (defn to-LAB
-  "sRGB -> LAB
+  "Converts an sRGB color to CIE 1976 L*a*b*.
 
-  Returned ranges:
+  Computed from [[to-XYZ]]; for other white points see [[XYZ-to-LAB]]. White point CIE 1931 2° D65.
 
-  * L: 0.0 - 100.0
-  * a: -86.18 - 98.25
-  * b: -107.86 - 94.48"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -86.18 to 98.23, b -107.86 to 94.48. See also [[from-LAB]], [[to-LAB*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (-> srgb to-XYZ XYZ-to-LAB))
 
 (defn to-LAB*
-  "sRGB -> LAB, normalized"
+  "Converts an sRGB color to LAB with channels mapped to `[0,255]`.
+
+  Each channel of [[to-LAB]] is mapped linearly from its range (L 0 to 100, a -86.18 to 98.23, b -107.86 to 94.48) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-LAB*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-LAB srgb)]
@@ -1899,15 +2010,21 @@
      (XYZ1-to-XYZ (Vec4. x (from-lab-correct y) z (.w c))))))
 
 (defn from-LAB
-  "LAB -> sRGB,
+  "Converts LAB to sRGB, the inverse of [[to-LAB]].
 
-  For ranges, see [[to-LAB]]"
+  - `c` LAB color, any type accepted by [[to-color]], with channels in the ranges of [[to-LAB]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-LAB*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [lab]
   (-> lab LAB-to-XYZ from-XYZ))
 
 (defn from-LAB*
-  "LAB -> sRGB, normalized"
+  "Converts LAB with channels in `[0,255]`, as produced by [[to-LAB*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-LAB]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [lab*]
   (let [^Vec4 c (pr/to-color lab*)]
@@ -1940,19 +2057,25 @@
                 (.w cc)))))))
 
 (defn to-LUV
-  "sRGB -> LUV
+  "Converts an sRGB color to CIE 1976 L*u*v*.
 
-  Returned ranges:
+  Computed from [[to-XYZ]]; for other white points see [[XYZ-to-LUV]]. White point CIE 1931 2° D65.
 
-  * L: 0.0 - 100.0
-  * u: -83.08 - 175.05
-  * v: -134.12 - 107.40"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, u -83.08 to 175.02, v -134.10 to 107.40. See also [[from-LUV]], [[to-LUV*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (-> srgb to-XYZ XYZ-to-LUV))
 
 (defn to-LUV*
-  "sRGB -> LUV, normalized"
+  "Converts an sRGB color to LUV with channels mapped to `[0,255]`.
+
+  Each channel of [[to-LUV]] is mapped linearly from its range (L 0 to 100, u -83.08 to 175.02, v -134.10 to 107.40) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-LUV*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-LUV srgb)]
@@ -1982,15 +2105,21 @@
                 (.w c)))))))
 
 (defn from-LUV
-  "LUV -> RGB
+  "Converts LUV to sRGB, the inverse of [[to-LUV]].
 
-  For ranges, see [[to-LUV]]"
+  - `c` LUV color, any type accepted by [[to-color]], with channels in the ranges of [[to-LUV]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-LUV*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [luv]
   (-> luv LUV-to-XYZ from-XYZ))
 
 (defn from-LUV*
-  "LUV -> RGB, normalized"
+  "Converts LUV with channels in `[0,255]`, as produced by [[to-LUV*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-LUV]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [luv*]
   (let [^Vec4 c (pr/to-color luv*)]
@@ -2022,19 +2151,25 @@
                 (.w cc)))))))
 
 (defn to-HunterLAB
-  "sRGB -> HunterLAB
+  "Converts an sRGB color to Hunter Lab (Hunter 1948).
 
-  Returned ranges:
+  Computed from [[to-XYZ]]; Ka and Kb from the white point by the textbook formulas `175 / 198.04 * (Xn + Yn)` and `70 / 218.11 * (Yn + Zn)` (colour-science uses a table value of Kb for D65 differing by about 0.2). White point CIE 1931 2° D65.
 
-  * L: 0.0 - 100.0
-  * a: -69.08 - 109.48
-  * b: -199.78 - 55.72"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -69.08 to 109.46, b -199.78 to 55.72. See also [[from-HunterLAB]], [[to-HunterLAB*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (-> srgb to-XYZ XYZ-to-HunterLAB))
 
 (defn to-HunterLAB*
-  "sRGB -> HunterLAB, normalized"
+  "Converts an sRGB color to HunterLAB with channels mapped to `[0,255]`.
+
+  Each channel of [[to-HunterLAB]] is mapped linearly from its range (L 0 to 100, a -69.08 to 109.46, b -199.78 to 55.72) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-HunterLAB*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-HunterLAB srgb)]
@@ -2059,15 +2194,21 @@
          (XYZ1-to-XYZ (Vec4. X Y Z (.w c))))))))
 
 (defn from-HunterLAB
-  "HunterLAB -> RGB
+  "Converts HunterLAB to sRGB, the inverse of [[to-HunterLAB]].
 
-  For ranges, see [[to-HunterLAB]]"
+  - `c` HunterLAB color, any type accepted by [[to-color]], with channels in the ranges of [[to-HunterLAB]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-HunterLAB*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [hunterlab]
   (-> hunterlab HunterLAB-to-XYZ from-XYZ))
 
 (defn from-HunterLAB*
-  "HunterLAB -> RGB, normalized"
+  "Converts HunterLAB with channels in `[0,255]`, as produced by [[to-HunterLAB*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-HunterLAB]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [hunterlab*]
   (let [^Vec4 c (pr/to-color hunterlab*)]
@@ -2084,19 +2225,25 @@
    (to-luma-color-hue (XYZ-to-LAB xyz whitepoint))))
 
 (defn to-LCH
-  "sRGB -> LCH
+  "Converts an sRGB color to CIE LCh(ab), the polar form of [[to-LAB]].
 
-  Returned ranges:
+  Hue in degrees; for grays the hue is undefined (rounding noise). White point CIE 1931 2° D65.
 
-  * L: 0.0 - 100.0
-  * C: 0.0 - 133.82
-  * H: 0.0 - 360.0"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, C 0 to 133.81, H 0 to 360. See also [[from-LCH]], [[to-LCH*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (to-luma-color-hue to-LAB srgb))
 
 (defn to-LCH*
-  "sRGB -> LCH, normalized"
+  "Converts an sRGB color to LCH with channels mapped to `[0,255]`.
+
+  Each channel of [[to-LCH]] is mapped linearly from its range (L 0 to 100, C 0 to 133.81, H 0 to 360) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-LCH*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-LCH srgb)]
@@ -2111,15 +2258,21 @@
    (LAB-to-XYZ (from-luma-color-hue lch) whitepoint)))
 
 (defn from-LCH
-  "LCH -> sRGB
+  "Converts LCH to sRGB, the inverse of [[to-LCH]].
 
-  For ranges, see [[to-LCH]]."
+  - `c` LCH color, any type accepted by [[to-color]], with channels in the ranges of [[to-LCH]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-LCH*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [lch]
   (from-luma-color-hue from-LAB lch))
 
 (defn from-LCH*
-  "LCH -> sRGB, normalized"
+  "Converts LCH with channels in `[0,255]`, as produced by [[to-LCH*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-LCH]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [lch*]
   (let [^Vec4 c (pr/to-color lch*)]
@@ -2136,19 +2289,25 @@
    (to-luma-color-hue (XYZ-to-LUV xyz whitepoint))))
 
 (defn to-LCHuv
-  "sRGB -> LCHuv
+  "Converts an sRGB color to CIE LCh(uv), the polar form of [[to-LUV]].
 
-  Returned ranges:
+  Hue in degrees; for grays the hue is undefined (rounding noise). White point CIE 1931 2° D65.
 
-  * L: 0.0 - 100.0
-  * C: 0.0 - 180.0
-  * H: 0.0 - 360.0"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, C 0 to 179.04, H 0 to 360. See also [[from-LCHuv]], [[to-LCHuv*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (to-luma-color-hue to-LUV srgb))
 
 (defn to-LCHuv*
-  "sRGB -> LCHuv, normalized"
+  "Converts an sRGB color to LCHuv with channels mapped to `[0,255]`.
+
+  Each channel of [[to-LCHuv]] is mapped linearly from its range (L 0 to 100, C 0 to 179.04, H 0 to 360) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-LCHuv*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-LCHuv srgb)]
@@ -2163,15 +2322,21 @@
    (LUV-to-XYZ (from-luma-color-hue lchuv) whitepoint)))
 
 (defn from-LCHuv
-  "LCHuv -> sRGB
+  "Converts LCHuv to sRGB, the inverse of [[to-LCHuv]].
 
-  For ranges, see [[to-LCH]]."
+  - `c` LCHuv color, any type accepted by [[to-color]], with channels in the ranges of [[to-LCHuv]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-LCHuv*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [lchuv]
   (from-luma-color-hue from-LUV lchuv))
 
 (defn from-LCHuv*
-  "LCHuv -> sRGB, normalized"
+  "Converts LCHuv with channels in `[0,255]`, as produced by [[to-LCHuv*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-LCHuv]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [lchuv*]
   (let [^Vec4 c (pr/to-color lchuv*)]
@@ -2195,19 +2360,25 @@
               (.w xyz))))))
 
 (defn to-Yxy
-  "sRGB -> Yxy
+  "Converts an sRGB color to CIE xyY, luminance Y and chromaticity x, y.
 
-  Returned ranges:
+  Computed from [[to-XYZ]]; for black the white-point chromaticity is used (Lindbloom convention), so black round-trips. White point CIE 1931 2° D65.
 
-  * Y: 0.0 - 100.0
-  * x: 0.15 - 0.64
-  * y: 0.06 - 0.60"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: Y 0 to 100, x 0.15 to 0.64, y 0.06 to 0.60. See also [[from-Yxy]], [[to-Yxy*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (XYZ-to-Yxy (to-XYZ srgb)))
 
 (defn to-Yxy*
-  "sRGB -> Yxy, normalized"
+  "Converts an sRGB color to Yxy with channels mapped to `[0,255]`.
+
+  Each channel of [[to-Yxy]] is mapped linearly from its range (Y 0 to 100, x 0.15 to 0.64, y 0.06 to 0.60) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-Yxy*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-Yxy srgb)]
@@ -2227,15 +2398,21 @@
         (Vec4. X (.x c) Z (.w c))))))
 
 (defn from-Yxy
-  "Yxy -> sRGB
+  "Converts Yxy to sRGB, the inverse of [[to-Yxy]].
 
-  For ranges, see [[to-Yxy]]."
+  - `c` Yxy color, any type accepted by [[to-color]], with channels in the ranges of [[to-Yxy]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-Yxy*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [yxy]
   (from-XYZ (Yxy-to-XYZ yxy)))
 
 (defn from-Yxy*
-  "Yxy -> sRGB, normalized"
+  "Converts Yxy with channels in `[0,255]`, as produced by [[to-Yxy*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-Yxy]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [yxy*]
   (let [^Vec4 c (pr/to-color yxy*)]
@@ -2318,16 +2495,24 @@
      (Vec4. (* W13 (.x uv)) (* W13 (.y uv)) W (.w c)))))
 
 (defn to-UVW
-  "sRGB -> UVW
+  "Converts an sRGB color to CIE 1964 U*V*W*.
 
-  * U: -82.15 171.81
-  * V: -87.16 70.82
-  * W: -17.0 99.0"
+  Computed from [[to-XYZ]] via the CIE 1960 u, v chromaticities; for black the white-point chromaticity is used. White point CIE 1931 2° D65.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: U -82.16 to 171.81, V -87.17 to 70.81, W -17 to 99.04. See also [[from-UVW]], [[to-UVW*]]."
   ^Vec4 [srgb]
   (XYZ-to-UVW (to-XYZ srgb)))
 
 (defn to-UVW*
-  "sRGB -> UVW, normalized"
+  "Converts an sRGB color to UVW with channels mapped to `[0,255]`.
+
+  Each channel of [[to-UVW]] is mapped linearly from its range (U -82.16 to 171.81, V -87.17 to 70.81, W -17 to 99.04) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-UVW*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-UVW srgb)]
@@ -2348,12 +2533,20 @@
      (Yxy-to-XYZ (Vec4. Y (.x xy) (.y xy) (.w c))))))
 
 (defn from-UVW
-  "UVW -> sRGB"
+  "Converts UVW to sRGB, the inverse of [[to-UVW]].
+
+  - `c` UVW color, any type accepted by [[to-color]], with channels in the ranges of [[to-UVW]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-UVW*]]."
   ^Vec4 [uvw]
   (from-XYZ (UVW-to-XYZ uvw)))
 
 (defn from-UVW*
-  "UVW -> sRGB, normalized"
+  "Converts UVW with channels in `[0,255]`, as produced by [[to-UVW*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-UVW]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [uvw*]
   (let [^Vec4 cc (pr/to-color uvw*)]
@@ -2383,9 +2576,13 @@
         (v/vec4 (mat/mulv m (Vec3. (.x xyz) (.y xyz) (.z xyz))) (.w xyz))))))
 
 (defn to-LMS
-  "RGB -> LMS, D65
+  "Converts an sRGB color to LMS cone responses with the Hunt-Pointer-Estevez matrix normalized to D65.
 
-  Ranges: 0.0 - 100.0"
+  Computed from [[to-XYZ]]; white is about (100, 100, 100). For other cone matrices see [[->XYZ-to-LMS]].
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100.003, M 0 to 99.999, S 0 to 99.979. See also [[from-LMS]], [[to-LMS*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [c (to-XYZ c)]
@@ -2395,7 +2592,13 @@
            (.w c))))
 
 (defn to-LMS*
-  "RGB -> LMS, normalized"
+  "Converts an sRGB color to LMS with channels mapped to `[0,255]`.
+
+  Each channel of [[to-LMS]] is mapped linearly from its range (L 0 to 100.003, M 0 to 99.999, S 0 to 99.979) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-LMS*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-LMS c)]
@@ -2423,9 +2626,11 @@
         (v/vec4 (mat/mulv m (Vec3. (.x lms) (.y lms) (.z lms))) (.w lms))))))
 
 (defn from-LMS
-  "LMS -> RGB, D65
+  "Converts LMS to sRGB, the inverse of [[to-LMS]].
 
-  Ranges: 0.0 - 100.0"
+  - `c` LMS color, any type accepted by [[to-color]], with channels in the ranges of [[to-LMS]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-LMS*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -2439,7 +2644,11 @@
                      (.w c)))))
 
 (defn from-LMS*
-  "LMS -> RGB, normalized"
+  "Converts LMS with channels in `[0,255]`, as produced by [[to-LMS*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-LMS]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -2469,13 +2678,13 @@
 
 
 (defn to-IPT
-  "RGB -> IPT
+  "Converts an sRGB color to IPT (Ebner and Fairchild 1998).
 
-  Ranges:
+  Computed from [[to-XYZ]] scaled to 0-1. White point CIE 1931 2° D65.
 
-  * I: 0.0 - 1.0
-  * P: -0.45 - 0.66
-  * T: -0.75 - 0.65"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: I 0 to 1, P -0.45 to 0.66, T -0.75 to 0.65. See also [[from-IPT]], [[to-IPT*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [c (to-XYZ1 c)
@@ -2489,7 +2698,13 @@
            (.w c))))
 
 (defn to-IPT*
-  "RGB -> IPT, normalized"
+  "Converts an sRGB color to IPT with channels mapped to `[0,255]`.
+
+  Each channel of [[to-IPT]] is mapped linearly from its range (I 0 to 1, P -0.45 to 0.66, T -0.75 to 0.65) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-IPT*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-IPT c)]
@@ -2499,7 +2714,11 @@
            (.w cc))))
 
 (defn from-IPT
-  "IPT -> RGB"
+  "Converts IPT to sRGB, the inverse of [[to-IPT]].
+
+  - `c` IPT color, any type accepted by [[to-color]], with channels in the ranges of [[to-IPT]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-IPT*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2517,7 +2736,11 @@
                       (.w c)))))
 
 (defn from-IPT*
-  "IPT -> RGB, normalized"
+  "Converts IPT with channels in `[0,255]`, as produced by [[to-IPT*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-IPT]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -2538,13 +2761,13 @@
   (spow v 2.34192037470726))
 
 (defn to-IgPgTg
-  "RGB -> IgPgTg
+  "Converts an sRGB color to IgPgTg (Hellwig and Fairchild 2020).
 
-  Ranges:
+  Computed from [[to-XYZ]] scaled to 0-1. White point CIE 1931 2° D65.
 
-  * Ig: 0.0 - 0.97
-  * Pg: -0.35 - 0.39
-  * Tg: -0.41 - 0.44"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: Ig 0 to 0.97, Pg -0.35 to 0.39, Tg -0.41 to 0.44. See also [[from-IgPgTg]], [[to-IgPgTg*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [c (to-XYZ1 c)
@@ -2558,7 +2781,13 @@
            (.w c))))
 
 (defn to-IgPgTg*
-  "RGB -> IgPgTg*, normalized"
+  "Converts an sRGB color to IgPgTg with channels mapped to `[0,255]`.
+
+  Each channel of [[to-IgPgTg]] is mapped linearly from its range (Ig 0 to 0.97, Pg -0.35 to 0.39, Tg -0.41 to 0.44) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-IgPgTg*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-IgPgTg c)]
@@ -2570,7 +2799,11 @@
 (def ^:private igpgtg-vec3 (Vec3. 18.36 21.46 19435.0))
 
 (defn from-IgPgTg
-  "IgPgTg -> RGB"
+  "Converts IgPgTg to sRGB, the inverse of [[to-IgPgTg]].
+
+  - `c` IgPgTg color, any type accepted by [[to-color]], with channels in the ranges of [[to-IgPgTg]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-IgPgTg*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2597,7 +2830,11 @@
                       (.w c)))))
 
 (defn from-IgPgTg*
-  "IgPgTg -> RGB, normalized"
+  "Converts IgPgTg with channels in `[0,255]`, as produced by [[to-IgPgTg*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-IgPgTg]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -2632,17 +2869,13 @@
               (inc (* jab-c3 v))) jab-p)))
 
 (defn to-JAB
-  "RGB -> JzAzBz
+  "Converts an sRGB color to Jzazbz (Safdar et al. 2017).
 
-  Jab https://www.osapublishing.org/oe/abstract.cfm?uri=oe-25-13-15131
+  Computed from absolute XYZ with the white at 100 cd/m2 (colour-science convention; other implementations use 203 cd/m2).
 
-  Ranges:
+  - `c` color, any type accepted by [[to-color]]
 
-  * J: 0.0 - 0.17
-  * a: -0.09 - 0.11
-  * b: -0.156 - 0.115
-  
-  Reference white point set to 100.0"
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: J 0 to 0.167, a -0.093 to 0.109, b -0.156 to 0.115. See also [[from-JAB]], [[to-JAB*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [c (to-XYZ c)
@@ -2659,7 +2892,13 @@
                  (inc (* jab-d (.x Iab)))) jab-d0) (.y Iab) (.z Iab) (.w c))))
 
 (defn to-JAB*
-  "RGB -> JzAzBz, normalized"
+  "Converts an sRGB color to JAB with channels mapped to `[0,255]`.
+
+  Each channel of [[to-JAB]] is mapped linearly from its range (J 0 to 0.167, a -0.093 to 0.109, b -0.156 to 0.115) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-JAB*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-JAB c)]
@@ -2675,9 +2914,11 @@
                          (- (* jab-c3 v) jab-c2)) jab-rn))))
 
 (defn from-JAB
-  "JzAzBz -> RGB
+  "Converts JAB to sRGB, the inverse of [[to-JAB]].
 
-  For ranges, see [[to-JAB]]."
+  - `c` JAB color, any type accepted by [[to-color]], with channels in the ranges of [[to-JAB]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-JAB*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2696,7 +2937,11 @@
                      (.z XYZ') (.w c)))))
 
 (defn from-JAB*
-  "JzAzBz -> RGB, normalized"
+  "Converts JAB with channels in `[0,255]`, as produced by [[to-JAB*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-JAB]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -2708,21 +2953,25 @@
 ;;
 
 (defn to-JCH
-  "RGB -> JCH
+  "Converts an sRGB color to JzCzhz, the polar form of [[to-JAB]].
 
-  Hue based color space derived from JAB
-  
-  Ranges:
+  Hue in degrees; for grays the hue is undefined (rounding noise). Absolute white at 100 cd/m2.
 
-  * J: 0.0 - 0.167
-  * C: 0.0 - 0.159
-  * H: 0.0 - 360.0"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: J 0 to 0.167, C 0 to 0.159, H 0 to 360. See also [[from-JCH]], [[to-JCH*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (to-luma-color-hue to-JAB c))
 
 (defn to-JCH*
-  "RGB -> JCH, normalized"
+  "Converts an sRGB color to JCH with channels mapped to `[0,255]`.
+
+  Each channel of [[to-JCH]] is mapped linearly from its range (J 0 to 0.167, C 0 to 0.159, H 0 to 360) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-JCH*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-JCH c)]
@@ -2732,15 +2981,21 @@
            (.w cc))))
 
 (defn from-JCH
-  "JCH -> RGB
+  "Converts JCH to sRGB, the inverse of [[to-JCH]].
 
-  For ranges, see [[to-JCH]]."
+  - `c` JCH color, any type accepted by [[to-color]], with channels in the ranges of [[to-JCH]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-JCH*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (from-luma-color-hue from-JAB c))
 
 (defn from-JCH*
-  "JCH -> RGB, normalized"
+  "Converts JCH with channels in `[0,255]`, as produced by [[to-JCH*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-JCH]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -2805,13 +3060,13 @@
 ;; HSI
 
 (defn to-HSI
-  "RGB -> HSI
+  "Converts an sRGB color to HSI, hue, saturation and intensity.
 
-  Ranges:
+  Intensity is the mean of the channels, saturation `1 - min / I`; hue in degrees on the RGB hexagon, 0 for grays.
 
-  * H: 0.0 - 360
-  * S: 0.0 - 1.0
-  * I: 0.0 - 1.0"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: H 0 to 360, S 0 to 1, I 0 to 1. See also [[from-HSI]], [[to-HSI*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2822,9 +3077,11 @@
     (Vec4. (.x hc) S (/ I 255.0) (.w c))))
 
 (defn from-HSI
-  "HSI -> RGB
+  "Converts HSI to sRGB, the inverse of [[to-HSI]].
 
-  For ranges, see [[to-HSI]]."
+  - `c` HSI color, any type accepted by [[to-color]], with channels in the ranges of [[to-HSI]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-HSI*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2836,19 +3093,29 @@
         rgb' (v/add (from-HCX h' C X) (Vec3. m m m))]
     (v/vec4 (v/mult rgb' 255.0) (.w c))))
 
-(def ^{:metadoc/categories meta-conv :doc "RGB -> HSI, normalized"} to-HSI* (comp normalize-HSx to-HSI))
-(def ^{:metadoc/categories meta-conv :doc "HSI -> RGB, normalized"} from-HSI* (comp from-HSI denormalize-HSx pr/to-color))
+(def ^{:doc "Converts an sRGB color to HSI with channels mapped to `[0,255]`.
+
+  Each channel of [[to-HSI]] is mapped linearly from its range (H 0 to 360, S 0 to 1, I 0 to 1) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-HSI*]]." :metadoc/categories meta-conv} to-HSI* (comp normalize-HSx to-HSI))
+(def ^{:doc "Converts HSI with channels in `[0,255]`, as produced by [[to-HSI*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-HSI]]." :metadoc/categories meta-conv} from-HSI* (comp from-HSI denormalize-HSx pr/to-color))
 
 ;; HSV
 
 (defn to-HSV
-  "RGB -> HSV
+  "Converts an sRGB color to HSV (HSB), hue, saturation and value.
 
-    Ranges:
+  Hexagonal hue in degrees (0 for grays), value `max`, saturation `(max - min) / max`.
 
-  * H: 0.0 - 360
-  * S: 0.0 - 1.0
-  * V: 0.0 - 1.0"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: H 0 to 360, S 0 to 1, V 0 to 1. See also [[from-HSV]], [[to-HSV*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2859,11 +3126,11 @@
     (Vec4. (.x hc) S (/ V 255.0) (.w c))))
 
 (defn from-HSV
-  "HSV -> RGB
+  "Converts HSV to sRGB, the inverse of [[to-HSV]].
 
-  Same as HSB.
-  
-  For ranges, see [[to-HSV]]."
+  - `c` HSV color, any type accepted by [[to-color]], with channels in the ranges of [[to-HSV]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-HSV*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2874,15 +3141,25 @@
         ^Vec3 rgb' (v/add (from-HCX h' C X) (Vec3. m m m))]
     (v/vec4 (v/mult rgb' 255.0) (.w c))))
 
-(def ^{:metadoc/categories meta-conv :doc "RGB -> HSV, normalized"} to-HSV* (comp normalize-HSx to-HSV))
-(def ^{:metadoc/categories meta-conv :doc "HSV -> RGB, normalized"} from-HSV* (comp from-HSV denormalize-HSx pr/to-color))
+(def ^{:doc "Converts an sRGB color to HSV with channels mapped to `[0,255]`.
+
+  Each channel of [[to-HSV]] is mapped linearly from its range (H 0 to 360, S 0 to 1, V 0 to 1) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-HSV*]]." :metadoc/categories meta-conv} to-HSV* (comp normalize-HSx to-HSV))
+(def ^{:doc "Converts HSV with channels in `[0,255]`, as produced by [[to-HSV*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-HSV]]." :metadoc/categories meta-conv} from-HSV* (comp from-HSV denormalize-HSx pr/to-color))
 
 ;; HSB = HSV
 
-(def ^{:metadoc/categories meta-conv :doc "RGB -> HSB(V), normalized (see [[to-HSV]])"} to-HSB to-HSV)
-(def ^{:metadoc/categories meta-conv :doc "HSB(V) -> RGB, normalized (see [[from-HSV]])"} from-HSB from-HSV)
-(def ^{:metadoc/categories meta-conv :doc "RGB -> HSB(V) (see [[to-HSV*]])"} to-HSB* to-HSV*)
-(def ^{:metadoc/categories meta-conv :doc "HSB(V) -> RGB (see [[from-HSV*]])"} from-HSB* from-HSV*)
+(def ^{:doc "Alias of [[to-HSV]]: HSB is another name of HSV." :metadoc/categories meta-conv} to-HSB to-HSV)
+(def ^{:doc "Alias of [[from-HSV]]." :metadoc/categories meta-conv} from-HSB from-HSV)
+(def ^{:doc "Alias of [[to-HSV*]]." :metadoc/categories meta-conv} to-HSB* to-HSV*)
+(def ^{:doc "Alias of [[from-HSV*]]." :metadoc/categories meta-conv} from-HSB* from-HSV*)
 
 ;; paletton HSV
 
@@ -2890,11 +3167,25 @@
 (declare paletton-rgb-to-hsv)
 
 (defn to-PalettonHSV
+  "Converts an sRGB color to the HSV variant used by [[paletton]].
+
+  The author's reverse engineering of the Paletton color wheel: hue in degrees on the Paletton (RYB-like) wheel, saturation and value up to 2.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: H 0 to 360, S 0 to 2, V 0 to 2. See also [[from-PalettonHSV]], [[to-PalettonHSV*]]."
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (paletton-rgb-to-hsv (.x c) (.y c) (.z c) (.w c))))
 
 (defn to-PalettonHSV*
+  "Converts an sRGB color to PalettonHSV with channels mapped to `[0,255]`.
+
+  Hue of [[to-PalettonHSV]] times 255/360, saturation and value times 127.5. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-PalettonHSV*]]."
   ^Vec4 [c]
   (let [^Vec4 c (to-PalettonHSV c)]
     (Vec4. (* n360->255 (.x c))
@@ -2903,11 +3194,21 @@
            (.w c))))
 
 (defn from-PalettonHSV
+  "Converts PalettonHSV to sRGB, the inverse of [[to-PalettonHSV]].
+
+  - `c` PalettonHSV color, any type accepted by [[to-color]], with channels in the ranges of [[to-PalettonHSV]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-PalettonHSV*]]."
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (paletton-hsv-to-rgb (.x c) (.y c) (.z c) (.w c))))
 
 (defn from-PalettonHSV*
+  "Converts PalettonHSV with channels in `[0,255]`, as produced by [[to-PalettonHSV*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-PalettonHSV]]."
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-PalettonHSV (Vec4. (* n255->360 (.x c))
@@ -2919,13 +3220,13 @@
 
 
 (defn to-HSL
-  "RGB -> HSL
+  "Converts an sRGB color to HSL, hue, saturation and lightness.
 
-  Ranges:
+  Hexagonal hue in degrees (0 for grays), lightness `(max + min) / 2`.
 
-  * H: 0.0 - 360
-  * S: 0.0 - 1.0
-  * L: 0.0 - 1.0"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: H 0 to 360, S 0 to 1, L 0 to 1. See also [[from-HSL]], [[to-HSL*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2937,9 +3238,11 @@
     (Vec4. (.x hc) (/ S 255.0) L (.w c))))
 
 (defn from-HSL
-  "HSL -> RGB
+  "Converts HSL to sRGB, the inverse of [[to-HSL]].
 
-  For ranges, see [[to-HSL]]."
+  - `c` HSL color, any type accepted by [[to-color]], with channels in the ranges of [[to-HSL]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-HSL*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -2950,8 +3253,18 @@
         ^Vec3 rgb' (v/add (from-HCX h' C X) (Vec3. m m m))]
     (v/vec4 (v/mult rgb' 255.0) (.w c))))
 
-(def ^{:metadoc/categories meta-conv :doc "RGB -> HSL, normalized"} to-HSL* (comp normalize-HSx to-HSL))
-(def ^{:metadoc/categories meta-conv :doc "HSL -> RGB, normalized"} from-HSL* (comp from-HSL denormalize-HSx pr/to-color))
+(def ^{:doc "Converts an sRGB color to HSL with channels mapped to `[0,255]`.
+
+  Each channel of [[to-HSL]] is mapped linearly from its range (H 0 to 360, S 0 to 1, L 0 to 1) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-HSL*]]." :metadoc/categories meta-conv} to-HSL* (comp normalize-HSx to-HSL))
+(def ^{:doc "Converts HSL with channels in `[0,255]`, as produced by [[to-HSL*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-HSL]]." :metadoc/categories meta-conv} from-HSL* (comp from-HSL denormalize-HSx pr/to-color))
 
 ;; HCL
 ;; http://w3.uqo.ca/missaoui/Publications/TRColorSpace.zip
@@ -2983,9 +3296,9 @@
                           (m/abs (- b r))))
         H (m/degrees (if (zero? gb-) 0.0 (m/atan (/ gb- rg-))))
         H (cond
-            (and (>= rg- 0.0) (>= gb- 0,0)) (* H m/TWO_THIRD)
+            (and (>= rg- 0.0) (>= gb- 0.0)) (* H m/TWO_THIRD)
             (and (>= rg- 0.0) (neg? gb-)) (* 2.0 m/TWO_THIRD H)
-            (and (neg? rg-) (>= gb- 0,0)) (+ (* 2.0 m/TWO_THIRD H) 180.0)
+            (and (neg? rg-) (>= gb- 0.0)) (+ (* 2.0 m/TWO_THIRD H) 180.0)
             (and (neg? rg-) (neg? gb-)) (- (* m/TWO_THIRD H) 180.0) 
             :else H)]
     (Vec4. H C L (.w c))))
@@ -3043,25 +3356,24 @@
 ;; by Alvy Ray Smitch and Eric Ray Lyons, 1995-1996
 
 (defn to-HWB
-  "RGB -> HWB
+  "Converts an sRGB color to HWB, hue, whiteness and blackness.
 
-  HWB - A More Intuitive Hue-Based Color Model
-  by Alvy Ray Smitch and Eric Ray Lyons, 1995-1996
+  A. R. Smith, E. R. Lyons, HWB - A More Intuitive Hue-Based Color Model (1996): whiteness `min`, blackness `1 - max`; hue in degrees, 0 for grays.
 
-  Ranges:
+  - `c` color, any type accepted by [[to-color]]
 
-  * H: 0.0 - 360.0
-  * W: 0.0 - 1.0
-  * B: 0.0 - 1.0"
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: H 0 to 360, W 0 to 1, B 0 to 1. See also [[from-HWB]], [[to-HWB*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (to-HSV c)]
     (Vec4. (.x c) (* (- 1.0 (.y c)) (.z c)) (- 1.0 (.z c)) (.w c))))
 
 (defn from-HWB
-  "HWB -> RGB
+  "Converts HWB to sRGB, the inverse of [[to-HWB]].
 
-  For ranges, see [[to-HWB]]."
+  - `c` HWB color, any type accepted by [[to-color]], with channels in the ranges of [[to-HWB]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-HWB*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -3072,8 +3384,18 @@
         b- (if (> w+b 1.0) (- 1.0 (/ b w+b)) (- 1.0 b))]
     (from-HSV (Vec4. (.x c) (if (zero? w) 1.0 (- 1.0 (/ w b-))) b- (.w c)))))
 
-(def ^{:metadoc/categories meta-conv :doc "RGB -> HWB, normalized"} to-HWB* (comp normalize-HSx to-HWB))
-(def ^{:metadoc/categories meta-conv :doc "HWB -> RGB, normalized"} from-HWB* (comp from-HWB denormalize-HSx pr/to-color))
+(def ^{:doc "Converts an sRGB color to HWB with channels mapped to `[0,255]`.
+
+  Each channel of [[to-HWB]] is mapped linearly from its range (H 0 to 360, W 0 to 1, B 0 to 1) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-HWB*]]." :metadoc/categories meta-conv} to-HWB* (comp normalize-HSx to-HWB))
+(def ^{:doc "Converts HWB with channels in `[0,255]`, as produced by [[to-HWB*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-HWB]]." :metadoc/categories meta-conv} from-HWB* (comp from-HWB denormalize-HSx pr/to-color))
 
 
 ;; ### GLHS
@@ -3086,17 +3408,13 @@
 (def ^{:private true :const true :tag 'double} weight-min 0.2)
 
 (defn to-GLHS
-  "RGB -> GLHS
+  "Converts an sRGB color to GLHS, the generalized lightness, hue and saturation model of Levkowitz and Herman.
 
-  Color Theory and Modeling for Computer Graphics, Visualization, and Multimedia Applications (The Springer International Series in Engineering and Computer Science) by Haim Levkowitz
+  H. Levkowitz, Color Theory and Modeling for Computer Graphics, Visualization, and Multimedia Applications: weights wmin 0.2, wmid 0.1, wmax 0.7, the closest approximation to the Munsell space (p. 79). Channel order L, H, S; hue in degrees, 0 for grays.
 
-  Weights: 0.2 (min), 0.1 (mid), 0.7 (max).
+  - `c` color, any type accepted by [[to-color]]
 
-  Ranges:
-  
-  * L: 0.0 - 1.0
-  * H: 0.0 - 360.0
-  * S: 0.0 - 1.0"
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 1, H 0 to 360, S 0 to 1. See also [[from-GLHS]], [[to-GLHS*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -3126,7 +3444,13 @@
         (Vec4. (/ l 255.0) h s (.w c))))))
 
 (defn to-GLHS*
-  "RGB -> GLHS, normalized"
+  "Converts an sRGB color to GLHS with channels mapped to `[0,255]`.
+
+  Each channel of [[to-GLHS]] is mapped linearly from its range (L 0 to 1, H 0 to 360, S 0 to 1) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-GLHS*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c] 
   (let [cc (to-GLHS c)]
@@ -3136,9 +3460,11 @@
            (.w cc))))
 
 (defn from-GLHS
-  "GLHS -> RGB
+  "Converts GLHS to sRGB, the inverse of [[to-GLHS]].
 
-  For ranges, see [[to-GLHS]]."
+  - `c` GLHS color, any type accepted by [[to-color]], with channels in the ranges of [[to-GLHS]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-GLHS*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -3172,7 +3498,11 @@
           6 (Vec4. (.z rgb) (.y rgb) (.x rgb) (.w c)))))))
 
 (defn from-GLHS*
-  "GLHS -> RGB"
+  "Converts GLHS with channels in `[0,255]`, as produced by [[to-GLHS*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-GLHS]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -3236,13 +3566,13 @@
 ;; ### YDbDr
 
 (defn to-YDbDr
-  "RGB -> YDbDr
+  "Converts an sRGB color to YDbDr, the SECAM color space.
 
-  Ranges:
+  BT.601 luma `Y = 0.299 R + 0.587 G + 0.114 B`, `Db = -0.450 R - 0.883 G + 1.333 B`, `Dr = -1.333 R + 1.116 G + 0.217 B`, on the 0-255 scale.
 
-  * Y: 0.0 - 255.0
-  * Db: -340.0 - 340.0
-  * Dr: -340.0 - 340.0"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: Y 0 to 255, Db -339.92 to 339.92, Dr -339.92 to 339.92. See also [[from-YDbDr]], [[to-YDbDr*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c] 
   (let [^Vec4 c (pr/to-color c)
@@ -3252,7 +3582,13 @@
     (Vec4. Y Db Dr (.w c))))
 
 (defn to-YDbDr*
-  "RGB -> YDbDr"
+  "Converts an sRGB color to YDbDr with channels mapped to `[0,255]`.
+
+  Each channel of [[to-YDbDr]] is mapped linearly from its range (Y 0 to 255, Db -339.92 to 339.92, Dr -339.92 to 339.92) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-YDbDr*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-YDbDr c)]
@@ -3262,9 +3598,11 @@
            (.w cc))))
 
 (defn from-YDbDr
-  "YDbDr -> RGB
+  "Converts YDbDr to sRGB, the inverse of [[to-YDbDr]].
 
-  For ranges, see [[to-YDbDr]]."
+  - `c` YDbDr color, any type accepted by [[to-color]], with channels in the ranges of [[to-YDbDr]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-YDbDr*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -3277,7 +3615,11 @@
     (Vec4. r g b (.w c))))
 
 (defn from-YDbDr*
-  "YDbDr -> RGB, normalized"
+  "Converts YDbDr with channels in `[0,255]`, as produced by [[to-YDbDr*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-YDbDr]]."
   {:metadoc/categories meta-conv}
   [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -3445,13 +3787,13 @@
 ;; ### YCgCo
 
 (defn to-YCgCo
-  "RGB -> YCgCo
+  "Converts an sRGB color to YCgCo (Malvar and Sullivan 2003, H.264).
 
-  Ranges:
-  
-  * Y: 0.0 - 255.0
-  * Cg: -127.5 - 127.5
-  * Co: -127.5 - 127.5"
+  `Y = R/4 + G/2 + B/4`, `Cg = -R/4 + G/2 - B/4`, `Co = R/2 - B/2`, on the 0-255 scale; exact inverse.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: Y 0 to 255, Cg -127.5 to 127.5, Co -127.5 to 127.5. See also [[from-YCgCo]], [[to-YCgCo*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -3461,15 +3803,23 @@
     (Vec4. Y Cg Co (.w c))))
 
 (defn to-YCgCo*
-  "RGB -> YCgCo, normalized"
+  "Converts an sRGB color to YCgCo with channels mapped to `[0,255]`.
+
+  The channels of [[to-YCgCo]] with 127.5 added to the two chroma channels. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-YCgCo*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (v/add (to-YCgCo c) y-norm))
 
 (defn from-YCgCo
-  "YCgCo -> RGB
+  "Converts YCgCo to sRGB, the inverse of [[to-YCgCo]].
 
-  For ranges, see [[to-YCgCo]]."
+  - `c` YCgCo color, any type accepted by [[to-color]], with channels in the ranges of [[to-YCgCo]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-YCgCo*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -3479,7 +3829,11 @@
     (Vec4. (+ Co tmp) (+ (.x c) Cg) (- tmp Co) (.w c))))
 
 (defn from-YCgCo*
-  "YCgCo -> RGB, normalized"
+  "Converts YCgCo with channels in `[0,255]`, as produced by [[to-YCgCo*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-YCgCo]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (from-YCgCo (v/sub (pr/to-color c) y-norm)))
@@ -3497,15 +3851,13 @@
 (def ^{:private true :const true :tag 'double} ch-bc-da+ed-eb-r (/ (+ ch-bc-da ch-ed (- ch-eb))))
 
 (defn to-Cubehelix
-  "RGB -> Cubehelix
+  "Converts an sRGB color to Cubehelix, a hue-saturation-lightness space built on Green's cubehelix scheme.
 
-  D3 version
-  
-  Ranges:
+  D3 (d3-color) formulation of D. A. Green (2011). Hue in degrees; for grays the hue is undefined and set by the formula.
 
-  * H: 0.0 - 360.0
-  * S: 0.0 - 4.61
-  * L: 0.0 - 1.0"
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: H 0 to 360, S 0 to 4.614, L 0 to 1. See also [[from-Cubehelix]], [[to-Cubehelix*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -3523,7 +3875,13 @@
         (Vec4. (if (neg? h) (+ h 360.0) h) s l (.w c))))))
 
 (defn to-Cubehelix*
-  "RGB -> Cubehelix, normalized"
+  "Converts an sRGB color to Cubehelix with channels mapped to `[0,255]`.
+
+  Each channel of [[to-Cubehelix]] is mapped linearly from its range (H 0 to 360, S 0 to 4.614, L 0 to 1) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-Cubehelix*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-Cubehelix c)]
@@ -3533,9 +3891,11 @@
            (.w cc))))
 
 (defn from-Cubehelix
-  "Cubehelix -> RGB
+  "Converts Cubehelix to sRGB, the inverse of [[to-Cubehelix]].
 
-  For ranges, see [[to-Cubehelix]]."
+  - `c` Cubehelix color, any type accepted by [[to-color]], with channels in the ranges of [[to-Cubehelix]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-Cubehelix*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
@@ -3550,7 +3910,11 @@
            (.w c))))
 
 (defn from-Cubehelix*
-  "Cubehelix -> RGB, normalized"
+  "Converts Cubehelix with channels in `[0,255]`, as produced by [[to-Cubehelix*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-Cubehelix]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c] 
   (let [^Vec4 c (pr/to-color c)
@@ -3564,17 +3928,13 @@
 ;; https://github.com/nschloe/colorio/blob/master/colorio/_osa.py
 
 (defn to-OSA
-  "OSA-UCS -> RGB
+  "Converts an sRGB color to OSA-UCS Ljg (MacAdam 1974).
 
-  https://github.com/nschloe/colorio/blob/master/colorio/_osa.py
+  Computed from [[to-XYZ]] as in colorio: `L = (Lambda - 14.3993) / sqrt(2)` (colour-science uses 14.4, L differs by 4.95e-4). Near black j and g reach extreme values (j down to about -221).
 
-  Ranges:
+  - `c` color, any type accepted by [[to-color]]
 
-  * L: -13.5 - 7.14
-  * j (around): -20.0 - 14.0 + some extreme values
-  * g (around): -20.0 - 12.0 + some extreme values
-
-  Note that for some cases (like `(to-OSA [18 7 4])`) function returns some extreme values."
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L -13.51 to 7.14, j -221.26 to 19.91, g -18.04 to 62.92. See also [[from-OSA]], [[to-OSA*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [xyz (to-XYZ c)
@@ -3611,9 +3971,11 @@
 (deftype OSAFDF [^double fomega ^double dfomega ^double X ^double Y ^double Z])
 
 (defn from-OSA
-  "RGB -> OSA-UCS
+  "Converts OSA to sRGB, the inverse of [[to-OSA]].
 
-  For ranges, see [[to-OSA]]."
+  - `c` OSA color, any type accepted by [[to-color]], with channels in the ranges of [[to-OSA]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-OSA*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 col (pr/to-color c)
@@ -3692,9 +4054,13 @@
           (from-XYZ (Vec4. (.X res) (.Y res) (.Z res) (.w col))))))))
 
 (defn to-OSA*
-  "OSA-UCS -> RGB, normalized
+  "Converts an sRGB color to OSA with channels mapped to `[0,255]`.
 
-  Note that due to some extreme outliers, normalization is triple cubic root for `g` and `j`."
+  L of [[to-OSA]] is mapped linearly; j and g first go through a triple cube root, because of their extreme values near black, then are mapped linearly. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-OSA*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [c (to-OSA c)]
@@ -3704,9 +4070,11 @@
            (.w c))))
 
 (defn from-OSA*
-  "OSA-UCS -> RGB, normalized
+  "Converts OSA with channels in `[0,255]`, as produced by [[to-OSA*]], to sRGB.
 
-  Note that due to some extreme outliers, normalization is triple cubic power for `g` and `j`."
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-OSA]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
@@ -3797,27 +4165,107 @@
                   (m/mnorm (.z c) 0.0 255.0 minb maxb)
                   (.w c)))))))
 
-(def ^{:doc "RGB -> DIN99" :metadoc/categories meta-conv} to-DIN99 (make-to-DIN99 :din99))
-(def ^{:doc "RGB -> DIN99" :metadoc/categories meta-conv} to-DIN99b (make-to-DIN99 :din99b))
-(def ^{:doc "RGB -> DIN99" :metadoc/categories meta-conv} to-DIN99o (make-to-DIN99 :din99o))
-(def ^{:doc "RGB -> DIN99" :metadoc/categories meta-conv} to-DIN99c (make-to-DIN99 :din99c))
-(def ^{:doc "RGB -> DIN99" :metadoc/categories meta-conv} to-DIN99d (make-to-DIN99 :din99d))
-(def ^{:doc "RGB -> DIN99, normalized" :metadoc/categories meta-conv} to-DIN99* (make-to-DIN99* to-DIN99 :din99))
-(def ^{:doc "RGB -> DIN99b, normalized" :metadoc/categories meta-conv} to-DIN99b* (make-to-DIN99* to-DIN99b :din99b))
-(def ^{:doc "RGB -> DIN99o, normalized" :metadoc/categories meta-conv} to-DIN99o* (make-to-DIN99* to-DIN99o :din99o))
-(def ^{:doc "RGB -> DIN99c, normalized" :metadoc/categories meta-conv} to-DIN99c* (make-to-DIN99* to-DIN99c :din99c))
-(def ^{:doc "RGB -> DIN99d, normalized" :metadoc/categories meta-conv} to-DIN99d* (make-to-DIN99* to-DIN99d :din99d))
+(def ^{:doc "Converts an sRGB color to DIN99, a CIELAB-based uniform space (DIN 6176, ASTM D2244-07).
 
-(def ^{:doc "DIN99 -> RGB" :metadoc/categories meta-conv} from-DIN99 (make-from-DIN99 :din99))
-(def ^{:doc "DIN99b -> RGB" :metadoc/categories meta-conv} from-DIN99b (make-from-DIN99 :din99b))
+  Computed from [[to-LAB]] (CIE 1931 2° D65); logarithmic lightness, rotated and compressed chroma.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -27.45 to 36.18, b -33.40 to 31.15. See also [[from-DIN99]], [[to-DIN99*]]." :metadoc/categories meta-conv} to-DIN99 (make-to-DIN99 :din99))
+(def ^{:doc "Converts an sRGB color to DIN99b, a CIELAB-based uniform space (Cui et al. 2002).
+
+  Computed from [[to-LAB]] (CIE 1931 2° D65), with the DIN99b constants and a 26° hue rotation.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -40.11 to 45.52, b -40.49 to 44.37. See also [[from-DIN99b]], [[to-DIN99b*]]." :metadoc/categories meta-conv} to-DIN99b (make-to-DIN99 :din99b))
+(def ^{:doc "RGB -> DIN99" :metadoc/categories meta-conv} to-DIN99o (make-to-DIN99 :din99o))
+(def ^{:doc "Converts an sRGB color to DIN99c, a CIELAB-based uniform space (Cui et al. 2002).
+
+  Computed from XYZ with the DIN99c modification of X, then CIELAB (CIE 1931 2° D65) and the DIN99c constants.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -38.44 to 43.67, b -40.79 to 43.59. See also [[from-DIN99c]], [[to-DIN99c*]]." :metadoc/categories meta-conv} to-DIN99c (make-to-DIN99 :din99c))
+(def ^{:doc "Converts an sRGB color to DIN99d, a CIELAB-based uniform space (Cui et al. 2002).
+
+  Computed from XYZ with the DIN99d modification of X, then CIELAB (CIE 1931 2° D65) and the DIN99d constants, 50° hue rotation.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -37.35 to 42.32, b -41.04 to 43.04. See also [[from-DIN99d]], [[to-DIN99d*]]." :metadoc/categories meta-conv} to-DIN99d (make-to-DIN99 :din99d))
+(def ^{:doc "Converts an sRGB color to DIN99 with channels mapped to `[0,255]`.
+
+  Each channel of [[to-DIN99]] is mapped linearly from its range (L 0 to 100, a -27.45 to 36.18, b -33.40 to 31.15) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-DIN99*]]." :metadoc/categories meta-conv} to-DIN99* (make-to-DIN99* to-DIN99 :din99))
+(def ^{:doc "Converts an sRGB color to DIN99b with channels mapped to `[0,255]`.
+
+  Each channel of [[to-DIN99b]] is mapped linearly from its range (L 0 to 100, a -40.11 to 45.52, b -40.49 to 44.37) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-DIN99b*]]." :metadoc/categories meta-conv} to-DIN99b* (make-to-DIN99* to-DIN99b :din99b))
+(def ^{:doc "RGB -> DIN99o, normalized" :metadoc/categories meta-conv} to-DIN99o* (make-to-DIN99* to-DIN99o :din99o))
+(def ^{:doc "Converts an sRGB color to DIN99c with channels mapped to `[0,255]`.
+
+  Each channel of [[to-DIN99c]] is mapped linearly from its range (L 0 to 100, a -38.44 to 43.67, b -40.79 to 43.59) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-DIN99c*]]." :metadoc/categories meta-conv} to-DIN99c* (make-to-DIN99* to-DIN99c :din99c))
+(def ^{:doc "Converts an sRGB color to DIN99d with channels mapped to `[0,255]`.
+
+  Each channel of [[to-DIN99d]] is mapped linearly from its range (L 0 to 100, a -37.35 to 42.32, b -41.04 to 43.04) to `[0,255]`. Alpha is kept.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4`. Inverse: [[from-DIN99d*]]." :metadoc/categories meta-conv} to-DIN99d* (make-to-DIN99* to-DIN99d :din99d))
+
+(def ^{:doc "Converts DIN99 to sRGB, the inverse of [[to-DIN99]].
+
+  - `c` DIN99 color, any type accepted by [[to-color]], with channels in the ranges of [[to-DIN99]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-DIN99*]]." :metadoc/categories meta-conv} from-DIN99 (make-from-DIN99 :din99))
+(def ^{:doc "Converts DIN99b to sRGB, the inverse of [[to-DIN99b]].
+
+  - `c` DIN99b color, any type accepted by [[to-color]], with channels in the ranges of [[to-DIN99b]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-DIN99b*]]." :metadoc/categories meta-conv} from-DIN99b (make-from-DIN99 :din99b))
 (def ^{:doc "DIN99o -> RGB" :metadoc/categories meta-conv} from-DIN99o (make-from-DIN99 :din99o))
-(def ^{:doc "DIN99c -> RGB" :metadoc/categories meta-conv} from-DIN99c (make-from-DIN99 :din99c))
-(def ^{:doc "DIN99d -> RGB" :metadoc/categories meta-conv} from-DIN99d (make-from-DIN99 :din99d))
-(def ^{:doc "DIN99 -> RGB, normalized" :metadoc/categories meta-conv} from-DIN99* (make-from-DIN99* from-DIN99 :din99))
-(def ^{:doc "DIN99b -> RGB, normalized" :metadoc/categories meta-conv} from-DIN99b* (make-from-DIN99* from-DIN99b :din99b))
+(def ^{:doc "Converts DIN99c to sRGB, the inverse of [[to-DIN99c]].
+
+  - `c` DIN99c color, any type accepted by [[to-color]], with channels in the ranges of [[to-DIN99c]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-DIN99c*]]." :metadoc/categories meta-conv} from-DIN99c (make-from-DIN99 :din99c))
+(def ^{:doc "Converts DIN99d to sRGB, the inverse of [[to-DIN99d]].
+
+  - `c` DIN99d color, any type accepted by [[to-color]], with channels in the ranges of [[to-DIN99d]]
+
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-DIN99d*]]." :metadoc/categories meta-conv} from-DIN99d (make-from-DIN99 :din99d))
+(def ^{:doc "Converts DIN99 with channels in `[0,255]`, as produced by [[to-DIN99*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-DIN99]]." :metadoc/categories meta-conv} from-DIN99* (make-from-DIN99* from-DIN99 :din99))
+(def ^{:doc "Converts DIN99b with channels in `[0,255]`, as produced by [[to-DIN99b*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-DIN99b]]." :metadoc/categories meta-conv} from-DIN99b* (make-from-DIN99* from-DIN99b :din99b))
 (def ^{:doc "DIN99o -> RGB, normalized" :metadoc/categories meta-conv} from-DIN99o* (make-from-DIN99* from-DIN99o :din99o))
-(def ^{:doc "DIN99c -> RGB, normalized" :metadoc/categories meta-conv} from-DIN99c* (make-from-DIN99* from-DIN99c :din99c))
-(def ^{:doc "DIN99d -> RGB, normalized" :metadoc/categories meta-conv} from-DIN99d* (make-from-DIN99* from-DIN99d :din99d))
+(def ^{:doc "Converts DIN99c with channels in `[0,255]`, as produced by [[to-DIN99c*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-DIN99c]]." :metadoc/categories meta-conv} from-DIN99c* (make-from-DIN99* from-DIN99c :din99c))
+(def ^{:doc "Converts DIN99d with channels in `[0,255]`, as produced by [[to-DIN99d*]], to sRGB.
+
+  - `c` color with channels in `[0,255]`
+
+  Returns an RGB `Vec4`, not clamped. See also [[from-DIN99d]]." :metadoc/categories meta-conv} from-DIN99d* (make-from-DIN99* from-DIN99d :din99d))
 
 ;; Other RGB
 
@@ -3830,7 +4278,7 @@
 
   Returns a function of one XYZ color (`Y` 0-100, as [[to-XYZ]], relative to the space's white point; any value accepted by [[to-color]]) returning `Vec4` RGB with channels 0-255, encoded with the space's transfer function; alpha is kept. Values outside the gamut are not clamped. No chromatic adaptation is applied.
 
-  For `:sRGB` the result differs from [[from-XYZ]] by at most about 6e-4 (0-255), see [[->RGB-to-XYZ]].
+  For `:sRGB` the result equals [[from-XYZ]]: both use the matrices of `(rgb/rgbs :sRGB)`.
 
   Throws `ex-info` with `{:space space}` for an unknown space name.
 
@@ -3851,7 +4299,7 @@
 
   Returns a function of one RGB color (channels 0-255, encoded with the space's transfer function; any value accepted by [[to-color]]) returning `Vec4` XYZ (`Y` 0-100, as [[to-XYZ]], relative to the space's white point); alpha is kept. No chromatic adaptation is applied.
 
-  For `:sRGB` the result differs from [[to-XYZ]] by at most about 2.2e-4 (0-100): the space's matrix is derived from the primaries and `CIE-2-D65`, [[to-XYZ]] uses fixed (Lindbloom) matrices.
+  For `:sRGB` the result equals [[to-XYZ]]: both use the matrix of `(rgb/rgbs :sRGB)`, derived from the primaries and `CIE-2-D65`.
 
   Throws `ex-info` with `{:space space}` for an unknown space name.
 
@@ -3935,18 +4383,24 @@
 ;; ### Grayscale
 
 (defn to-Gray
-  "RGB -> Grayscale"
+  "Converts an sRGB color to gray, all three channels set to the [[luma]] of the color.
+
+  The conversion is lossy: `from-Gray` is the same function and cannot restore the color.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: all channels in `[0,255]`. See also [[from-Gray]], [[to-Gray*]]."
   {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
         l (luma c)]
     (Vec4. l l l (.w c))))
 
-(def ^{:doc "RGB -> Grayscale" :metadoc/categories meta-conv} to-Gray* to-Gray)
+(def ^{:doc "The same as [[to-Gray]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} to-Gray* to-Gray)
 
 ;; do nothing in reverse
-(def ^{:doc "RGB -> Grayscale" :metadoc/categories meta-conv} from-Gray to-Gray)
-(def ^{:doc "RGB -> Grayscale" :metadoc/categories meta-conv} from-Gray* to-Gray)
+(def ^{:doc "The same function as [[to-Gray]]: the gray conversion cannot be inverted." :metadoc/categories meta-conv} from-Gray to-Gray)
+(def ^{:doc "The same function as [[to-Gray]]: the gray conversion cannot be inverted." :metadoc/categories meta-conv} from-Gray* to-Gray)
 
 ;; Just for a case "do nothing"
 (def ^{:doc "Alias for [[to-color]]" :metadoc/categories meta-conv} to-RGB pr/to-color)
@@ -3960,10 +4414,19 @@
 (def ^{:doc "linearRGB -> sRGB" :metadoc/categories meta-conv} from-linearRGB* to-sRGB)
 
 ;; List of all color spaces with functions
-(def ^{:doc "Map of all color spaces functions.
+(def ^{:doc "Colorspace conversions by name: keyword to `[to-XXX from-XXX]`, the raw converters.
 
-* key - name as keyword
-* value - vector with functions containing to-XXX and from-XXX converters."
+  The `to-` function converts an sRGB color (any type accepted by [[to-color]]) to the colorspace, the `from-` function converts back; both return `Vec4` and keep alpha. Values are not clamped. Use [[colorspaces*]] for channels mapped to `[0,255]`; names are listed in [[colorspaces-list]].
+
+  Conventions of the raw conversions (input sRGB, channels 0-255, alpha kept):
+
+  - hue in degrees 0-360: `:HSV`, `:HSB`, `:HSL`, `:HSI`, `:HWB`, `:GLHS` (second channel), `:Cubehelix`, `:LCH`, `:LCHuv`, `:JCH`, `:Oklch`, `:PalettonHSV`; hue in 0-1: `:Okhsl`, `:Okhsv`, `:Okhwb`; hue -180 to 180: `:HCL`; for grays the hue is undefined (0 or rounding noise)
+  - CIE 1931 2° D65 white: `:XYZ` (0-100), `:XYZ1` (0-1), `:Yxy`, `:LAB`, `:LCH`, `:LUV`, `:LCHuv`, `:HunterLAB`, `:UVW`, `:UCS`, the `:DIN99` family, `:IPT`, `:IgPgTg`, `:OSA`, `:LMS`; `:JAB` and `:JCH` use absolute luminance with white at 100 cd/m2
+  - linear transforms of the gamma-encoded channels on the 0-255 scale: `:CMY`, `:OHTA`, `:YCbCr`, `:YCgCo`, `:YDbDr`, `:YIQ`, `:YPbPr`, `:YUV`
+  - from linear RGB: `:linearRGB`, `:XYB`, the Oklab family (`:Oklab`, `:Oklch`, `:Okhsl`, `:Okhsv`, `:Okhwb`)
+  - other: `:RGB` and `:pass` (identity), `:Gray` (lossy, luma), `:RYB` (Leonard's heuristic), `:sRGB` (encodes linear RGB)
+
+  Ranges and sources are in the docstrings of the `to-` functions."
      :metadoc/categories meta-conv}
   colorspaces {:CMY         [to-CMY from-CMY]
                :OHTA        [to-OHTA from-OHTA]
@@ -4016,10 +4479,9 @@
                :RGB         [to-color to-color]
                :pass        [to-color to-color]})
 
-(def ^{:doc "Map of all color spaces functions (normalized).
+(def ^{:doc "Colorspace conversions by name with channels mapped to `[0,255]`: keyword to `[to-XXX* from-XXX*]`.
 
-* key - name as keyword
-* value - vector with functions containing to-XXX* and from-XXX* converters."
+  Each `to-XXX*` maps the channels of the raw `to-XXX` (see [[colorspaces]]) to `[0,255]`, mostly linearly from the ranges of sRGB colors; `from-XXX*` reverses it. Useful for treating any colorspace like RGB, e.g. in pixel filters. Alpha is kept, values are not clamped."
      :metadoc/categories meta-conv}
   colorspaces* {:CMY         [to-CMY* from-CMY*]
                 :OHTA        [to-OHTA* from-OHTA*]
@@ -4073,7 +4535,7 @@
                 :pass        [to-color to-color]})
 
 ;; List of color spaces names
-(def ^{:doc "List of all color space names." :metadoc/categories meta-conv} colorspaces-list (sort (keys colorspaces)))
+(def ^{:doc "Sorted list of the colorspace names, the keys of [[colorspaces]] and [[colorspaces*]]." :metadoc/categories meta-conv} colorspaces-list (sort (keys colorspaces)))
 
 (defn- colorspace-converters
   "The `[to from]` pair of `colorspace` in `table` ([[colorspaces]] or [[colorspaces*]]); throws `ex-info` with `{:colorspace colorspace}` for an unknown name."

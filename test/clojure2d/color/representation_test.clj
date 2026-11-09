@@ -9,6 +9,8 @@
             [fastmath.core :as m]
             [fastmath.vector :as v]
             [clojure2d.color :as c]
+            [clojure2d.color.rgb :as rgb]
+            [fastmath.matrix :as mat]
             [clojure2d.test-predicates :refer [rel-close? throws-data?]])
   (:import [fastmath.vector Vec4]
            [java.awt Color]))
@@ -200,9 +202,10 @@
       (is (rel-close? 1.0e-12 e (c/relative-luma col)) (str col))
       (is (rel-close? 1.0e-12 (* 2.55 ((c/to-XYZ col) 1)) (c/relative-luma col)) (str col))))
   (testing "luma: the same weights on the encoded channels"
-    (is (rel-close? 1.0e-15 (* 0.21267285140562248 255.0) (c/luma :red)))
+    (let [y-row (take 3 (drop 3 (mat/mat->seq (:rgb-to-xyz (rgb/rgbs :sRGB)))))]
+      (is (rel-close? 1.0e-15 (* (first y-row) 255.0) (c/luma :red)) "Y row of rgbs :sRGB"))
     (is (rel-close? 1.0e-15 255.0 (c/luma :white)))
-    (is (== 100.0 (c/luma (c/gray 100))) "gray: weights sum to 1")))
+    (is (rel-close? 1.0e-15 100.0 (c/luma (c/gray 100))) "gray: weights sum to 1 (within rounding)")))
 
 ;; G3: contracts
 

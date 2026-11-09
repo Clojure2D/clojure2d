@@ -23,6 +23,7 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color.cssgram`: filters `brannan` and `perpetua` (gradient approximated); `filter-definitions` (filters as data: overlays, filter steps, approximation notes); docstrings for the namespace, every filter, `filters`, `filters-list`, `custom-filter`; `custom-filter` accepts the W3C whole-color modes and `:darker-color`, `:lighter-color`
 * `clojure2d.color`: docstrings for the representation layer (named colors, accessors, setters, AWT colors, clamping, scaling, `hue`, `hue-polar`, `format-hex`, `pack`, `black?`) and the `ColorProto` protocol; namespace docstring corrected for packed integers and hex strings
 * `clojure2d.color/to-color` (and every color function) accepts color names as strings, case-insensitive, for names without a namespace (`"red"`, `"Dark-Blue"`), and `float` arrays
+* `clojure2d.color`: docstrings for the colorspace conversions (model, source, conventions, ranges; `to-`, `from-`, normalized `*` variants) and a convention table in `colorspaces`, `colorspaces*`, `colorspaces-list`; `to-OSA`/`from-OSA` docstrings no longer swapped
 
 ### Changed
 
@@ -32,7 +33,8 @@ All notable changes to this project will be documented in this file. This change
 * [breaking] `clojure2d.color.blend/luminocity` renamed to `luminosity` (no alias); `cssgram` `custom-filter` operator `:luminocity` renamed to `:luminosity`
 * `clojure2d.color.cssgram`: soft light and hue overlays use the W3C (CSS) modes `w3c-softlight` (gingham, moon, reyes, slumber, stinson) and `w3c-hue` (maven), as in browsers; output changes (gingham up to 2.7, maven up to 34 on the 0-255 scale)
 * [breaking] `clojure2d.color/color` (every arity) clamps channels and alpha to `[0,255]` (before: only the 3- and 4-argument forms); `to-color` of 1- and 2-element sequences and arrays no longer clamps, like longer ones
-* [breaking] `clojure2d.color/luma` and `relative-luma` use the Y row of the `to-XYZ` sRGB matrix (0.2126729, 0.7151522, 0.0721750) instead of 0.212671, 0.715160, 0.072169: `relative-luma` equals the Y of `to-XYZ` times 2.55; values change by up to 0.0023 (0-255), also `to-Gray`, `contrast-ratio` (up to 5.5e-5 relative)
+* [breaking] `clojure2d.color/luma` and `relative-luma` use the Y row of the `to-XYZ` sRGB matrix (0.2126740, 0.7151511, 0.0721750) instead of 0.212671, 0.715160, 0.072169: `relative-luma` equals the Y of `to-XYZ` times 2.55; values change by up to 0.0023 (0-255), also `to-Gray`, `contrast-ratio` (up to 5.5e-5 relative)
+* [breaking] `clojure2d.color/to-XYZ`, `from-XYZ` (and every XYZ-based colorspace: LAB, LUV, LCH, HunterLAB, Yxy, UVW, UCS, IPT, IgPgTg, JAB, OSA, DIN99, LMS) use the matrices of `clojure2d.color.rgb/rgbs :sRGB`, derived from the sRGB primaries and `CIE-2-D65`, instead of fixed Lindbloom matrices: white maps exactly to the white point (LAB a*, b* of white 0 instead of -2.7e-4); XYZ changes by up to 2.1e-4 (0-100), LAB and delta E by up to 3.1e-4
 * [breaking] `clojure2d.color`: nil and unknown color names are not colors: `to-color`, `color`, the channel accessors, `to-awt-color` (and every function converting colors) throw `ex-info` with `{:color c}` instead of returning nil or failing later (e.g. `core/set-color` with nil was silently ignored); `valid-color?` returns false
 
 ### Fixed

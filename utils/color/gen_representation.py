@@ -14,7 +14,7 @@ Sections:
 * :hue  hexagonal hue in degrees (Python colorsys.rgb_to_hsv, h * 360)
 * :hue-polar  polar hue in degrees: atan2(sqrt(3)/2 (g - b), r - (g + b)/2) mapped to [0, 360)
 * :relative-luminance  0-255: colour eotf_sRGB of the channels / 255, weighted with the Y row of the
-  sRGB to XYZ matrix used by clojure2d to-XYZ (Lindbloom), times 255
+  sRGB to XYZ matrix used by clojure2d to-XYZ (sRGB primaries, CIE-2-D65), times 255
 """
 
 import colorsys
@@ -26,7 +26,10 @@ import matplotlib.colors as mc
 from colour.models import eotf_sRGB
 
 OUT = "test/resources/color/representation_reference.edn"
-SRGB_Y = (0.21267285140562248, 0.715152155287818, 0.07217499330655958)  # to-XYZ matrix, Y row
+import re
+import colour
+WP_XY = [float(v) for v in re.search(r":CIE-2-D65 \[([^\]]+)\]", open("resources/color/whitepoints.edn").read()).group(1).split()][2:]
+SRGB_Y = tuple(colour.normalised_primary_matrix([0.64, 0.33, 0.30, 0.60, 0.15, 0.06], WP_XY)[1])  # to-XYZ Y row
 
 
 def num(x):

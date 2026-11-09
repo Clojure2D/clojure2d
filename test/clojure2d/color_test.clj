@@ -10,7 +10,6 @@
             [clojure2d.test-predicates :refer [throws-data?]]
             [fastmath.matrix]
             [fastmath.core :as m]
-            [fastmath.random :as r]
             [fastmath.vector :as v])
   (:import [fastmath.vector Vec4]))
 
@@ -95,42 +94,7 @@
   (is (== 1.0 (b/msubtract 0.0 255.0)))
   (is (== 255.0 (b/msubtract 255.0 0.0))))
 
-;; test color converters
-
-(def random-color-sequence
-  (->> (concat (c/named-colors-list)
-               (repeatedly 30000 #(v/generate-vec4 (fn [] (r/irand 256))))
-               (repeatedly 30000 #(v/generate-vec3 (fn [] (r/irand 256))))
-               (repeatedly 40000 r/irand)
-               (repeatedly 40000 #(v/fmap (c/to-color (c/random-color)) (fn [^double v] (m/floor v)))))
-       (mapv c/to-color)))
-
-(defn compare-colors
-  [[to from] colors]
-  (filter identity
-          (map (fn [c]
-                 (not= c (v/fmap (from (to c)) #(m/round %)))) colors)))
-
-(defn compare-colors-
-  [[to from] colors]
-  (filter #(not= (first %) (second %))
-          (map (fn [c]
-                 [c (v/fmap (from (to c)) #(m/round %))]) colors)))
-
-(defn colorspace-validity
-  "Test if colorspace conversion works properly"
-  [cs cs-tab]
-  (empty? (compare-colors (cs-tab cs) random-color-sequence)))
-
-(defmacro build-colorspace-reversibility-test
-  [cs-tab]
-  (let [cs-sym (symbol (str "reversibility-test-" (name cs-tab)))]
-    `(deftest ~cs-sym
-       ~@(for [cs (remove #{:Gray} (keys c/colorspaces))]
-           `(is (colorspace-validity ~cs ~cs-tab))))))
-
-(build-colorspace-reversibility-test c/colorspaces)
-(build-colorspace-reversibility-test c/colorspaces*)
+;; colorspace round trips: clojure2d.color.colorspaces-test
 
 ;; color conversion
 
@@ -246,7 +210,7 @@
   (is (= 57.58 (m/approx (c/get-channel :orangered :LAB 0))))
   (is (= 0.5 (m/approx (c/get-channel :orangered :HSL 2))))
   (is (= 69.0 (m/approx (c/get-channel :orangered 1))))
-  (is (= 1.0 (/ (c/relative-luma :white) 255.0)))
+  (is (< (abs (- 1.0 (/ (c/relative-luma :white) 255.0))) 1.0e-15))
   (is (= 0.81 (m/approx (/ (c/relative-luma :aquamarine) 255.0))))
   (is (= 0.35 (m/approx (/ (c/relative-luma :hotpink) 255.0))))
   (is (= 0.07 (m/approx (/ (c/relative-luma :darkslateblue) 255.0))))
@@ -468,16 +432,11 @@
     (is (= [c/from-sRGB c/to-sRGB] (c/colorspaces :linearRGB)))))
 
 (deftest sRGB-matrix-consistency-test
-  ;; to-XYZ1 (fixed Lindbloom matrix) vs rgbs :sRGB (derived from primaries and CIE-2-D65):
-  ;; matrix entries within 2.2e-6; XYZ (0-100) within 2.2e-4 and RGB (0-255) within 6e-4, measured
-  ;; 2.14e-4 (pure red) and 5.81e-4 over an 18^3 sRGB grid including 255
-  (let [M (fastmath.matrix/mat->seq (:rgb-to-xyz (clojure2d.color.rgb/rgbs :sRGB)))
-        cols (for [rgb [[255 0 0] [0 255 0] [0 0 255]]] (take 3 (c/to-XYZ1 rgb)))
-        L (apply interleave cols)]
-    (is (every? #(< (abs (double %)) 2.2e-6) (map - M L))))
+  ;; to-XYZ / from-XYZ use the matrices of rgbs :sRGB (derived from primaries and CIE-2-D65): equal to the
+  ;; builders within 1e-12
   (let [->xyz (c/->RGB-to-XYZ :sRGB)
         ->rgb (c/->XYZ-to-RGB :sRGB)]
     (doseq [rgb [[255 255 255] [30 120 200] [255 0 0] [0 0 255] [0 255 0] [128 128 128]]
             :let [xyz (c/to-XYZ rgb)]]
-      (is (< (max-abs-diff (take 3 xyz) (take 3 (->xyz rgb))) 2.2e-4) (str rgb))
-      (is (< (max-abs-diff (take 3 (c/from-XYZ xyz)) (take 3 (->rgb xyz))) 6e-4) (str rgb)))))
+      (is (< (max-abs-diff (take 3 xyz) (take 3 (->xyz rgb))) 1.0e-12) (str rgb))
+      (is (< (max-abs-diff (take 3 (c/from-XYZ xyz)) (take 3 (->rgb xyz))) 1.0e-12) (str rgb)))))

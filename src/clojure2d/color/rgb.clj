@@ -382,7 +382,7 @@
   - `:NTSC` (alias `:ITU-R-BT470-525`) - NTSC 1953 primaries, `CIE-2-C`, gamma 2.2 (ITU-R BT.470 System M),
   - `:NTSC-colour` - as `:NTSC` with gamma 2.8, the value of colour-science, kept for compatibility,
   - `:PAL-SECAM` (alias `:ITU-R-BT470-625`) - `CIE-2-D65`, gamma 2.8,
-  - `:sRGB` - `CIE-2-D65`, [[linear-to-srgb]]; its matrices are derived from the primaries and differ by at most 2.2e-6 from the fixed (Lindbloom) matrices of `clojure2d.color/to-XYZ` and `from-XYZ`, which keeps white mapped exactly to white between D65 spaces,
+  - `:sRGB` - `CIE-2-D65`, [[linear-to-srgb]]; its matrices are derived from the primaries and are also used by `clojure2d.color/to-XYZ` and `from-XYZ`, so white maps exactly to white between D65 spaces,
   - `:SMPTE-C` - `CIE-2-D65`, gamma 2.2,
   - `:ITU-R-BT709` - sRGB primaries, `CIE-2-D65`, [[to-BT709]] (camera OETF, scene referred, as colour-science: the same light gives other code values than sRGB, for example sRGB 128 becomes 115.3; for display referred BT.709 use [[rgb-data->map]] with [[to-BT1886]], [[from-BT1886]]),
   - `:Display-P3` - P3 primaries, `CIE-2-D65`, [[linear-to-srgb]],
