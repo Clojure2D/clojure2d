@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color.blend/color-blends`: whole-color modes by name (HSB, W3C non-separable, darker/lighter color, channel copies); `cssgram/custom-filter` resolves whole-color modes through it
 * `clojure2d.color.cssgram`: filters `brannan` and `perpetua` (gradient approximated); `filter-definitions` (filters as data: overlays, filter steps, approximation notes); docstrings for the namespace, every filter, `filters`, `filters-list`, `custom-filter`; `custom-filter` accepts the W3C whole-color modes and `:darker-color`, `:lighter-color`
 * `clojure2d.color`: docstrings for the representation layer (named colors, accessors, setters, AWT colors, clamping, scaling, `hue`, `hue-polar`, `format-hex`, `pack`, `black?`) and the `ColorProto` protocol; namespace docstring corrected for packed integers and hex strings
+* `clojure2d.color/to-color` (and every color function) accepts color names as strings, case-insensitive, for names without a namespace (`"red"`, `"Dark-Blue"`), and `float` arrays
 
 ### Changed
 

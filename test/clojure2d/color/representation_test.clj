@@ -224,7 +224,7 @@
     (is (throws-data? {:channel ch} #(c/get-channel :red :HSB ch)))))
 
 (deftest hex-validation-test
-  (doseq [s ["#12345" "1234567" "#123456789" "" "#" " #fff" "#ggg" "zz" "red"]]
+  (doseq [s ["#12345" "1234567" "#123456789" "" "#" " #fff" "#ggg" "zz" "#red" " red" "docc/hermosa-pink"]]
     (is (throws-data? {:color s} #(c/to-color s)) (pr-str s)))
   (doseq [s ["f" "#ab" "#abc" "#abcd" "#abcdef" "#abcdef01"]]
     (is (instance? Vec4 (c/to-color s)) s)))
@@ -242,3 +242,23 @@
     (is (c/possible-palette? [:red :green])))
   (testing "ambiguous: two small numbers are a gray with alpha"
     (is (c/possible-color? [16 32]))))
+
+;; G4: gaps
+
+(deftest color-name-strings-test
+  ;; every non-namespaced name as a string, case-insensitive, equals the keyword; CSS names as in browsers
+  (let [names (remove namespace (c/named-colors-list))]
+    (doseq [k names]
+      (is (= (c/to-color k) (c/to-color (name k)) (c/to-color (.toUpperCase (name k)))) (str k))))
+  (doseq [[k rgb] (:css-names @reference)]
+    (is (= (conj rgb 255.0) (vec (c/to-color (name k)))) (str k)))
+  (is (= (c/to-color :dark-blue) (c/to-color "Dark-Blue")))
+  (testing "hex wins: no color name is valid hex text"
+    (is (not-any? #(re-matches #"[0-9a-fA-F]{1,8}" (name %)) (c/named-colors-list))))
+  (is (== 255.0 (c/red "Red")) "accessors on strings"))
+
+(deftest float-array-test
+  (doseq [xs [[] [7] [7 9] [1 2 3] [1 2 3 4] [1 2 3 4 5]]]
+    (is (= (c/to-color (double-array xs)) (c/to-color (float-array xs))) (str xs)))
+  (is (= [1.5 2.5 3.5 4.5] [(c/red (float-array [1.5 2.5 3.5 4.5])) (c/green (float-array [1.5 2.5 3.5 4.5]))
+                            (c/blue (float-array [1.5 2.5 3.5 4.5])) (c/alpha (float-array [1.5 2.5 3.5 4.5]))])))

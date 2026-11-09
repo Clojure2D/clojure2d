@@ -17,10 +17,10 @@
   * fastmath `Vec3` - 3 channels (RGB), assuming `alpha` set to value of `255`.
   * fastmath `Vec2` - gray with alpha
   * `java.awt.Color` - Java AWT representation. Creators are [[awt-color]], [[awt-gray]]. Use [[to-awt-color]] to convert to this representation.
-  * `keyword` - one of the defined names (see [[named-colors-list]])
+  * `keyword` - one of the defined names (see [[named-colors-list]]); names without a namespace also as strings, case-insensitive (`Red`, `dark-blue`)
   * `Integer` or `Long` - packed ARGB value `0xAARRGGBB`. When the top byte is 0 the color is opaque (alpha 255), so `0xffaa01` is opaque orange; a fully transparent packed color cannot be expressed. See [[pack]].
   * `String` - hex notation `#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`, case-insensitive, `#` optional; one or two hex digits give a gray (`ab` is `#ababab`). See [[format-hex]].
-  * any `seqable` (list, vector) or `double`, `int`, `long` array - 0 elements: black; 1: gray; 2: gray and alpha; 3: RGB; 4 or more: RGBA (the first four).
+  * any `seqable` (list, vector) or `double`, `float`, `int`, `long` array - 0 elements: black; 1: gray; 2: gray and alpha; 3: RGB; 4 or more: RGBA (the first four).
 
   To create color from individual channel values use [[color]] function. To create gray for given intensity call [[gray]].
 
@@ -256,9 +256,9 @@
 (defn to-color
   "Converts any color representation to `Vec4` (RGBA), without clamping.
 
-  - `c` one of: `Vec4` (returned as is), `Vec3` (alpha 255), `Vec2` (gray, alpha), keyword (a name of [[named-colors-list]]), packed ARGB integer (top byte 0 means opaque), hex string (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `#` optional, case-insensitive, 1 or 2 digits for a gray), `java.awt.Color`, sequence or `double`/`int`/`long` array (0 elements black, 1 gray, 2 gray and alpha, 3 RGB, 4 or more RGBA)
+  - `c` one of: `Vec4` (returned as is), `Vec3` (alpha 255), `Vec2` (gray, alpha), keyword (a name of [[named-colors-list]]), packed ARGB integer (top byte 0 means opaque), hex string (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `#` optional, case-insensitive, 1 or 2 digits for a gray), color name string (case-insensitive, names without a namespace, e.g. `Red`, `dark-blue`), `java.awt.Color`, sequence or `double`/`float`/`int`/`long` array (0 elements black, 1 gray, 2 gray and alpha, 3 RGB, 4 or more RGBA)
 
-  Returns a `Vec4`; values are taken as given, so a `Vec4` from another colorspace passes through. Throws `ex-info` with `{:color c}` for nil, an unknown color name or an invalid hex string. See also [[color]] (clamped), [[valid-color?]], [[to-awt-color]], [[format-hex]]."
+  Returns a `Vec4`; values are taken as given, so a `Vec4` from another colorspace passes through. Throws `ex-info` with `{:color c}` for nil, an unknown color name or a string which is neither hex nor a color name. See also [[color]] (clamped), [[valid-color?]], [[to-awt-color]], [[format-hex]]."
   {:metadoc/categories meta-ops}
   ^Vec4 [c] (pr/to-color c))
 
@@ -637,21 +637,20 @@
   (^Color [^double v ^double a] (awt-color v v v a)))
 
 (defn- hex-string->color
-  "Parses hex notation (`#` optional) to `Vec4`: 1 digit `v` is `vvvvvv`, 2 digits `vv` are `vvvvvv`, `rgb`, `rgba` (digits doubled), `rrggbb`, `rrggbbaa`."
-  ^Vec4 [^String input]
-  (let [^String s (if (= (first input) \#) (subs input 1) input)
-        _ (when-not (and (#{1 2 3 4 6 8} (count s)) (re-matches #"[0-9a-fA-F]+" s))
-            (throw (ex-info (str "Invalid hex color: " input) {:color input})))
-        ^String s (case (count s)
-                    1 (str s s s s s s)
-                    2 (str s s s)
-                    3 (let [[r g b] s] (str r r g g b b))
-                    4 (let [[r g b a] s] (str r r g g b b a a))
-                    s)
-        rgb (Long/parseLong (subs s 0 (min 6 (count s))) 16)]
-    (if (= 8 (count s))
-      (Vec4. (bit-and 0xff (m/>> rgb 16)) (bit-and 0xff (m/>> rgb 8)) (bit-and 0xff rgb) (Long/parseLong (subs s 6) 16))
-      (pr/to-color (Long/parseLong s 16)))))
+  "Parses hex notation (`#` optional) to `Vec4`: 1 digit `v` is `vvvvvv`, 2 digits `vv` are `vvvvvv`, `rgb`, `rgba` (digits doubled), `rrggbb`, `rrggbbaa`. Returns nil for other text."
+  [^String input]
+  (let [^String s (if (= (first input) \#) (subs input 1) input)]
+    (when (and (#{1 2 3 4 6 8} (count s)) (re-matches #"[0-9a-fA-F]+" s))
+      (let [^String s (case (count s)
+                        1 (str s s s s s s)
+                        2 (str s s s)
+                        3 (let [[r g b] s] (str r r g g b b))
+                        4 (let [[r g b a] s] (str r r g g b b a a))
+                        s)
+            rgb (Long/parseLong (subs s 0 (min 6 (count s))) 16)]
+        (if (= 8 (count s))
+          (Vec4. (bit-and 0xff (m/>> rgb 16)) (bit-and 0xff (m/>> rgb 8)) (bit-and 0xff rgb) (Long/parseLong (subs s 6) 16))
+          (pr/to-color (Long/parseLong s 16)))))))
 
 (defn- gray-vec4
   "Unclamped gray `Vec4`."
@@ -668,6 +667,20 @@
   "Throws `ex-info` with `{:color nil}`: nil is not a color."
   []
   (throw (ex-info "nil is not a color" {:color nil})))
+
+(defn- color-name-string->color
+  "The `Vec4` of a predefined color name given as a string, case-insensitive, names without a namespace only; nil otherwise."
+  [^String input]
+  (let [k (keyword (.toLowerCase input))]
+    (when (nil? (namespace k))
+      (@color-presets-delay k))))
+
+(defn- string->color
+  "Parses hex notation or a color name; throws `ex-info` with `{:color input}` otherwise."
+  ^Vec4 [^String input]
+  (or (hex-string->color input)
+      (color-name-string->color input)
+      (throw (ex-info (str "Invalid color string: " input) {:color input}))))
 
 (defn- packed-alpha
   "Alpha of a packed ARGB integer: the top byte, or 255 when the top byte is 0."
@@ -762,13 +775,13 @@
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
   (luma ^double [c] (pr/luma (pr/to-color c)))
   String
-  (alpha ^double [^String c] (.w (hex-string->color c)))
-  (red ^double [^String c] (.x (hex-string->color c)))
-  (green ^double [^String c] (.y (hex-string->color c)))
-  (blue ^double [^String c] (.z (hex-string->color c)))
-  (to-color ^Vec4 [^String c] (hex-string->color c))
-  (to-awt-color ^Color [^String c] (pr/to-awt-color (hex-string->color c)))
-  (luma ^double [^String c] (pr/luma (hex-string->color c)))
+  (alpha ^double [^String c] (.w (string->color c)))
+  (red ^double [^String c] (.x (string->color c)))
+  (green ^double [^String c] (.y (string->color c)))
+  (blue ^double [^String c] (.z (string->color c)))
+  (to-color ^Vec4 [^String c] (string->color c))
+  (to-awt-color ^Color [^String c] (pr/to-awt-color (string->color c)))
+  (luma ^double [^String c] (pr/luma (string->color c)))
   APersistentVector
   (to-color ^Vec4 [c] (case (count c)
                         0 (Vec4. 0.0 0.0 0.0 255.0)
@@ -827,6 +840,21 @@
                         2 (gray-vec4 (aget ^ints c 0) (aget ^ints c 1))
                         3 (Vec4. (aget ^ints c 0) (aget ^ints c 1) (aget ^ints c 2) 255.0)
                         (Vec4. (aget ^ints c 0) (aget ^ints c 1) (aget ^ints c 2) (aget ^ints c 3))))
+  (alpha ^double [c] (pr/alpha (pr/to-color c)))
+  (red ^double [c] (pr/red (pr/to-color c)))
+  (green ^double [c] (pr/green (pr/to-color c)))
+  (blue ^double [c] (pr/blue (pr/to-color c)))
+  (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
+  (luma [c] ^double (pr/luma (pr/to-color c))))
+
+(extend-type (Class/forName "[F")
+  pr/ColorProto
+  (to-color ^Vec4 [c] (case (alength ^floats c)
+                        0 (Vec4. 0.0 0.0 0.0 255.0)
+                        1 (gray-vec4 (aget ^floats c 0))
+                        2 (gray-vec4 (aget ^floats c 0) (aget ^floats c 1))
+                        3 (Vec4. (aget ^floats c 0) (aget ^floats c 1) (aget ^floats c 2) 255.0)
+                        (Vec4. (aget ^floats c 0) (aget ^floats c 1) (aget ^floats c 2) (aget ^floats c 3))))
   (alpha ^double [c] (pr/alpha (pr/to-color c)))
   (red ^double [c] (pr/red (pr/to-color c)))
   (green ^double [c] (pr/green (pr/to-color c)))
