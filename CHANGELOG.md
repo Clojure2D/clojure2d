@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color.blend`: per-channel modes `w3c-softlight` (W3C/CSS soft light), `grainextract`, `grainmerge` (GIMP), `phoenix`, `interpolation` (pegtop.net), registered in `blends` (`blends-list` changes, seeded `glitch` results may differ)
 * `clojure2d.color.blend`: W3C non-separable modes `w3c-hue`, `w3c-saturation`, `w3c-color`, `w3c-luminosity` (luminance-preserving, as in CSS) and whole-color modes `darker-color`, `lighter-color`
 * `clojure2d.color.blend/blend-fn` (mode lookup by name, throws `ex-info` for an unknown name) and `opacity` (mode mixed with the base)
+* `clojure2d.color.cssgram`: filters `brannan` and `perpetua` (gradient approximated); `filter-definitions` (filters as data: overlays, filter steps, approximation notes); docstrings for the namespace, every filter, `filters`, `filters-list`, `custom-filter`; `custom-filter` accepts the W3C whole-color modes and `:darker-color`, `:lighter-color`
 
 ### Changed
 
@@ -26,6 +27,7 @@ All notable changes to this project will be documented in this file. This change
 * `->spectrum-to-XYZ1` / `->spectrum-to-XYZ`: `:extrapolation` accepts `:constant` (new default) or `:zero`; `:trim` and `nil` are removed (they threw under fastmath 3.0.0-alpha10) and now throw `ex-info`; unknown observer or illuminant throws `ex-info`
 * `->spectrum-to-XYZ1` / `->spectrum-to-XYZ`: `:interpolation` now applies to the spectrum only, default `:auto` (Sprague for uniform data, not-a-knot cubic spline otherwise, as colour-science); new `:illuminant-interpolation` (default `:linear`); color matching functions always use `:auto`
 * [breaking] `clojure2d.color.blend/luminocity` renamed to `luminosity` (no alias); `cssgram` `custom-filter` operator `:luminocity` renamed to `:luminosity`
+* `clojure2d.color.cssgram`: soft light and hue overlays use the W3C (CSS) modes `w3c-softlight` (gingham, moon, reyes, slumber, stinson) and `w3c-hue` (maven), as in browsers; output changes (gingham up to 2.7, maven up to 34 on the 0-255 scale)
 
 ### Fixed
 
@@ -33,6 +35,8 @@ All notable changes to this project will be documented in this file. This change
 * `->RGB-to-XYZ`, `->XYZ-to-RGB`, `->RGB-to-RGB`, `->RGB-to-linear-RGB`, `->linear-RGB-to-RGB` with an unknown space name, or a space map missing required keys, failed with a `NullPointerException` (some only when called); now throw `ex-info` with `{:space k}` or `{:missing-keys ks}` when the converter is built
 * `clojure2d.color.rgb/rgbs` `:NTSC` (and `:ITU-R-BT470-525`) used gamma 2.8; now 2.2, the assumed display gamma of ITU-R BT.470 System M; the former curve (as in colour-science) is available as `:NTSC-colour`
 * White point values (`resources/color/whitepoints.edn` regenerated):
+* `clojure2d.color.cssgram/lark` overlay gray 248 instead of CSSgram's 242; `willow` applied the invalid CSS `::before` overlay (ignored by browsers), lacked the `::after` color overlay rgb(216, 205, 203) and used contrast 0.85 instead of 0.95
+* `clojure2d.color.cssgram/custom-filter`: a function step replaced all previous steps (now composed); an unknown operator or blend mode was silently ignored or replaced by `normal` (now throws `ex-info` with `{:operator op}` or `{:blend mode}`)
   - D-series `CIE-2-D50`, `CIE-2-D55`, `CIE-2-D60`, `CIE-2-D75`, `CIE-10-D50`, `CIE-10-D55`, `CIE-10-D60`, `CIE-10-D65`, `CIE-10-D75` are now full precision 1 nm integrations of the CIE spectra (xy change 1e-5 to 3e-5; the former values were the CIE 15:2004 Table T.3 values, 5 nm sums over 380-780 nm, which the new values match to 4 decimals); `CIE-2-D65` is unchanged; RGB spaces based on `CIE-2-D50` (Adobe Wide Gamut, Best, Beta, ColorMatch, Don, Ekta Space PS5, ECI v2, Xtreme) change by less than 0.01 on 0-255
   - computed (`*`) white points recomputed with the fixed integration: `*-ISO-SP*` were off by about 0.24 in xy, `CIE-2015-*-E*` were not 1/3, other ISO 7589 entries off by about 8e-4, the rest by about 2e-7
 * `clojure2d.color.whitepoints/chromatic-adaptation-matrix` (and `->XYZ-to-XYZ`) failed with a `ClassCastException` mixing `RealMatrix` and `Mat3x3`
