@@ -16,6 +16,9 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color.rgb`: `rgb-space` (space lookup, throws `ex-info` for an unknown name), `rgb-spaces-list`; docstrings for the namespace, transfer functions, `rgb-data->matrix`, `rgb-data->map`, `rgbs`
 * Data generator `utils/whitepoints/gen_resources.py` (replaces `utils/colors/cie.clj`) and CIE D-series basis data `resources/color/illuminant_d_series_basis.edn`
 * `clojure2d.color.blend`: docstrings for the namespace, every per-channel mode (formula, source, argument roles), `blends`, `blends-list`, `alpha-blending`, `blend-colors`, `blend-palettes`, `blend-gradients`, `hue`, `saturation`, `luminosity`, `color`, `ch0`-`ch2`
+* `clojure2d.color.blend`: per-channel modes `w3c-softlight` (W3C/CSS soft light), `grainextract`, `grainmerge` (GIMP), `phoenix`, `interpolation` (pegtop.net), registered in `blends` (`blends-list` changes, seeded `glitch` results may differ)
+* `clojure2d.color.blend`: W3C non-separable modes `w3c-hue`, `w3c-saturation`, `w3c-color`, `w3c-luminosity` (luminance-preserving, as in CSS) and whole-color modes `darker-color`, `lighter-color`
+* `clojure2d.color.blend/blend-fn` (mode lookup by name, throws `ex-info` for an unknown name) and `opacity` (mode mixed with the base)
 
 ### Changed
 

@@ -9,7 +9,7 @@
             [clojure2d.color :as c]
             [clojure2d.color.blend :as b]
             [fastmath.vector :as v]
-            [clojure2d.test-predicates :refer [rel-close?]]))
+            [clojure2d.test-predicates :refer [rel-close? throws-data?]]))
 
 (def reference (delay (-> "blend/blend_reference.edn" io/resource slurp edn/read-string)))
 
@@ -179,3 +179,53 @@
 (deftest luminosity-rename-test
   (is (nil? (ns-resolve 'clojure2d.color.blend 'luminocity)))
   (is (fn? b/luminosity)))
+
+;; G4: gaps
+
+(deftest nonseparable-modes-test
+  ;; W3C hue, saturation, color, luminosity (Lum, ClipColor, SetLum, Sat, SetSat) and darker / lighter
+  ;; color vs the numpy oracle, composited with alpha: 1e-9 relative to max(1, |expected|)
+  (let [{:keys [cb cs] :as ns} (:nonseparable @reference)]
+    (doseq [k [:w3c-hue :w3c-saturation :w3c-color :w3c-luminosity :darker-color :lighter-color]
+            [x y e] (map vector cb cs (ns k))]
+      (is (vec-close? 1.0e-9 e ((mode k) (c/color x) (c/color y))) (str k " " x " " y)))))
+
+(deftest nonseparable-properties-test
+  (let [x (c/color 200 50 30) y (c/color 20 120 220)
+        lum (fn [c] (+ (* 0.3 (c 0)) (* 0.59 (c 1)) (* 0.11 (c 2))))]
+    (testing "luminance comes from the right color"
+      (is (m/<= (m/abs (m/- (lum x) (lum (b/w3c-hue x y)))) 1.0e-9))
+      (is (m/<= (m/abs (m/- (lum x) (lum (b/w3c-color x y)))) 1.0e-9))
+      (is (m/<= (m/abs (m/- (lum y) (lum (b/w3c-luminosity x y)))) 1.0e-9)))
+    (testing "channels stay in [0, 255]"
+      (doseq [f [b/w3c-hue b/w3c-saturation b/w3c-color b/w3c-luminosity]
+              [p q] [[[255 255 0] [0 0 255]] [[0 0 10] [255 250 0]] [[128 128 128] [255 0 0]]]
+              :let [r (f p q)]]
+        (is (every? #(m/<= -1.0e-9 % 255.000000001) (take 3 r)) (str p q))))
+    (testing "gray source has no saturation: w3c-saturation gives a gray of the backdrop luminance"
+      (let [r (b/w3c-saturation x (c/color 100 100 100))]
+        (is (vec-close? 1.0e-9 (repeat 3 (lum x)) (take 3 r)))))))
+
+(deftest darker-lighter-color-test
+  ;; (0 10 10) and (5 0 50) have the same Lum (7.0): ties keep the backdrop
+  (let [p (c/color 0 10 10) q (c/color 5 0 50)]
+    (is (= p (b/darker-color p q)) "tie")
+    (is (= q (b/darker-color q p)) "tie")
+    (is (= p (b/lighter-color p q)) "tie")
+    (is (= (c/color 10 20 30) (b/darker-color (c/color 200 200 200) (c/color 10 20 30))))
+    (is (= (c/color 200 200 200) (b/lighter-color (c/color 200 200 200) (c/color 10 20 30))))))
+
+(deftest blend-fn-test
+  (is (identical? b/multiply (b/blend-fn :multiply)))
+  (is (identical? b/screen (b/blend-fn b/screen)))
+  (let [f (fn [a _] a)] (is (identical? f (b/blend-fn f))))
+  (is (throws-data? {:blend :nope} #(b/blend-fn :nope)))
+  (is (throws-data? {:blend nil} #(b/blend-fn nil)))
+  (is (throws-data? {:blend "multiply"} #(b/blend-fn "multiply"))))
+
+(deftest opacity-test
+  (doseq [[x y] (take 200 @points)]
+    (is (== x ((b/opacity :multiply 0.0) x y)))
+    (is (== (b/multiply x y) ((b/opacity b/multiply 1.0) x y)))
+    (is (rel-close? 1.0e-12 (+ x (* 0.3 (- (b/screen x y) x))) ((b/opacity :screen 0.3) x y))))
+  (is (throws-data? {:blend :nope} #(b/opacity :nope 0.5))))

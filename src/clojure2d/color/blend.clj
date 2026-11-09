@@ -8,15 +8,17 @@
 
   Per-channel modes, all `(f a b)` returning a double, are collected in [[blends]] (keyword to function) and [[blends-list]]:
 
-  - clamped modes, results clamped to `[0,255]`; sources: W3C Compositing Level 1 ([[normal]], [[multiply]], [[screen]], [[overlay]], [[hardlight]], [[darken]], [[lighten]], [[dodge]], [[burn]], [[difference]], [[exclusion]]), Photoshop ([[add]], [[subtract]], [[linearburn]], [[linearlight]], [[vividlight]], [[pinlight]], [[hardmix]], [[divide]], [[softlight]]) and pegtop.net ([[inversedodge]], [[inverseburn]], [[softdodge]], [[softburn]], [[reflect]], [[glow]], [[freeze]], [[heat]], [[stamp]], [[negation]], [[pegtoplight]], [[average]])
+  - clamped modes, results clamped to `[0,255]`; sources: W3C Compositing Level 1 ([[normal]], [[multiply]], [[screen]], [[overlay]], [[hardlight]], [[darken]], [[lighten]], [[dodge]], [[burn]], [[difference]], [[exclusion]]), Photoshop ([[add]], [[subtract]], [[linearburn]], [[linearlight]], [[vividlight]], [[pinlight]], [[hardmix]], [[divide]], [[softlight]]) W3C `soft-light` ([[w3c-softlight]]), GIMP ([[grainextract]], [[grainmerge]]) and pegtop.net ([[inversedodge]], [[inverseburn]], [[softdodge]], [[softburn]], [[reflect]], [[glow]], [[freeze]], [[heat]], [[stamp]], [[negation]], [[pegtoplight]], [[average]], [[phoenix]], [[interpolation]])
   - modulus modes, prefixed with `m` ([[madd]], [[mdodge]], ...): the author's artistic family, the unclamped formula of the clamped mode wrapped with mod 256 and capped at 255 (results in `[0,255]`; integer-valued results equal plain mod 256)
   - bitwise modes ([[or]], [[and]], [[xor]], [[nor]], [[nand]], [[xnor]]) on the channel values truncated to integers
+
+  [[blend-fn]] looks a mode up by name (and throws for an unknown one); [[opacity]] mixes a mode's result with the base.
 
   Division by zero: a zero numerator gives 0, as for W3C `color-dodge` and `color-burn`; otherwise the clamped modes saturate and the modulus modes divide by `EPSILON` (1e-10) before wrapping.
 
   [[blend-colors]] blends two colors channel by channel (one mode for all channels or one mode per channel) and composites the result with the colors' alpha as in [W3C Compositing Level 1](https://www.w3.org/TR/compositing-1/#blending) ([[alpha-blending]]). [[blend-palettes]] and [[blend-gradients]] apply it to palettes and gradients.
 
-  Colorspace blends [[hue]], [[saturation]], [[luminosity]] and [[color]] take one HSB channel from one color and the others from the second color; [[ch0]], [[ch1]] and [[ch2]] do the same for a channel of any colorspace."
+  Colorspace blends [[hue]], [[saturation]], [[luminosity]] and [[color]] take one HSB channel from one color and the others from the second color; [[ch0]], [[ch1]] and [[ch2]] do the same for a channel of any colorspace. [[w3c-hue]], [[w3c-saturation]], [[w3c-color]] and [[w3c-luminosity]] are the W3C non-separable modes, which keep luminance (`0.3 r + 0.59 g + 0.11 b`) instead of HSB brightness; [[darker-color]] and [[lighter-color]] pick the whole color with the lower or higher luminance."
   (:refer-clojure :exclude [or and])
   (:require [fastmath.core :as m]
             [fastmath.vector :as v]
@@ -719,6 +721,73 @@
     (wrap256 (m/- 255.0 (m// (m/* 255.0 (m/- 255.0 a)) (m/max m/EPSILON (m/+ b b)))))
     (wrap256 (m// (m/* 255.0 a) (m/max m/EPSILON (m/* 2.0 (m/- 255.0 b)))))))
 
+(defn w3c-softlight
+  "Soft light mode, W3C variant.
+
+  Formula: `a - (1 - 2 * b) * a * (1 - a)` when `b <= 0.5`, else `a + (2 * b - 1) * (D(a) - a)` with `D(a) = ((16 * a - 12) * a + 4) * a` for `a <= 0.25` and `sqrt(a)` otherwise. W3C `soft-light`, as used by CSS.
+
+  - `a` base (backdrop) channel value, `[0,255]`
+  - `b` blend (source) channel value, `[0,255]`
+
+  Returns the blended value in `[0,255]`. See also [[softlight]], [[pegtoplight]]."
+  ^double [^double a ^double b]
+  (let [a1 (m/* a r255)
+        b1 (m/* b r255)]
+    (m/* 255.0 (if (m/<= b1 0.5)
+                 (m/- a1 (m/* (m/- 1.0 (m/* 2.0 b1)) a1 (m/- 1.0 a1)))
+                 (let [d (if (m/<= a1 0.25)
+                           (m/* (m/+ (m/* (m/- (m/* 16.0 a1) 12.0) a1) 4.0) a1)
+                           (m/sqrt a1))]
+                   (m/+ a1 (m/* (m/- (m/* 2.0 b1) 1.0) (m/- d a1))))))))
+
+(defn grainextract
+  "Grain extract mode (GIMP).
+
+  Formula: `a - b + 0.5`, clamped.
+
+  - `a` base (backdrop) channel value, `[0,255]`
+  - `b` blend (source) channel value, `[0,255]`
+
+  Returns the blended value in `[0,255]`. See also [[grainmerge]], [[subtract]]."
+  ^double [^double a ^double b]
+  (clamp255 (m/+ (m/- a b) 127.5)))
+
+(defn grainmerge
+  "Grain merge mode (GIMP).
+
+  Formula: `a + b - 0.5`, clamped.
+
+  - `a` base (backdrop) channel value, `[0,255]`
+  - `b` blend (source) channel value, `[0,255]`
+
+  Returns the blended value in `[0,255]`. See also [[grainextract]], [[add]]."
+  ^double [^double a ^double b]
+  (clamp255 (m/- (m/+ a b) 127.5)))
+
+(defn phoenix
+  "Phoenix mode (pegtop.net).
+
+  Formula: `min(a, b) - max(a, b) + 1`, i.e. `1 - |a - b|`.
+
+  - `a` base (backdrop) channel value, `[0,255]`
+  - `b` blend (source) channel value, `[0,255]`
+
+  Returns the blended value in `[0,255]`. See also [[difference]]."
+  ^double [^double a ^double b]
+  (m/+ (m/- (m/min a b) (m/max a b)) 255.0))
+
+(defn interpolation
+  "Interpolation mode (pegtop.net): a smooth, cosine-shaped average.
+
+  Formula: `0.5 - 0.25 * cos(pi * a) - 0.25 * cos(pi * b)`.
+
+  - `a` base (backdrop) channel value, `[0,255]`
+  - `b` blend (source) channel value, `[0,255]`
+
+  Returns the blended value in `[0,255]`. See also [[average]]."
+  ^double [^double a ^double b]
+  (m/* 63.75 (m/- 2.0 (m/cos (m/* m/PI a r255)) (m/cos (m/* m/PI b r255)))))
+
 (def ^{:doc "Per-channel modes by name: keyword to `(f a b)` (see the namespace docstring). Use with [[blend-colors]], `clojure2d.pixels` and `clojure2d.color.cssgram`."}
   blends {:normal normal
            :add add
@@ -774,9 +843,42 @@
            :softlight softlight
            :pegtoplight pegtoplight
            :vividlight vividlight
-           :mvividlight mvividlight})
+           :mvividlight mvividlight
+           :w3c-softlight w3c-softlight
+           :grainextract grainextract
+           :grainmerge grainmerge
+           :phoenix phoenix
+           :interpolation interpolation})
 
 (def ^{:doc "Sorted list of the per-channel mode names (keywords of [[blends]])."} blends-list (sort (keys blends)))
+
+(defn blend-fn
+  "Per-channel mode for a name or a function.
+
+  - `mode` a keyword of [[blends]] or a function `(f a b)`
+
+  Returns the function. Throws `ex-info` with `{:blend mode}` for an unknown keyword, `nil` or any other value.
+
+  See also [[blends]], [[opacity]]."
+  [mode]
+  (cond
+    (fn? mode) mode
+    :else (clojure.core/or (get blends mode)
+                           (throw (ex-info (str "Unknown blend mode: " mode) {:blend mode})))))
+
+(defn opacity
+  "Per-channel mode applied with an opacity: mixes the base with the mode's result.
+
+  Formula: `(1 - t) * a + t * f(a, b)`, exactly `a` for `t = 0` and `f(a, b)` for `t = 1`.
+
+  - `mode` a keyword of [[blends]] or a function `(f a b)` (see [[blend-fn]])
+  - `t` opacity, `0.0` returns the base, `1.0` the mode's result
+
+  Returns a per-channel mode `(f a b)`. See also [[blend-colors]]."
+  [mode ^double t]
+  (let [f (blend-fn mode)]
+    (fn ^double [^double a ^double b]
+      (m/+ (m/* (m/- 1.0 t) a) (m/* t (double (f a b)))))))
 
 (defn alpha-blending
   "Composites a blended color over the backdrop with the colors' alpha (W3C Compositing Level 1 source-over with blending).
@@ -937,3 +1039,127 @@
 
   Returns a `Vec4` composited with the colors' alpha by [[alpha-blending]]. See also [[ch0]], [[ch1]], [[luminosity]]."
   ([colorspace cb cs] (cs-op colorspace cb cs 2)) ([cb cs] (ch2 :RGB cb cs)))
+
+;; W3C non-separable modes and whole-color modes
+
+(defn- lum
+  "W3C `Lum`: `0.3 r + 0.59 g + 0.11 b`."
+  ^double [^Vec4 c]
+  (m/+ (m/* 0.3 (.x c)) (m/* 0.59 (.y c)) (m/* 0.11 (.z c))))
+
+(defn- scale-around
+  "Channels moved towards `l` by factor `f`: `l + (c - l) * f`."
+  ^Vec4 [^Vec4 c ^double l ^double f]
+  (Vec4. (m/+ l (m/* (m/- (.x c) l) f))
+         (m/+ l (m/* (m/- (.y c) l) f))
+         (m/+ l (m/* (m/- (.z c) l) f))
+         (.w c)))
+
+(defn- clip-color
+  "W3C `ClipColor` on the 0-255 scale: brings the channels into `[0,255]` keeping `Lum`."
+  ^Vec4 [^Vec4 c]
+  (let [l (lum c)
+        n (m/min (.x c) (.y c) (.z c))
+        x (m/max (.x c) (.y c) (.z c))
+        c (if (m/< n 0.0) (scale-around c l (m// l (m/- l n))) c)]
+    (if (m/> x 255.0) (scale-around c l (m// (m/- 255.0 l) (m/- x l))) c)))
+
+(defn- set-lum
+  "W3C `SetLum`: `c` shifted to luminance `l`, then clipped."
+  ^Vec4 [^Vec4 c ^double l]
+  (let [d (m/- l (lum c))]
+    (clip-color (Vec4. (m/+ (.x c) d) (m/+ (.y c) d) (m/+ (.z c) d) (.w c)))))
+
+(defn- sat
+  "W3C `Sat`: largest minus smallest channel."
+  ^double [^Vec4 c]
+  (m/- (m/max (.x c) (.y c) (.z c)) (m/min (.x c) (.y c) (.z c))))
+
+(defn- set-sat
+  "W3C `SetSat`: channels rescaled so that the smallest is 0 and the largest `s`; a gray gives black."
+  ^Vec4 [^Vec4 c ^double s]
+  (let [mn (m/min (.x c) (.y c) (.z c))
+        mx (m/max (.x c) (.y c) (.z c))]
+    (if (m/> mx mn)
+      (let [f (m// s (m/- mx mn))]
+        (Vec4. (m/* (m/- (.x c) mn) f) (m/* (m/- (.y c) mn) f) (m/* (m/- (.z c) mn) f) (.w c)))
+      (Vec4. 0.0 0.0 0.0 (.w c)))))
+
+(defn- whole-color-op
+  "`(f cb cs)` on colors, composited with [[alpha-blending]]."
+  [f cb cs]
+  (let [cb (c/to-color cb)
+        cs (c/to-color cs)]
+    (alpha-blending cb cs (f cb cs))))
+
+(defn w3c-hue
+  "W3C hue mode: the hue of the source with the saturation and luminance of the backdrop.
+
+  Formula: `SetLum(SetSat(cs, Sat(cb)), Lum(cb))` with W3C `Lum = 0.3 r + 0.59 g + 0.11 b`. W3C Compositing Level 1 `hue`; composited with the colors' alpha by [[alpha-blending]].
+
+  - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
+  - `cs` source color, anything accepted by `clojure2d.color/to-color`
+
+  Returns a `Vec4`. See also [[hue]] (HSB), [[w3c-saturation]], [[w3c-color]], [[w3c-luminosity]]."
+  [cb cs]
+  (whole-color-op (fn [cb cs] (set-lum (set-sat cs (sat cb)) (lum cb))) cb cs))
+
+(defn w3c-saturation
+  "W3C saturation mode: the saturation of the source with the hue and luminance of the backdrop.
+
+  Formula: `SetLum(SetSat(cb, Sat(cs)), Lum(cb))`. W3C Compositing Level 1 `saturation`; composited with the colors' alpha by [[alpha-blending]].
+
+  - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
+  - `cs` source color, anything accepted by `clojure2d.color/to-color`
+
+  Returns a `Vec4`. See also [[saturation]] (HSB), [[w3c-hue]], [[w3c-color]], [[w3c-luminosity]]."
+  [cb cs]
+  (whole-color-op (fn [cb cs] (set-lum (set-sat cb (sat cs)) (lum cb))) cb cs))
+
+(defn w3c-color
+  "W3C color mode: the hue and saturation of the source with the luminance of the backdrop.
+
+  Formula: `SetLum(cs, Lum(cb))`. W3C Compositing Level 1 `color`; composited with the colors' alpha by [[alpha-blending]].
+
+  - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
+  - `cs` source color, anything accepted by `clojure2d.color/to-color`
+
+  Returns a `Vec4`. See also [[color]] (HSB), [[w3c-luminosity]], [[w3c-hue]], [[w3c-saturation]]."
+  [cb cs]
+  (whole-color-op (fn [cb cs] (set-lum cs (lum cb))) cb cs))
+
+(defn w3c-luminosity
+  "W3C luminosity mode: the luminance of the source with the hue and saturation of the backdrop.
+
+  Formula: `SetLum(cb, Lum(cs))`. W3C Compositing Level 1 `luminosity`; composited with the colors' alpha by [[alpha-blending]].
+
+  - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
+  - `cs` source color, anything accepted by `clojure2d.color/to-color`
+
+  Returns a `Vec4`. See also [[luminosity]] (HSB), [[w3c-color]], [[w3c-hue]], [[w3c-saturation]]."
+  [cb cs]
+  (whole-color-op (fn [cb cs] (set-lum cb (lum cs))) cb cs))
+
+(defn darker-color
+  "Darker color mode (Photoshop): the whole color with the lower luminance.
+
+  Compares W3C `Lum = 0.3 r + 0.59 g + 0.11 b`; on a tie the backdrop is kept. Composited with the colors' alpha by [[alpha-blending]].
+
+  - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
+  - `cs` source color, anything accepted by `clojure2d.color/to-color`
+
+  Returns a `Vec4`. See also [[lighter-color]], [[darken]] (per channel)."
+  [cb cs]
+  (whole-color-op (fn [cb cs] (if (m/< (lum cs) (lum cb)) cs cb)) cb cs))
+
+(defn lighter-color
+  "Lighter color mode (Photoshop): the whole color with the higher luminance.
+
+  Compares W3C `Lum = 0.3 r + 0.59 g + 0.11 b`; on a tie the backdrop is kept. Composited with the colors' alpha by [[alpha-blending]].
+
+  - `cb` backdrop color, anything accepted by `clojure2d.color/to-color`
+  - `cs` source color, anything accepted by `clojure2d.color/to-color`
+
+  Returns a `Vec4`. See also [[darker-color]], [[lighten]] (per channel)."
+  [cb cs]
+  (whole-color-op (fn [cb cs] (if (m/> (lum cs) (lum cb)) cs cb)) cb cs))

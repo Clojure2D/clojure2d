@@ -23,6 +23,10 @@ Sections ({mode [value ...]} in the order of :grid followed by :random):
 * :bitwise  logical modes on the channel values truncated to integers, low 8 bits
 * :pillow  Pillow ImageChops on the integer points only ({mode [byte ...]} in the order of
   :pillow-points)
+* :nonseparable  {:cb [[r g b a] ...] :cs [...] mode [[r g b a] ...]}: W3C Compositing Level 1
+  hue, saturation, color, luminosity (Lum, ClipColor, SetLum, Sat, SetSat on the 0-1 scale) and
+  darker-color / lighter-color (whole color with the lower / higher Lum, backdrop on ties), composited
+  as :compositing; 300 pairs (seed 20261111) incl. grays and opaque colors
 * :compositing  {:cb [[r g b a] ...] :cs [...] mode [[r g b a] ...]}: W3C Compositing Level 1 source-over
   with blending, unpremultiplied result, for multiply and screen; 300 color pairs (seed 20261110),
   alphas from {0, 1, 128, 254, 255} or uniform, pairs with both alphas 0 excluded
@@ -117,6 +121,16 @@ FORMULA = {
     "stamp": clamp(a + 2.0 * b - 1.0),
     "negation": (1.0 - np.abs(1.0 - a - b)) * 255.0,
     "average": (a + b) / 2.0 * 255.0,
+    # W3C soft-light
+    "w3c-softlight": np.where(b <= 0.5, a - (1.0 - 2.0 * b) * a * (1.0 - a),
+                              a + (2.0 * b - 1.0) * (np.where(a <= 0.25, ((16.0 * a - 12.0) * a + 4.0) * a,
+                                                              np.sqrt(a)) - a)) * 255.0,
+    # GIMP grain extract / merge (floating point, 0.5 offset)
+    "grainextract": clamp(a - b + 0.5),
+    "grainmerge": clamp(a + b - 0.5),
+    # pegtop.net phoenix, interpolation
+    "phoenix": (np.minimum(a, b) - np.maximum(a, b) + 1.0) * 255.0,
+    "interpolation": (0.5 - 0.25 * np.cos(np.pi * a) - 0.25 * np.cos(np.pi * b)) * 255.0,
 }
 
 
@@ -205,6 +219,69 @@ def compositing():
     return cb, cs, out
 
 
+def lum(c):
+    return 0.3 * c[:, 0] + 0.59 * c[:, 1] + 0.11 * c[:, 2]
+
+
+def clip_color(c):
+    l = lum(c)[:, None]
+    n = c.min(axis=1)[:, None]
+    x = c.max(axis=1)[:, None]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        c = np.where(n < 0.0, l + (c - l) * l / (l - n), c)
+        c = np.where(x > 1.0, l + (c - l) * (1.0 - l) / (x - l), c)
+    return c
+
+
+def set_lum(c, l):
+    return clip_color(c + (l - lum(c))[:, None])
+
+
+def sat(c):
+    return c.max(axis=1) - c.min(axis=1)
+
+
+def set_sat(c, s):
+    # W3C SetSat: Cmax -> s, Cmid -> (Cmid - Cmin) s / (Cmax - Cmin), Cmin -> 0; gray -> 0
+    out = np.zeros_like(c)
+    for i in range(len(c)):
+        order = np.argsort(c[i], kind="stable")
+        mn, mid, mx = order
+        if c[i, mx] > c[i, mn]:
+            out[i, mid] = (c[i, mid] - c[i, mn]) * s[i] / (c[i, mx] - c[i, mn])
+            out[i, mx] = s[i]
+    return out
+
+
+def nonseparable():
+    rng = np.random.default_rng(20261111)
+    n = 300
+    cb = np.column_stack([rng.uniform(0.0, 255.0, (n, 3)), rng.choice([0.0, 128.0, 255.0, 255.0], n)])
+    cs = np.column_stack([rng.uniform(0.0, 255.0, (n, 3)), rng.choice([0.0, 128.0, 255.0, 255.0], n)])
+    cb[:20, :3] = cb[:20, :1]  # grays
+    cs[20:40, :3] = cs[20:40, :1]
+    keep = (cb[:, 3] > 0.0) | (cs[:, 3] > 0.0)
+    cb, cs = cb[keep], cs[keep]
+    ab, as_ = cb[:, 3:] / 255.0, cs[:, 3:] / 255.0
+    Cb, Cs = cb[:, :3] / 255.0, cs[:, :3] / 255.0
+    lb, ls = lum(Cb), lum(Cs)
+    modes = {
+        "w3c-hue": set_lum(set_sat(Cs, sat(Cb)), lb),
+        "w3c-saturation": set_lum(set_sat(Cb, sat(Cs)), lb),
+        "w3c-color": set_lum(Cs, lb),
+        "w3c-luminosity": set_lum(Cb, ls),
+        "darker-color": np.where((ls < lb)[:, None], Cs, Cb),
+        "lighter-color": np.where((ls > lb)[:, None], Cs, Cb),
+    }
+    out = {}
+    for name, blended in modes.items():
+        cs_mixed = (1.0 - ab) * Cs + ab * blended
+        ao = as_ + ab * (1.0 - as_)
+        co = (as_ * cs_mixed + (1.0 - as_) * ab * Cb) / ao
+        out[name] = np.column_stack([co * 255.0, ao * 255.0])
+    return cb, cs, out
+
+
 def rows(m):
     return "[" + " ".join(vec(r) for r in m) + "]"
 
@@ -240,6 +317,9 @@ def main():
            " :pillow-points " + "[" + " ".join(f"{x} {y}" for x, y in PILLOW_POINTS) + "]",
            section("pillow", {k: pillow(op) for k, op in PILLOW_OPS.items()},
                    lambda v: "[" + " ".join(str(x) for x in v) + "]")]
+    cb, cs, ns = nonseparable()
+    out.append(" :nonseparable {:cb " + rows(cb) + "\n                :cs " + rows(cs) + "\n"
+               + "\n".join(f"                :{k} {rows(v)}" for k, v in ns.items()) + "}")
     cb, cs, comp = compositing()
     out.append(" :compositing {:cb " + rows(cb) + "\n               :cs " + rows(cs) + "\n"
                + "\n".join(f"               :{k} {rows(v)}" for k, v in comp.items()) + "}}")
