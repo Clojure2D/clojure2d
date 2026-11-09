@@ -177,6 +177,8 @@
 (defn to-BT709
   "Encodes a linear channel value with the ITU-R BT.709 OETF: `4.5 v` for `v < 0.018`, `1.099 v^0.45 - 0.099` otherwise (the standard's rounded constants).
 
+  The OETF is the camera (scene referred) encoding; displays decode BT.709 video with the BT.1886 EOTF ([[from-BT1886]], gamma 2.4), so OETF and EOTF are not inverses of each other.
+
   See also [[from-BT709]], [[to-BT2020]]."
   ^double [^double v]
   (if (m/< v 0.018)
@@ -184,7 +186,9 @@
     (m/- (m/* 1.099 (m/spow v 0.45)) 0.099)))
 
 (defn from-BT709
-  "Decodes an ITU-R BT.709 encoded value to a linear one; inverse of [[to-BT709]] (inverse OETF)."
+  "Decodes an ITU-R BT.709 encoded value to a linear one; inverse of [[to-BT709]] (inverse OETF).
+
+  The segments switch at `to-BT709(0.018)` (about 0.08124), as colour-science. With the standard's rounded constants the segments do not meet exactly, so the function is not monotonic just below the switch: `0.0812` decodes to 0.018044, `0.08125` to 0.018000."
   ^double [^double v]
   (if (m/< v BT709-V-BREAK)
     (m// v 4.5)
@@ -238,7 +242,7 @@
   Parameters:
 
   - `v` (double): encoded value, nominally 0-1.
-  - `lw`, `lb` (doubles, optional): display white and black luminance; default 1 and 0, where the EOTF is the plain power `v^2.4`.
+  - `lw`, `lb` (doubles, optional): display white and black luminance, `lw > lb >= 0`; default 1 and 0, where the EOTF is the plain power `v^2.4`. Other values give `##NaN` or infinities.
 
   Returns `a · max(v + b, 0)^2.4` with `a = (lw^(1/2.4) - lb^(1/2.4))^2.4`, `b = lb^(1/2.4) / (lw^(1/2.4) - lb^(1/2.4))`; negative arguments of the power are clamped to 0.
 
@@ -251,7 +255,7 @@
      (m/* a (m/spow (m/max (m/+ v b) 0.0) 2.4)))))
 
 (defn to-BT1886
-  "Encodes display luminance with the inverse ITU-R BT.1886 EOTF; inverse of [[from-BT1886]] with the same optional `lw`, `lb` (default 1 and 0, the plain power `v^(1/2.4)`)."
+  "Encodes display luminance with the inverse ITU-R BT.1886 EOTF; inverse of [[from-BT1886]] with the same optional `lw`, `lb` (`lw > lb >= 0`, default 1 and 0, the plain power `v^(1/2.4)`)."
   (^double [^double v] (to-BT1886 v 1.0 0.0))
   (^double [^double v ^double lw ^double lb]
    (let [n (m/- (m/pow lw (m// 2.4)) (m/pow lb (m// 2.4)))
@@ -380,7 +384,7 @@
   - `:PAL-SECAM` (alias `:ITU-R-BT470-625`) - `CIE-2-D65`, gamma 2.8,
   - `:sRGB` - `CIE-2-D65`, [[linear-to-srgb]]; its matrices are derived from the primaries and differ by at most 2.2e-6 from the fixed (Lindbloom) matrices of `clojure2d.color/to-XYZ` and `from-XYZ`, which keeps white mapped exactly to white between D65 spaces,
   - `:SMPTE-C` - `CIE-2-D65`, gamma 2.2,
-  - `:ITU-R-BT709` - sRGB primaries, `CIE-2-D65`, [[to-BT709]],
+  - `:ITU-R-BT709` - sRGB primaries, `CIE-2-D65`, [[to-BT709]] (camera OETF, scene referred, as colour-science: the same light gives other code values than sRGB, for example sRGB 128 becomes 115.3; for display referred BT.709 use [[rgb-data->map]] with [[to-BT1886]], [[from-BT1886]]),
   - `:Display-P3` - P3 primaries, `CIE-2-D65`, [[linear-to-srgb]],
   - `:P3-D65` - P3 primaries, `CIE-2-D65`, gamma 2.6,
   - `:DCI-P3` - P3 primaries, `CIE-2-DCI-P3`, gamma 2.6,
@@ -556,19 +560,24 @@
               (assoc :ITU-R-BT470-625 (:PAL-SECAM m))
               (assoc :ROMM-RGB (:ProPhoto-RGB m)))))
 
+(def ^:private rgb-space-keys #{:whitepoint :rgb-to-xyz :xyz-to-rgb :to :from})
+
 (defn rgb-space
   "Returns an RGB space map.
 
   Parameters:
 
-  - `space` - a key of [[rgbs]] (for example `:sRGB` or `:Adobe-RGB-1998`) or an RGB space map (see [[rgb-data->map]]), returned as is.
+  - `space` - a key of [[rgbs]] (for example `:sRGB` or `:Adobe-RGB-1998`) or an RGB space map (see [[rgb-data->map]]), returned as is when it has the keys `:whitepoint`, `:rgb-to-xyz`, `:xyz-to-rgb`, `:to` and `:from` (non-nil).
 
-  Throws `ex-info` with `{:space space}` for any other value.
+  Throws `ex-info` with `{:space space}` for an unknown name or any other value, and with `{:missing-keys ks}` for a map without some of the required keys.
 
   See also [[rgb-spaces-list]]."
   [space]
   (cond
-    (map? space) space
+    (map? space) (let [missing (into (sorted-set) (remove #(some? (space %))) rgb-space-keys)]
+                   (if (seq missing)
+                     (throw (ex-info (str "RGB space map without keys: " missing) {:missing-keys missing}))
+                     space))
     (contains? rgbs space) (rgbs space)
     :else (throw (ex-info (str "Unknown RGB space: " space) {:space space}))))
 

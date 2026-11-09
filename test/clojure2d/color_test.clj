@@ -7,6 +7,7 @@
             [clojure2d.color.munsell :as mu]
             [clojure2d.color.whitepoints :as wp]
             [clojure2d.color.rgb]
+            [clojure2d.test-predicates :refer [throws-data?]]
             [fastmath.matrix]
             [fastmath.core :as m]
             [fastmath.random :as r]
@@ -310,12 +311,6 @@
 (def ^:private whitepoints-colour
   (delay (-> "whitepoints/colour_reference.edn" clojure.java.io/resource slurp clojure.edn/read-string)))
 
-(defn- throws-data?
-  "Calls `f`, expects `ex-info` with exactly `m` as data."
-  [m f]
-  (try (f) false
-       (catch clojure.lang.ExceptionInfo e (= m (ex-data e)))))
-
 (deftest XYZ-to-XYZ-cat16-test
   ;; colour matrix_chromatic_adaptation_VonKries CAT16 C -> D65 applied to XYZ (0-100): 1e-12 relative to 100
   (let [M (partition 3 (get-in @whitepoints-colour [:adaptation [:cat16 :CIE-2-C :CIE-2-D65]]))
@@ -453,10 +448,12 @@
       (is (= ((c/->RGB-to-XYZ :Adobe-RGB-1998) c) ((c/->RGB-to-XYZ (clojure2d.color.rgb/rgbs :Adobe-RGB-1998)) c))))))
 
 (deftest RGB-builders-unknown-space-test
-  ;; B2: unknown space throws ex-info at build time (was NullPointerException on call)
+  ;; B2: unknown space (and space map without required keys) throws ex-info at build time
+  ;; (was NullPointerException on call)
   (doseq [f [c/->RGB-to-XYZ c/->XYZ-to-RGB c/->RGB-to-linear-RGB c/->linear-RGB-to-RGB
              #(c/->RGB-to-RGB % :sRGB) #(c/->RGB-to-RGB :sRGB %)]]
-    (is (throws-data? {:space :nope} #(f :nope)))))
+    (is (throws-data? {:space :nope} #(f :nope)))
+    (is (throws-data? {:missing-keys #{:whitepoint}} #(f (dissoc (clojure2d.color.rgb/rgbs :sRGB) :whitepoint))))))
 
 (deftest sRGB-functions-test
   ;; colour eotf_inverse_sRGB / eotf_sRGB x 255 on 0-1 (grid avoids the 0.040449936-0.04045 gap): 1e-9

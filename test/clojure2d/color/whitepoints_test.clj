@@ -9,7 +9,8 @@
             [clojure.java.io :as io]
             [fastmath.core :as m]
             [fastmath.matrix :as mat]
-            [clojure2d.color.whitepoints :as wp])
+            [clojure2d.color.whitepoints :as wp]
+            [clojure2d.test-predicates :refer [rel-close? throws-data?]])
   (:import [fastmath.vector Vec2 Vec3 Vec4]))
 
 (defn- reference [name] (-> (str "whitepoints/" name) io/resource slurp edn/read-string))
@@ -17,18 +18,6 @@
 (def colour (delay (reference "colour_reference.edn")))
 (def spacesxyz (delay (reference "spacesxyz_reference.edn")))
 (def colorspec (delay (reference "colorspec_reference.edn")))
-
-(defn- rel-close?
-  "Absolute difference within `tol`, scaled by `max(1, |b|)`."
-  [^double tol a b]
-  (let [a (double a) b (double b)]
-    (m/<= (m/abs (m/- a b)) (m/* tol (m/max 1.0 (m/abs b))))))
-
-(defn- throws-data?
-  "Calls `f`, expects `ex-info` with exactly `m` as data."
-  [m f]
-  (try (f) false
-       (catch clojure.lang.ExceptionInfo e (= m (ex-data e)))))
 
 (defn- vec-close?
   [tol as bs]

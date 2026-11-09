@@ -10,18 +10,12 @@
             [fastmath.matrix :as mat]
             [clojure2d.color.rgb :as rgb]
             [fastmath.vector :as v]
-            [clojure2d.color.whitepoints :as wp]))
+            [clojure2d.color.whitepoints :as wp]
+            [clojure2d.test-predicates :refer [rel-close? throws-data?]]))
 
 (defn- reference [name] (-> (str "rgb/" name) io/resource slurp edn/read-string))
 
 (def colour (delay (reference "colour_reference.edn")))
-
-(defn- rel-close?
-  "Difference within `tol` scaled by `max(1, |b|)`; equal infinities are close."
-  [^double tol a b]
-  (let [a (double a) b (double b)]
-    (or (== a b)
-        (m/<= (m/abs (m/- a b)) (m/* tol (m/max 1.0 (m/abs b)))))))
 
 ;; G1: transfer functions
 
@@ -99,12 +93,6 @@
 
 (defn- wp-var [k] @(ns-resolve 'clojure2d.color.whitepoints (symbol (name k))))
 
-(defn- throws-data?
-  "Calls `f`, expects `ex-info` with exactly `m` as data."
-  [m f]
-  (try (f) false
-       (catch clojure.lang.ExceptionInfo e (= m (ex-data e)))))
-
 (deftest rgbs-keys-test
   (is (= (set (concat (keys (:spaces @colour)) (keys aliases))) (set (keys rgb/rgbs))))
   (doseq [[a k] aliases]
@@ -143,7 +131,10 @@
 
 (deftest rgb-space-test
   (is (identical? (rgb/rgbs :sRGB) (rgb/rgb-space :sRGB)))
-  (let [space {:to identity}] (is (identical? space (rgb/rgb-space space))))
+  (let [space (into {} (rgb/rgbs :Adobe-RGB-1998))] (is (identical? space (rgb/rgb-space space))))
+  (testing "space map without required keys"
+    (is (throws-data? {:missing-keys #{:from :rgb-to-xyz :whitepoint :xyz-to-rgb}} #(rgb/rgb-space {:to identity})))
+    (is (throws-data? {:missing-keys #{:whitepoint}} #(rgb/rgb-space (assoc (rgb/rgbs :sRGB) :whitepoint nil)))))
   (is (throws-data? {:space :nope} #(rgb/rgb-space :nope)))
   (is (throws-data? {:space nil} #(rgb/rgb-space nil)))
   (is (= (sort (keys rgb/rgbs)) rgb/rgb-spaces-list)))

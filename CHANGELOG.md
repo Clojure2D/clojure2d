@@ -25,7 +25,7 @@ All notable changes to this project will be documented in this file. This change
 ### Fixed
 
 * `->linear-RGB-to-RGB` applied the decoding transfer function (`:from`) instead of the encoding one; linear -> RGB conversions were wrong for every space
-* `->RGB-to-XYZ`, `->XYZ-to-RGB`, `->RGB-to-RGB`, `->RGB-to-linear-RGB`, `->linear-RGB-to-RGB` with an unknown space name failed with a `NullPointerException` (some only when called); now throw `ex-info` with `{:space k}` when the converter is built
+* `->RGB-to-XYZ`, `->XYZ-to-RGB`, `->RGB-to-RGB`, `->RGB-to-linear-RGB`, `->linear-RGB-to-RGB` with an unknown space name, or a space map missing required keys, failed with a `NullPointerException` (some only when called); now throw `ex-info` with `{:space k}` or `{:missing-keys ks}` when the converter is built
 * `clojure2d.color.rgb/rgbs` `:NTSC` (and `:ITU-R-BT470-525`) used gamma 2.8; now 2.2, the assumed display gamma of ITU-R BT.470 System M; the former curve (as in colour-science) is available as `:NTSC-colour`
 * White point values (`resources/color/whitepoints.edn` regenerated):
   - D-series `CIE-2-D50`, `CIE-2-D55`, `CIE-2-D60`, `CIE-2-D75`, `CIE-10-D50`, `CIE-10-D55`, `CIE-10-D60`, `CIE-10-D65`, `CIE-10-D75` are now full precision 1 nm integrations of the CIE spectra (xy change 1e-5 to 3e-5; the former values were the CIE 15:2004 Table T.3 values, 5 nm sums over 380-780 nm, which the new values match to 4 decimals); `CIE-2-D65` is unchanged; RGB spaces based on `CIE-2-D50` (Adobe Wide Gamut, Best, Beta, ColorMatch, Don, Ekta Space PS5, ECI v2, Xtreme) change by less than 0.01 on 0-255

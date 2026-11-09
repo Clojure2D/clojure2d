@@ -52,8 +52,8 @@ These are data, not code, under `resources/`:
 
 - `resources/` — datasets used by the library at runtime: external data and anything precalculated (lookup tables). Loaded lazily (`delay`).
 - `test/resources/` — oracle/reference data for tests only; must not ship in the package (as in fastmath). Needs a test-only resource path in `project.clj` (not configured yet).
-- `utils/` — every generator script: dataset converters and oracle-value generators.
-- Tests compare against independent oracles (colour/Python, R, Julia, mpmath) and are constructed as in fastmath (see the `fastmath-testing` skill). colour-science is not always the primary source (e.g. its CMCCAT97 matrix is a misprint, its D-series tables stop at 780 nm); see the vault note `Topics/Clojure2D/Colour Oracle Pitfalls`.
+- `utils/` — every generator script: dataset converters and oracle-value generators. Current oracle generators: `utils/munsell/`, `utils/whitepoints/`, `utils/rgb/` (each with a README).
+- Tests compare against independent oracles (colour/Python, R, Julia, mpmath) and are constructed as in fastmath (see the `fastmath-testing` skill); shared predicates (`rel-close?`, `throws-data?`) live in `test/clojure2d/test_predicates.clj`. colour-science is not always the primary source (e.g. its CMCCAT97 matrix is a misprint, its D-series tables stop at 780 nm); see the vault note `Topics/Clojure2D/Colour Oracle Pitfalls`.
 - Oracle toolkits (installing any needed packages is allowed):
   - `Rscript` — R packages
   - `/home/ts/.juliaup/bin/julia` — Julia packages
