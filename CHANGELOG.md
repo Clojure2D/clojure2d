@@ -30,6 +30,8 @@ All notable changes to this project will be documented in this file. This change
 * `->spectrum-to-XYZ1` / `->spectrum-to-XYZ`: `:interpolation` now applies to the spectrum only, default `:auto` (Sprague for uniform data, not-a-knot cubic spline otherwise, as colour-science); new `:illuminant-interpolation` (default `:linear`); color matching functions always use `:auto`
 * [breaking] `clojure2d.color.blend/luminocity` renamed to `luminosity` (no alias); `cssgram` `custom-filter` operator `:luminocity` renamed to `:luminosity`
 * `clojure2d.color.cssgram`: soft light and hue overlays use the W3C (CSS) modes `w3c-softlight` (gingham, moon, reyes, slumber, stinson) and `w3c-hue` (maven), as in browsers; output changes (gingham up to 2.7, maven up to 34 on the 0-255 scale)
+* [breaking] `clojure2d.color/color` (every arity) clamps channels and alpha to `[0,255]` (before: only the 3- and 4-argument forms); `to-color` of 1- and 2-element sequences and arrays no longer clamps, like longer ones
+* [breaking] `clojure2d.color/luma` and `relative-luma` use the Y row of the `to-XYZ` sRGB matrix (0.2126729, 0.7151522, 0.0721750) instead of 0.212671, 0.715160, 0.072169: `relative-luma` equals the Y of `to-XYZ` times 2.55; values change by up to 0.0023 (0-255), also `to-Gray`, `contrast-ratio` (up to 5.5e-5 relative)
 
 ### Fixed
 
@@ -41,6 +43,9 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color.cssgram/custom-filter`: a function step replaced all previous steps (now composed); an unknown operator or blend mode was silently ignored or replaced by `normal` (now throws `ex-info` with `{:operator op}` or `{:blend mode}`)
 * `clojure2d.color.blend/blend-colors`, `blend-palettes`, `blend-gradients` with a mode keyword (e.g. `:multiply`) silently acted as `normal` (the keyword was called as a lookup); keywords now resolve through `blend-fn`, an unknown one throws `ex-info` with `{:blend mode}`
 * `clojure2d.color.blend/ch0`, `ch1`, `ch2` with an unknown colorspace threw a `NullPointerException`; now `ex-info` with `{:colorspace colorspace}`
+* `clojure2d.color/to-color` read the CSS 4-digit hex `#rgba` as a packed number (`#f00a` gave [0 240 10 255]); now red, green, blue, alpha with doubled digits
+* `clojure2d.color/alpha` of a packed integer whose top byte is 0 returned 0 while `to-color` treats it as opaque; now 255 (so `pack` of such an integer keeps it opaque)
+* named color `:sandy-brown` was `#faa460` instead of the CSS `#f4a460` (`:sandybrown`)
   - D-series `CIE-2-D50`, `CIE-2-D55`, `CIE-2-D60`, `CIE-2-D75`, `CIE-10-D50`, `CIE-10-D55`, `CIE-10-D60`, `CIE-10-D65`, `CIE-10-D75` are now full precision 1 nm integrations of the CIE spectra (xy change 1e-5 to 3e-5; the former values were the CIE 15:2004 Table T.3 values, 5 nm sums over 380-780 nm, which the new values match to 4 decimals); `CIE-2-D65` is unchanged; RGB spaces based on `CIE-2-D50` (Adobe Wide Gamut, Best, Beta, ColorMatch, Don, Ekta Space PS5, ECI v2, Xtreme) change by less than 0.01 on 0-255
   - computed (`*`) white points recomputed with the fixed integration: `*-ISO-SP*` were off by about 0.24 in xy, `CIE-2015-*-E*` were not 1/3, other ISO 7589 entries off by about 8e-4, the rest by about 2e-7
 * `clojure2d.color.whitepoints/chromatic-adaptation-matrix` (and `->XYZ-to-XYZ`) failed with a `ClassCastException` mixing `RealMatrix` and `Mat3x3`

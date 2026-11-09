@@ -3,6 +3,7 @@
   `utils/color/gen_representation.py`: CSS Color 4 named colors and hex parsing (matplotlib), hexagonal
   hue (Python colorsys) and the polar hue formula; other behavior as properties."
   (:require [clojure.test :refer [deftest is testing]]
+            [clojure.string]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
             [fastmath.core :as m]
@@ -29,7 +30,7 @@
       (is (= (conj rgb 255.0) (vec (c/to-color k))) (str k)))))
 
 (deftest hex-strings-test
-  ;; 3, 6 and 8 hex digits, with and without #, mixed case (matplotlib to_rgba), exact
+  ;; 3, 4 (CSS #rgba), 6 and 8 hex digits, with and without #, mixed case (matplotlib to_rgba), exact
   (doseq [[s & rgba] (:hex @reference)]
     (is (= (vec rgba) (vec (c/to-color s))) s)))
 
@@ -69,8 +70,9 @@
       (is (= (v/vec4 255.0 170.0 1.0 128.0) (c/to-color 0x80ffaa01)))
       (is (= (v/vec4 171.0 171.0 171.0 255.0) (c/to-color "ab")))
       (is (= (v/vec4 255.0 255.0 255.0 255.0) (c/to-color "f"))))
-    (testing "to-color does not clamp"
-      (is (= (v/vec4 300.0 -5.0 10.0 255.0) (c/to-color [300 -5 10]))))))
+    (testing "to-color does not clamp, also for 1-2 element sequences"
+      (is (= (v/vec4 300.0 -5.0 10.0 255.0) (c/to-color [300 -5 10])))
+      (is (= (v/vec4 300.0 300.0 300.0 -5.0) (c/to-color [300 -5]) (c/to-color (double-array [300 -5])))))))
 
 (deftest accessors-setters-test
   (let [x [10 20 30 40]]
@@ -99,8 +101,11 @@
 (deftest clamping-rounding-test
   (is (= (v/vec4 0.0 250.2 255.0 200.4) (c/clamp (v/vec4 -1.1 250.2 260.3 200.4))))
   (is (= (v/vec4 2.0 3.0 0.0 255.0) (c/lclamp [1.5 2.5 -0.5 254.5])) "half up")
-  (is (= (v/vec4 255.0 0.0 10.0 255.0) (c/color 300 -5 10)))
-  (is (= (v/vec4 255.0 255.0 255.0 0.0) (c/gray 300 -5))))
+  (testing "creation clamps every arity (G2), to-color does not"
+    (is (= (v/vec4 255.0 0.0 10.0 255.0) (c/color 300 -5 10) (c/color [300 -5 10]) (c/color [300 -5 10 900])))
+    (is (= (v/vec4 255.0 0.0 10.0 0.0) (c/color 300 -5 10 -1) (c/color [300 -5 10] -1)))
+    (is (= (v/vec4 255.0 255.0 255.0 0.0) (c/gray 300 -5)))
+    (is (= (v/vec4 0.0 0.0 0.0 255.0) (c/gray -3)))))
 
 (deftest scale-test
   (is (= (v/vec4 20.0 40.0 60.0 40.0) (c/scale [10 20 30 40] 2.0)))
@@ -164,3 +169,34 @@
              'set-alpha 'set-red 'set-green 'set-blue 'set-ch0 'set-ch1 'set-ch2 'set-awt-alpha 'awt-color 'awt-gray
              'clamp 'lclamp 'scale 'scale-down 'scale-up 'format-hex 'pack 'quil 'black? 'not-black?]]
     (is (m/> (count (:doc (meta (ns-resolve 'clojure2d.color s)))) 80) (str s))))
+
+;; G2: value fixes
+
+(deftest packed-alpha-test
+  ;; one rule for every accessor: top byte 0 means opaque
+  (doseq [n [0x000000 0xff0000 0x00ff0000 0x01ff0000 0x80123456 0xff123456 -1 Integer/MIN_VALUE]
+          x [n (unchecked-int n)]]
+    (is (== (c/alpha x) (c/alpha (c/to-color x))) (str x))
+    (is (= [(c/red x) (c/green x) (c/blue x)] (vec (take 3 (c/to-color x)))) (str x)))
+  (is (== 255.0 (c/alpha 0xff0000)))
+  (is (= (unchecked-int 0xffff0000) (c/pack 0xff0000))))
+
+(deftest hyphenated-names-test
+  ;; every non-namespaced hyphenated name equals its CSS name without hyphens (sandy-brown fixed in G2)
+  (let [css (:css-names @reference)
+        names (filter #(and (nil? (namespace %)) (re-find #"-" (name %))) (c/named-colors-list))]
+    (is (< 80 (count names)))
+    (doseq [k names
+            :let [plain (keyword (clojure.string/replace (name k) "-" ""))]]
+      (is (= (conj (css plain) 255.0) (vec (c/to-color k))) (str k)))))
+
+(deftest luminance-test
+  ;; relative-luma vs colour eotf_sRGB weighted with the to-XYZ Y row, and vs Y of to-XYZ: 1e-12 relative
+  (let [{:keys [colors relative-luminance]} @reference]
+    (doseq [[col e] (map vector colors relative-luminance)]
+      (is (rel-close? 1.0e-12 e (c/relative-luma col)) (str col))
+      (is (rel-close? 1.0e-12 (* 2.55 ((c/to-XYZ col) 1)) (c/relative-luma col)) (str col))))
+  (testing "luma: the same weights on the encoded channels"
+    (is (rel-close? 1.0e-15 (+ (* 0.21267285140562248 255.0)) (c/luma :red)))
+    (is (rel-close? 1.0e-15 255.0 (c/luma :white)))
+    (is (== 100.0 (c/luma (c/gray 100))) "gray: weights sum to 1")))

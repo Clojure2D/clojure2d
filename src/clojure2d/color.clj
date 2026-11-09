@@ -19,7 +19,7 @@
   * `java.awt.Color` - Java AWT representation. Creators are [[awt-color]], [[awt-gray]]. Use [[to-awt-color]] to convert to this representation.
   * `keyword` - one of the defined names (see [[named-colors-list]])
   * `Integer` or `Long` - packed ARGB value `0xAARRGGBB`. When the top byte is 0 the color is opaque (alpha 255), so `0xffaa01` is opaque orange; a fully transparent packed color cannot be expressed. See [[pack]].
-  * `String` - hex notation `#rgb`, `#rrggbb` or `#rrggbbaa`, case-insensitive, `#` optional; one or two hex digits give a gray (`ab` is `#ababab`). See [[format-hex]].
+  * `String` - hex notation `#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`, case-insensitive, `#` optional; one or two hex digits give a gray (`ab` is `#ababab`). See [[format-hex]].
   * any `seqable` (list, vector) or `double`, `int`, `long` array - 0 elements: black; 1: gray; 2: gray and alpha; 3: RGB; 4 or more: RGBA (the first four).
 
   To create color from individual channel values use [[color]] function. To create gray for given intensity call [[gray]].
@@ -255,7 +255,11 @@
 ;; ## Color representation
 
 (defn to-color
-  "Convert any color representation to `Vec4` vector."
+  "Converts any color representation to `Vec4` (RGBA), without clamping.
+
+  - `c` one of: `Vec4` (returned as is), `Vec3` (alpha 255), `Vec2` (gray, alpha), keyword (a name of [[named-colors-list]]), packed ARGB integer (top byte 0 means opaque), hex string (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `#` optional, case-insensitive, 1 or 2 digits for a gray), `java.awt.Color`, sequence or `double`/`int`/`long` array (0 elements black, 1 gray, 2 gray and alpha, 3 RGB, 4 or more RGBA)
+
+  Returns a `Vec4`; values are taken as given, so a `Vec4` from another colorspace passes through. See also [[color]] (clamped), [[to-awt-color]], [[format-hex]]."
   {:metadoc/categories meta-ops}
   ^Vec4 [c] (pr/to-color c))
 
@@ -269,21 +273,37 @@
   ^java.awt.Color [c] (pr/to-awt-color c))
 
 (defn luma
-  "Returns luma"
+  "Returns the luma of a color: the luminance weights applied to the gamma-encoded channels.
+
+  Formula: `0.2126729 r + 0.7151522 g + 0.0721750 b` (the Y row of the sRGB to XYZ matrix of [[to-XYZ]], Rec. 709 primaries) on the channels as given, without linearization.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a double, `[0,255]` for RGB colors (white 255). See also [[relative-luma]] (linear), [[to-Gray]]."
   {:metadoc/categories meta-ops}
   ^double [c] (pr/luma c))
 
+(def ^{:private true :const true :tag 'double} srgb-y-r 0.21267285140562248)
+(def ^{:private true :const true :tag 'double} srgb-y-g 0.715152155287818)
+(def ^{:private true :const true :tag 'double} srgb-y-b 0.07217499330655958)
+
 (defn- luma-fn
-  "Local luma conversion function"
+  "Weighted sum of channels with the Y row of the sRGB to XYZ matrix of [[to-XYZ]]."
   ^double [^double r ^double g ^double b]
-  (+ (* 0.212671 r)
-     (* 0.715160 g)
-     (* 0.072169 b)))
+  (+ (* srgb-y-r r)
+     (* srgb-y-g g)
+     (* srgb-y-b b)))
 
 (declare from-sRGB)
 
 (defn relative-luma
-  "Returns relative luminance"
+  "Returns the relative luminance of an sRGB color, scaled to `[0,255]`.
+
+  The channels are linearized (sRGB transfer function) and weighted with the Y row of the sRGB to XYZ matrix: `0.2126729 r + 0.7151522 g + 0.0721750 b`. Equals the Y of [[to-XYZ]] times 2.55; divide by 255 for the WCAG relative luminance.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a double, `[0,255]` (white 255). See also [[luma]], [[contrast-ratio]]."
   {:metadoc/categories meta-ops}
   ^double [c]
   (let [^Vec4 c (from-sRGB c)]
@@ -317,7 +337,11 @@
   ^double [c] (pr/blue c))
 
 (defn alpha
-  "Returns alpha value."
+  "Returns the alpha value of a color.
+
+  - `c` color, any type accepted by [[to-color]]
+
+  Returns a double, not clamped; 255 for colors without alpha (`Vec3`, 3-element sequences, packed integers whose top byte is 0). See also [[set-alpha]]."
   {:metadoc/categories meta-ops}
   ^double [c] (pr/alpha c))
 
@@ -504,21 +528,23 @@
            (lclamp255 a))))
 
 (defn color
-  "Create Vec4 object as color representation.
+  "Creates a color, `Vec4` (RGBA) with channels and alpha clamped to `[0,255]`.
 
-  Arity: 
+  Arities:
 
-  * 1 - convert to `Vec4` from any color. Same as [[to-color]]
-  * 2 - sets color alpha
-  * 3 - sets r,g,b with alpha 255
-  * 4 - sets r,g,b and alpha
-  
-  See also [[gray]]. [[awt-color]], [[awt-gray]]."
+  - `[c]` any color (see [[to-color]]), clamped
+  - `[c a]` any color with alpha set to `a`, clamped
+  - `[r g b]` from channel values, alpha 255
+  - `[r g b a]` from channel values and alpha
+
+  Unlike [[to-color]], which converts without clamping, `color` always returns a valid RGBA color. See also [[gray]], [[awt-color]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [c]
-   (pr/to-color c))
-  (^Vec4 [c a]
-   (set-alpha c a))
+   (let [^Vec4 v (pr/to-color c)]
+     (Vec4. (clamp255 (.x v)) (clamp255 (.y v)) (clamp255 (.z v)) (clamp255 (.w v)))))
+  (^Vec4 [c ^double a]
+   (let [^Vec4 v (pr/to-color c)]
+     (Vec4. (clamp255 (.x v)) (clamp255 (.y v)) (clamp255 (.z v)) (clamp255 a))))
   (^Vec4 [^double r ^double g ^double b]
    (Vec4. (clamp255 r)
           (clamp255 g)
@@ -590,9 +616,12 @@
   (^Vec4 [c alpha?] (scale c 255.0 alpha?)))
 
 (defn gray
-  "Create grayscale color based on intensity `v`. Optional parameter alpha `a`.
+  "Creates a gray color, `Vec4` with all three channels equal to `v`.
 
-  See also [[color]]"
+  - `v` intensity
+  - `a` alpha (optional, default 255)
+
+  Values are clamped to `[0,255]`. See also [[color]], [[awt-gray]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [^double v] (color v v v))
   (^Vec4 [^double v ^double a] (color v v v a)))
@@ -608,20 +637,31 @@
   (^Color [^double v] (awt-color v v v))
   (^Color [^double v ^double a] (awt-color v v v a)))
 
-(defn- string->long
-  "Parse color string and convert to long"
-  [^String s]
+(defn- hex-string->color
+  "Parses hex notation (`#` optional) to `Vec4`: 1 digit `v` is `vvvvvv`, 2 digits `vv` are `vvvvvv`, `rgb`, `rgba` (digits doubled), `rrggbb`, `rrggbbaa`."
+  ^Vec4 [^String s]
   (let [^String s (if (= (first s) \#) (subs s 1) s)
-        cs (count s)]
-    (if (and (= cs 8)
-             (= (subs s 6) "00"))
-      (set-alpha (pr/to-color (Long/parseLong (subs s 0 6) 16)) 0)
-      (Long/parseLong (condp = cs
-                        1 (str s s s s s s)
-                        2 (str s s s)
-                        3 (let [[r g b] s] (str r r g g b b))
-                        8 (str (subs s 6) (subs s 0 6))
-                        s) 16))))
+        ^String s (case (count s)
+                    1 (str s s s s s s)
+                    2 (str s s s)
+                    3 (let [[r g b] s] (str r r g g b b))
+                    4 (let [[r g b a] s] (str r r g g b b a a))
+                    s)
+        rgb (Long/parseLong (subs s 0 (min 6 (count s))) 16)]
+    (if (= 8 (count s))
+      (Vec4. (bit-and 0xff (m/>> rgb 16)) (bit-and 0xff (m/>> rgb 8)) (bit-and 0xff rgb) (Long/parseLong (subs s 6) 16))
+      (pr/to-color (Long/parseLong s 16)))))
+
+(defn- gray-vec4
+  "Unclamped gray `Vec4`."
+  (^Vec4 [^double v] (Vec4. v v v 255.0))
+  (^Vec4 [^double v ^double a] (Vec4. v v v a)))
+
+(defn- packed-alpha
+  "Alpha of a packed ARGB integer: the top byte, or 255 when the top byte is 0."
+  ^double [^long c]
+  (let [a (bit-and 0xff (m/>> c 24))]
+    (if (zero? a) 255.0 (double a))))
 
 (extend-protocol pr/ColorProto
   Vec2
@@ -687,40 +727,40 @@
   (green [_] nil)
   (blue [_] nil)
   Long
-  (alpha ^double [^long c] (bit-and 0xff (m/>> c 24)))
+  (alpha ^double [^long c] (packed-alpha c))
   (red ^double [^long c] (bit-and 0xff (m/>> c 16)))
   (green ^double [^long c] (bit-and 0xff (m/>> c 8)))
   (blue ^double [^long c] (bit-and 0xff c))
   (to-color ^Vec4 [^long c] (Vec4. (bit-and 0xff (m/>> c 16))
                                    (bit-and 0xff (m/>> c 8))
                                    (bit-and 0xff c)
-                                   (if (zero? (bit-and 0xff000000 c)) 255.0 (bit-and 0xff (m/>> c 24)))))
+                                   (packed-alpha c)))
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
   (luma ^double [c] (pr/luma (pr/to-color c)))
   Integer
-  (alpha ^double [c] (bit-and 0xff (m/>> ^int c 24)))
+  (alpha ^double [c] (packed-alpha (long c)))
   (red ^double [c] (bit-and 0xff (m/>> ^int c 16)))
   (green ^double [c] (bit-and 0xff (m/>> ^int c 8)))
   (blue ^double [c] (bit-and 0xff ^int c))
   (to-color ^Vec4 [c] (Vec4. (bit-and 0xff (m/>> ^int c 16))
                              (bit-and 0xff (m/>> ^int c 8))
                              (bit-and 0xff ^int c)
-                             (if (zero? (bit-and 0xff000000 c)) 255.0 (bit-and 0xff (m/>> ^int c 24)))))
+                             (packed-alpha (long c))))
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
   (luma ^double [c] (pr/luma (pr/to-color c)))
   String
-  (alpha ^double [^String c] (pr/alpha (string->long c)))
-  (red ^double [^String c] (pr/red (string->long c)))
-  (green ^double [^String c] (pr/green (string->long c)))
-  (blue ^double [^String c] (pr/blue (string->long c)))
-  (to-color ^Vec4 [^String c] (pr/to-color (string->long c)))
-  (to-awt-color ^Color [^String c] (pr/to-awt-color (pr/to-color (string->long c))))
-  (luma ^double [^String c] (pr/luma (pr/to-color (string->long c))))
+  (alpha ^double [^String c] (.w (hex-string->color c)))
+  (red ^double [^String c] (.x (hex-string->color c)))
+  (green ^double [^String c] (.y (hex-string->color c)))
+  (blue ^double [^String c] (.z (hex-string->color c)))
+  (to-color ^Vec4 [^String c] (hex-string->color c))
+  (to-awt-color ^Color [^String c] (pr/to-awt-color (hex-string->color c)))
+  (luma ^double [^String c] (pr/luma (hex-string->color c)))
   APersistentVector
   (to-color ^Vec4 [c] (case (count c)
                         0 (Vec4. 0.0 0.0 0.0 255.0)
-                        1 (gray (c 0))
-                        2 (gray (c 0) (c 1))
+                        1 (gray-vec4 (c 0))
+                        2 (gray-vec4 (c 0) (c 1))
                         3 (Vec4. (c 0) (c 1) (c 2) 255.0)
                         (Vec4. (c 0) (c 1) (c 2) (c 3))))
   (alpha ^double [c] (pr/alpha (pr/to-color c)))
@@ -732,8 +772,8 @@
   ISeq
   (to-color ^Vec4 [c] (case (count (take 4 c))
                         0 (Vec4. 0.0 0.0 0.0 255.0)
-                        1 (gray (first c))
-                        2 (gray (first c) (second c))
+                        1 (gray-vec4 (first c))
+                        2 (gray-vec4 (first c) (second c))
                         3 (Vec4. (first c) (second c) (nth c 2) 255.0)
                         (Vec4. (first c) (second c) (nth c 2) (nth c 3 255.0))))
   (alpha ^double [c] (pr/alpha (pr/to-color c)))
@@ -755,8 +795,8 @@
   pr/ColorProto
   (to-color ^Vec4 [c] (case (alength ^doubles c)
                         0 (Vec4. 0.0 0.0 0.0 255.0)
-                        1 (gray (aget ^doubles c 0))
-                        2 (gray (aget ^doubles c 0) (aget ^doubles c 1))
+                        1 (gray-vec4 (aget ^doubles c 0))
+                        2 (gray-vec4 (aget ^doubles c 0) (aget ^doubles c 1))
                         3 (Vec4. (aget ^doubles c 0) (aget ^doubles c 1) (aget ^doubles c 2) 255.0)
                         (Vec4. (aget ^doubles c 0) (aget ^doubles c 1) (aget ^doubles c 2) (aget ^doubles c 3))))
   (alpha ^double [c] (pr/alpha (pr/to-color c)))
@@ -770,8 +810,8 @@
   pr/ColorProto
   (to-color ^Vec4 [c] (case (alength ^ints c)
                         0 (Vec4. 0.0 0.0 0.0 255.0)
-                        1 (gray (aget ^ints c 0))
-                        2 (gray (aget ^ints c 0) (aget ^ints c 1))
+                        1 (gray-vec4 (aget ^ints c 0))
+                        2 (gray-vec4 (aget ^ints c 0) (aget ^ints c 1))
                         3 (Vec4. (aget ^ints c 0) (aget ^ints c 1) (aget ^ints c 2) 255.0)
                         (Vec4. (aget ^ints c 0) (aget ^ints c 1) (aget ^ints c 2) (aget ^ints c 3))))
   (alpha ^double [c] (pr/alpha (pr/to-color c)))
@@ -785,8 +825,8 @@
   pr/ColorProto
   (to-color ^Vec4 [c] (case (alength ^longs c)
                         0 (Vec4. 0.0 0.0 0.0 255.0)
-                        1 (gray (aget ^longs c 0))
-                        2 (gray (aget ^longs c 0) (aget ^longs c 1))
+                        1 (gray-vec4 (aget ^longs c 0))
+                        2 (gray-vec4 (aget ^longs c 0) (aget ^longs c 1))
                         3 (Vec4. (aget ^longs c 0) (aget ^longs c 1) (aget ^longs c 2) 255.0)
                         (Vec4. (aget ^longs c 0) (aget ^longs c 1) (aget ^longs c 2) (aget ^longs c 3))))
   (alpha ^double [c] (pr/alpha (pr/to-color c)))
@@ -1496,7 +1536,7 @@
   "Pure RGB->XYZ conversion without corrections."
   ^Vec3 [^Vec3 c]
   (Vec3. (+ (* (.x c) 0.4124564390896921) (* (.y c) 0.357576077643909) (* (.z c) 0.18043748326639894))
-         (+ (* (.x c) 0.21267285140562248) (* (.y c) 0.715152155287818) (* (.z c) 0.07217499330655958))
+         (+ (* (.x c) srgb-y-r) (* (.y c) srgb-y-g) (* (.z c) srgb-y-b))
          (+ (* (.x c) 0.019333895582329317) (* (.y c) 0.119192025881303) (* (.z c) 0.9503040785363677))))
 
 (defn to-XYZ1
