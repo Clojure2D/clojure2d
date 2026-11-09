@@ -16,7 +16,12 @@
   - CIE L*: [[to-L*]], [[from-L*]],
   - ACES log: [[to-ACEScc]], [[from-ACEScc]], [[to-ACEScct]], [[from-ACEScct]],
   - Blackmagic Film Generation 5: [[to-Blackmagic-WG]], [[from-Blackmagic-WG]],
-  - ITU-R BT.2020: [[to-BT2020]], [[from-BT2020]]."
+  - ITU-R BT.2020: [[to-BT2020]], [[from-BT2020]],
+  - ITU-R BT.709: [[to-BT709]], [[from-BT709]],
+  - ROMM RGB / ProPhoto RGB: [[to-ROMM]], [[from-ROMM]],
+  - SMPTE 240M: [[to-SMPTE240M]], [[from-SMPTE240M]],
+  - ITU-R BT.1886 display EOTF: [[to-BT1886]], [[from-BT1886]],
+  - HDR: SMPTE ST 2084 PQ [[to-PQ]], [[from-PQ]] and ITU-R BT.2100 HLG [[to-HLG]], [[from-HLG]]."
   (:require [clojure2d.color.whitepoints :as wp]
             [fastmath.matrix :as mat]
             [fastmath.core :as m])
@@ -164,6 +169,147 @@
     (m// v 4.5)
     (m/spow (m// (m/+ v 0.09929682680944) 1.09929682680944) 2.2222222222222222)))
 
+;; ITU-R BT.709 (= BT.601)
+
+;; decoding switches segments at the encoded value of the break point, as colour-science
+(def ^{:private true :const true :tag 'double} BT709-V-BREAK (m/- (m/* 1.099 (m/pow 0.018 0.45)) 0.099))
+
+(defn to-BT709
+  "Encodes a linear channel value with the ITU-R BT.709 OETF: `4.5 v` for `v < 0.018`, `1.099 v^0.45 - 0.099` otherwise (the standard's rounded constants).
+
+  See also [[from-BT709]], [[to-BT2020]]."
+  ^double [^double v]
+  (if (m/< v 0.018)
+    (m/* 4.5 v)
+    (m/- (m/* 1.099 (m/spow v 0.45)) 0.099)))
+
+(defn from-BT709
+  "Decodes an ITU-R BT.709 encoded value to a linear one; inverse of [[to-BT709]] (inverse OETF)."
+  ^double [^double v]
+  (if (m/< v BT709-V-BREAK)
+    (m// v 4.5)
+    (m/spow (m// (m/+ v 0.099) 1.099) (m// 0.45))))
+
+;; ROMM RGB / ProPhoto RGB
+
+(def ^{:private true :const true :tag 'double} ROMM-ET (/ 512.0))
+
+(defn to-ROMM
+  "Encodes a linear channel value with the ROMM RGB (ProPhoto RGB) curve: `16 v` below `1/512`, `v^(1/1.8)` otherwise (ISO 22028-2, floating point form).
+
+  See also [[from-ROMM]]."
+  ^double [^double v]
+  (if (m/< v ROMM-ET)
+    (m/* 16.0 v)
+    (m/spow v (m// 1.8))))
+
+(defn from-ROMM
+  "Decodes a ROMM RGB (ProPhoto RGB) encoded value to a linear one; inverse of [[to-ROMM]]."
+  ^double [^double v]
+  (if (m/< v (m/* 16.0 ROMM-ET))
+    (m// v 16.0)
+    (m/spow v 1.8)))
+
+;; SMPTE 240M
+
+(def ^{:private true :const true :tag 'double} SMPTE240M-V-BREAK (m/- (m/* 1.1115 (m/pow 0.0228 0.45)) 0.1115))
+
+(defn to-SMPTE240M
+  "Encodes a linear channel value with the SMPTE 240M OETF: `4 v` for `v < 0.0228`, `1.1115 v^0.45 - 0.1115` otherwise.
+
+  See also [[from-SMPTE240M]]."
+  ^double [^double v]
+  (if (m/< v 0.0228)
+    (m/* 4.0 v)
+    (m/- (m/* 1.1115 (m/spow v 0.45)) 0.1115)))
+
+(defn from-SMPTE240M
+  "Decodes a SMPTE 240M encoded value to a linear one (SMPTE 240M EOTF); inverse of [[to-SMPTE240M]]."
+  ^double [^double v]
+  (if (m/< v SMPTE240M-V-BREAK)
+    (m// v 4.0)
+    (m/spow (m// (m/+ v 0.1115) 1.1115) (m// 0.45))))
+
+;; ITU-R BT.1886
+
+(defn from-BT1886
+  "Decodes a video signal value with the ITU-R BT.1886 reference EOTF (gamma 2.4) to display luminance.
+
+  Parameters:
+
+  - `v` (double): encoded value, nominally 0-1.
+  - `lw`, `lb` (doubles, optional): display white and black luminance; default 1 and 0, where the EOTF is the plain power `v^2.4`.
+
+  Returns `a · max(v + b, 0)^2.4` with `a = (lw^(1/2.4) - lb^(1/2.4))^2.4`, `b = lb^(1/2.4) / (lw^(1/2.4) - lb^(1/2.4))`; negative arguments of the power are clamped to 0.
+
+  See also [[to-BT1886]]."
+  (^double [^double v] (from-BT1886 v 1.0 0.0))
+  (^double [^double v ^double lw ^double lb]
+   (let [n (m/- (m/pow lw (m// 2.4)) (m/pow lb (m// 2.4)))
+         a (m/pow n 2.4)
+         b (m// (m/pow lb (m// 2.4)) n)]
+     (m/* a (m/spow (m/max (m/+ v b) 0.0) 2.4)))))
+
+(defn to-BT1886
+  "Encodes display luminance with the inverse ITU-R BT.1886 EOTF; inverse of [[from-BT1886]] with the same optional `lw`, `lb` (default 1 and 0, the plain power `v^(1/2.4)`)."
+  (^double [^double v] (to-BT1886 v 1.0 0.0))
+  (^double [^double v ^double lw ^double lb]
+   (let [n (m/- (m/pow lw (m// 2.4)) (m/pow lb (m// 2.4)))
+         a (m/pow n 2.4)
+         b (m// (m/pow lb (m// 2.4)) n)]
+     (m/- (m/spow (m// v a) (m// 2.4)) b))))
+
+;; SMPTE ST 2084 (PQ)
+
+(def ^{:private true :const true :tag 'double} PQ-M1 0.1593017578125)
+(def ^{:private true :const true :tag 'double} PQ-M2 78.84375)
+(def ^{:private true :const true :tag 'double} PQ-C1 0.8359375)
+(def ^{:private true :const true :tag 'double} PQ-C2 18.8515625)
+(def ^{:private true :const true :tag 'double} PQ-C3 18.6875)
+
+(defn to-PQ
+  "Encodes linear light with the SMPTE ST 2084 (PQ) inverse EOTF, the HDR10 / ITU-R BT.2100 PQ curve.
+
+  The input is display luminance normalised to 10000 cd/m² (`1.0` = 10000 cd/m², `0.01` = 100 cd/m²); the result is the PQ signal in 0-1.
+
+  See also [[from-PQ]], [[to-HLG]]."
+  ^double [^double v]
+  (let [y (m/spow v PQ-M1)]
+    (m/spow (m// (m/+ PQ-C1 (m/* PQ-C2 y)) (m/+ (m/* PQ-C3 y) 1.0)) PQ-M2)))
+
+(defn from-PQ
+  "Decodes a SMPTE ST 2084 (PQ) signal to linear light normalised to 10000 cd/m² (PQ EOTF); inverse of [[to-PQ]], non-positive signals give 0."
+  ^double [^double v]
+  (let [vp (m/spow v (m// PQ-M2))
+        n (m/max 0.0 (m/- vp PQ-C1))]
+    (m/spow (m// n (m/- PQ-C2 (m/* PQ-C3 vp))) (m// PQ-M1))))
+
+;; ITU-R BT.2100 HLG
+
+(def ^{:private true :const true :tag 'double} HLG-A 0.17883277)
+(def ^{:private true :const true :tag 'double} HLG-B 0.28466892)
+(def ^{:private true :const true :tag 'double} HLG-C 0.559910729529562)
+
+(defn to-HLG
+  "Encodes scene linear light (0-1) with the ITU-R BT.2100 hybrid log-gamma (HLG) OETF: `sqrt(3 v)` for `v <= 1/12` (symmetric for negative `v`), `a ln(12 v - b) + c` above, with `a = 0.17883277`, `b = 1 - 4a`, `c = 0.5 - a ln(4a)`.
+
+  Scene referred: the HLG OOTF (system gamma) is not applied.
+
+  See also [[from-HLG]], [[to-PQ]]."
+  ^double [^double v]
+  (let [e (m/* 12.0 v)]
+    (if (m/<= e 1.0)
+      (m/* 0.5 (m/spow e 0.5))
+      (m/+ (m/* HLG-A (m/log (m/- e HLG-B))) HLG-C))))
+
+(defn from-HLG
+  "Decodes an ITU-R BT.2100 HLG signal to scene linear light (inverse OETF); inverse of [[to-HLG]]."
+  ^double [^double v]
+  (m// (if (m/<= v 0.5)
+         (m/spow (m/* 2.0 v) 2.0)
+         (m/+ (m/exp (m// (m/- v HLG-C) HLG-A)) HLG-B))
+       12.0))
+
 ;;
 
 (defn rgb-data->matrix
@@ -233,7 +379,13 @@
   - `:NTSC-colour` - as `:NTSC` with gamma 2.8, the value of colour-science, kept for compatibility,
   - `:PAL-SECAM` (alias `:ITU-R-BT470-625`) - `CIE-2-D65`, gamma 2.8,
   - `:sRGB` - `CIE-2-D65`, [[linear-to-srgb]]; its matrices are derived from the primaries and differ by at most 2.2e-6 from the fixed (Lindbloom) matrices of `clojure2d.color/to-XYZ` and `from-XYZ`, which keeps white mapped exactly to white between D65 spaces,
-  - `:SMPTE-C` - `CIE-2-D65`, gamma 2.2.
+  - `:SMPTE-C` - `CIE-2-D65`, gamma 2.2,
+  - `:ITU-R-BT709` - sRGB primaries, `CIE-2-D65`, [[to-BT709]],
+  - `:Display-P3` - P3 primaries, `CIE-2-D65`, [[linear-to-srgb]],
+  - `:P3-D65` - P3 primaries, `CIE-2-D65`, gamma 2.6,
+  - `:DCI-P3` - P3 primaries, `CIE-2-DCI-P3`, gamma 2.6,
+  - `:SMPTE-240M` - `CIE-2-D65`, [[to-SMPTE240M]],
+  - `:ProPhoto-RGB` (alias `:ROMM-RGB`) - `CIE-2-D50`, [[to-ROMM]].
 
   Primaries as in colour-science; white points are the full precision values of `clojure2d.color.whitepoints`, so matrices differ from those built with rounded white points (for example D65 0.3127, 0.3290) by up to about 2.4e-4.
 
@@ -361,6 +513,38 @@
                                          wp/CIE-2-D65
                                          (->mgamma 0.45454545454545453)
                                          (->mgamma 2.2))
+                 :ITU-R-BT709 (rgb-data->map [0.6400, 0.3300]
+                                             [0.3000, 0.6000]
+                                             [0.1500, 0.0600]
+                                             wp/CIE-2-D65
+                                             to-BT709 from-BT709)
+                 :Display-P3 (rgb-data->map [0.680, 0.320]
+                                            [0.265, 0.690]
+                                            [0.150, 0.060]
+                                            wp/CIE-2-D65
+                                            linear-to-srgb srgb-to-linear)
+                 :P3-D65 (rgb-data->map [0.680, 0.320]
+                                        [0.265, 0.690]
+                                        [0.150, 0.060]
+                                        wp/CIE-2-D65
+                                        (->mgamma (/ 2.6))
+                                        (->mgamma 2.6))
+                 :DCI-P3 (rgb-data->map [0.680, 0.320]
+                                        [0.265, 0.690]
+                                        [0.150, 0.060]
+                                        wp/CIE-2-DCI-P3
+                                        (->mgamma (/ 2.6))
+                                        (->mgamma 2.6))
+                 :SMPTE-240M (rgb-data->map [0.630, 0.340]
+                                            [0.310, 0.595]
+                                            [0.155, 0.070]
+                                            wp/CIE-2-D65
+                                            to-SMPTE240M from-SMPTE240M)
+                 :ProPhoto-RGB (rgb-data->map [0.7347, 0.2653]
+                                              [0.1596, 0.8404]
+                                              [0.0366, 0.0001]
+                                              wp/CIE-2-D50
+                                              to-ROMM from-ROMM)
                  :Xtreme-RGB (rgb-data->map [1.0 0.0]
                                             [0.0 1.0]
                                             [0.0 0.0]
@@ -369,7 +553,8 @@
                                             (->mgamma 2.2))}]
           (-> m
               (assoc :ITU-R-BT470-525 (:NTSC m))
-              (assoc :ITU-R-BT470-625 (:PAL-SECAM m)))))
+              (assoc :ITU-R-BT470-625 (:PAL-SECAM m))
+              (assoc :ROMM-RGB (:ProPhoto-RGB m)))))
 
 (defn rgb-space
   "Returns an RGB space map.

@@ -33,7 +33,15 @@
    :ACEScc [rgb/to-ACEScc rgb/from-ACEScc]
    :ACEScct [rgb/to-ACEScct rgb/from-ACEScct]
    :Blackmagic-WG [rgb/to-Blackmagic-WG rgb/from-Blackmagic-WG]
-   :BT2020 [rgb/to-BT2020 rgb/from-BT2020]})
+   :BT2020 [rgb/to-BT2020 rgb/from-BT2020]
+   :BT709 [rgb/to-BT709 rgb/from-BT709]
+   :ROMM [rgb/to-ROMM rgb/from-ROMM]
+   :SMPTE240M [rgb/to-SMPTE240M rgb/from-SMPTE240M]
+   :BT1886 [rgb/to-BT1886 rgb/from-BT1886]
+   :BT1886-100-0.1 [#(rgb/to-BT1886 % 100.0 0.1) #(rgb/from-BT1886 % 100.0 0.1)]
+   :PQ [rgb/to-PQ rgb/from-PQ]
+   :HLG [rgb/to-HLG rgb/from-HLG]
+   :gamma-2.6 [(rgb/->gamma (/ 2.6)) (rgb/->gamma 2.6)]})
 
 (deftest transfer-functions-test
   ;; encoding and decoding on -0.5 ... 1000 vs colour: 1e-12 relative to max(1, |expected|)
@@ -49,8 +57,8 @@
   (doseq [[k [encode decode]] transfer-fns
           x [1.0e-6 1.0e-4 0.001 0.0031308 0.01 0.018 0.1 0.18 0.5 0.9 1.0 2.0 100.0 1000.0]]
     (is (rel-close? 1.0e-12 x (decode (encode x))) (str k " " x)))
-  (testing "negative values round-trip, except ACEScc (constant below 0)"
-    (doseq [[k [encode decode]] (dissoc transfer-fns :ACEScc)
+  (testing "negative values round-trip, except ACEScc (constant below 0), BT.1886 and PQ (decoding clamps to 0)"
+    (doseq [[k [encode decode]] (dissoc transfer-fns :ACEScc :BT1886 :BT1886-100-0.1 :PQ)
             x [-0.5 -0.01 -1.0e-4]]
       (is (rel-close? 1.0e-12 x (decode (encode x))) (str k " " x)))
     (is (== (rgb/to-ACEScc 0.0) (rgb/to-ACEScc -1.0) (/ (- 9.72 16.0) 17.52)))))
@@ -65,6 +73,20 @@
   (testing "Blackmagic decoding overflows to infinity"
     (is (== ##Inf (rgb/from-Blackmagic-WG 100.0)))))
 
+(deftest BT1886-defaults-test
+  ;; default white 1, black 0 is the plain power law 2.4
+  (doseq [x [0.0 0.01 0.18 0.5 1.0 2.0]]
+    (is (rel-close? 1.0e-12 ((rgb/->gamma 2.4) x) (rgb/from-BT1886 x)) (str x))
+    (is (rel-close? 1.0e-12 ((rgb/->gamma (/ 2.4)) x) (rgb/to-BT1886 x)) (str x))))
+
+(deftest HDR-transfer-test
+  (testing "PQ: 100 cd/m2 (0.01) and 10000 cd/m2 (1.0)"
+    (is (rel-close? 1.0e-12 1.0 (rgb/to-PQ 1.0)))
+    (is (m/< (m/abs (m/- 0.508078421517399 (rgb/to-PQ 0.01))) 1.0e-12)))
+  (testing "HLG: 1/12 -> 0.5, 1 -> 1 within 1e-8 (the 8 digit constants a, b give 0.9999999951, as colour)"
+    (is (rel-close? 1.0e-15 0.5 (rgb/to-HLG (/ 12.0))))
+    (is (rel-close? 1.0e-8 1.0 (rgb/to-HLG 1.0)))))
+
 (deftest namespace-docstring-test
   (let [doc (:doc (meta (find-ns 'clojure2d.color.rgb)))]
     (is (re-find #":rgb-to-xyz" doc))
@@ -73,7 +95,7 @@
 
 ;; G2: space table
 
-(def ^:private aliases {:ITU-R-BT470-525 :NTSC :ITU-R-BT470-625 :PAL-SECAM})
+(def ^:private aliases {:ITU-R-BT470-525 :NTSC :ITU-R-BT470-625 :PAL-SECAM :ROMM-RGB :ProPhoto-RGB})
 
 (defn- wp-var [k] @(ns-resolve 'clojure2d.color.whitepoints (symbol (name k))))
 

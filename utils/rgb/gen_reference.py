@@ -30,6 +30,10 @@ from colour.models import (eotf_inverse_sRGB, eotf_sRGB, gamma_function, log_enc
                            log_decoding_ACEScc, log_encoding_ACEScct, log_decoding_ACEScct,
                            oetf_BlackmagicFilmGeneration5, oetf_inverse_BlackmagicFilmGeneration5,
                            oetf_BT2020, oetf_inverse_BT2020)
+from colour.models import (oetf_BT709, oetf_inverse_BT709, cctf_encoding_ROMMRGB,
+                           cctf_decoding_ROMMRGB, oetf_SMPTE240M, eotf_SMPTE240M, eotf_BT1886,
+                           eotf_inverse_BT1886, eotf_ST2084, eotf_inverse_ST2084, oetf_BT2100_HLG,
+                           oetf_inverse_BT2100_HLG)
 from colour.models.rgb.transfer_functions.itur_bt_2020 import CONSTANTS_BT2020_PRECISE
 
 warnings.filterwarnings("ignore")
@@ -67,6 +71,17 @@ TRANSFER = {
     "Blackmagic-WG": (oetf_BlackmagicFilmGeneration5, oetf_inverse_BlackmagicFilmGeneration5),
     "BT2020": (lambda x: oetf_BT2020(x, constants=CONSTANTS_BT2020_PRECISE),
                lambda x: oetf_inverse_BT2020(x, constants=CONSTANTS_BT2020_PRECISE)),
+    "BT709": (oetf_BT709, oetf_inverse_BT709),
+    "ROMM": (cctf_encoding_ROMMRGB, cctf_decoding_ROMMRGB),
+    "SMPTE240M": (oetf_SMPTE240M, eotf_SMPTE240M),
+    "BT1886": (eotf_inverse_BT1886, eotf_BT1886),
+    # display white 100, black 0.1 (luminance, not normalised)
+    "BT1886-100-0.1": (lambda x: eotf_inverse_BT1886(x, L_B=0.1, L_W=100.0),
+                       lambda x: eotf_BT1886(x, L_B=0.1, L_W=100.0)),
+    # clojure2d PQ is normalised: linear 1.0 = 10000 cd/m2
+    "PQ": (lambda x: eotf_inverse_ST2084(10000.0 * x), lambda x: eotf_ST2084(x) / 10000.0),
+    "HLG": (oetf_BT2100_HLG, oetf_inverse_BT2100_HLG),
+    "gamma-2.6": (lambda x: gamma_function(x, 1 / 2.6, "Mirror"), lambda x: gamma_function(x, 2.6, "Mirror")),
 }
 
 
@@ -117,6 +132,12 @@ SPACES = {
     "sRGB": ("sRGB", "CIE-2-D65", "sRGB"),
     "SMPTE-C": ("SMPTE C", "CIE-2-D65", "gamma-2.2"),
     "Xtreme-RGB": ("Xtreme RGB", "CIE-2-D50", "gamma-2.2"),
+    "ITU-R-BT709": ("ITU-R BT.709", "CIE-2-D65", "BT709"),
+    "Display-P3": ("Display P3", "CIE-2-D65", "sRGB"),
+    "P3-D65": ("P3-D65", "CIE-2-D65", "gamma-2.6"),
+    "DCI-P3": ("DCI-P3", "CIE-2-DCI-P3", "gamma-2.6"),
+    "SMPTE-240M": ("SMPTE 240M", "CIE-2-D65", "SMPTE240M"),
+    "ProPhoto-RGB": ("ProPhoto RGB", "CIE-2-D50", "ROMM"),
 }
 
 SPACE_TRANSFER = dict(TRANSFER)
@@ -154,7 +175,9 @@ def spaces():
 
 SAMPLES_SEED = 20261109
 RGB_PAIRS = [("sRGB", "Adobe-RGB-1998"), ("sRGB", "ECI-RGB-v2"), ("sRGB", "ACEScg"),
-             ("Adobe-Wide-Gamut-RGB", "ITU-R-BT2020"), ("ACEScct", "sRGB"), ("NTSC", "PAL-SECAM")]
+             ("Adobe-Wide-Gamut-RGB", "ITU-R-BT2020"), ("ACEScct", "sRGB"), ("NTSC", "PAL-SECAM"),
+             ("sRGB", "ITU-R-BT709"), ("sRGB", "Display-P3"), ("Display-P3", "P3-D65"),
+             ("sRGB", "DCI-P3"), ("sRGB", "SMPTE-240M"), ("sRGB", "ProPhoto-RGB")]
 
 
 def colourspace(k, wps):
