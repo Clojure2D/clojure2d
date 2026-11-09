@@ -17,8 +17,10 @@ Oracles ({space [[c1 c2 c3] ...]} in :oracle, raw clojure2d ranges):
   (L shifted by (14.4 - 14.3993) / sqrt(2): clojure2d uses colorio's 14.3993), DIN99 (ASTMD2244-07),
   DIN99b, DIN99c, DIN99d
 * colour-science on encoded sRGB: HCL (Sarifuddin, hue in degrees), YCgCo (channels reordered Y Cg Co)
-* coloraide 8.14: HSV, HSL, HSI, HWB, Cubehelix, CMY (x 255), Oklab, Oklch, XYB (raw B = coloraide b + y)
-* matrices: YDbDr (SECAM), OHTA (Ohta 1980), LMS (Hunt-Pointer-Estevez normalized to D65, on XYZ 0-100)
+* coloraide 8.14: HSV, HSL, HSI, HWB, Cubehelix, DIN99o (coloraide's D65 white: tested at 1e-2), Okhsl, Okhsv (hue / 360), CMY (x 255), Oklab, Oklch, XYB (raw B = coloraide b + y)
+* matrices: YDbDr (SECAM), OHTA (Ohta 1980), LMS (Hunt-Pointer-Estevez normalized to D65, on XYZ 0-100),
+  YUV and YIQ (BT.601 luma, clojure2d chroma rows)
+* colour-science YCbCr (full range, no offset): YCbCr with BT.601 weights, YPbPr with BT.709 weights
 * RYB: Python port of Arah J. Leonard's rgb2ryb (npm rgb2ryb 0.0.4)
 
 :chromatic {space [bool ...]}: rows where the hue is defined, for spaces with hue: channel spread above
@@ -100,6 +102,10 @@ def oracle(RGB):
     uvw[black] = [0.0, 0.0, -17.0]  # black: white-point chromaticity (Lindbloom), U = V = 0
     hcl = colour.RGB_to_HCL(RGB) * np.array([180.0 / math.pi, 1.0, 1.0])
     yco = colour.RGB_to_YCoCg(RGB)
+    def okh(space):
+        v = coloraide_coords(space, S)
+        v[:, 0] /= 360.0  # clojure2d hue 0-1
+        return v
     xyb = coloraide_coords("xyb", S)
     xyb[:, 2] += xyb[:, 1]
     O = {
@@ -122,9 +128,15 @@ def oracle(RGB):
         "OHTA": RGB @ np.array([[1 / 3, 1 / 3, 1 / 3], [0.5, 0.0, -0.5], [-0.25, 0.5, -0.25]]).T,
         "LMS": (xyz * 100.0) @ HPE_D65.T,
         "RYB": np.array([rgb2ryb(*c) for c in RGB]),
+        "DIN99o": coloraide_coords("din99o", S),
+        "Okhsl": okh("okhsl"), "Okhsv": okh("okhsv"),
+        "YCbCr": colour.RGB_to_YCbCr(S, K=colour.WEIGHTS_YCBCR["ITU-R BT.601"], out_legal=False, out_int=False) * 255.0,
+        "YPbPr": colour.RGB_to_YCbCr(S, K=colour.WEIGHTS_YCBCR["ITU-R BT.709"], out_legal=False, out_int=False) * 255.0,
+        "YUV": RGB @ np.array([[0.299, 0.587, 0.114], [-0.147, -0.289, 0.436], [0.615, -0.515, -0.1]]).T,
+        "YIQ": RGB @ np.array([[0.299, 0.587, 0.114], [0.595716, -0.274453, -0.321263], [0.211456, -0.522591, 0.311135]]).T,
     }
     spread = RGB.max(axis=1) - RGB.min(axis=1)
-    chromatic = {k: list(spread > 1e-6) for k in ["HSV", "HSL", "HSI", "HWB", "Cubehelix", "HCL"]}
+    chromatic = {k: list(spread > 1e-6) for k in ["HSV", "HSL", "HSI", "HWB", "Cubehelix", "HCL", "Okhsl", "Okhsv"]}
     # polar spaces: hue only where chroma > 0.01 (grays carry rounding-noise hue)
     chromatic.update({"LCH": list(O["LCH"][:, 1] > 0.01), "LCHuv": list(O["LCHuv"][:, 1] > 0.01),
                       "JCH": list(O["JCH"][:, 1] > 0.01), "Oklch": list(O["Oklch"][:, 1] > 0.01)})

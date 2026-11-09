@@ -13,16 +13,21 @@
 (def reference (delay (-> "color/colorspaces_reference.edn" io/resource slurp edn/read-string)))
 
 (def ^:private hue-channel
-  {:HSV 0 :HSL 0 :HSI 0 :HWB 0 :Cubehelix 0 :HCL 0 :LCH 2 :LCHuv 2 :JCH 2 :Oklch 2})
+  {:HSV 0 :HSL 0 :HSI 0 :HWB 0 :Cubehelix 0 :HCL 0 :LCH 2 :LCHuv 2 :JCH 2 :Oklch 2 :Okhsl 0 :Okhsv 0})
+
+(def ^:private hue-period
+  ;; hue in degrees, Okhsl / Okhsv in 0-1
+  {:Okhsl 1.0 :Okhsv 1.0})
 
 (def ^:private oracle-tolerance
-  ;; Oklab family: rounded published matrices until G3
-  {:Oklab 1.0e-7 :Oklch 1.0e-6})
+  ;; Okhsl / Okhsv: the same algorithm and constants as coloraide; DIN99o: coloraide's D65 white differs
+  ;; from CIE-2-D65 (L 4e-3, a, b 7e-3)
+  {:Oklab 1.0e-9 :Oklch 1.0e-9 :Okhsl 1.0e-9 :Okhsv 1.0e-9 :DIN99o 1.0e-2})
 
-(defn- hue-distance ^double [^double a ^double b]
+(defn- hue-distance ^double [^double period ^double a ^double b]
   (let [d (m/abs (m/- a b))
-        d (m/rem d 360.0)]
-    (m/min d (m/- 360.0 d))))
+        d (m/rem d period)]
+    (m/min d (m/- period d))))
 
 (deftest oracle-test
   ;; raw conversions vs the oracles: 1e-12 relative to max(1, |expected|) unless stated in oracle-tolerance;
@@ -37,17 +42,18 @@
             ch [0 1 2]]
       (if (= ch hc)
         (when (nth (chromatic k) i)
-          (is (m/<= (hue-distance (e ch) (actual ch)) (m/* tol 360.0)) (str k " " rgb " hue")))
+          (let [period (hue-period k 360.0)]
+            (is (m/<= (hue-distance period (e ch) (actual ch)) (m/* tol period)) (str k " " rgb " hue"))))
         (is (rel-close? tol (e ch) (actual ch)) (str k " " rgb " channel " ch))))))
 
 (def ^:private round-trip-exempt
-  ;; Gray is lossy; YCbCr, YUV, YIQ (mixed Y coefficients) and the Oklab family (rounded matrices) until G3
-  #{:Gray :YCbCr :YUV :YIQ :Oklab :Oklch :Okhsl :Okhsv :Okhwb})
+  ;; Gray is lossy
+  #{:Gray})
 
 (def ^:private round-trip-tolerance
-  ;; 0-255 scale; XYB, OSA and HCL inverses are not exact (found in G1, fixed in G3); JAB/JCH power
-  ;; functions lose ~1e-9
-  {:XYB 1.0e-4 :OSA 1.0e-4 :HCL 0.06 :JAB 1.0e-8 :JCH 1.0e-8})
+  ;; 0-255 scale; JAB/JCH power functions lose ~1e-9; OSA is ill-conditioned near black (cube roots close
+  ;; to 0, j and g in the thousands): up to 1.5e-6 there, 7e-10 elsewhere
+  {:JAB 1.0e-8 :JCH 1.0e-8 :OSA 2.0e-6})
 
 (deftest round-trip-test
   (let [samples (:samples @reference)]
@@ -56,19 +62,19 @@
                   [to* from*] (c/colorspaces* k)
                   tol (round-trip-tolerance k 1.0e-9)]
             rgb samples
-            :when (not (and (= k :HCL) (every? zero? rgb))) ;; HCL black: G3
             :let [x (c/color rgb)]]
       (is (every? #(m/<= % tol) (map #(m/abs (m/- %1 %2)) x (from (to x)))) (str k " " rgb))
       (is (every? #(m/<= % tol) (map #(m/abs (m/- %1 %2)) x (from* (to* x)))) (str k "* " rgb)))))
 
 (deftest normalized-range-test
-  ;; to-X* of sRGB colors stays in [0,255]; overshoot up to 0.005 until the ranges are recomputed (G3)
+  ;; to-X* of sRGB colors stays in [0,255]: ranges are sampled extrema (utils/color/gen_normalized_ranges.clj,
+  ;; 64^3 grid + cube edges); this grid differs, overshoot <= 1e-6
   (let [grid (for [r (range 0 256 17) g (range 0 256 17) b (range 0 256 17)] (c/color r g b))]
     (doseq [k (keys c/colorspaces*)
             :let [to* (first (c/colorspaces* k))
                   vs (mapcat #(take 3 (to* %)) grid)]]
-      (is (m/<= -0.005 (reduce min vs)) (str k " min"))
-      (is (m/<= (reduce max vs) 255.005) (str k " max")))))
+      (is (m/<= -1.0e-6 (reduce min vs)) (str k " min"))
+      (is (m/<= (reduce max vs) (+ 255.0 1.0e-6)) (str k " max")))))
 
 (deftest edge-cases-test
   (testing "grays: hexagonal hue and saturation 0"
@@ -98,8 +104,7 @@
 
 (deftest docstrings-test
   (doseq [k (keys c/colorspaces)
-          :when (not (#{:pass :RGB :sRGB :linearRGB :XYZ :XYZ1 :DIN99o :YCbCr :YUV :YIQ :YPbPr
-                        :Oklab :Oklch :Okhsl :Okhsv :Okhwb :HCL} k))
+          :when (not (#{:pass :RGB :sRGB :linearRGB} k))
           f ["to-" "from-" "to-" "from-"]
           :let [star (if (#{0 1} (.indexOf ["to-" "from-" "to-" "from-"] f)) "" "*")]]
     (is (some? (:doc (meta (ns-resolve 'clojure2d.color (symbol (str f (name k) star)))))) (str f (name k) star))))
@@ -119,3 +124,24 @@
       (is (m/<= (m/abs (x (if (= k :UVW) 1 2))) 1.0e-12) (str k))))
   (testing "to-XYZ* maps white to 255"
     (is (every? #(m/<= (m/abs (m/- 255.0 %)) 1.0e-12) (take 3 (c/to-XYZ* :white))))))
+
+;; G3: model fixes
+
+(deftest g3-fixes-test
+  (testing "Okhsl, Okhsv: black, white and grays have saturation 0, hue 0"
+    (doseq [g [0 1 128 254 255] f [c/to-Okhsl c/to-Okhsv]
+            :let [x (f (c/gray g))]]
+      (is (zero? (x 0)) (str g))
+      (is (zero? (x 1)) (str g))))
+  (testing "Okhsl, Okhsv saturation stays within 1 (up to rounding)"
+    (doseq [rgb (:samples @reference) f [c/to-Okhsl c/to-Okhsv]]
+      (is (m/<= ((f rgb) 1) (+ 1.0 1.0e-6)) (str rgb))))
+  (testing "HCL: black round-trips, exact inverse"
+    (is (= (c/to-color :black) (c/from-HCL (c/to-HCL :black)))))
+  (testing "YCbCr, YUV, YIQ share BT.601 luma, equal to YDbDr's Y"
+    (doseq [rgb (take 20 (:samples @reference))
+            k [:YCbCr :YUV :YIQ]]
+      (is (rel-close? 1.0e-12 ((c/to-YDbDr rgb) 0) (((first (c/colorspaces k)) rgb) 0)) (str k rgb))))
+  (testing "YPbPr: Pb, Pr within 127.5"
+    (is (rel-close? 1.0e-12 127.5 ((c/to-YPbPr :blue) 1)))
+    (is (rel-close? 1.0e-12 127.5 ((c/to-YPbPr :red) 2)))))

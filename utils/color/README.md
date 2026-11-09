@@ -6,6 +6,7 @@ Oracle generators for `clojure2d.color` (color audit). Run from the repository r
 |---|---|---|
 | `gen_representation.py` | matplotlib 3.11.1, numpy 2.5.2 in `/home/ts/penv` | `test/resources/color/representation_reference.edn` |
 | `gen_colorspaces.py` | colour-science 0.4.7, coloraide 8.14.1, numpy 2.5.2 in `/home/ts/penv` | `test/resources/color/colorspaces_reference.edn` |
+| `gen_normalized_ranges.clj` | clojure2d (`lein run -m clojure.main utils/color/gen_normalized_ranges.clj`) | printed table of sampled extrema; the normalization literals of the `to-X*`/`from-X*` functions are set from it |
 
 ```
 /home/ts/penv/.venv/bin/python -I utils/color/gen_representation.py
