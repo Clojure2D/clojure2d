@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color.munsell` namespace (port of colour-science, BSD-3-Clause): `munsell-spec`, `munsell-to-Yxy` (Illuminant C by default), `munsell-value` and `luminance` with `:astm`, `:newhall`, `:osa`, `:priest`, `:munsell`, `:moon`, `:saunderson`, `:ladd`, `:mccamy` value scales
 * `clojure2d.color.whitepoints/chromatic-adaptation-transform`: cone response matrices of an adaptation method, throws for an unknown one
 * `clojure2d.color.whitepoints/cmf`: color matching functions of `:CIE-2`, `:CIE-10`, `:CIE-2015-2`, `:CIE-2015-10` observers
+* `clojure2d.color.whitepoints`: `whitepoint` lookup by observer and illuminant; correlated color temperature `CCT->xy` (`:cie-d`, `:kang2002`), `xy->CCT` (`:cie-d`, `:mccamy`, `:hernandez`), `CCT->uv` / `uv->CCT` (`:krystek`), `CCT->mired`, `mired->CCT`, `daylight-locus`; light source spectra `planck-law`, `blackbody-spectrum`, `illuminant-A-spectrum`, `illuminant-D-spectrum` (ported from colour-science, checked against it)
 * Docstrings for all white point vars and the `whitepoints` map; data generator `utils/whitepoints/gen_resources.py` (replaces `utils/colors/cie.clj`) and CIE D-series basis data `resources/color/illuminant_d_series_basis.edn`
 * Docstrings for `clojure2d.color.whitepoints` (namespace, coordinate helpers, adaptation, spectral data, `cmf-cie*` functions), `->XYZ-to-LMS`, `->LMS-to-XYZ`, `->RGB-to-RGB`, `->spectrum-to-XYZ`, `wavelength-to-XYZ`
 

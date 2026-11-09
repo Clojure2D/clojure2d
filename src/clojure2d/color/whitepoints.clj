@@ -10,11 +10,15 @@
   - coordinate helpers: [[xy->XZ]], [[XZ->xy]], [[xy->coordinates]], [[XZ->coordinates]], [[coordinates]], [[tristimulus]],
   - chromatic adaptation: [[chromatic-adaptation-methods]] (13 von Kries type cone response matrices), [[chromatic-adaptation-transform]] and [[chromatic-adaptation-matrix]],
   - spectral data: [[color-matching-functions-data]], [[illuminants-spectrum-data]], color matching functions [[cmf]] (and `cmf-cie2-*`, `cmf-cie10-*`),
-  - spectrum to XYZ: [[spectrum]], [[->spectrum-to-XYZ1]]."
+  - spectrum to XYZ: [[spectrum]], [[->spectrum-to-XYZ1]],
+  - white point lookup: [[whitepoint]],
+  - correlated color temperature: [[CCT->xy]], [[xy->CCT]], [[CCT->uv]], [[uv->CCT]], [[CCT->mired]], [[mired->CCT]], [[daylight-locus]],
+  - light source spectra: [[planck-law]], [[blackbody-spectrum]], [[illuminant-A-spectrum]], [[illuminant-D-spectrum]]."
   (:require [fastmath.core :as m]
             [fastmath.vector :as v]
             [fastmath.matrix :as mat]
             [fastmath.interpolation :as i]
+            [fastmath.optimization :as opt]
             [clojure.java.io :refer [resource input-stream]]
             [clojure.edn :as edn])
   (:import [fastmath.vector Vec2 Vec3 Vec4]
@@ -23,7 +27,6 @@
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
-(m/use-primitive-operators)
 
 (defn- read-edn [n] (-> (resource n) input-stream slurp edn/read-string))
 
@@ -40,7 +43,7 @@
   See also [[XZ->xy]], [[xy->coordinates]], [[tristimulus]]."
   (^Vec2 [^Vec2 xy] (xy->XZ (.x xy) (.y xy)))
   (^Vec2 [^double x ^double y]
-   (-> (Vec2. x (- 1.0 x y))
+   (-> (Vec2. x (m/- 1.0 x y))
        (v/div y))))
 
 (defn xy->coordinates
@@ -73,7 +76,7 @@
   (^Vec2 [^Vec2 XZ] (XZ->xy (.x XZ) (.y XZ)))
   (^Vec2 [^double X ^double Z]
    (-> (Vec2. X 1.0)
-       (v/div (+ 1.0 X Z)))))
+       (v/div (m/+ 1.0 X Z)))))
 
 (defn XZ->coordinates
   "Creates a white point definition `[X Z x y]` from `X`, `Z` tristimulus values (with `Y = 1`).
@@ -108,8 +111,10 @@
         (map (fn [[k v]] [k (v/vec4 v)]))
         (read-edn "color/whitepoints.edn")))
 
-(def ^:private observer-names {"2" "CIE 1931 2°" "10" "CIE 1964 10°"
-                               "2015-2" "CIE 2015 2°" "2015-10" "CIE 2015 10°"})
+(def ^:private observer-names {"2" "CIE 1931 2°"
+                               "10" "CIE 1964 10°"
+                               "2015-2" "CIE 2015 2°"
+                               "2015-10" "CIE 2015 10°"})
 
 (def ^:private illuminant-names
   {"A" "CIE standard illuminant A (incandescent, 2856 K)"
@@ -164,6 +169,24 @@
          `(def ~(with-meta (symbol (name k)) {:doc (whitepoint-doc k)}) (Vec4. ~X ~Z ~x ~y)))))
 
 (gen-whitepoints [:CIE-10-FL3-3 :CIE-2-FL3-4 :CIE-2-FL11* :CIE-2015-10-D60* :CIE-10-FL7 :CIE-10-D75 :CIE-2-FL3-9 :CIE-2-HP1 :CIE-2-ID50* :CIE-2015-10-ID50* :CIE-10-LED-BH1* :CIE-2-FL3-13 :CIE-10-FL3-6 :CIE-10-LED-B3 :CIE-2-ISO-PD :CIE-10-FL3-14 :CIE-2015-2-ID65* :CIE-10-HP3* :CIE-2-FL12 :CIE-2-HP4 :CIE-2015-10-FL10* :CIE-2-LED-BH1* :CIE-10-FL3-8 :CIE-2015-2-FL10* :CIE-2-FL2 :CIE-10-A :CIE-10-D60* :CIE-10-FL3-13 :CIE-10-FL3-11* :CIE-10-FL10* :CIE-2-E* :CIE-2-FL8 :CIE-2-ISO-SP :CIE-2015-2-A* :CIE-10-LED-RGB1 :CIE-2015-2-FL4* :CIE-2-FL4 :CIE-10-FL12 :CIE-2015-10-FL2* :CIE-2-FL3-7* :CIE-2-FL3-13* :CIE-2-FL3-4* :CIE-2-FL3-5* :CIE-2015-2-LED-V2* :CIE-10-ISO-SST* :CIE-2015-10-HP4* :CIE-2015-10-FL3-13* :CIE-10-B* :CIE-10-FL3-5* :CIE-2-FL3* :CIE-2015-2-FL3-13* :CIE-2-FL7* :CIE-2-E :CIE-2015-2-E* :CIE-10-FL12* :CIE-2015-10-FL6* :CIE-2015-10-FL3-14* :CIE-2015-10-ISO-ST* :CIE-2-FL3-8* :CIE-10-LED-B1 :CIE-10-FL6* :CIE-10-LED-V2 :CIE-10-C* :CIE-2-FL9* :CIE-2015-2-LED-BH1* :CIE-2-LED-B4* :CIE-10-LED-B2 :CIE-10-D65 :CIE-2015-10-FL11* :CIE-2015-2-LED-V1* :CIE-2015-2-FL3-2* :CIE-10-ISO-SD :CIE-2015-2-FL9* :CIE-2-D50 :CIE-10-FL3-12 :CIE-10-FL3-1* :CIE-2-BLACKMAGIC-WG :CIE-2-FL3-12* :CIE-2-FL3-2 :CIE-2015-10-FL1* :CIE-2015-2-D60* :CIE-2015-2-FL3-10* :CIE-2015-2-ISO-SP* :CIE-2-HP3* :CIE-2015-2-ISO-SST* :CIE-10-HP2* :CIE-10-FL4 :CIE-2-FL3-11 :CIE-10-LED-V1 :CIE-2015-2-HP2* :CIE-10-FL3-15 :CIE-10-LED-B5* :CIE-10-FL11 :CIE-10-ISO-ST* :CIE-10-HP1* :CIE-2-ISO-PF :CIE-2-LED-V2* :CIE-2015-10-LED-V1* :CIE-2015-10-FL4* :CIE-2-ISO-SD :CIE-2-C :CIE-10-FL8* :CIE-2015-10-ISO-SP* :CIE-2-B :CIE-2-ID65 :CIE-2-FL3-3 :CIE-2-ISO-PF* :CIE-10-FL3-2* :CIE-10-FL1 :CIE-10-E :CIE-2015-10-ISO-SPF* :CIE-2015-2-FL1* :CIE-10-FL3-8* :CIE-2015-10-ISO-PF* :CIE-2-D75 :CIE-2-D65* :CIE-2015-10-FL3-12* :CIE-2-FL3-5 :CIE-2-FL3-15* :CIE-10-ID50* :CIE-2-C* :CIE-2015-2-D75* :CIE-2015-10-D75* :CIE-10-LED-BH1 :CIE-2-HP3 :CIE-10-ISO-SP* :CIE-2-FL1 :CIE-2015-10-LED-V2* :CIE-2-ISO-PD* :CIE-10-FL3-7 :CIE-2015-10-HP3* :CIE-10-LED-B2* :CIE-2015-2-LED-B3* :CIE-2-FL11 :CIE-2015-2-FL5* :CIE-2015-10-ISO-SD* :CIE-2015-2-LED-B5* :CIE-10-ISO-PD* :CIE-10-FL3-7* :CIE-2015-10-FL3-7* :CIE-10-LED-B4 :CIE-10-LED-B5 :CIE-2015-2-ISO-PD* :CIE-2-FL3-14 :CIE-10-LED-RGB1* :CIE-2-ISO-ST :CIE-2015-10-B* :CIE-2-HP2* :CIE-10-HP2 :CIE-2015-10-A* :CIE-10-FL3-9* :CIE-2-D50* :CIE-10-FL11* :CIE-10-ISO-PF :CIE-2-ID50 :CIE-10-HP4* :CIE-2-FL3-6* :CIE-2-LED-V1* :CIE-2-LED-B4 :CIE-2-ISO-SST* :CIE-2-FL3-14* :CIE-2015-2-HP1* :CIE-2015-2-LED-B4* :CIE-2-A :CIE-10-E* :CIE-2-FL8* :CIE-2-HP5 :CIE-10-D65* :CIE-2-FL5* :CIE-2015-10-FL3-3* :CIE-2-FL3-11* :CIE-2-ACES :CIE-2015-10-FL12* :CIE-2015-10-HP5* :CIE-2015-10-FL8* :CIE-2-FL2* :CIE-2015-10-FL3-11* :CIE-2015-2-D55* :CIE-2-D65 :CIE-2-FL3 :CIE-2015-2-ISO-PF* :CIE-10-D60 :CIE-2015-2-FL3-15* :CIE-2015-2-FL3-7* :CIE-2-FL3-10* :CIE-2-FL3-7 :CIE-2015-2-LED-B1* :CIE-2-LED-RGB1 :CIE-2015-10-LED-BH1* :CIE-10-FL3-14* :CIE-2-D60 :CIE-2015-10-FL3-2* :CIE-2-FL12* :CIE-2015-2-D50* :CIE-10-ID65 :CIE-2015-2-FL3-3* :CIE-10-D55 :CIE-2015-2-FL2* :CIE-2015-10-FL3* :CIE-10-D55* :CIE-10-FL3* :CIE-2-FL10* :CIE-2-ICC-D50 :CIE-2-A* :CIE-2015-2-FL11* :CIE-2015-2-C* :CIE-2-LED-B5 :CIE-2015-10-D50* :CIE-2015-2-FL3-8* :CIE-10-D75* :CIE-2015-10-FL7* :CIE-2015-10-FL3-10* :CIE-10-A* :CIE-10-FL2* :CIE-2-FL3-2* :CIE-2015-2-FL3-11* :CIE-2-LED-V1 :CIE-2015-10-LED-B5* :CIE-10-ISO-SP :CIE-2-HP5* :CIE-2-LED-BH1 :CIE-2-FL9 :CIE-2015-10-FL9* :CIE-2015-10-ISO-PD* :CIE-10-ISO-PF* :CIE-2-FL1* :CIE-2-LED-B3 :CIE-10-ISO-SPF* :CIE-2-ISO-SD* :CIE-10-ISO-SPF :CIE-2-ISO-SST :CIE-2015-2-FL6* :CIE-2-FL3-9* :CIE-2015-10-FL5* :CIE-2-ISO-SPF* :CIE-10-FL2 :CIE-2-HP2 :CIE-2015-2-FL3* :CIE-10-ID50 :CIE-2-FL7 :CIE-10-LED-B1* :CIE-10-FL4* :CIE-2015-10-C* :CIE-2-FL5 :CIE-10-FL3-4* :CIE-2015-2-FL3-1* :CIE-10-FL3-12* :CIE-2-PLASA :CIE-10-FL3-4 :CIE-10-LED-B3* :CIE-2015-2-LED-B2* :CIE-2015-2-HP4* :CIE-10-LED-V2* :CIE-2015-10-LED-B2* :CIE-2015-2-FL3-5* :CIE-2015-10-FL3-5* :CIE-10-B :CIE-10-D50 :CIE-2-DCI-P3 :CIE-2-FL6* :CIE-10-ISO-SD* :CIE-10-FL3-10 :CIE-2015-2-FL12* :CIE-10-HP3 :CIE-2015-2-ID50* :CIE-2-ID65* :CIE-10-FL3-3* :CIE-10-FL9* :CIE-2015-10-E* :CIE-2015-2-FL3-9* :CIE-10-FL7* :CIE-10-FL5 :CIE-2015-10-FL3-15* :CIE-10-HP5 :CIE-2015-2-FL7* :CIE-2-LED-RGB1* :CIE-2-FL3-8 :CIE-2-ISO-SP* :CIE-10-LED-B4* :CIE-2015-10-FL3-8* :CIE-2-ISO-ST* :CIE-10-FL3-9 :CIE-2-LED-B5* :CIE-2015-10-LED-B3* :CIE-2-LED-B1 :CIE-10-HP5* :CIE-2-FL3-1* :CIE-2015-2-ISO-ST* :CIE-2-FL4* :CIE-2015-10-ID65* :CIE-10-FL3-11 :CIE-10-HP1 :CIE-2-HP1* :CIE-2-FL3-3* :CIE-2015-2-HP5* :CIE-2015-10-LED-RGB1* :CIE-2-D55* :CIE-2-D75* :CIE-2-FL6 :CIE-2015-10-D65* :CIE-2-FL3-10 :CIE-2-FL3-15 :CIE-2-ISO-SPF :CIE-2015-10-FL3-9* :CIE-10-FL3-5 :CIE-10-FL5* :CIE-10-FL3-13* :CIE-2015-10-D55* :CIE-2015-10-FL3-1* :CIE-10-FL6 :CIE-2-HP4* :CIE-10-FL3-10* :CIE-10-FL3-1 :CIE-2015-2-LED-RGB1* :CIE-2015-2-FL3-14* :CIE-2-FL3-12 :CIE-2-LED-B2* :CIE-2015-2-FL3-4* :CIE-2015-10-LED-B4* :CIE-2-FL3-1 :CIE-2-LED-B1* :CIE-2015-2-D65* :CIE-10-HP4 :CIE-10-FL3-2 :CIE-2015-2-FL8* :CIE-10-C :CIE-2-FL10 :CIE-2-FL3-6 :CIE-2015-2-ISO-SD* :CIE-2-LED-B2 :CIE-10-FL8 :CIE-2015-10-FL3-4* :CIE-10-ISO-SST :CIE-10-FL3 :CIE-10-D50* :CIE-10-FL3-15* :CIE-10-ID65* :CIE-2015-2-FL3-6* :CIE-2015-2-HP3* :CIE-2-LED-B3* :CIE-2-LED-V2 :CIE-2015-2-ISO-SPF* :CIE-10-FL1* :CIE-10-ISO-ST :CIE-10-FL9 :CIE-2015-10-FL3-6* :CIE-10-FL10 :CIE-2015-10-LED-B1* :CIE-2-D60* :CIE-10-FL3-6* :CIE-2-D55 :CIE-2015-2-FL3-12* :CIE-10-ISO-PD :CIE-2015-10-HP1* :CIE-2015-2-B* :CIE-2015-10-HP2* :CIE-2-B* :CIE-10-LED-V1* :CIE-2015-10-ISO-SST*])
+
+(defn whitepoint
+  "Returns the white point of an illuminant for a standard observer.
+
+  Parameters:
+
+  - `observer` (keyword): `:CIE-2`, `:CIE-10`, `:CIE-2015-2` or `:CIE-2015-10`.
+  - `illuminant` (keyword): illuminant name as in the white point vars, for example `:D65`, `:A` or `:FL3-1`; add `*` (`:D65*`) for the value computed from the spectrum. The 2015 observers have computed values only.
+
+  Returns `Vec4` `[X Z x y]`, the same value as the var `<observer>-<illuminant>` (for example `CIE-2-D65`).
+
+  Throws `ex-info` with `{:observer observer :illuminant illuminant}` when no such white point exists.
+
+  See also [[whitepoints]], [[tristimulus]]."
+  [observer illuminant]
+  (or (whitepoints (keyword (str (name observer) "-" (name illuminant))))
+      (throw (ex-info (str "No white point for observer " observer " and illuminant " illuminant)
+                      {:observer observer :illuminant illuminant}))))
 
 (defn coordinates
   "Creates a white point definition `[X Z x y]`.
@@ -363,7 +386,7 @@
   Returns a map `{:range wavelength-range :lambda lambda :value value}`, the format of [[illuminants-spectrum-data]] entries and of the spectra accepted by [[->spectrum-to-XYZ1]].
 
   See also [[->spectrum-to-XYZ1]]."
-  ([lambda value] (spectrum [(reduce min lambda) (reduce max lambda)] lambda value))
+  ([lambda value] (spectrum [(reduce m/min lambda) (reduce m/max lambda)] lambda value))
   ([wavelength-range lambda value] {:range wavelength-range :lambda lambda :value value}))
 
 (def ^:private spectrum-extrapolations #{:constant :zero})
@@ -414,7 +437,7 @@
   See also `clojure2d.color/->spectrum-to-XYZ` (Y in 0-100), [[cmf]]."
   ([] (->spectrum-to-XYZ1 :CIE-2 :D65))
   ([observer illuminant] (->spectrum-to-XYZ1 observer illuminant nil))
-  ([observer illuminant {:keys [interpolation illuminant-interpolation step extrapolation]
+  ([observer illuminant {:keys [interpolation illuminant-interpolation ^double step extrapolation]
                          :or {interpolation :auto illuminant-interpolation :linear
                               step 1.0 extrapolation :constant}}]
    (when-not (spectrum-extrapolations extrapolation)
@@ -426,10 +449,8 @@
          illuminant-data (if (map? illuminant) illuminant
                              (or (illuminants-spectrum-data illuminant)
                                  (throw (ex-info (str "Unknown illuminant: " illuminant) {:illuminant illuminant}))))
-         [lo hi] (:range observer-data)
-         lo (double lo)
-         step (double step)
-         n (m/inc (long (m/floor (m/+ m/EPSILON (m// (m/- (double hi) lo) step)))))
+         [^double lo ^double hi] (:range observer-data)
+         n (m/long-inc (long (m/floor (m/+ m/EPSILON (m// (m/- hi lo) step)))))
          observer-interpolator (fn [k] (spectrum-interpolator :auto :zero
                                                              {:range (:range observer-data)
                                                               :lambda (:lambda observer-data)
@@ -459,4 +480,312 @@
                         (m/+ Z (m/* rv (Array/aget wz k)))))
                (Vec3. (m// X norm) (m// Y norm) (m// Z norm))))))))))
 
-(m/unuse-primitive-operators)
+;; correlated color temperature
+
+(defn daylight-locus
+  "Returns the `y` chromaticity coordinate of the CIE daylight locus for a given `x`.
+
+  The CIE daylight locus is `y = -3.000 x^2 + 2.870 x - 0.275`, valid for `x` between about 0.25 and 0.38 (CCT 4000-25000 K).
+
+  See also [[CCT->xy]], [[illuminant-D-spectrum]]."
+  ^double [^double x]
+  (m/+ (m/* x (m/+ (m/* -3.0 x) 2.87)) -0.275))
+
+(defn CCT->mired
+  "Converts a correlated color temperature in K to micro reciprocal degrees (mired), `1e6 / cct`.
+
+  See also [[mired->CCT]]."
+  ^double [^double cct]
+  (m// 1.0e6 cct))
+
+(defn mired->CCT
+  "Converts micro reciprocal degrees (mired) to a correlated color temperature in K, `1e6 / mired`.
+
+  See also [[CCT->mired]]."
+  ^double [^double mired]
+  (m// 1.0e6 mired))
+
+(defn- unknown-method!
+  [method]
+  (throw (ex-info (str "Unknown method: " method) {:method method})))
+
+(defn- check-cct-domain!
+  [method ^double cct ^double lo ^double hi]
+  (when-not (m/<= lo cct hi)
+    (throw (ex-info (str "Correlated color temperature " cct " K outside the domain of " method ": [" lo ", " hi "]")
+                    {:method method :cct cct}))))
+
+(def ^{:private true :const true :tag 'double} INVERSE-DOMAIN-RTOL 1.0e-9)
+
+(defn- check-inverse-cct-domain!
+  "Domain check of a numerically found CCT: accepts results within the minimiser accuracy of a boundary."
+  [method ^double cct ^double lo ^double hi]
+  (check-cct-domain! method cct (m/* lo (m/- 1.0 INVERSE-DOMAIN-RTOL)) (m/* hi (m/+ 1.0 INVERSE-DOMAIN-RTOL))))
+
+(defn- CCT->xy-cie-d-unchecked
+  ^Vec2 [^double cct]
+  (let [x (if (m/<= cct 7000.0)
+            (m/+ (m// -4.607e9 (m/* cct cct cct)) (m// 2.9678e6 (m/* cct cct)) (m// 99.11 cct) 0.244063)
+            (m/+ (m// -2.0064e9 (m/* cct cct cct)) (m// 1.9018e6 (m/* cct cct)) (m// 247.48 cct) 0.23704))]
+    (Vec2. x (daylight-locus x))))
+
+(defn- CCT->xy-cie-d
+  ^Vec2 [^double cct]
+  (check-cct-domain! :cie-d cct 4000.0 25000.0)
+  (CCT->xy-cie-d-unchecked cct))
+
+(defn- CCT->xy-kang2002
+  ^Vec2 [^double cct]
+  (check-cct-domain! :kang2002 cct 1667.0 25000.0)
+  (let [x (if (m/<= cct 4000.0)
+            (m/+ (m// -0.2661239e9 (m/* cct cct cct)) (m// -0.2343589e6 (m/* cct cct)) (m// 877.6956 cct) 0.179910)
+            (m/+ (m// -3.0258469e9 (m/* cct cct cct)) (m// 2.1070379e6 (m/* cct cct)) (m// 222.6347 cct) 0.24039))
+        x2 (m/* x x)
+        x3 (m/* x2 x)
+        y (cond
+            (m/<= cct 2222.0) (m/+ (m/* -1.1063814 x3) (m/* -1.34811020 x2) (m/* 2.18555832 x) -0.20219683)
+            (m/<= cct 4000.0) (m/+ (m/* -0.9549476 x3) (m/* -1.37418593 x2) (m/* 2.09137015 x) -0.16748867)
+            :else (m/+ (m/* 3.0817580 x3) (m/* -5.8733867 x2) (m/* 3.75112997 x) -0.37001483))]
+    (Vec2. x y)))
+
+(defn CCT->xy
+  "Converts a correlated color temperature to `x`, `y` chromaticity coordinates.
+
+  Parameters:
+
+  - `method` (keyword, optional):
+      - `:cie-d` (default) - CIE daylight (D-series) locus, CCT 4000-25000 K,
+      - `:kang2002` - Kang et al. 2002 approximation of the Planckian locus, CCT 1667-25000 K.
+  - `cct` (double): correlated color temperature in K.
+
+  Returns `Vec2` `[x y]` (CIE 1931 2° observer).
+
+  Throws `ex-info` with `{:method method}` for an unknown method and `{:method method :cct cct}` for a CCT outside the method's domain.
+
+  See also [[xy->CCT]], [[daylight-locus]], [[illuminant-D-spectrum]]."
+  (^Vec2 [^double cct] (CCT->xy-cie-d cct))
+  (^Vec2 [method ^double cct]
+   (case method
+     :cie-d (CCT->xy-cie-d cct)
+     :kang2002 (CCT->xy-kang2002 cct)
+     (unknown-method! method))))
+
+(defn- minimize-distance
+  "CCT in `[lo, hi]` minimising the squared distance between `(cct->coords cct)` and `target`."
+  ^double [cct->coords ^Vec2 target ^double lo ^double hi]
+  (let [a (.x target)
+        b (.y target)
+        f (fn ^double [^double cct]
+            (let [^Vec2 c (cct->coords cct)
+                  da (m/- (.x c) a)
+                  db (m/- (.y c) b)]
+              (m/+ (m/* da da) (m/* db db))))]
+    (first (opt/minimize :brent f {:bounds [[lo hi]] :rel 1.0e-12 :abs 1.0e-10}))))
+
+(defn- xy->CCT-cie-d
+  ^double [^double x ^double y]
+  ;; search beyond the domain, so that a result outside it is detected instead of clipped
+  (let [cct (minimize-distance CCT->xy-cie-d-unchecked (Vec2. x y) 2000.0 50000.0)]
+    (check-inverse-cct-domain! :cie-d cct 4000.0 25000.0)
+    cct))
+
+(defn- xy->CCT-mccamy
+  ^double [^double x ^double y]
+  (let [n (m// (m/- x 0.3320) (m/- y 0.1858))]
+    (m/+ (m/* n (m/+ (m/* n (m/+ (m/* -449.0 n) 3525.0)) -6823.3)) 5520.33)))
+
+(defn- xy->CCT-hernandez
+  ^double [^double x ^double y]
+  (let [n (m// (m/- x 0.3366) (m/- y 0.1735))
+        cct (m/+ -949.86315
+                 (m/* 6253.80338 (m/exp (m// (m/- n) 0.92159)))
+                 (m/* 28.70599 (m/exp (m// (m/- n) 0.20039)))
+                 (m/* 0.00004 (m/exp (m// (m/- n) 0.07125))))]
+    (if (m/> cct 50000.0)
+      (let [n (m// (m/- x 0.3356) (m/- y 0.1691))]
+        (m/+ 36284.48953
+             (m/* 0.00228 (m/exp (m// (m/- n) 0.07861)))
+             (m/* 5.4535e-36 (m/exp (m// (m/- n) 0.01543)))))
+      cct)))
+
+(defn- xy->CCT-dispatch
+  ^double [method ^double x ^double y]
+  (case method
+    :cie-d (xy->CCT-cie-d x y)
+    :mccamy (xy->CCT-mccamy x y)
+    :hernandez (xy->CCT-hernandez x y)
+    (unknown-method! method)))
+
+(defn xy->CCT
+  "Estimates the correlated color temperature of `x`, `y` chromaticity coordinates.
+
+  Parameters:
+
+  - `method` (keyword, optional):
+      - `:cie-d` (default) - CCT of the nearest point (in xy) of the CIE daylight locus, found numerically; the result must be in 4000-25000 K (up to a relative 1e-9),
+      - `:mccamy` - McCamy 1992 cubic approximation, accurate near the Planckian locus for about 2000-12500 K,
+      - `:hernandez` - Hernández-Andrés et al. 1999 exponential approximation, for about 3000-800000 K.
+  - `xy` (`Vec2`) or `x`, `y` (doubles): chromaticity coordinates (CIE 1931 2° observer). A 2-arity call with a keyword as the first argument is `[method xy]`.
+
+  Returns the CCT in K as a double. `:mccamy` and `:hernandez` are closed forms and do not check their accuracy range.
+
+  Throws `ex-info` with `{:method method}` for an unknown method and `{:method :cie-d :cct cct}` when the `:cie-d` result is outside its domain.
+
+  See also [[CCT->xy]], [[uv->CCT]]."
+  (^double [^Vec2 xy] (xy->CCT-cie-d (.x xy) (.y xy)))
+  (^double [a b]
+   (if (keyword? a)
+     (let [^Vec2 xy b] (xy->CCT-dispatch a (.x xy) (.y xy)))
+     (xy->CCT-cie-d (double a) (double b))))
+  (^double [method ^double x ^double y] (xy->CCT-dispatch method x y)))
+
+(defn- CCT->uv-krystek-unchecked
+  ^Vec2 [^double t]
+  (let [t2 (m/* t t)]
+    (Vec2. (m// (m/+ 0.860117757 (m/* 1.54118254e-4 t) (m/* 1.28641212e-7 t2))
+                (m/+ 1.0 (m/* 8.42420235e-4 t) (m/* 7.08145163e-7 t2)))
+           (m// (m/+ 0.317398726 (m/* 4.22806245e-5 t) (m/* 4.20481691e-8 t2))
+                (m/+ 1.0 (m/* -2.89741816e-5 t) (m/* 1.61456053e-7 t2))))))
+
+(defn CCT->uv
+  "Converts a correlated color temperature to CIE 1960 UCS `u`, `v` coordinates of the Planckian locus.
+
+  Parameters:
+
+  - `method` (keyword, optional): `:krystek` (default) - Krystek 1985 rational approximation, CCT 1000-15000 K.
+  - `cct` (double): correlated color temperature in K.
+
+  Returns `Vec2` `[u v]`.
+
+  Throws `ex-info` with `{:method method}` for an unknown method and `{:method method :cct cct}` for a CCT outside the domain.
+
+  See also [[uv->CCT]], [[CCT->xy]]."
+  (^Vec2 [^double cct] (CCT->uv :krystek cct))
+  (^Vec2 [method ^double cct]
+   (case method
+     :krystek (do (check-cct-domain! :krystek cct 1000.0 15000.0)
+                  (CCT->uv-krystek-unchecked cct))
+     (unknown-method! method))))
+
+(defn- uv->CCT-krystek
+  ^double [^double u ^double v]
+  (let [cct (minimize-distance CCT->uv-krystek-unchecked (Vec2. u v) 500.0 30000.0)]
+    (check-inverse-cct-domain! :krystek cct 1000.0 15000.0)
+    cct))
+
+(defn uv->CCT
+  "Estimates the correlated color temperature of CIE 1960 UCS `u`, `v` coordinates.
+
+  Parameters:
+
+  - `method` (keyword, optional): `:krystek` (default) - CCT of the nearest point (in uv) of the Krystek 1985 Planckian locus, found numerically; the result must be in 1000-15000 K (up to a relative 1e-9).
+  - `uv` (`Vec2`) or `u`, `v` (doubles): CIE 1960 UCS coordinates. A 2-arity call with a keyword as the first argument is `[method uv]`.
+
+  Returns the CCT in K as a double.
+
+  Throws `ex-info` with `{:method method}` for an unknown method and `{:method :krystek :cct cct}` when the result is outside the domain.
+
+  See also [[CCT->uv]], [[xy->CCT]]."
+  (^double [^Vec2 uv] (uv->CCT-krystek (.x uv) (.y uv)))
+  (^double [a b]
+   (if (keyword? a)
+     (let [^Vec2 uv b] (uv->CCT a (.x uv) (.y uv)))
+     (uv->CCT-krystek (double a) (double b))))
+  (^double [method ^double u ^double v]
+   (case method
+     :krystek (uv->CCT-krystek u v)
+     (unknown-method! method))))
+
+;; spectra of light sources
+
+(def ^{:private true :const true :tag 'double} PLANCK-C1 3.741771e-16) ;; W m^2
+(def ^{:private true :const true :tag 'double} PLANCK-C2 1.4388e-2) ;; m K, as ITS-90 and CIE 15
+
+(defn planck-law
+  "Spectral radiance of a blackbody (Planck's law).
+
+  Uses the radiation constants `c1 = 3.741771e-16 W m^2` and `c2 = 1.4388e-2 m K` (the value of ITS-90 and CIE 15), in vacuum.
+
+  Parameters:
+
+  - `lambda` (double): wavelength in nm, positive.
+  - `temperature` (double): temperature in K, positive.
+
+  Returns the spectral radiance in W sr^-1 m^-2 nm^-1.
+
+  See also [[blackbody-spectrum]]."
+  ^double [^double lambda ^double temperature]
+  (let [l (m/* lambda 1.0e-9)]
+    (m/* 1.0e-9 (m// PLANCK-C1 (m/* m/PI (m/pow l 5.0) (m/expm1 (m// PLANCK-C2 (m/* l temperature))))))))
+
+(def ^:private default-wavelengths (range 360 781))
+
+(defn blackbody-spectrum
+  "Creates the spectrum of a blackbody radiator from [[planck-law]].
+
+  Parameters:
+
+  - `temperature` (double): temperature in K.
+  - `lambdas` (sequence of numbers, optional): wavelengths in nm, default 360-780 nm every 1 nm.
+
+  Returns a spectrum map (see [[spectrum]]) with spectral radiance values in W sr^-1 m^-2 nm^-1, usable as an illuminant of [[->spectrum-to-XYZ1]].
+
+  See also [[illuminant-A-spectrum]], [[illuminant-D-spectrum]]."
+  ([^double temperature] (blackbody-spectrum temperature default-wavelengths))
+  ([^double temperature lambdas]
+   (spectrum lambdas (mapv (fn [^double l] (planck-law l temperature)) lambdas))))
+
+(def ^{:private true :const true :tag 'double} ILLUMINANT-A-C2 1.435e7) ;; nm K, CIE definition of A
+(def ^{:private true :const true :tag 'double} ILLUMINANT-A-T 2848.0)
+
+(defn illuminant-A-spectrum
+  "Creates the spectrum of CIE standard illuminant A from its closed form definition (CIE 15).
+
+  `S(λ) = 100 (560 / λ)^5 (exp(c2 / (2848 · 560)) - 1) / (exp(c2 / (2848 λ)) - 1)` with `c2 = 1.435e7 nm K`, normalised to 100 at 560 nm.
+
+  Parameters:
+
+  - `lambdas` (sequence of numbers, optional): wavelengths in nm, default 360-780 nm every 1 nm.
+
+  Returns a spectrum map (see [[spectrum]]).
+
+  See also [[blackbody-spectrum]], [[illuminants-spectrum-data]] (tabulated `:A`)."
+  ([] (illuminant-A-spectrum default-wavelengths))
+  ([lambdas]
+   (let [n (m/expm1 (m// ILLUMINANT-A-C2 (m/* ILLUMINANT-A-T 560.0)))]
+     (spectrum lambdas (mapv (fn [^double l] (m/* 100.0 (m/pow (m// 560.0 l) 5.0)
+                                                 (m// n (m/expm1 (m// ILLUMINANT-A-C2 (m/* ILLUMINANT-A-T l))))))
+                             lambdas)))))
+
+(def ^:private d-series-basis (delay (read-edn "color/illuminant_d_series_basis.edn")))
+
+(defn- round-3
+  "Rounds to 3 decimals, half to even (as CIE practice and numpy)."
+  ^double [^double v]
+  (m// (m/rint (m/* v 1000.0)) 1000.0))
+
+(defn illuminant-D-spectrum
+  "Creates the spectrum of a CIE D-series (daylight) illuminant.
+
+  The spectrum is `S0 + M1 S1 + M2 S2` with the CIE basis functions (300-830 nm, 5 nm) and `M1`, `M2` computed from the chromaticity and rounded to 3 decimals, as CIE 15 prescribes.
+
+  Parameters:
+
+  - `xy` (`Vec2`): chromaticity coordinates of the illuminant, or
+  - `cct` (double): correlated color temperature in K (4000-25000), converted with [[CCT->xy]] `:cie-d`. The nominal CCT of D65 is 6500 · 1.4388 / 1.4380 (about 6504 K), of D50 5000 · 1.4388 / 1.4380.
+
+  Returns a spectrum map (see [[spectrum]]) at 300-830 nm every 5 nm, usable as an illuminant of [[->spectrum-to-XYZ1]].
+
+  Throws `ex-info` (see [[CCT->xy]]) for a CCT outside 4000-25000 K.
+
+  See also [[daylight-locus]], [[illuminant-A-spectrum]]."
+  [xy-or-cct]
+  (let [^Vec2 xy (if (number? xy-or-cct) (CCT->xy :cie-d xy-or-cct) xy-or-cct)
+        x (.x xy)
+        y (.y xy)
+        mm (m/+ 0.0241 (m/* 0.2562 x) (m/* -0.7341 y))
+        m1 (round-3 (m// (m/+ -1.3515 (m/* -1.7703 x) (m/* 5.9114 y)) mm))
+        m2 (round-3 (m// (m/+ 0.0300 (m/* -31.4424 x) (m/* 30.0717 y)) mm))
+        {:keys [lambda S0 S1 S2]} @d-series-basis]
+    (spectrum lambda (mapv (fn [^double s0 ^double s1 ^double s2] (m/+ s0 (m/* m1 s1) (m/* m2 s2))) S0 S1 S2))))
+

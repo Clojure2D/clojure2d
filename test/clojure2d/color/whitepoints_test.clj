@@ -303,3 +303,112 @@
     (is (vec-close? 1.0e-12 [(/ X Y) (/ Z Y)] [(.x w) (.y w)]) (str k))
     (is (vec-close? 1.0e-12 (xy XYZ) (wp-xy k)) (str k))
     (is (vec-close? 1.0e-12 (wp-xy k) (xy (vec ((wp/->spectrum-to-XYZ1 o i) flat-400-700)))) (str k))))
+
+;; G5: white point lookup, correlated color temperature, light source spectra
+
+(deftest whitepoint-test
+  (is (= wp/CIE-2-D65 (wp/whitepoint :CIE-2 :D65)))
+  (is (= (wp/whitepoints :CIE-2015-10-FL3-1*) (wp/whitepoint :CIE-2015-10 :FL3-1*)))
+  (is (throws-data? {:observer :CIE-2015-2 :illuminant :D65} #(wp/whitepoint :CIE-2015-2 :D65)))
+  (is (throws-data? {:observer :CIE-2 :illuminant :nope} #(wp/whitepoint :CIE-2 :nope))))
+
+(def ^:private cct-data (delay (:cct @colour)))
+
+(deftest daylight-locus-test
+  ;; colour daylight_locus_function: 1e-12
+  (doseq [[x y] (:daylight-locus @cct-data)]
+    (is (rel-close? 1.0e-12 y (wp/daylight-locus x)) (str x))))
+
+(deftest mired-test
+  (doseq [[t mired] (:mired @cct-data)]
+    (is (rel-close? 1.0e-15 mired (wp/CCT->mired t)) (str t))
+    (is (rel-close? 1.0e-15 t (wp/mired->CCT mired)) (str t))))
+
+(deftest CCT->xy-test
+  ;; colour CCT_to_xy_CIE_D / CCT_to_xy_Kang2002, including branch boundaries: 1e-12
+  (doseq [[method rows] (get @cct-data :cct->xy)
+          [t x y] rows]
+    (is (vec-close? 1.0e-12 [x y] (vec (wp/CCT->xy method t))) (str method " " t)))
+  (is (= (wp/CCT->xy 6504.0) (wp/CCT->xy :cie-d 6504.0)))
+  (testing "domains and methods"
+    (is (throws-data? {:method :cie-d :cct 3999.0} #(wp/CCT->xy 3999.0)))
+    (is (throws-data? {:method :cie-d :cct 25001.0} #(wp/CCT->xy :cie-d 25001.0)))
+    (is (throws-data? {:method :kang2002 :cct 1666.0} #(wp/CCT->xy :kang2002 1666.0)))
+    (is (throws-data? {:method :nope} #(wp/CCT->xy :nope 6500.0)))
+    (is (thrown? clojure.lang.ExceptionInfo (wp/CCT->xy ##NaN)))))
+
+(deftest xy->CCT-test
+  (testing ":mccamy, :hernandez (both branches) vs colour, closed forms: 1e-12"
+    (doseq [method [:mccamy :hernandez]
+            [x y t] (get-in @cct-data [:xy->cct method])]
+      (is (rel-close? 1.0e-12 t (wp/xy->CCT method x y)) (str method " " [x y]))
+      (is (rel-close? 1.0e-12 t (wp/xy->CCT method (Vec2. x y))) (str method " " [x y]))))
+  (testing ":cie-d vs colour xy_to_CCT_CIE_D (Nelder-Mead, xatol 1e-4 K): 1e-6 relative"
+    (doseq [[x y t] (get-in @cct-data [:xy->cct :cie-d])]
+      (is (rel-close? 1.0e-6 t (wp/xy->CCT x y)) (str [x y]))
+      (is (rel-close? 1.0e-6 t (wp/xy->CCT (Vec2. x y))) (str [x y]))
+      (is (rel-close? 1.0e-6 t (wp/xy->CCT :cie-d (Vec2. x y))) (str [x y]))))
+  (testing ":cie-d round trip on the locus: 1e-8 relative"
+    (doseq [t [4000.0 5003.0 6504.0 7000.0 12000.0 25000.0]]
+      (is (rel-close? 1.0e-8 t (wp/xy->CCT (wp/CCT->xy t))) (str t))))
+  (testing "errors"
+    (is (throws-data? {:method :nope} #(wp/xy->CCT :nope 0.3 0.3)))
+    (is (= :cie-d (:method (try (wp/xy->CCT 0.5 0.41) (catch clojure.lang.ExceptionInfo e (ex-data e))))))
+    (is (< (:cct (ex-data (try (wp/xy->CCT 0.5 0.41) (catch clojure.lang.ExceptionInfo e e)))) 4000.0))))
+
+(deftest CCT->uv-test
+  ;; colour CCT_to_uv_Krystek1985: 1e-12
+  (doseq [[t u v] (:cct->uv @cct-data)]
+    (is (vec-close? 1.0e-12 [u v] (vec (wp/CCT->uv t))) (str t)))
+  (is (throws-data? {:method :krystek :cct 999.0} #(wp/CCT->uv 999.0)))
+  (is (throws-data? {:method :nope} #(wp/CCT->uv :nope 6500.0))))
+
+(deftest uv->CCT-test
+  ;; colour uv_to_CCT_Krystek1985 (Nelder-Mead): 1e-6 relative; round trip 1e-8
+  (doseq [[u v t] (:uv->cct @cct-data)]
+    (is (rel-close? 1.0e-6 t (wp/uv->CCT u v)) (str [u v]))
+    (is (rel-close? 1.0e-6 t (wp/uv->CCT :krystek (Vec2. u v))) (str [u v])))
+  (doseq [t [1000.0 2856.0 6504.0 15000.0]]
+    (is (rel-close? 1.0e-8 t (wp/uv->CCT (wp/CCT->uv t))) (str t)))
+  (is (throws-data? {:method :nope} #(wp/uv->CCT :nope 0.2 0.3))))
+
+(def ^:private spectra-data (delay (:spectra @colour)))
+
+(deftest planck-law-test
+  ;; colour planck_law (sd_blackbody scaling, W/(sr m2 nm)): 1e-12 relative
+  (doseq [[l t p] (:planck @spectra-data)]
+    (is (m/<= (m/abs (m/- p (wp/planck-law l t))) (m/* 1.0e-12 (m/abs p))) (str [l t])))
+  (let [s (wp/blackbody-spectrum 5000.0)]
+    (is (numerically= [360 780] (:range s)))
+    (is (= 421 (count (:value s))))
+    (is (== (wp/planck-law 555.0 5000.0) (nth (:value s) 195))))
+  (testing "blackbody white point vs the Krystek Planckian locus: 1.5e-4 in uv (Krystek's fit deviates
+            from the integrated locus by up to 1.1e-4, measured 2000-10000 K)"
+    (doseq [t [2000.0 3000.0 5000.0 6504.0 10000.0]
+            :let [[X Y Z] (vec ((wp/->spectrum-to-XYZ1 :CIE-2 (wp/blackbody-spectrum t (range 360 831))) flat-400-700))
+                  d (m/+ X (m/* 15.0 Y) (m/* 3.0 Z))]]
+      (is (vec-close? 1.5e-4 (vec (wp/CCT->uv t)) [(m// (m/* 4.0 X) d) (m// (m/* 6.0 Y) d)]) (str t)))))
+
+(deftest illuminant-A-spectrum-test
+  ;; colour sd_CIE_standard_illuminant_A (300-830 nm, 5 nm): 1e-12 relative; tabulated :A: 5e-6 (table rounding)
+  (let [rows (:illuminant-A @spectra-data)
+        s (wp/illuminant-A-spectrum (map first rows))]
+    (is (vec-close? 1.0e-12 (map second rows) (:value s)))
+    (is (vec-close? 1.0e-12 [100.0] [(first (:value (wp/illuminant-A-spectrum [560])))]))
+    (is (vec-close? 5.0e-6 (:value (wp/illuminants-spectrum-data :A))
+                    (:value (wp/illuminant-A-spectrum (:lambda (wp/illuminants-spectrum-data :A))))))))
+
+(deftest illuminant-D-spectrum-test
+  ;; colour sd_CIE_illuminant_D_series (M1, M2 rounded): 1e-12 relative to max(1, |value|)
+  (doseq [[[x y] values] (:illuminant-D @spectra-data)
+          :let [s (wp/illuminant-D-spectrum (Vec2. x y))]]
+    (is (numerically= [300 830] (:range s)))
+    (is (vec-close? 1.0e-12 values (:value s)) (str [x y])))
+  (testing "CCT argument equals the xy of CCT->xy"
+    (is (= (wp/illuminant-D-spectrum 6504.0) (wp/illuminant-D-spectrum (wp/CCT->xy 6504.0)))))
+  (testing "D65 from its nominal CCT 6500 * 1.4388 / 1.4380 matches the tabulated D65 (CIE table rounding): 1e-3"
+    (let [tab (wp/illuminants-spectrum-data :D65)
+          s (wp/illuminant-D-spectrum (m// (m/* 6500.0 1.4388) 1.4380))
+          by-l (zipmap (:lambda s) (:value s))]
+      (is (vec-close? 1.0e-3 (:value tab) (map by-l (:lambda tab))))))
+  (is (throws-data? {:method :cie-d :cct 3000.0} #(wp/illuminant-D-spectrum 3000.0))))
