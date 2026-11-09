@@ -167,6 +167,18 @@
 ;;
 
 (defn rgb-data->matrix
+  "Calculates the matrices between linear RGB and XYZ of an RGB space from its primaries and white point.
+
+  The RGB to XYZ matrix maps the primaries to their chromaticities and RGB `[1 1 1]` to the white point tristimulus values (`Y = 1`, see `clojure2d.color.whitepoints/tristimulus`).
+
+  Parameters:
+
+  - `red`, `green`, `blue` (`[x y]` each): chromaticity coordinates of the primaries.
+  - `whitepoint` (`Vec4`): white point from `clojure2d.color.whitepoints`.
+
+  Returns a pair `[rgb-to-xyz xyz-to-rgb]` of `Mat3x3`.
+
+  See also [[rgb-data->map]]."
   [[^double red-x ^double red-y]
    [^double green-x ^double green-y]
    [^double blue-x ^double blue-y]
@@ -180,6 +192,18 @@
     [m (mat/inverse m)]))
 
 (defn rgb-data->map
+  "Builds an RGB space map (see the namespace docstring for its keys) from primaries, white point and transfer functions.
+
+  Parameters:
+
+  - `red`, `green`, `blue` (`[x y]` each): chromaticity coordinates of the primaries.
+  - `whitepoint` (`Vec4`): white point from `clojure2d.color.whitepoints`.
+  - `to` (function of one double): encoding transfer function, linear to encoded.
+  - `from` (function of one double): decoding transfer function, encoded to linear.
+
+  Returns a map with `:red`, `:green`, `:blue`, `:whitepoint`, `:to`, `:from` and the matrices `:rgb-to-xyz`, `:xyz-to-rgb` from [[rgb-data->matrix]]. The map can be used wherever a space name is accepted, for example in `clojure2d.color/->RGB-to-RGB`.
+
+  See also [[rgbs]]."
   [red green blue whitepoint to from]
   (let [[m1 m2] (rgb-data->matrix red green blue whitepoint)]
     {:red red :green green :blue blue
@@ -189,7 +213,32 @@
      :to to
      :from from}))
 
-(def rgbs (let [m {:ACES2065-1 (rgb-data->map   [0.73470, 0.26530],
+(def ^{:doc "Predefined RGB spaces, a map from keyword to RGB space map (see the namespace docstring for the keys).
+
+  Spaces (white point var of `clojure2d.color.whitepoints`, transfer function):
+
+  - `:ACES2065-1`, `:ACEScg` - ACES AP0 and AP1 primaries, `CIE-2-ACES`, linear,
+  - `:ACEScc`, `:ACEScct` - ACES AP1, `CIE-2-ACES`, [[to-ACEScc]], [[to-ACEScct]],
+  - `:Adobe-RGB-1998` - `CIE-2-D65`, gamma 563/256,
+  - `:Adobe-Wide-Gamut-RGB` - `CIE-2-D50`, gamma 563/256,
+  - `:Apple-RGB` - `CIE-2-D65`, gamma 1.8,
+  - `:Best-RGB`, `:Beta-RGB`, `:Don-RGB`, `:Ekta-Space-PS-5`, `:Xtreme-RGB` - `CIE-2-D50`, gamma 2.2,
+  - `:Blackmagic-Wide-Gamut` - `CIE-2-BLACKMAGIC-WG`, [[to-Blackmagic-WG]] (Film Generation 5),
+  - `:Canon-Cinema-Gamut` - `CIE-2-D65`, linear,
+  - `:CIE-RGB` - `CIE-2-E`, gamma 2.2,
+  - `:ColorMatch-RGB` - `CIE-2-D50`, gamma 1.8,
+  - `:ECI-RGB-v2` - `CIE-2-D50`, CIE L* ([[to-L*]]),
+  - `:ITU-R-BT2020` - `CIE-2-D65`, [[to-BT2020]],
+  - `:NTSC` (alias `:ITU-R-BT470-525`) - NTSC 1953 primaries, `CIE-2-C`, gamma 2.2 (ITU-R BT.470 System M),
+  - `:NTSC-colour` - as `:NTSC` with gamma 2.8, the value of colour-science, kept for compatibility,
+  - `:PAL-SECAM` (alias `:ITU-R-BT470-625`) - `CIE-2-D65`, gamma 2.8,
+  - `:sRGB` - `CIE-2-D65`, [[linear-to-srgb]]; its matrices are derived from the primaries and differ by at most 2.2e-6 from the fixed (Lindbloom) matrices of `clojure2d.color/to-XYZ` and `from-XYZ`, which keeps white mapped exactly to white between D65 spaces,
+  - `:SMPTE-C` - `CIE-2-D65`, gamma 2.2.
+
+  Primaries as in colour-science; white points are the full precision values of `clojure2d.color.whitepoints`, so matrices differ from those built with rounded white points (for example D65 0.3127, 0.3290) by up to about 2.4e-4.
+
+  See also [[rgb-space]], [[rgb-spaces-list]], [[rgb-data->map]]."}
+  rgbs (let [m {:ACES2065-1 (rgb-data->map   [0.73470, 0.26530],
                                               [0.00000, 1.00000],
                                               [0.00010, -0.07700]
                                               wp/CIE-2-ACES
@@ -287,8 +336,14 @@
                                       [0.2100, 0.7100],
                                       [0.1400, 0.0800]
                                       wp/CIE-2-C
-                                      (->mgamma 0.35714285714285715)
-                                      (->mgamma 2.8))
+                                      (->mgamma 0.45454545454545453)
+                                      (->mgamma 2.2))
+                 :NTSC-colour (rgb-data->map [0.6700, 0.3300],
+                                             [0.2100, 0.7100],
+                                             [0.1400, 0.0800]
+                                             wp/CIE-2-C
+                                             (->mgamma 0.35714285714285715)
+                                             (->mgamma 2.8))
                  :PAL-SECAM (rgb-data->map [0.6400, 0.3300],
                                            [0.2900, 0.6000],
                                            [0.1500, 0.0600] 
@@ -316,3 +371,21 @@
               (assoc :ITU-R-BT470-525 (:NTSC m))
               (assoc :ITU-R-BT470-625 (:PAL-SECAM m)))))
 
+(defn rgb-space
+  "Returns an RGB space map.
+
+  Parameters:
+
+  - `space` - a key of [[rgbs]] (for example `:sRGB` or `:Adobe-RGB-1998`) or an RGB space map (see [[rgb-data->map]]), returned as is.
+
+  Throws `ex-info` with `{:space space}` for any other value.
+
+  See also [[rgb-spaces-list]]."
+  [space]
+  (cond
+    (map? space) space
+    (contains? rgbs space) (rgbs space)
+    :else (throw (ex-info (str "Unknown RGB space: " space) {:space space}))))
+
+(def ^{:doc "Sorted names (keywords) of the predefined RGB spaces of [[rgbs]], aliases included."}
+  rgb-spaces-list (sort (keys rgbs)))

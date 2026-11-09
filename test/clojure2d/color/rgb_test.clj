@@ -7,7 +7,10 @@
             [clojure.edn :as edn]
             [clojure.java.io :as io]
             [fastmath.core :as m]
-            [clojure2d.color.rgb :as rgb]))
+            [fastmath.matrix :as mat]
+            [clojure2d.color.rgb :as rgb]
+            [fastmath.vector :as v]
+            [clojure2d.color.whitepoints :as wp]))
 
 (defn- reference [name] (-> (str "rgb/" name) io/resource slurp edn/read-string))
 
@@ -67,3 +70,58 @@
     (is (re-find #":rgb-to-xyz" doc))
     (is (re-find #"to-ACEScct" doc))
     (is (re-find #"\[\[rgbs\]\]" doc))))
+
+;; G2: space table
+
+(def ^:private aliases {:ITU-R-BT470-525 :NTSC :ITU-R-BT470-625 :PAL-SECAM})
+
+(defn- wp-var [k] @(ns-resolve 'clojure2d.color.whitepoints (symbol (name k))))
+
+(defn- throws-data?
+  "Calls `f`, expects `ex-info` with exactly `m` as data."
+  [m f]
+  (try (f) false
+       (catch clojure.lang.ExceptionInfo e (= m (ex-data e)))))
+
+(deftest rgbs-keys-test
+  (is (= (set (concat (keys (:spaces @colour)) (keys aliases))) (set (keys rgb/rgbs))))
+  (doseq [[a k] aliases]
+    (is (identical? (rgb/rgbs k) (rgb/rgbs a)) (str a))))
+
+(deftest rgbs-definitions-test
+  ;; primaries equal colour RGB_COLOURSPACES; white point = the clojure2d var used by the oracle;
+  ;; matrices vs colour normalised_primary_matrix with that white point: 1e-15, inverses 1e-14
+  (doseq [[k {:keys [red green blue whitepoint rgb-to-xyz xyz-to-rgb]}] (:spaces @colour)
+          :let [space (rgb/rgbs k)]]
+    (is (= [red green blue] (mapv #(mapv double %) [(:red space) (:green space) (:blue space)])) (str k))
+    (is (identical? (wp-var whitepoint) (:whitepoint space)) (str k))
+    (is (every? true? (map (partial rel-close? 1.0e-15) rgb-to-xyz (mat/mat->seq (:rgb-to-xyz space)))) (str k))
+    (is (every? true? (map (partial rel-close? 1.0e-14) xyz-to-rgb (mat/mat->seq (:xyz-to-rgb space)))) (str k))))
+
+(deftest rgbs-transfer-test
+  ;; space :to / :from vs colour cctf (standard constants where colour deviates): 1e-12 relative
+  (let [grid (:grid @colour)]
+    (doseq [[k {:keys [encoded decoded]}] (:spaces @colour)
+            :let [{:keys [to from]} (rgb/rgbs k)]
+            [x enc dec] (map vector grid encoded decoded)]
+      (is (rel-close? 1.0e-12 enc (to x)) (str k " encode " x))
+      (is (rel-close? 1.0e-12 dec (from x)) (str k " decode " x)))))
+
+(deftest rgb-data->map-test
+  (let [space (rgb/rgb-data->map [0.64 0.33] [0.30 0.60] [0.15 0.06] wp/CIE-2-D65
+                                 rgb/linear-to-srgb rgb/srgb-to-linear)]
+    (is (= #{:red :green :blue :whitepoint :rgb-to-xyz :xyz-to-rgb :to :from} (set (keys space))))
+    (is (= [(:rgb-to-xyz space) (:xyz-to-rgb space)]
+           (rgb/rgb-data->matrix [0.64 0.33] [0.30 0.60] [0.15 0.06] wp/CIE-2-D65)))
+    (testing "RGB [1 1 1] maps to the white point, inverse matrix is the inverse"
+      (is (every? true? (map (partial rel-close? 1.0e-15) (vec (wp/tristimulus wp/CIE-2-D65))
+                             (vec (mat/mulv (:rgb-to-xyz space) (v/vec3 1.0 1.0 1.0))))))
+      (is (every? true? (map (partial rel-close? 1.0e-15) (mat/mat->seq (mat/eye 3))
+                             (mat/mat->seq (mat/mulm (:rgb-to-xyz space) (:xyz-to-rgb space)))))))))
+
+(deftest rgb-space-test
+  (is (identical? (rgb/rgbs :sRGB) (rgb/rgb-space :sRGB)))
+  (let [space {:to identity}] (is (identical? space (rgb/rgb-space space))))
+  (is (throws-data? {:space :nope} #(rgb/rgb-space :nope)))
+  (is (throws-data? {:space nil} #(rgb/rgb-space nil)))
+  (is (= (sort (keys rgb/rgbs)) rgb/rgb-spaces-list)))

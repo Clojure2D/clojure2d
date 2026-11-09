@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color.whitepoints/cmf`: color matching functions of `:CIE-2`, `:CIE-10`, `:CIE-2015-2`, `:CIE-2015-10` observers
 * `clojure2d.color.whitepoints`: `whitepoint` lookup by observer and illuminant; correlated color temperature `CCT->xy` (`:cie-d`, `:kang2002`), `xy->CCT` (`:cie-d`, `:mccamy`, `:hernandez`), `CCT->uv` / `uv->CCT` (`:krystek`), `CCT->mired`, `mired->CCT`, `daylight-locus`; light source spectra `planck-law`, `blackbody-spectrum`, `illuminant-A-spectrum`, `illuminant-D-spectrum` (ported from colour-science, checked against it)
 * Docstrings for every public var of `clojure2d.color.whitepoints` (including the 359 white point vars) and for `->XYZ-to-LMS`, `->LMS-to-XYZ`, `->RGB-to-RGB`, `->spectrum-to-XYZ`, `wavelength-to-XYZ`
+* `clojure2d.color.rgb`: `rgb-space` (space lookup, throws `ex-info` for an unknown name), `rgb-spaces-list`; docstrings for the namespace, transfer functions, `rgb-data->matrix`, `rgb-data->map`, `rgbs`
 * Data generator `utils/whitepoints/gen_resources.py` (replaces `utils/colors/cie.clj`) and CIE D-series basis data `resources/color/illuminant_d_series_basis.edn`
 
 ### Changed
@@ -21,6 +22,7 @@ All notable changes to this project will be documented in this file. This change
 
 ### Fixed
 
+* `clojure2d.color.rgb/rgbs` `:NTSC` (and `:ITU-R-BT470-525`) used gamma 2.8; now 2.2, the assumed display gamma of ITU-R BT.470 System M; the former curve (as in colour-science) is available as `:NTSC-colour`
 * White point values (`resources/color/whitepoints.edn` regenerated):
   - D-series `CIE-2-D50`, `CIE-2-D55`, `CIE-2-D60`, `CIE-2-D75`, `CIE-10-D50`, `CIE-10-D55`, `CIE-10-D60`, `CIE-10-D65`, `CIE-10-D75` are now full precision 1 nm integrations of the CIE spectra (xy change 1e-5 to 3e-5; the former values were the CIE 15:2004 Table T.3 values, 5 nm sums over 380-780 nm, which the new values match to 4 decimals); `CIE-2-D65` is unchanged; RGB spaces based on `CIE-2-D50` (Adobe Wide Gamut, Best, Beta, ColorMatch, Don, Ekta Space PS5, ECI v2, Xtreme) change by less than 0.01 on 0-255
   - computed (`*`) white points recomputed with the fixed integration: `*-ISO-SP*` were off by about 0.24 in xy, `CIE-2015-*-E*` were not 1/3, other ISO 7589 entries off by about 8e-4, the rest by about 2e-7
