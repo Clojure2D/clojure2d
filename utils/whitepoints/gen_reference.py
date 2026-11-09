@@ -14,13 +14,27 @@ Sections (clojure2d conventions: white point layout [X Z x y], Y = 1):
 * :lms  {method [[X Y Z L M S] ...]}, colour vecmul(M, XYZ)
 * :rgb-to-rgb  {[source target method] [[r g b r' g' b'] ...]} (0-255), colour RGB_to_RGB with
   colourspaces built from clojure2d primaries, white points and transfer functions
+* :cmfs, :illuminants  colour MSDS_CMFS / SDS_ILLUMINANTS in the format of resources/color/*.edn
+* :wavelength  {observer [[lambda X Y Z] ...]}, colour wavelength_to_XYZ (Y of the CMF peak = 1)
+* :spectrum-white  {[observer illuminant] [X Y Z]}, colour sd_to_XYZ Integration of a perfect
+  reflector (Y = 1), illuminant aligned to the CMF range (colour's illuminant default: linear
+  interpolation, constant extrapolation)
+* :colorchecker  ColorChecker N Ohta spectra [{:lambda [...] :value [...]} ...]
+* :spectrum-samples  {[observer illuminant extrapolation interpolation illuminant-interpolation]
+  [[X Y Z] ...]} for the ColorChecker spectra (Y in 0-1): colour defaults (:auto sample = Sprague,
+  :linear illuminant), both linear, both Sprague; :zero extrapolates sample and illuminant with zeros
+* :spectrum-nonuniform  {:spectra [...] :XYZ [...]}, ColorChecker at non-uniform wavelengths, colour
+  CubicSpline (default rule), D65, CIE-2
 """
 
 import re
+import warnings
 
 import numpy as np
 import colour
-from colour.algebra import vecmul
+from colour.algebra import LinearInterpolator, SpragueInterpolator, vecmul
+
+warnings.filterwarnings("ignore")
 
 SEED = 20261109
 OUT = "test/resources/whitepoints/colour_reference.edn"
@@ -129,12 +143,137 @@ def rgb_to_rgb(rng, wps):
                   for s, t, m in cases)
 
 
+OBSERVERS = {"CIE-2": "CIE 1931 2 Degree Standard Observer",
+             "CIE-10": "CIE 1964 10 Degree Standard Observer",
+             "CIE-2015-2": "CIE 2015 2 Degree Standard Observer",
+             "CIE-2015-10": "CIE 2015 10 Degree Standard Observer"}
+ISO = {"PF": "Photoflood", "PD": "Photographic Daylight", "SD": "Sensitometric Daylight",
+       "SPF": "Sensitometric Photoflood", "SP": "Sensitometric Printer",
+       "SST": "Sensitometric Studio Tungsten", "ST": "Studio Tungsten"}
+
+
+def illuminant_names():
+    """clojure2d key -> colour SDS_ILLUMINANTS name."""
+    names = {}
+    for n in colour.SDS_ILLUMINANTS:
+        if n.startswith("ISO 7589 "):
+            k = "ISO-" + next(a for a, b in ISO.items() if "ISO 7589 " + b == n)
+        else:
+            k = n.replace(".", "-")
+        names[k] = n
+    return names
+
+
+def nums(xs):
+    return "[" + " ".join(num(x) for x in xs) + "]"
+
+
+def longs(xs):
+    return "[" + " ".join(str(int(x)) for x in xs) + "]"
+
+
+def cmfs_data():
+    def entry(k, n):
+        c = colour.MSDS_CMFS[n]
+        w = c.wavelengths
+        return (f":{k} {{:lambda {longs(w)} :x {nums(c.values[:, 0])} :y {nums(c.values[:, 1])}"
+                f" :z {nums(c.values[:, 2])} :range [{int(w[0])} {int(w[-1])}]}}")
+    return "{" + "\n  ".join(entry(k, n) for k, n in OBSERVERS.items()) + "}"
+
+
+def illuminants_data():
+    def entry(k, n):
+        sd = colour.SDS_ILLUMINANTS[n]
+        w = sd.wavelengths
+        return f":{k} {{:lambda {longs(w)} :value {nums(sd.values)} :range [{int(w[0])} {int(w[-1])}]}}"
+    return "{" + "\n  ".join(entry(k, n) for k, n in sorted(illuminant_names().items())) + "}"
+
+
+def wavelength(rng):
+    out = []
+    for k, n in OBSERVERS.items():
+        c = colour.MSDS_CMFS[n]
+        lo, hi = c.shape.start, c.shape.end
+        ls = list(np.arange(lo, hi + 1, 7.0)) + [hi] + list(np.round(rng.uniform(lo, hi, 60), 3))
+        out.append((f":{k}", records([[l, *colour.wavelength_to_XYZ(l, c)] for l in ls])))
+    return kv_map(out)
+
+
+def spectrum_white():
+    out = []
+    for k, n in OBSERVERS.items():
+        cmfs = colour.MSDS_CMFS[n]
+        ones = colour.sd_ones(cmfs.shape)
+        for i, ni in sorted(illuminant_names().items()):
+            XYZ = colour.sd_to_XYZ(ones, cmfs, colour.SDS_ILLUMINANTS[ni], method="Integration") / 100
+            out.append((f"[:{k} :{i}]", nums(XYZ)))
+    return kv_map(out)
+
+
+def colorchecker():
+    sds = list(colour.SDS_COLOURCHECKERS["ColorChecker N Ohta"].values())
+    return sds, "[" + "\n  ".join(f"{{:lambda {longs(sd.wavelengths)} :value {nums(sd.values)}}}"
+                                  for sd in sds) + "]"
+
+
+ZERO = {"method": "Constant", "left": 0, "right": 0}
+
+
+def aligned(sd, shape, interpolator, kw):
+    sd = sd.copy()
+    if interpolator is not None:
+        sd.interpolator = interpolator
+    return sd.align(shape, interpolator=interpolator, **kw)
+
+
+# [clojure2d :interpolation, :illuminant-interpolation] -> colour interpolators (None: colour's
+# default rule, Sprague for uniform and CubicSpline for non-uniform data)
+INTERPOLATIONS = [("auto", "linear", None, LinearInterpolator),
+                  ("linear", "linear", LinearInterpolator, LinearInterpolator),
+                  ("sprague", "sprague", SpragueInterpolator, SpragueInterpolator)]
+
+
+def spectrum_samples(sds):
+    out = []
+    for interp, ill_interp, cls, ill_cls in INTERPOLATIONS:
+        for k in ["CIE-2", "CIE-2015-10"]:
+            cmfs = colour.MSDS_CMFS[OBSERVERS[k]]
+            for i in ["D65", "A", "FL2"]:
+                for e in ["constant", "zero"]:
+                    kw = {} if e == "constant" else {"extrapolator_kwargs": ZERO}
+                    ill = aligned(colour.SDS_ILLUMINANTS[i], cmfs.shape, ill_cls, kw)
+                    rows = [colour.sd_to_XYZ(aligned(sd, cmfs.shape, cls, kw), cmfs, ill,
+                                             method="Integration") / 100 for sd in sds]
+                    out.append((f"[:{k} :{i} :{e} :{interp} :{ill_interp}]", records(rows)))
+    return kv_map(out)
+
+
+def nonuniform(sds):
+    """ColorChecker spectra at non-uniform wavelengths (every third 5 nm sample dropped);
+    colour default rule picks CubicSpline (scipy not-a-knot), D65 linear, CIE-2, constant."""
+    cmfs = colour.MSDS_CMFS[OBSERVERS["CIE-2"]]
+    ill = colour.SDS_ILLUMINANTS["D65"].copy().align(cmfs.shape)
+    spectra, rows = [], []
+    for sd in sds:
+        keep = [j for j in range(len(sd.wavelengths)) if j % 3 != 1]
+        nu = colour.SpectralDistribution(sd.values[keep], sd.wavelengths[keep])
+        assert not nu.is_uniform()
+        spectra.append(f"{{:lambda {longs(nu.wavelengths)} :value {nums(nu.values)}}}")
+        rows.append(colour.sd_to_XYZ(nu.copy().align(cmfs.shape), cmfs, ill, method="Integration") / 100)
+    return "{:spectra [" + "\n  ".join(spectra) + "]\n :XYZ " + records(rows) + "}"
+
+
 def main():
     rng = np.random.default_rng(SEED)
     wps = whitepoints()
     sections = [(":xy->XYZ", records(xy_rows(rng))), (":XYZ->xy", records(XZ_rows(rng))),
                 (":cat-matrices", cat_matrices()), (":adaptation", adaptation(wps)),
-                (":lms", lms(rng)), (":rgb-to-rgb", rgb_to_rgb(rng, wps))]
+                (":lms", lms(rng)), (":rgb-to-rgb", rgb_to_rgb(rng, wps)),
+                (":cmfs", cmfs_data()), (":illuminants", illuminants_data()),
+                (":wavelength", wavelength(rng)), (":spectrum-white", spectrum_white())]
+    sds, cc = colorchecker()
+    sections += [(":colorchecker", cc), (":spectrum-samples", spectrum_samples(sds)),
+                 (":spectrum-nonuniform", nonuniform(sds))]
     body = "\n ".join(f"{k}\n {v}" for k, v in sections)
     with open(OUT, "w") as f:
         f.write(f";; generated by utils/whitepoints/gen_reference.py, colour {colour.__version__}\n")

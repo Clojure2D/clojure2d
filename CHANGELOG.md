@@ -8,12 +8,23 @@ All notable changes to this project will be documented in this file. This change
 * Munsell colours: `clojure2d.color/munsell-to-Yxy` (D65 by default) and `clojure2d.color/munsell-to-sRGB` (not clamped)
 * `clojure2d.color.munsell` namespace (port of colour-science, BSD-3-Clause): `munsell-spec`, `munsell-to-Yxy` (Illuminant C by default), `munsell-value` and `luminance` with `:astm`, `:newhall`, `:osa`, `:priest`, `:munsell`, `:moon`, `:saunderson`, `:ladd`, `:mccamy` value scales
 * `clojure2d.color.whitepoints/chromatic-adaptation-transform`: cone response matrices of an adaptation method, throws for an unknown one
-* Docstrings for `clojure2d.color.whitepoints` (namespace, coordinate helpers, adaptation), `->XYZ-to-LMS`, `->LMS-to-XYZ`, `->RGB-to-RGB`
+* `clojure2d.color.whitepoints/cmf`: color matching functions of `:CIE-2`, `:CIE-10`, `:CIE-2015-2`, `:CIE-2015-10` observers
+* Docstrings for `clojure2d.color.whitepoints` (namespace, coordinate helpers, adaptation, spectral data, `cmf-cie*` functions), `->XYZ-to-LMS`, `->LMS-to-XYZ`, `->RGB-to-RGB`, `->spectrum-to-XYZ`, `wavelength-to-XYZ`
+
+### Changed
+
+* `spectrum` and `->spectrum-to-XYZ1` moved to `clojure2d.color.whitepoints`; `clojure2d.color` keeps aliases
+* `->spectrum-to-XYZ1` / `->spectrum-to-XYZ`: `:extrapolation` accepts `:constant` (new default) or `:zero`; `:trim` and `nil` are removed (they threw under fastmath 3.0.0-alpha10) and now throw `ex-info`; unknown observer or illuminant throws `ex-info`
+* `->spectrum-to-XYZ1` / `->spectrum-to-XYZ`: `:interpolation` now applies to the spectrum only, default `:auto` (Sprague for uniform data, not-a-knot cubic spline otherwise, as colour-science); new `:illuminant-interpolation` (default `:linear`); color matching functions always use `:auto`
 
 ### Fixed
 
 * `clojure2d.color.whitepoints/chromatic-adaptation-matrix` (and `->XYZ-to-XYZ`) failed with a `ClassCastException` mixing `RealMatrix` and `Mat3x3`
 * `:rainbow` gradient returned channel values above 255 (now clamped like other gradients)
+* `->spectrum-to-XYZ1` / `->spectrum-to-XYZ` with default options (`:trim` extrapolation) or `nil` extrapolation threw an exception
+* `->spectrum-to-XYZ1` / `->spectrum-to-XYZ` integrated over the wrong range (the intersection or the union of the illuminant, sample and observer ranges); now over the observer's range with the illuminant and sample extended, as CIE 15 (`:ISO-SP`, 2015 observers with `:E` were wrong)
+* `->spectrum-to-XYZ1` docstring named the spectrum key `:values` (the key is `:value`) and the converter was hinted as `Vec4` (returns `Vec3`)
+* `wavelength-to-XYZ` (and `wavelength`) used CIE 1964 10° for every observer other than `:CIE-2`; now supports all four observers and throws for an unknown one
 * An unknown chromatic adaptation method in `chromatic-adaptation-matrix`, `->XYZ-to-XYZ`, `->XYZ-to-LMS`, `->LMS-to-XYZ` and `->RGB-to-RGB` (white points differ) failed with an unrelated `IllegalArgumentException` (LMS builders only when called); now throws `ex-info` with `{:method k}` when the converter is built
 
 ## 1.5.0-alpha1

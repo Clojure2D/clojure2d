@@ -313,6 +313,11 @@
   (try (f) false
        (catch clojure.lang.ExceptionInfo e (= {:method k} (ex-data e)))))
 
+(defn- throws-observer?
+  [k f]
+  (try (f) false
+       (catch clojure.lang.ExceptionInfo e (= {:observer k} (ex-data e)))))
+
 (deftest XYZ-to-XYZ-cat16-test
   ;; colour matrix_chromatic_adaptation_VonKries CAT16 C -> D65 applied to XYZ (0-100): 1e-12 relative to 100
   (let [M (partition 3 (get-in @whitepoints-colour [:adaptation [:cat16 :CIE-2-C :CIE-2-D65]]))
@@ -359,3 +364,40 @@
       (is (= ((c/->RGB-to-RGB :sRGB :Adobe-Wide-Gamut-RGB :bradford) c)
              ((c/->RGB-to-RGB :sRGB :Adobe-Wide-Gamut-RGB) c)))))
   (is (throws-method? :nope #(c/->RGB-to-RGB :sRGB :Adobe-Wide-Gamut-RGB :nope))))
+
+;; spectral wrappers, oracle: test/resources/whitepoints (utils/whitepoints/gen_reference.py)
+
+(deftest spectrum-aliases-test
+  (is (identical? wp/spectrum c/spectrum))
+  (is (identical? wp/->spectrum-to-XYZ1 c/->spectrum-to-XYZ1)))
+
+(deftest spectrum-to-XYZ-test
+  ;; 0-100 scale of ->spectrum-to-XYZ1: 1e-12 relative
+  (let [s (c/spectrum (range 380 781 5) (map #(+ 0.2 (* 0.5 (m/sin (/ % 40.0)))) (range 380 781 5)))]
+    (doseq [o [:CIE-2 :CIE-2015-10]
+            i [:D65 :A :FL2]
+            :let [^Vec4 res ((c/->spectrum-to-XYZ o i) s)
+                  expected ((c/->spectrum-to-XYZ1 o i) s)]]
+      (is (< (max-abs-diff (map #(* 100.0 %) expected) (take 3 res)) 1e-12) (str [o i]))
+      (is (== 255.0 (.w res)))))
+  (is (< (abs (- 100.0 (.y ^Vec4 ((c/->spectrum-to-XYZ) (c/spectrum (range 400 701 10) (repeat 31 1.0)))))) 1e-10)))
+
+(deftest wavelength-to-XYZ-test
+  ;; colour wavelength_to_XYZ for all four observers (B3: non :CIE-2 observers used CIE-10): 1e-10 on 0-100
+  (doseq [[k rows] (:wavelength @whitepoints-colour)
+          [l & XYZ] rows]
+    (is (< (max-abs-diff (map #(* 100.0 %) XYZ) (take 3 (c/wavelength-to-XYZ l k))) 1e-10) (str k " " l)))
+  (is (= (c/wavelength-to-XYZ 550.0 :CIE-2) (c/wavelength-to-XYZ 550.0)))
+  (is (not= (c/wavelength-to-XYZ 550.0 :CIE-10) (c/wavelength-to-XYZ 550.0 :CIE-2015-10)))
+  (is (= [0.0 0.0 0.0] (take 3 (c/wavelength-to-XYZ 385.0 :CIE-2015-2))))
+  (is (= [0.0 0.0 0.0] (take 3 (c/wavelength-to-XYZ 900.0))))
+  (is (throws-observer? :nope #(c/wavelength-to-XYZ 550.0 :nope))))
+
+(deftest wavelength-test
+  ;; ripple of wavelength-to-XYZ: sRGB of the colour XYZ, clamped
+  (doseq [k [:CIE-2 :CIE-10 :CIE-2015-2]
+          [l X Y Z] (take 20 (get-in @whitepoints-colour [:wavelength k]))]
+    (is (< (max-abs-diff (take 3 (c/clamp (c/from-XYZ (v/vec4 (* 100.0 X) (* 100.0 Y) (* 100.0 Z) 255.0))))
+                         (take 3 (c/wavelength l k)))
+           1e-9)
+        (str k " " l))))

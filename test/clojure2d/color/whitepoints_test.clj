@@ -134,3 +134,117 @@
                                      (wp/tristimulus wp/CIE-2-A))))
           (str k))))
   (is (throws-method? :nope #(wp/chromatic-adaptation-matrix :nope wp/CIE-2-C wp/CIE-2-D65))))
+
+;; G3: spectral data and spectrum -> XYZ
+
+(def ^:private observers [:CIE-2 :CIE-10 :CIE-2015-2 :CIE-2015-10])
+
+(defn- throws-data?
+  [m f]
+  (try (f) false
+       (catch clojure.lang.ExceptionInfo e (= m (ex-data e)))))
+
+(defn- xy [[^double X ^double Y ^double Z]] (let [s (m/+ X Y Z)] [(m// X s) (m// Y s)]))
+
+(defn- numerically=
+  "Equal structure, numbers compared with `==` (data files store integral values as longs)."
+  [a b]
+  (cond (map? a) (and (map? b) (= (set (keys a)) (set (keys b))) (every? #(numerically= (a %) (b %)) (keys a)))
+        (sequential? a) (and (sequential? b) (= (count a) (count b)) (every? true? (map numerically= a b)))
+        (number? a) (and (number? b) (== a b))
+        :else (= a b)))
+
+(deftest spectral-data-test
+  ;; data files equal colour MSDS_CMFS / SDS_ILLUMINANTS exactly
+  (is (numerically= (:cmfs @colour) wp/color-matching-functions-data))
+  (is (numerically= (:illuminants @colour) wp/illuminants-spectrum-data)))
+
+(deftest cmf-test
+  ;; colour wavelength_to_XYZ (Sprague on the 1 nm data, as here), integer and fractional
+  ;; wavelengths: 1e-12
+  (doseq [[k rows] (:wavelength @colour)
+          :let [[x y z] (wp/cmf k)]
+          [l & XYZ] rows]
+    (is (vec-close? 1.0e-12 XYZ [(x l) (y l) (z l)]) (str k " " l)))
+  (testing "0 outside the observer range"
+    (doseq [k observers
+            :let [[x y z] (wp/cmf k)
+                  [lo hi] (:range (wp/color-matching-functions-data k))]
+            l [(- lo 0.5) (+ hi 0.5) 100.0 1000.0]]
+      (is (= [0.0 0.0 0.0] [(x l) (y l) (z l)]) (str k " " l))))
+  (testing "built once"
+    (is (identical? (wp/cmf :CIE-10) (wp/cmf :CIE-10))))
+  (testing "1931 and 1964 vars"
+    (is (= [wp/cmf-cie2-x wp/cmf-cie2-y wp/cmf-cie2-z] (wp/cmf :CIE-2)))
+    (is (= [wp/cmf-cie10-x wp/cmf-cie10-y wp/cmf-cie10-z] (wp/cmf :CIE-10))))
+  (is (throws-data? {:observer :nope} #(wp/cmf :nope))))
+
+(deftest spectrum-test
+  (is (numerically= {:range [400 700] :lambda [700 400 500] :value [3 1 2]} (wp/spectrum [700 400 500] [3 1 2])))
+  (is (= {:range [380 780] :lambda [400 700] :value [1 2]} (wp/spectrum [380 780] [400 700] [1 2]))))
+
+(def ^:private flat-400-700 (wp/spectrum (range 400 701 10) (repeat 31 1.0)))
+
+(deftest spectrum-to-XYZ1-white-test
+  ;; perfect reflector under every illuminant and observer vs colour sd_to_XYZ Integration
+  ;; (colour interpolates illuminants linearly, as the default here; constant extrapolation to
+  ;; the CMF range): XYZ 1e-12
+  (is (= 236 (count (:spectrum-white @colour))))
+  (doseq [[[o i] XYZ] (:spectrum-white @colour)
+          :let [f (wp/->spectrum-to-XYZ1 o i)]]
+    (is (vec-close? 1.0e-12 XYZ (vec (f flat-400-700))) (str [o i]))))
+
+(deftest spectrum-to-XYZ1-samples-test
+  ;; ColorChecker N Ohta (380-780 nm, 5 nm) vs colour sd_to_XYZ Integration: defaults (:auto sample =
+  ;; Sprague, :linear illuminant, = colour defaults), both :linear, both :sprague; :constant and :zero
+  ;; extrapolation: 1e-12
+  (is (= 36 (count (:spectrum-samples @colour))))
+  (doseq [[[o i e interp ill-interp] rows] (:spectrum-samples @colour)
+          :let [f (wp/->spectrum-to-XYZ1 o i {:interpolation interp :illuminant-interpolation ill-interp
+                                              :extrapolation e})]
+          [{:keys [lambda value]} XYZ] (map vector (:colorchecker @colour) rows)]
+    (is (vec-close? 1.0e-12 XYZ (vec (f (wp/spectrum lambda value)))) (str [o i e interp ill-interp]))))
+
+(deftest spectrum-to-XYZ1-nonuniform-test
+  ;; non-uniform wavelengths: :auto picks a not-a-knot cubic spline, colour CubicSplineInterpolator
+  ;; (scipy interp1d cubic), D65, CIE-2: 1e-12
+  (let [{:keys [spectra XYZ]} (:spectrum-nonuniform @colour)
+        f (wp/->spectrum-to-XYZ1)]
+    (is (= 24 (count spectra)))
+    (doseq [[{:keys [lambda value]} expected] (map vector spectra XYZ)]
+      (is (vec-close? 1.0e-12 expected (vec (f (wp/spectrum lambda value))))))))
+
+(deftest spectrum-to-XYZ1-contract-test
+  (testing "defaults: :CIE-2, :D65, :auto, :linear illuminant, :constant (B1: used to throw)"
+    (let [res ((wp/->spectrum-to-XYZ1) flat-400-700)]
+      (is (instance? Vec3 res))
+      (is (rel-close? 1.0e-12 1.0 (.y ^Vec3 res)))
+      (is (= res ((wp/->spectrum-to-XYZ1 :CIE-2 :D65 {:interpolation :auto :illuminant-interpolation :linear
+                                                      :extrapolation :constant :step 1.0})
+                  flat-400-700)))))
+  (testing ":auto falls back to :linear below 4 samples, uses a cubic spline for 4-5 samples"
+    (let [s3 (wp/spectrum [400 550 700] [0.2 0.8 0.4])
+          s5 (wp/spectrum [400 450 500 550 700] [0.2 0.5 0.8 0.6 0.4])]
+      (is (= ((wp/->spectrum-to-XYZ1) s3) ((wp/->spectrum-to-XYZ1 :CIE-2 :D65 {:interpolation :linear}) s3)))
+      (is (= ((wp/->spectrum-to-XYZ1) s5) ((wp/->spectrum-to-XYZ1 :CIE-2 :D65 {:interpolation :b-spline}) s5)))))
+  (testing "B2: integration over the CMF range"
+    (doseq [o [:CIE-2015-2 :CIE-2015-10]]
+      (is (vec-close? 1.0e-6 [(/ 1.0 3.0) (/ 1.0 3.0)] (xy (vec ((wp/->spectrum-to-XYZ1 o :E) flat-400-700))))
+          (str o)))
+    ;; ISO-SP (350-560 nm) extended to 830 nm, was cut at 560 nm by :trim
+    (is (vec-close? 1.0e-12 (xy (get-in @colour [:spectrum-white [:CIE-2 :ISO-SP]]))
+                    (xy (vec ((wp/->spectrum-to-XYZ1 :CIE-2 :ISO-SP) flat-400-700))))))
+  (testing ":zero extrapolation of a 400-700 nm flat sample gives Y < 1"
+    (is (< 0.99 (.y ^Vec3 ((wp/->spectrum-to-XYZ1 :CIE-2 :D65 {:extrapolation :zero}) flat-400-700)) 1.0)))
+  (testing "spectrum map as illuminant equals the keyword"
+    (is (= ((wp/->spectrum-to-XYZ1 :CIE-10 :A) flat-400-700)
+           ((wp/->spectrum-to-XYZ1 :CIE-10 (wp/illuminants-spectrum-data :A)) flat-400-700))))
+  (testing "step: 5 nm sampling keeps Y = 1, white point within 1e-4 of 1 nm"
+    (let [res ((wp/->spectrum-to-XYZ1 :CIE-2 :D65 {:step 5.0}) flat-400-700)]
+      (is (rel-close? 1.0e-12 1.0 (.y ^Vec3 res)))
+      (is (vec-close? 1.0e-4 (xy (vec ((wp/->spectrum-to-XYZ1) flat-400-700))) (xy (vec res))))))
+  (testing "errors"
+    (doseq [e [:trim nil :skip :error 0.0]]
+      (is (throws-data? {:extrapolation e} #(wp/->spectrum-to-XYZ1 :CIE-2 :D65 {:extrapolation e})) (str e)))
+    (is (throws-data? {:observer :nope} #(wp/->spectrum-to-XYZ1 :nope :D65)))
+    (is (throws-data? {:illuminant :nope} #(wp/->spectrum-to-XYZ1 :CIE-2 :nope)))))

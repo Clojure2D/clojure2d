@@ -9,7 +9,8 @@
 
   - coordinate helpers: [[xy->XZ]], [[XZ->xy]], [[xy->coordinates]], [[XZ->coordinates]], [[coordinates]], [[tristimulus]],
   - chromatic adaptation: [[chromatic-adaptation-methods]] (13 von Kries type cone response matrices), [[chromatic-adaptation-transform]] and [[chromatic-adaptation-matrix]],
-  - spectral data: [[color-matching-functions-data]], [[illuminants-spectrum-data]] and interpolated color matching functions."
+  - spectral data: [[color-matching-functions-data]], [[illuminants-spectrum-data]], color matching functions [[cmf]] (and `cmf-cie2-*`, `cmf-cie10-*`),
+  - spectrum to XYZ: [[spectrum]], [[->spectrum-to-XYZ1]]."
   (:require [fastmath.core :as m]
             [fastmath.vector :as v]
             [fastmath.matrix :as mat]
@@ -17,7 +18,8 @@
             [clojure.java.io :refer [resource input-stream]]
             [clojure.edn :as edn])
   (:import [fastmath.vector Vec2 Vec3 Vec4]
-           [fastmath.matrix Mat3x3]))
+           [fastmath.matrix Mat3x3]
+           [fastmath.java Array]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -231,42 +233,173 @@
 
 ;; spectrum
 
-(def color-matching-functions-data
+(def ^{:doc "CIE standard observer color matching functions, keyed by observer.
+
+  Keys: `:CIE-2` (CIE 1931 2°), `:CIE-10` (CIE 1964 10°), `:CIE-2015-2`, `:CIE-2015-10` (CIE 2015 cone fundamental based). Each value is a map with `:lambda` (wavelengths in nm, 1 nm step), `:x`, `:y`, `:z` (the color matching functions) and `:range` (`[first last]` wavelength: 360-830 nm for 1931/1964, 390-830 nm for 2015).
+
+  Data from colour-science.
+
+  See also [[cmf]], [[illuminants-spectrum-data]]."}
+  color-matching-functions-data
   (read-edn "color/cmfs_standard_observer.edn"))
 
-(def illuminants-spectrum-data
+(def ^{:doc "Relative spectral power distributions of CIE and other standard illuminants, keyed by illuminant.
+
+  Keys are the illuminant parts of white point names: `:A`, `:B`, `:C`, `:D50`, `:D55`, `:D60`, `:D65`, `:D75`, `:E`, `:FL1` - `:FL12`, `:FL3-1` - `:FL3-15`, `:HP1` - `:HP5`, `:ID50`, `:ID65`, `:LED-B1` - `:LED-B5`, `:LED-BH1`, `:LED-RGB1`, `:LED-V1`, `:LED-V2` and ISO 7589 illuminants `:ISO-PD`, `:ISO-PF`, `:ISO-SD`, `:ISO-SP`, `:ISO-SPF`, `:ISO-SST`, `:ISO-ST`. Each value is a spectrum map (see [[spectrum]]): `:lambda` (nm), `:value`, `:range`.
+
+  Data from colour-science.
+
+  See also [[color-matching-functions-data]], [[->spectrum-to-XYZ1]]."}
+  illuminants-spectrum-data
   (read-edn "color/illuminants.edn"))
 
-(let [[x y] (get-in color-matching-functions-data [:CIE-2 :range])]
-  (def cmf-cie2-x (-> (i/interpolation :sprague
-                                     (get-in color-matching-functions-data [:CIE-2 :lambda])
-                                     (get-in color-matching-functions-data [:CIE-2 :x]))
-                    (i/extrapolation :zero x y)))
+(defn- cmf-interpolators
+  [observer]
+  (let [{:keys [lambda x y z]} (color-matching-functions-data observer)
+        [lo hi] (:range (color-matching-functions-data observer))
+        interpolator (fn [values] (-> (i/interpolation :sprague lambda values)
+                                     (i/extrapolation :zero lo hi)))]
+    [(interpolator x) (interpolator y) (interpolator z)]))
 
-  (def cmf-cie2-y (-> (i/interpolation :sprague
-                                     (get-in color-matching-functions-data [:CIE-2 :lambda])
-                                     (get-in color-matching-functions-data [:CIE-2 :y]))
-                    (i/extrapolation :zero x y)))
+(def ^:private cmfs-delays
+  (into {} (map (fn [k] [k (delay (cmf-interpolators k))])) (keys color-matching-functions-data)))
 
-  (def cmf-cie2-z (-> (i/interpolation :sprague
-                                     (get-in color-matching-functions-data [:CIE-2 :lambda])
-                                     (get-in color-matching-functions-data [:CIE-2 :z]))
-                    (i/extrapolation :zero x y))))
+(defn cmf
+  "Returns the color matching functions of a standard observer as interpolated functions of wavelength.
 
-(let [[x y] (get-in color-matching-functions-data [:CIE-10 :range])]
-  (def cmf-cie10-x (-> (i/interpolation :sprague
-                                      (get-in color-matching-functions-data [:CIE-10 :lambda])
-                                      (get-in color-matching-functions-data [:CIE-10 :x]))
-                     (i/extrapolation :zero x y)))
+  Parameters:
 
-  (def cmf-cie10-y (-> (i/interpolation :sprague
-                                      (get-in color-matching-functions-data [:CIE-10 :lambda])
-                                      (get-in color-matching-functions-data [:CIE-10 :y]))
-                     (i/extrapolation :zero x y)))
+  - `observer` (keyword): `:CIE-2`, `:CIE-10`, `:CIE-2015-2` or `:CIE-2015-10`.
 
-  (def cmf-cie10-z (-> (i/interpolation :sprague
-                                      (get-in color-matching-functions-data [:CIE-10 :lambda])
-                                      (get-in color-matching-functions-data [:CIE-10 :z]))
-                     (i/extrapolation :zero x y))))
+  Returns a vector `[x y z]` of functions `(fn [lambda])`, `lambda` in nm, returning the color matching function value (`y` peaks at 1.0). Values between the 1 nm data samples are interpolated with the Sprague method, values outside the observer's range (see [[color-matching-functions-data]]) are 0. The functions are built once per observer, on first use.
+
+  Throws `ex-info` with `{:observer observer}` for an unknown observer.
+
+  See also [[color-matching-functions-data]], [[->spectrum-to-XYZ1]]."
+  [observer]
+  (if-let [d (cmfs-delays observer)]
+    @d
+    (throw (ex-info (str "Unknown observer: " observer) {:observer observer}))))
+
+(def ^{:doc "CIE 1931 2° color matching function x̄ as a function of wavelength in nm, see [[cmf]]."}
+  cmf-cie2-x ((cmf :CIE-2) 0))
+(def ^{:doc "CIE 1931 2° color matching function ȳ as a function of wavelength in nm, see [[cmf]]."}
+  cmf-cie2-y ((cmf :CIE-2) 1))
+(def ^{:doc "CIE 1931 2° color matching function z̄ as a function of wavelength in nm, see [[cmf]]."}
+  cmf-cie2-z ((cmf :CIE-2) 2))
+(def ^{:doc "CIE 1964 10° color matching function x̄ as a function of wavelength in nm, see [[cmf]]."}
+  cmf-cie10-x ((cmf :CIE-10) 0))
+(def ^{:doc "CIE 1964 10° color matching function ȳ as a function of wavelength in nm, see [[cmf]]."}
+  cmf-cie10-y ((cmf :CIE-10) 1))
+(def ^{:doc "CIE 1964 10° color matching function z̄ as a function of wavelength in nm, see [[cmf]]."}
+  cmf-cie10-z ((cmf :CIE-10) 2))
+
+(defn spectrum
+  "Creates a spectrum map from sampled spectral data.
+
+  Parameters:
+
+  - `lambda` (sequence of numbers): wavelengths in nm.
+  - `value` (sequence of numbers): spectral values at `lambda`, same length.
+  - `wavelength-range` (`[start end]`, optional): domain of the spectrum; default is the minimum and maximum of `lambda`.
+
+  Returns a map `{:range wavelength-range :lambda lambda :value value}`, the format of [[illuminants-spectrum-data]] entries and of the spectra accepted by [[->spectrum-to-XYZ1]].
+
+  See also [[->spectrum-to-XYZ1]]."
+  ([lambda value] (spectrum [(reduce min lambda) (reduce max lambda)] lambda value))
+  ([wavelength-range lambda value] {:range wavelength-range :lambda lambda :value value}))
+
+(def ^:private spectrum-extrapolations #{:constant :zero})
+
+(defn- uniform-wavelengths?
+  [lambda]
+  (let [diffs (map (fn [^double a ^double b] (m/- b a)) lambda (rest lambda))
+        d (double (first diffs))]
+    (every? (fn [^double x] (m/<= (m/abs (m/- x d)) (m/* m/EPSILON d))) diffs)))
+
+(defn- auto-interpolation
+  "colour-science rule: Sprague for uniform data, cubic spline (not-a-knot) otherwise."
+  [lambda]
+  (let [n (count lambda)]
+    (cond
+      (and (m/>= n 6) (uniform-wavelengths? lambda)) :sprague
+      (m/>= n 4) :b-spline
+      :else :linear)))
+
+(defn- spectrum-interpolator
+  [interpolation extrapolation {:keys [lambda value] :as spectrum-data}]
+  (let [[lo hi] (or (:range spectrum-data) [(reduce min lambda) (reduce max lambda)])
+        interpolation (if (= :auto interpolation) (auto-interpolation lambda) interpolation)]
+    (-> (i/interpolation interpolation lambda value)
+        (i/extrapolation extrapolation lo hi))))
+
+(defn ->spectrum-to-XYZ1
+  "Builds a converter of a spectrum (reflectance or transmittance) to XYZ under an illuminant and a standard observer.
+
+  The XYZ values are sums over the observer's wavelength range (360-830 nm or 390-830 nm), sampled every `step` nm: `X = Σ S(λ) R(λ) x̄(λ) / Σ S(λ) ȳ(λ)` (similarly `Y`, `Z`), where `S` is the illuminant, `R` the spectrum and `x̄`, `ȳ`, `z̄` the color matching functions. The illuminant, the spectrum and the color matching functions are interpolated at the sampled wavelengths; the illuminant and the spectrum are extended beyond their own ranges according to `:extrapolation`. A perfect reflector (`R = 1`) gives `Y = 1` and the illuminant's white point.
+
+  Parameters:
+
+  - `observer` (optional, default `:CIE-2`): a key of [[color-matching-functions-data]] or a map of the same form.
+  - `illuminant` (optional, default `:D65`): a key of [[illuminants-spectrum-data]] or a spectrum map (see [[spectrum]]).
+  - `options` (map, optional):
+      - `:interpolation` - interpolation method of the spectrum, default `:auto`: Sprague for uniformly spaced wavelengths and at least 6 samples, cubic spline (`:b-spline`, not-a-knot) for at least 4 samples, linear otherwise (the colour-science rule). Any 1D method of `fastmath.interpolation` can be given instead.
+      - `:illuminant-interpolation` - interpolation method of the illuminant, default `:linear` (safe for line spectra of fluorescent and LED illuminants, as colour-science); `:auto` or any 1D method of `fastmath.interpolation`.
+      - `:extrapolation` - values of the illuminant and the spectrum outside their ranges: `:constant` (default, the boundary values, as CIE 15 recommends) or `:zero`.
+      - `:step` - positive sampling interval in nm, default `1.0`.
+
+  The color matching functions are interpolated with the `:auto` rule (Sprague for the 1 nm standard observers, exact at integer wavelengths) and are 0 outside their range.
+
+  Returns a function of a spectrum map (`:lambda` in ascending order, `:value` and optional `:range`, see [[spectrum]]) returning `Vec3` `[X Y Z]` with `Y` in 0-1.
+
+  Throws `ex-info` with `{:extrapolation e}` for an unsupported extrapolation, `{:observer o}` or `{:illuminant i}` for an unknown key.
+
+  See also `clojure2d.color/->spectrum-to-XYZ` (Y in 0-100), [[cmf]]."
+  ([] (->spectrum-to-XYZ1 :CIE-2 :D65))
+  ([observer illuminant] (->spectrum-to-XYZ1 observer illuminant nil))
+  ([observer illuminant {:keys [interpolation illuminant-interpolation step extrapolation]
+                         :or {interpolation :auto illuminant-interpolation :linear
+                              step 1.0 extrapolation :constant}}]
+   (when-not (spectrum-extrapolations extrapolation)
+     (throw (ex-info (str "Unsupported extrapolation: " extrapolation ", use :constant or :zero")
+                     {:extrapolation extrapolation})))
+   (let [observer-data (if (map? observer) observer
+                           (or (color-matching-functions-data observer)
+                               (throw (ex-info (str "Unknown observer: " observer) {:observer observer}))))
+         illuminant-data (if (map? illuminant) illuminant
+                             (or (illuminants-spectrum-data illuminant)
+                                 (throw (ex-info (str "Unknown illuminant: " illuminant) {:illuminant illuminant}))))
+         [lo hi] (:range observer-data)
+         lo (double lo)
+         step (double step)
+         n (m/inc (long (m/floor (m/+ m/EPSILON (m// (m/- (double hi) lo) step)))))
+         observer-interpolator (fn [k] (spectrum-interpolator :auto :zero
+                                                             {:range (:range observer-data)
+                                                              :lambda (:lambda observer-data)
+                                                              :value (k observer-data)}))
+         x (observer-interpolator :x)
+         y (observer-interpolator :y)
+         z (observer-interpolator :z)
+         illuminant-interpolator (spectrum-interpolator illuminant-interpolation extrapolation illuminant-data)
+         lambdas (double-array n)
+         wx (double-array n) wy (double-array n) wz (double-array n)]
+     (dotimes [k n]
+       (let [l (m/+ lo (m/* k step))
+             s (double (illuminant-interpolator l))]
+         (Array/aset lambdas k l)
+         (Array/aset wx k (m/* s (double (x l))))
+         (Array/aset wy k (m/* s (double (y l))))
+         (Array/aset wz k (m/* s (double (z l))))))
+     (let [norm (v/sum wy)]
+       (fn ^Vec3 [spectrum-data]
+         (let [r (spectrum-interpolator interpolation extrapolation spectrum-data)]
+           (loop [k (long 0) X 0.0 Y 0.0 Z 0.0]
+             (if (m/< k n)
+               (let [rv (double (r (Array/aget lambdas k)))]
+                 (recur (m/inc k)
+                        (m/+ X (m/* rv (Array/aget wx k)))
+                        (m/+ Y (m/* rv (Array/aget wy k)))
+                        (m/+ Z (m/* rv (Array/aget wz k)))))
+               (Vec3. (m// X norm) (m// Y norm) (m// Z norm))))))))))
 
 (m/unuse-primitive-operators)

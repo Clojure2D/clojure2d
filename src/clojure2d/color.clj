@@ -3784,87 +3784,28 @@
 
 ;;
 
-(defn spectrum
-  "Create Spectrum object from data"
-  ([lambda value] (let [start (reduce min lambda)
-                        end (reduce max lambda)]
-                    {:range [start end] :lambda lambda :value value}))
-  ([range lambda value] {:range range :lambda lambda :value value}))
+(def ^{:doc "Alias for [[clojure2d.color.whitepoints/spectrum]]: creates a spectrum map `{:range :lambda :value}` from sampled spectral data."}
+  spectrum wp/spectrum)
 
-(defn ->spectrum-to-XYZ1
-  "Build a converter of spectrum data to XYZ for given observant and illuminant.
-
-  Y is normalized to a 0-1 range.
-
-  Additional parameters:
-  * `:interpolation` - method of interpolation, default: `:linear` (also: `:cubic`, `:step`, see `fastmath.interpolation`)
-  * `:extrapolation` - what to do outside given range
-      - `:trim` - trim ranges to one common range (default)
-      - `:constant` - constant value from the boundaries
-      - `nil` - extrapolation is done by interpolation function
-  * `step` - distance between consecutive frequencies (default: `1.0`)
-
-  Returned function accepts spectrum data which is a map containing:
-
-  * `:lambda` - sequence of frequencies
-  * `:values` - sequence of values
-  * `:range` - range of frequencies"
-  (^Vec4 [] (->spectrum-to-XYZ1 :CIE-2 :D65))
-  (^Vec4 [observer illuminant] (->spectrum-to-XYZ1 observer illuminant nil))
-  (^Vec4 [observer illuminant {:keys [interpolation ^double step extrapolation]
-                               :or {interpolation :linear step 1.0 extrapolation :trim}}]
-   (let [trim? (= :trim extrapolation)
-         illuminant (get wp/illuminants-spectrum-data illuminant illuminant)
-         observer (get wp/color-matching-functions-data observer observer)
-         [^long si ^long ei] (:range illuminant)
-         [^long so ^long eo] (:range observer)
-         [^long start ^long end] (if trim?
-                                   [(m/max si so) (m/min ei eo)]
-                                   [(m/min si so) (m/max ei eo)])
-         r (range start (m/+ step end) step)
-         lo (:lambda observer)
-         i (-> (i/interpolation interpolation (:lambda illuminant) (:value illuminant))
-               (i/extrapolation extrapolation si ei))
-         x (-> (i/interpolation interpolation lo (:x observer)) (i/extrapolation extrapolation so eo))
-         y (-> (i/interpolation interpolation lo (:y observer)) (i/extrapolation extrapolation so eo))
-         z (-> (i/interpolation interpolation lo (:z observer)) (i/extrapolation extrapolation so eo))
-         n (v/sum (v/emult (map i r) (map y r)))]
-     (fn [{:keys [lambda value] :as spectrum}]
-       (let [[^long s ^long e] (:range spectrum)
-             [^long start1 ^long end1] (if trim?
-                                         [(m/max s start) (m/min e end)]
-                                         [(m/min s start) (m/max e end)])
-             r1 (range start1 (m/+ step end1) step)
-             s (-> (i/interpolation interpolation lambda value)
-                   (i/extrapolation extrapolation s e))
-             sx (map x r1)
-             sy (map y r1)
-             sz (map z r1)
-             sv (map s r1)
-             so (map i r1)
-             svo (v/emult sv so)]         
-         (v/div (Vec3. (v/sum (v/emult svo sx))
-                       (v/sum (v/emult svo sy))
-                       (v/sum (v/emult svo sz))) n))))))
+(def ^{:doc "Alias for [[clojure2d.color.whitepoints/->spectrum-to-XYZ1]]: builds a converter of a spectrum to XYZ with `Y` in 0-1."}
+  ->spectrum-to-XYZ1 wp/->spectrum-to-XYZ1)
 
 (defn ->spectrum-to-XYZ
-  "Build a converter of spectrum data to XYZ for given observant and illuminant.
+  "Builds a converter of a spectrum (reflectance or transmittance) to XYZ under an illuminant and a standard observer, with `Y` in 0-100.
 
-  Y is normalized to a 0-100 range.
+  Same as [[->spectrum-to-XYZ1]] (see `clojure2d.color.whitepoints/->spectrum-to-XYZ1` for the method), with the result scaled to the 0-100 range of [[to-XYZ]].
 
-  Additional parameters:
-  * `:interpolation` - method of interpolation, default: `:linear` (also: `:cubic`, `:step`, see `fastmath.interpolation`)
-  * `:extrapolation` - what to do outside given range
-      - `:trim` - trim ranges to one common range (default)
-      - `:constant` - constant value from the boundaries
-      - `nil` - extrapolation is done by interpolation function
-  * `step` - distance between consecutive frequencies (default: `1.0`)
+  Parameters:
 
-  Returned function accepts spectrum data which is a map containing:
+  - `observer` (optional, default `:CIE-2`): `:CIE-2`, `:CIE-10`, `:CIE-2015-2`, `:CIE-2015-10` or a color matching functions map.
+  - `illuminant` (optional, default `:D65`): a key of `clojure2d.color.whitepoints/illuminants-spectrum-data` or a spectrum map.
+  - `options` (map, optional): `:interpolation` of the spectrum (default `:auto`), `:illuminant-interpolation` (default `:linear`), `:extrapolation` (`:constant` default, or `:zero`), `:step` (nm, default `1.0`).
 
-  * `:lambda` - sequence of frequencies
-  * `:values` - sequence of values
-  * `:range` - range of frequencies"
+  Returns a function of a spectrum map (`:lambda`, `:value`, optional `:range`, see [[spectrum]]) returning XYZ as `Vec4` (alpha 255); a perfect reflector gives `Y = 100`.
+
+  Throws `ex-info` for an unsupported extrapolation, an unknown observer or illuminant.
+
+  See also [[wavelength-to-XYZ]]."
   ([] (->spectrum-to-XYZ :CIE-2 :D65))
   ([observer illuminant] (->spectrum-to-XYZ observer illuminant nil))
   ([observer illuminant options] (let [->xyz1 (->spectrum-to-XYZ1 observer illuminant options)]
@@ -4029,15 +3970,22 @@
            255.0)))
 
 (defn wavelength-to-XYZ
+  "Returns the XYZ color of monochromatic light of a given wavelength: the values of the color matching functions.
+
+  Parameters:
+
+  - `lambda` (double): wavelength in nm.
+  - `observer` (keyword, optional): `:CIE-2` (default), `:CIE-10`, `:CIE-2015-2` or `:CIE-2015-10`.
+
+  Returns XYZ as `Vec4` scaled as [[to-XYZ]] (the peak of `ȳ` gives `Y = 100`), alpha 255. Wavelengths between the 1 nm data samples are interpolated (Sprague); outside the observer's range (360-830 nm, 390-830 nm for 2015 observers) the result is black.
+
+  Throws `ex-info` with `{:observer observer}` for an unknown observer.
+
+  See also [[wavelength]], `clojure2d.color.whitepoints/cmf`."
   (^Vec4 [^double lambda] (wavelength-to-XYZ lambda :CIE-2))
   (^Vec4 [^double lambda observer]
-   (if (= :CIE-2 observer)
-     (XYZ1-to-XYZ (Vec3. (wp/cmf-cie2-x lambda)
-                         (wp/cmf-cie2-y lambda)
-                         (wp/cmf-cie2-z lambda)))
-     (XYZ1-to-XYZ (Vec3. (wp/cmf-cie10-x lambda)
-                         (wp/cmf-cie10-y lambda)
-                         (wp/cmf-cie10-z lambda))))))
+   (let [[x y z] (wp/cmf observer)]
+     (XYZ1-to-XYZ (Vec3. (x lambda) (y lambda) (z lambda))))))
 
 (defn wavelength
   "Returns color from given wavelength in nm"
