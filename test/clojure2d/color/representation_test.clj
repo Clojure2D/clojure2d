@@ -9,7 +9,7 @@
             [fastmath.core :as m]
             [fastmath.vector :as v]
             [clojure2d.color :as c]
-            [clojure2d.test-predicates :refer [rel-close?]])
+            [clojure2d.test-predicates :refer [rel-close? throws-data?]])
   (:import [fastmath.vector Vec4]
            [java.awt Color]))
 
@@ -200,3 +200,45 @@
     (is (rel-close? 1.0e-15 (+ (* 0.21267285140562248 255.0)) (c/luma :red)))
     (is (rel-close? 1.0e-15 255.0 (c/luma :white)))
     (is (== 100.0 (c/luma (c/gray 100))) "gray: weights sum to 1")))
+
+;; G3: contracts
+
+(deftest nil-and-unknown-names-test
+  (doseq [f [c/to-color c/to-awt-color c/luma c/red c/green c/blue c/alpha c/color c/format-hex c/pack]]
+    (is (throws-data? {:color nil} #(f nil)))
+    (is (throws-data? {:color :nope} #(f :nope))))
+  (is (false? (c/valid-color? nil)))
+  (is (false? (c/valid-color? :nope)))
+  (let [x (v/vec4 1.0 2.0 3.0 4.0)]
+    (is (identical? x (c/to-color x)) "Vec4 path unchanged")))
+
+(deftest channel-errors-test
+  (is (throws-data? {:colorspace :nope} #(c/set-channel :red :nope 0 5.0)))
+  (is (throws-data? {:colorspace :nope} #(c/get-channel :red :nope 0)))
+  (is (throws-data? {:colorspace :nope} #(c/color-converter :nope)))
+  (is (throws-data? {:colorspace :nope} #(c/color-converter :nope 100.0)))
+  (doseq [ch [-1 4 7]]
+    (is (throws-data? {:channel ch} #(c/set-channel :red ch 5.0)))
+    (is (throws-data? {:channel ch} #(c/set-channel :red :HSB ch 5.0)))
+    (is (throws-data? {:channel ch} #(c/get-channel :red ch)))
+    (is (throws-data? {:channel ch} #(c/get-channel :red :HSB ch)))))
+
+(deftest hex-validation-test
+  (doseq [s ["#12345" "1234567" "#123456789" "" "#" " #fff" "#ggg" "zz" "red"]]
+    (is (throws-data? {:color s} #(c/to-color s)) (pr-str s)))
+  (doseq [s ["f" "#ab" "#abc" "#abcd" "#abcdef" "#abcdef01"]]
+    (is (instance? Vec4 (c/to-color s)) s)))
+
+(deftest possible-color-test
+  (testing "colors"
+    (doseq [x [:red :nope "#fff" 0xff0000 (int 1) (v/vec2 1 2) (v/vec3 1 2 3) (v/vec4 1 2 3 4) (Color. 1 2 3)
+               [1] [1 2] [1 2 3] [1 2 3 4] [-255 255 0] '(1 2 3) (double-array [1 2 3])]]
+      (is (c/possible-color? x) (pr-str x))))
+  (testing "not colors: palettes, empty, too long, out of range, non-numbers, other types"
+    (doseq [x [nil [] [1 2 3 4 5] [0xff0000 0x00ff00] [0x0000ff 0x00ff00] [:red :green] [256 0 0] 1.5 identity]]
+      (is (not (c/possible-color? x)) (pr-str x))))
+  (testing "palettes"
+    (is (c/possible-palette? [0xff0000 0x00ff00]))
+    (is (c/possible-palette? [:red :green])))
+  (testing "ambiguous: two small numbers are a gray with alpha"
+    (is (c/possible-color? [16 32]))))

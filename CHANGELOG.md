@@ -32,6 +32,7 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color.cssgram`: soft light and hue overlays use the W3C (CSS) modes `w3c-softlight` (gingham, moon, reyes, slumber, stinson) and `w3c-hue` (maven), as in browsers; output changes (gingham up to 2.7, maven up to 34 on the 0-255 scale)
 * [breaking] `clojure2d.color/color` (every arity) clamps channels and alpha to `[0,255]` (before: only the 3- and 4-argument forms); `to-color` of 1- and 2-element sequences and arrays no longer clamps, like longer ones
 * [breaking] `clojure2d.color/luma` and `relative-luma` use the Y row of the `to-XYZ` sRGB matrix (0.2126729, 0.7151522, 0.0721750) instead of 0.212671, 0.715160, 0.072169: `relative-luma` equals the Y of `to-XYZ` times 2.55; values change by up to 0.0023 (0-255), also `to-Gray`, `contrast-ratio` (up to 5.5e-5 relative)
+* [breaking] `clojure2d.color`: nil and unknown color names are not colors: `to-color`, `color`, the channel accessors, `to-awt-color` (and every function converting colors) throw `ex-info` with `{:color c}` instead of returning nil or failing later (e.g. `core/set-color` with nil was silently ignored); `valid-color?` returns false
 
 ### Fixed
 
@@ -46,6 +47,9 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color/to-color` read the CSS 4-digit hex `#rgba` as a packed number (`#f00a` gave [0 240 10 255]); now red, green, blue, alpha with doubled digits
 * `clojure2d.color/alpha` of a packed integer whose top byte is 0 returned 0 while `to-color` treats it as opaque; now 255 (so `pack` of such an integer keeps it opaque)
 * named color `:sandy-brown` was `#faa460` instead of the CSS `#f4a460` (`:sandybrown`)
+* `clojure2d.color/set-channel`, `get-channel`, `color-converter` with an unknown colorspace threw a `NullPointerException` (or returned nil); now `ex-info` with `{:colorspace cs}`; a channel outside 0-3 was ignored by `set-channel` and gave NaN in `get-channel`, now `ex-info` with `{:channel ch}`
+* `clojure2d.color/to-color` accepted hex strings of 5, 7 or more digits as plain numbers and threw `NumberFormatException` for non-hex text; now 1, 2, 3, 4, 6 and 8 digits only, otherwise `ex-info` with `{:color s}`
+* `clojure2d.color/possible-color?` treated a vector of packed RGB integers (e.g. `[0xff0000 0x00ff00]`) as one color; a sequence is a color only with 1-4 numbers within `[-255,255]`
   - D-series `CIE-2-D50`, `CIE-2-D55`, `CIE-2-D60`, `CIE-2-D75`, `CIE-10-D50`, `CIE-10-D55`, `CIE-10-D60`, `CIE-10-D65`, `CIE-10-D75` are now full precision 1 nm integrations of the CIE spectra (xy change 1e-5 to 3e-5; the former values were the CIE 15:2004 Table T.3 values, 5 nm sums over 380-780 nm, which the new values match to 4 decimals); `CIE-2-D65` is unchanged; RGB spaces based on `CIE-2-D50` (Adobe Wide Gamut, Best, Beta, ColorMatch, Don, Ekta Space PS5, ECI v2, Xtreme) change by less than 0.01 on 0-255
   - computed (`*`) white points recomputed with the fixed integration: `*-ISO-SP*` were off by about 0.24 in xy, `CIE-2015-*-E*` were not 1/3, other ISO 7589 entries off by about 8e-4, the rest by about 2e-7
 * `clojure2d.color.whitepoints/chromatic-adaptation-matrix` (and `->XYZ-to-XYZ`) failed with a `ClassCastException` mixing `RealMatrix` and `Mat3x3`

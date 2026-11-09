@@ -211,20 +211,21 @@
   (m/constrain (m/round a) 0 255))
 
 (defn possible-color?
-  "Check if given argument can be considered as color.
+  "Checks by type whether `c` looks like a single color.
 
-  Check is done by analyzing type of the argument.
-  
-  See also [[valid-color?]]."
+  - `c` any value
+
+  Returns true for strings, keywords, packed integers (`Long`, `Integer`), `Vec2`, `Vec3`, `Vec4` and `java.awt.Color`, and for a sequence or array of 1 to 4 numbers, each within `[-255,255]`. The value is not converted, so an unknown name or an invalid hex string also passes. A short sequence of small numbers is ambiguous: `[16 32]` is a gray with alpha, not a palette of two packed colors. See also [[valid-color?]], [[possible-palette?]]."
   {:metadoc/categories #{:pal}}
   [c]
-  (or (string? c)
-      (and (not (seqable? c))
-           (satisfies? pr/ColorProto c))
-      (and (seqable? c)
-           (let [v (first c)]
-             (and (number? v)
-                  (< (long v) 0x01000000))))))
+  (cond
+    (or (string? c) (keyword? c) (instance? Long c) (instance? Integer c)
+        (instance? Vec2 c) (instance? Vec3 c) (instance? Vec4 c) (instance? Color c)) true
+    (seqable? c) (let [s (take 5 c)
+                       n (count s)]
+                   (and (<= 1 n 4)
+                        (every? #(and (number? %) (<= (m/abs (double %)) 255.0)) s)))
+    :else false))
 
 (defn possible-palette?
   "Checks by type whether `c` looks like a palette, a sequence of colors.
@@ -239,13 +240,11 @@
        (not (fn? c))))
 
 (defn valid-color?
-  "Check if given argument is valid color.
+  "Checks whether `c` is a valid color by converting it.
 
-  Check is done by trying to convert to color representation.
-  
-  Returns color when valid.
+  - `c` any value
 
-  See also [[possible-color?]]"
+  Returns the `Vec4` from [[to-color]] when the conversion succeeds, false otherwise (nil, an unknown name, an invalid hex string, an unsupported type). See also [[possible-color?]]."
   {:metadoc/categories #{:pal}}
   [c]
   (try
@@ -259,7 +258,7 @@
 
   - `c` one of: `Vec4` (returned as is), `Vec3` (alpha 255), `Vec2` (gray, alpha), keyword (a name of [[named-colors-list]]), packed ARGB integer (top byte 0 means opaque), hex string (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `#` optional, case-insensitive, 1 or 2 digits for a gray), `java.awt.Color`, sequence or `double`/`int`/`long` array (0 elements black, 1 gray, 2 gray and alpha, 3 RGB, 4 or more RGBA)
 
-  Returns a `Vec4`; values are taken as given, so a `Vec4` from another colorspace passes through. See also [[color]] (clamped), [[to-awt-color]], [[format-hex]]."
+  Returns a `Vec4`; values are taken as given, so a `Vec4` from another colorspace passes through. Throws `ex-info` with `{:color c}` for nil, an unknown color name or an invalid hex string. See also [[color]] (clamped), [[valid-color?]], [[to-awt-color]], [[format-hex]]."
   {:metadoc/categories meta-ops}
   ^Vec4 [c] (pr/to-color c))
 
@@ -639,8 +638,10 @@
 
 (defn- hex-string->color
   "Parses hex notation (`#` optional) to `Vec4`: 1 digit `v` is `vvvvvv`, 2 digits `vv` are `vvvvvv`, `rgb`, `rgba` (digits doubled), `rrggbb`, `rrggbbaa`."
-  ^Vec4 [^String s]
-  (let [^String s (if (= (first s) \#) (subs s 1) s)
+  ^Vec4 [^String input]
+  (let [^String s (if (= (first input) \#) (subs input 1) input)
+        _ (when-not (and (#{1 2 3 4 6 8} (count s)) (re-matches #"[0-9a-fA-F]+" s))
+            (throw (ex-info (str "Invalid hex color: " input) {:color input})))
         ^String s (case (count s)
                     1 (str s s s s s s)
                     2 (str s s s)
@@ -657,11 +658,22 @@
   (^Vec4 [^double v] (Vec4. v v v 255.0))
   (^Vec4 [^double v ^double a] (Vec4. v v v a)))
 
+(defn- named-color
+  "The `Vec4` of a predefined color name; throws `ex-info` with `{:color k}` for an unknown name."
+  ^Vec4 [k]
+  (or (@color-presets-delay k)
+      (throw (ex-info (str "Unknown color name: " k) {:color k}))))
+
+(defn- nil-color-error
+  "Throws `ex-info` with `{:color nil}`: nil is not a color."
+  []
+  (throw (ex-info "nil is not a color" {:color nil})))
+
 (defn- packed-alpha
   "Alpha of a packed ARGB integer: the top byte, or 255 when the top byte is 0."
   ^double [^long c]
   (let [a (bit-and 0xff (m/>> c 24))]
-    (if (zero? a) 255.0 (double a))))
+    (if (zero? a) 255.0 a)))
 
 (extend-protocol pr/ColorProto
   Vec2
@@ -700,13 +712,13 @@
   (blue ^double [^Vec4 c] (.z c))
   (alpha ^double [^Vec4 c] (.w c))
   clojure.lang.Keyword
-  (to-color ^Vec4 [n] (@color-presets-delay n))
-  (to-awt-color ^Color [n] (to-awt-color (@color-presets-delay n)))
-  (luma ^double [n] (pr/luma (@color-presets-delay n)))
-  (red ^double [n] (pr/red (@color-presets-delay n)))
-  (green ^double [n] (pr/green (@color-presets-delay n)))
-  (blue ^double [n] (pr/blue (@color-presets-delay n)))
-  (alpha ^double [n] (pr/alpha (@color-presets-delay n)))
+  (to-color ^Vec4 [n] (named-color n))
+  (to-awt-color ^Color [n] (to-awt-color (named-color n)))
+  (luma ^double [n] (pr/luma (named-color n)))
+  (red ^double [n] (pr/red (named-color n)))
+  (green ^double [n] (pr/green (named-color n)))
+  (blue ^double [n] (pr/blue (named-color n)))
+  (alpha ^double [n] (pr/alpha (named-color n)))
   Color
   (to-color ^Vec4 [^Color c]
     (Vec4. (.getRed c)
@@ -720,12 +732,13 @@
   (blue ^double [^Color c] (.getBlue c))
   (alpha ^double [^Color c] (.getAlpha c))
   nil
-  (to-color [_] nil)
-  (to-awt-color [_] nil)
-  (alpha [_] nil)
-  (red [_] nil)
-  (green [_] nil)
-  (blue [_] nil)
+  (to-color [_] (nil-color-error))
+  (to-awt-color [_] (nil-color-error))
+  (luma [_] (nil-color-error))
+  (alpha [_] (nil-color-error))
+  (red [_] (nil-color-error))
+  (green [_] (nil-color-error))
+  (blue [_] (nil-color-error))
   Long
   (alpha ^double [^long c] (packed-alpha c))
   (red ^double [^long c] (bit-and 0xff (m/>> c 16)))
@@ -4024,6 +4037,17 @@
 ;; List of color spaces names
 (def ^{:doc "List of all color space names." :metadoc/categories meta-conv} colorspaces-list (sort (keys colorspaces)))
 
+(defn- colorspace-converters
+  "The `[to from]` pair of `colorspace` in `table` ([[colorspaces]] or [[colorspaces*]]); throws `ex-info` with `{:colorspace colorspace}` for an unknown name."
+  [table colorspace]
+  (or (table colorspace)
+      (throw (ex-info (str "Unknown colorspace: " colorspace) {:colorspace colorspace}))))
+
+(defn- channel-error
+  "Throws `ex-info` with `{:channel ch}`: valid channels are 0-3."
+  [ch]
+  (throw (ex-info (str "Invalid channel: " ch ", expected 0-3") {:channel ch})))
+
 ;;
 
 (def ^{:doc "Alias for [[clojure2d.color.whitepoints/spectrum]]: creates a spectrum map `{:range :lambda :value}` from sampled spectral data."}
@@ -4078,17 +4102,24 @@
              (Vec4. (.x c) (+ 180.0 (.y c)) (.z c) (.w c)))))))
 
 (defn set-channel
-  "Set chosen channel with given value. Works with any color space."
+  "Returns the color with one channel set to `val`, optionally in another colorspace.
+
+  - `col` color, any type accepted by [[to-color]]
+  - `colorspace` (optional) a key of [[colorspaces]]: the color is converted with the raw `to-` function, the channel set, and converted back with `from-`
+  - `channel` 0, 1, 2 or 3 (alpha)
+  - `val` new value, in the colorspace's raw range, not clamped
+
+  Returns a `Vec4`. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace and `{:channel channel}` for a channel outside 0-3. See also [[get-channel]], [[set-alpha]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col colorspace ^long channel ^double val]
-   (let [[to from] (colorspaces colorspace)
+   (let [[to from] (colorspace-converters colorspaces colorspace)
          ^Vec4 c (to col)]
      (from (case channel
              0 (Vec4. val (.y c) (.z c) (.w c))
              1 (Vec4. (.x c) val (.z c) (.w c))
              2 (Vec4. (.x c) (.y c) val (.w c))
              3 (Vec4. (.x c) (.y c) (.z c) val)
-             c))))
+             (channel-error channel)))))
   (^Vec4 [col ^long channel ^double val]
    (let [^Vec4 c (pr/to-color col)]
      (case channel
@@ -4096,13 +4127,19 @@
        1 (Vec4. (.x c) val (.z c) (.w c))
        2 (Vec4. (.x c) (.y c) val (.w c))
        3 (Vec4. (.x c) (.y c) (.z c) val)
-       c))))
+       (channel-error channel)))))
 
 (defn get-channel
-  "Get chosen channel. Works with any color space."
+  "Returns one channel of a color, optionally in another colorspace.
+
+  - `col` color, any type accepted by [[to-color]]
+  - `colorspace` (optional) a key of [[colorspaces]]: the channel of the raw `to-` conversion
+  - `channel` 0, 1, 2 or 3 (alpha)
+
+  Returns a double. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace and `{:channel channel}` for a channel outside 0-3. See also [[set-channel]], [[ch0]]."
   {:metadoc/categories meta-ops}
   (^double [col colorspace ^long channel]
-   (let [to (first (colorspaces colorspace))]
+   (let [to (first (colorspace-converters colorspaces colorspace))]
      (get-channel (to col) channel)))
   (^double [col ^long channel]
    (case channel
@@ -4110,20 +4147,18 @@
      1 (ch1 col)
      2 (ch2 col)
      3 (alpha col)
-     ##NaN)))
+     (channel-error channel))))
 
 (defn color-converter
-  "Create function which converts provided color from `cs` color space using `ch-scale` as maximum value. (to simulate Processing `colorMode` fn).
+  "Creates a function converting colors given in colorspace `cs` with custom channel maxima to RGB, as Processing `colorMode`.
 
-  Arity:
+  - `cs` a key of [[colorspaces*]]
+  - `ch1-scale` .. `ch4-scale` maxima of the input channels; with one value it is used for all four channels, with three values alpha keeps the `[0,255]` range
 
-  * 1 - returns from-XXX* function
-  * 2 - sets the same maximum value for each channel
-  * 3 - sets individual maximum value without alpha, which is set to 0-255 range
-  * 4 - all channels have it's own individual maximum value."
+  The returned function rescales each channel of its argument to `[0,255]` (`255 * v / max`), clamps, and applies the normalized `from-` function of `cs` (`from-XXX*`). With `cs` alone it returns that `from-XXX*` function. Throws `ex-info` with `{:colorspace cs}` for an unknown colorspace. See also [[colorspaces*]]."
   {:metadoc/categories meta-conv}
   ([cs ch1-scale ch2-scale ch3-scale ch4-scale]
-   (let [colorspace-fn (second (colorspaces* cs))]
+   (let [colorspace-fn (second (colorspace-converters colorspaces* cs))]
      (fn [v] 
        (let [^Vec4 v (pr/to-color v)
              ch1 (* 255.0 (/ (.x v) ^double ch1-scale))
@@ -4133,7 +4168,7 @@
          (colorspace-fn (v/fmap (Vec4. ch1 ch2 ch3 ch4) clamp255))))))
   ([cs ch1-scale ch2-scale ch3-scale] (color-converter cs ch1-scale ch2-scale ch3-scale 255.0))
   ([cs ch-scale] (color-converter cs ch-scale ch-scale ch-scale ch-scale))
-  ([cs] (second (colorspaces* cs))))
+  ([cs] (second (colorspace-converters colorspaces* cs))))
 
 ;; black body
 
