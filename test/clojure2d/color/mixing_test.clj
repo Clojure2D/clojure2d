@@ -103,6 +103,8 @@
   (is (= 0.0 ((c/mixbox [0 0 255 0] [255 255 0 0]) 3)) "mixbox: transparent stays transparent")
   (is (= [78.0 150.0 100.0 255.0] (vec (c/mixbox :blue :yellow))) "mixbox: pigment green")
   (is (= 102.0 ((c/mixbox [0 0 255 51] [255 255 0 153]) 3)))
+  (is (every? #(Double/isNaN %) (c/mixbox :red :blue ##NaN)) "mixbox: NaN in, NaN out")
+  (is (every? #(Double/isNaN %) (c/mixbox [##NaN 0 0] :blue 0.5)))
   (let [cols (concat (repeat 5 [255 0 0 100]) (repeat 5 [250 0 0 100]) (repeat 5 [0 0 255 0]) (repeat 3 [0 0 250 0]))
         r (c/reduce-colors cols 2 {:fuzzy? false})]
     (is (= #{[0.0 0.0 255.0 0.0] [252.5 0.0 0.0 100.0]} (set (map vec r))) "reduce-colors: modes, alpha kept, ties averaged")))

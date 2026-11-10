@@ -72,14 +72,16 @@
     (mapv c/color (concat (for [r (range 0 256 17) g (range 0 256 17) b (range 0 256 17)] [r g b]) edges))))
 
 (def ^:private range-not-reached
-  ;; channels whose sampled extrema are not reached on range-grid: hue (maximum just below 360 / 1), OSA j and g
-  ;; (extrema near black, inside the cube), Okhsl and Okhsv saturation (extrema inside the cube)
+  ;; channels whose extrema are not reached on range-grid: hue (the whole period, maximum just below 360 / 1),
+  ;; OSA j and g (arctangent of values unbounded near some dark colors: open interval), Okhsl and Okhsv saturation, Okhwb whiteness (extrema inside
+  ;; the cube)
   {:HSV #{0} :HSB #{0} :HSL #{0} :HSI #{0} :HWB #{0} :PalettonHSV #{0} :LCH #{2} :LCHuv #{2} :JCH #{2} :Oklch #{2}
-   :Okhsl #{0 1} :Okhsv #{0 1} :Okhwb #{0} :OSA #{1 2}})
+   :GLHS #{1} :HCL #{0} :Cubehelix #{0} :Okhsl #{0 1} :Okhsv #{0 1} :Okhwb #{0 1} :OSA #{1 2}})
 
 (deftest normalized-range-test
-  ;; ranges are sampled extrema (utils/color/gen_normalized_ranges.clj, 64^3 grid + cube edges): on another grid
-  ;; to-X* stays within [0,255] (overshoot <= 1e-6) and reaches 0 and 255 within 1e-6 (stale ranges fail)
+  ;; ranges are extrema over the sRGB cube (utils/color/gen_normalized_ranges.clj: 64^3 grid + cube edges, refined
+  ;; by a pattern search; hue channels the whole period): on another grid to-X* stays within [0,255] (overshoot
+  ;; <= 1e-6) and reaches 0 and 255 within 1e-3 (extrema between grid points; stale ranges fail)
   (doseq [k (keys c/colorspaces*)
           :let [to* (first (c/colorspaces* k))
                 vs (mapv to* range-grid)]
@@ -90,8 +92,28 @@
     (is (m/<= -1.0e-6 mn) (str k " " ch " min"))
     (is (m/<= mx (+ 255.0 1.0e-6)) (str k " " ch " max"))
     (when-not (contains? (range-not-reached k) ch)
-      (is (m/<= mn 1.0e-6) (str k " " ch " min reached"))
-      (is (m/<= (- 255.0 1.0e-6) mx) (str k " " ch " max reached")))))
+      (is (m/<= mn 1.0e-3) (str k " " ch " min reached"))
+      (is (m/<= (- 255.0 1.0e-3) mx) (str k " " ch " max reached")))))
+
+(deftest normalized-range-witness-test
+  ;; the colors closest to the old limits found by the refined search: inside [0,255] now
+  (doseq [[k col] [[:GLHS [78.58 51.12 51.12]] [:HCL [11.03 44.96 44.97]] [:LCH [242.48 141.21 173.27]]
+                   [:Cubehelix [80.905492 28.333333 20.238095]] [:Okhsl [255.0 238.809524 147.994646]]
+                   [:Okhsv [0.0 32.380952 166.250945]] [:Okhwb [0.0 55.226399 255.0]] [:HSL [255.0 255.0 254.9999999]]
+                   [:JCH [255 0 1]] [:Oklch [255 0 1]] [:LCHuv [255 0 1]]]
+          :let [v ((first (c/colorspaces* k)) col)]
+          ch [0 1 2]]
+    (is (m/<= -1.0e-9 (v ch) (+ 255.0 1.0e-9)) (str k " " col " " ch)))
+  (testing "HSL saturation of a near-white tint is 1, not above"
+    (is (== 1.0 ((c/to-HSL [255 255 254.9999999]) 1))))
+  (testing "OSA j and g: arctangent mapping keeps values unbounded near the singular surface inside (0,255), reversibly"
+    (doseq [col [[0 0 45.575928] [20.238095 0 24.599341] [20 0 25] [0 0 0] [255 255 255]]
+            :let [v (c/to-OSA* col)]]
+      (is (and (m/< 0.0 (v 1) 255.0) (m/< 0.0 (v 2) 255.0)) (str col))
+      (is (m/< (reduce max (map #(m/abs (m/- (double %1) (double %2))) (conj col 255.0) (c/from-OSA* v))) 0.01) (str col)))
+    (let [osa (c/to-OSA (c/from-OSA* [150.0 127.5 127.5 255.0]))]
+      (is (m/< (m/abs (osa 1)) 1.0e-9) "127.5 is j = 0")
+      (is (m/< (m/abs (osa 2)) 1.0e-9) "127.5 is g = 0"))))
 
 (deftest edge-cases-test
   (testing "grays: hexagonal hue and saturation 0"

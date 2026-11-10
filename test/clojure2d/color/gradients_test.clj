@@ -252,7 +252,11 @@
   (is (throws-data? {:color-theme :nope} #(c/random-color :nope 100 nil)))
   (is (throws-data? {:domain [:a :b]} #(c/gradient [:red :blue] {:domain [:a :b]})))
   (is (throws-data? {:hue nil} #(c/paletton :monochromatic nil)))
-  (is (throws-data? {:hue :x} #(c/paletton :triad :x))))
+  (is (throws-data? {:hue :x} #(c/paletton :triad :x)))
+  (is (thrown? clojure.lang.ExceptionInfo (c/paletton :monochromatic ##NaN)) "NaN hue")
+  (is (throws-data? {:hue ##Inf} #(c/paletton :monochromatic ##Inf)))
+  (is (every? #(Double/isNaN %) (take 3 ((c/gradient :black-body) ##NaN))) ":black-body: NaN in, NaN out")
+  (is (every? #(Double/isNaN %) (take 3 ((first (c/colorspaces :PalettonHSV)) [##NaN 0 0 255]))) "PalettonHSV: NaN in, NaN out"))
 
 (deftest docstrings-test
   (doseq [s '[gradient palette merge-gradients iq-gradient gradient-cubehelix find-gradient find-palette random-color

@@ -215,6 +215,12 @@
     (is (throws-data? {:color :nope} #(f :nope))))
   (is (false? (c/valid-color? nil)))
   (is (false? (c/valid-color? :nope)))
+  (testing "values of other types: ex-info (was a protocol error)"
+    (doseq [f [c/to-color c/to-awt-color c/luma c/red c/green c/blue c/alpha]]
+      (is (throws-data? {:color 1.5} #(f 1.5)))
+      (is (throws-data? {:color 2/3} #(f 2/3)))
+      (is (throws-data? {:color java.lang.Character} #(f \a))))
+    (is (false? (c/valid-color? 1.5))))
   (let [x (v/vec4 1.0 2.0 3.0 4.0)]
     (is (identical? x (c/to-color x)) "Vec4 path unchanged")))
 

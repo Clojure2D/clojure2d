@@ -4,10 +4,14 @@
 ;;
 ;;     lein run -m clojure.main utils/color/gen_normalized_ranges.clj
 ;;
-;; Samples: a 64^3 grid of sRGB colors (step 255/63) plus 256 points on each of the 12 edges of the RGB cube.
+;; Samples: a 64^3 grid of sRGB colors (step 255/63) plus 256 points on each of the 12 edges of the RGB cube;
+;; the 6 best samples of each extremum are refined by a pattern search in the continuous RGB cube (steps 16
+;; down to 1e-10), so extrema between grid points (interior or on faces) are found as well.
 ;; For every colorspace prints the minimum and maximum of each channel of the raw `to-` conversion and of
 ;; the normalized `to-*` conversion. The normalization literals in `clojure2d.color` are set from the raw
-;; extrema (OSA j and g: extrema of their triple cube root).
+;; extrema, except hue channels, which use the whole period (0-360 degrees, -180-180 for HCL, 0-1 for Okhsl,
+;; Okhsv, Okhwb) and OSA j and g, unbounded near the surface Y0^(1/3) = 2/3 (dark colors), mapped by an
+;; arctangent (no literals).
 
 (require '[clojure2d.color :as c] '[fastmath.core :as m])
 
@@ -19,19 +23,33 @@
                 p)]
     (vec (concat (for [r steps g steps b steps] [r g b]) edges))))
 
-(defn extrema [f]
-  (reduce (fn [[mn mx] col]
-            (let [v (f (c/color col))]
-              [(mapv min mn (take 3 v)) (mapv max mx (take 3 v))]))
-          [[##Inf ##Inf ##Inf] [##-Inf ##-Inf ##-Inf]] grid))
+(defn- clamp-rgb [p] (mapv #(m/constrain (double %) 0.0 255.0) p))
 
-(defn triple-cbrt ^double [^double x] (m/cbrt (m/cbrt (m/cbrt x))))
+(defn- refine
+  "Pattern search maximizing `f` from `p0` in the RGB cube; returns the best value."
+  ^double [f p0]
+  (loop [p p0 v (double (f p0)) s 16.0]
+    (if (< s 1.0e-10)
+      v
+      (let [[bv bp] (apply max-key first (for [i (range 3) d [s (- s)]
+                                               :let [q (clamp-rgb (update p i + d))]]
+                                           [(double (f q)) q]))]
+        (if (> (double bv) v) (recur bp bv s) (recur p v (/ s 2.0)))))))
+
+(defn- channel-extremum
+  "Refined extremum of channel `ch` of `f` (`sign` 1 maximum, -1 minimum)."
+  ^double [f ch ^double sign]
+  (let [g (fn [p] (* sign (double ((f (c/color p)) ch))))
+        best (take 6 (sort-by (comp - g) grid))]
+    (* sign (double (reduce max (map #(refine g %) best))))))
+
+(defn extrema [f]
+  [(mapv #(channel-extremum f % -1.0) [0 1 2])
+   (mapv #(channel-extremum f % 1.0) [0 1 2])])
 
 (doseq [k c/colorspaces-list :when (not= k :pass)
         :let [[to] (c/colorspaces k)
               [to*] (c/colorspaces* k)
-              raw (extrema (if (= k :OSA)
-                             (fn [col] (let [v (to col)] [(v 0) (triple-cbrt (v 1)) (triple-cbrt (v 2))]))
-                             to))
+              raw (extrema to)
               norm (extrema to*)]]
   (println (pr-str [k {:raw raw :normalized norm}])))

@@ -11,7 +11,7 @@ Oracle generators for `clojure2d.color` (color audit). Run from the repository r
 | `gen_filters.py` | colour-science 0.4.7, DaltonLens 0.1.5, numpy 2.5.2 in `/home/ts/penv`; Node with chroma-js 2.6.0 (`npm install` in `utils/color`, `package.json`, `package-lock.json`, `chroma_oracle.mjs`) | `test/resources/color/filters_reference.edn`, `resources/color/cvd_machado2009.edn`, `resources/color/cvd_brettel1997.edn` (runtime tables) |
 | `gen_mixing.py` | coloraide 8.14.1, numpy 2.5.2 in `/home/ts/penv`; Node with chroma-js 2.6.0 (as `gen_filters.py`) | `test/resources/color/mixing_reference.edn` |
 | `gen_gradients.py` | coloraide 8.14.1, numpy 2.5.2 in `/home/ts/penv`; Node with chroma-js 2.6.0 and d3-scale-chromatic 3.1.0 (`npm install` in `utils/color`); curl and network access (paletton.com bundle, sha256 pinned) | `test/resources/color/gradients_reference.edn` |
-| `gen_normalized_ranges.clj` | clojure2d (`lein run -m clojure.main utils/color/gen_normalized_ranges.clj`) | printed table of sampled extrema; the normalization literals of the `to-X*`/`from-X*` functions are set from it |
+| `gen_normalized_ranges.clj` | clojure2d (`lein run -m clojure.main utils/color/gen_normalized_ranges.clj`) | printed table of the extrema over the sRGB cube (grid and cube edges, refined by a pattern search); the normalization literals of the `to-X*`/`from-X*` functions are set from it (hue channels: the whole period; OSA j, g mapped by an arctangent) |
 
 ```
 /home/ts/penv/.venv/bin/python -I utils/color/gen_representation.py
