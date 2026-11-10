@@ -1,7 +1,8 @@
 (ns clojure2d.color.adjustments-test
   "Color adjustments, CSS filters and color vision deficiency of `clojure2d.color` (area G of the color audit),
   checked against `utils/color/gen_filters.py`: W3C Filter Effects Level 1 matrices written from the specification,
-  chroma.js 2.6.0 and colour-science's Machado et al. (2009) matrices; the author's designs as properties."
+  chroma.js 2.6.0, colour-science's Machado et al. (2009) matrices and DaltonLens' Brettel et al. (1997) tritanopia;
+  the author's designs as properties."
   (:require [clojure.test :refer [deftest is testing]]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
@@ -10,6 +11,12 @@
             [clojure2d.test-predicates :refer [throws-data?]]))
 
 (def reference (delay (-> "color/filters_reference.edn" io/resource slurp edn/read-string)))
+
+(defn- throws-nan?
+  "`f` throws `ex-info` whose data has `NaN` under `k` (`NaN` is not equal to itself, so [[throws-data?]] cannot check it)."
+  [k f]
+  (try (f) false
+       (catch clojure.lang.ExceptionInfo e (let [v (get (ex-data e) k)] (and (number? v) (m/nan? (double v)))))))
 
 (defn- max-diff ^double [expected actual]
   (reduce max (map #(m/abs (m/- (double %1) (double %2))) expected actual)))
@@ -88,7 +95,10 @@
           b (c/to-PalettonHSV (c/complementary col))]
       (is (m/< (m/abs (m/- 180.0 (m/abs (m/- (a 0) (b 0))))) 1.0e-6))
       (is (m/< (m/abs (m/- (a 1) (b 1))) 1.0e-6))
-      (is (m/< (m/abs (m/- (a 2) (b 2))) 1.0e-6)))))
+      (is (m/< (m/abs (m/- (a 2) (b 2))) 1.0e-6))))
+  (testing "other colorspaces"
+    (is (throws-data? {:colorspace :LCH} #(c/complementary [200 50 80] :LCH)))
+    (is (throws-data? {:colorspace :Foo} #(c/complementary [200 50 80] :Foo)))))
 
 (deftest cvd-vars-test
   (let [{:keys [colors cvd-vars]} @reference]
@@ -116,24 +126,47 @@
   (testing "severity 0 keeps the color; named filters are severity 1 and 0.6"
     (doseq [k [:protanomaly :deuteranomaly :tritanomaly] col (take 10 (:colors @reference))]
       (is (m/<= (max-diff col (take 3 ((c/cvd-filter k 0.0) col))) 1.0e-9) (str k " " col)))
-    (doseq [[f k s] [[c/protanopia :protanomaly 1.0] [c/deuteranomaly :deuteranomaly 0.6] [c/tritanopia :tritanomaly 1.0]]
+    (doseq [[f args] [[c/protanopia [:protanomaly 1.0]] [c/deuteranopia [:deuteranomaly 1.0]]
+                      [c/tritanopia [:tritanomaly 1.0]] [c/protanomaly [:protanomaly 0.6]]
+                      [c/deuteranomaly [:deuteranomaly 0.6]] [c/tritanomaly [:tritanomaly 0.6]]
+                      [c/achromatomaly [:achromatomaly 0.5]]]
             col (take 10 (:colors @reference))]
-      (is (= (f col) ((c/cvd-filter k s) col)) (str k " " col))))
+      (is (= (f col) ((apply c/cvd-filter args) col)) (str args " " col))))
+  (testing "complete loss by name: severity 1"
+    (doseq [[f k] [[c/protanopia :protanopia] [c/deuteranopia :deuteranopia] [c/tritanopia :tritanopia]
+                   [c/achromatopsia :achromatopsia]]
+            col (take 10 (:colors @reference))]
+      (is (= (f col) ((c/cvd-filter k) col)) (str k " " col)))
+    (doseq [col (take 10 (:colors @reference))]
+      (is (m/<= (max-diff (c/achromatopsia col) ((c/cvd-filter :achromatomaly 1.0) col)) 1.0e-9) (str col))
+      (is (m/<= (max-diff col (take 3 ((c/cvd-filter :achromatomaly 0.0) col))) 1.0e-9) (str col))))
+  (testing "alpha kept"
+    (doseq [f [c/protanopia c/protanomaly c/deuteranopia c/deuteranomaly c/tritanopia c/tritanomaly
+               c/achromatopsia c/achromatomaly (c/cvd-filter :protanomaly 0.3)]]
+      (is (= 100.0 ((f [200 50 80 100]) 3)) (str f))))
   (testing "errors"
     (is (throws-data? {:deficiency :foo} #(c/cvd-filter :foo 0.5)))
+    (is (throws-data? {:deficiency :foo} #(c/cvd-filter :foo)))
+    (is (throws-data? {:deficiency :protanopia} #(c/cvd-filter :protanopia 1.0)))
+    (is (throws-data? {:deficiency :protanomaly} #(c/cvd-filter :protanomaly)))
+    (is (throws-nan? :severity #(c/cvd-filter :protanomaly ##NaN)))
     (is (throws-data? {:severity 1.5} #(c/cvd-filter :protanomaly 1.5)))
     (is (throws-data? {:severity -0.1} #(c/cvd-filter :tritanomaly -0.1)))))
 
 (deftest make-LCH-test
   (doseq [cs [:LAB :LUV :Oklab] col [[200 50 50] [30 160 90] [40 60 220]]
           :let [[to from] (c/make-LCH cs)]]
-    (is (m/<= (max-diff col (take 3 (from (to col)))) 1.0e-9) (str cs " " col))))
+    (is (m/<= (max-diff col (take 3 (from (to col)))) 1.0e-9) (str cs " " col)))
+  (is (throws-data? {:colorspace :Foo} #(c/make-LCH :Foo))))
 
 ;; G2: contracts
 
 (deftest negative-amount-test
-  (doseq [f [c/sepia c/grayscale c/saturation c/contrast c/exposure]]
-    (is (throws-data? {:amount -0.5} #(f -0.5)) (str f)))
+  (doseq [f [c/sepia c/grayscale c/saturation c/contrast c/exposure c/invert c/opacity]]
+    (is (throws-data? {:amount -0.5} #(f -0.5)) (str f))
+    (is (throws-nan? :amount #(f ##NaN)) (str f)))
+  (doseq [f [c/whiten c/blacken]]
+    (is (throws-nan? :amount #(f [200 50 80] ##NaN)) (str f)))
   (testing "brightness (offset) and hue-rotate accept negative values"
     (is (fn? (c/brightness -0.2)))
     (is (fn? (c/hue-rotate -20.0)))))
@@ -159,8 +192,23 @@
     (let [pal (sort-by c/luma (c/palette :guell))]
       (is (= (count pal) (count (c/correct-luma pal))))
       (is (= (count pal) (count (c/correct-luma (reverse pal)))))))
+  (testing "a small reversal at the end: the colors at 0 and 1 are kept"
+    (let [g (c/gradient [:black :white [245 245 245]])
+          cg (c/correct-luma g)]
+      (is (m/<= (max-diff (g 0.0) (cg 0.0)) 1.0e-9))
+      (is (m/<= (max-diff (g 1.0) (cg 1.0)) 1.0e-9))))
   (testing "non-monotonic lightness"
-    (is (throws-data? {:lightness :non-monotonic} #(c/correct-luma (c/gradient [:black :white :black]))))))
+    (is (throws-data? {:lightness :non-monotonic} #(c/correct-luma (c/gradient [:black :white :black]))))
+    (is (throws-data? {:lightness :non-monotonic} #(c/correct-luma [:red])))
+    (is (throws-data? {:lightness :non-monotonic} #(c/correct-luma [])))))
+
+(deftest apply-theme-test
+  (doseq [t (concat c/color-themes [[nil nil nil] [[0 10] 5.0 nil]])]
+    (let [r (c/apply-theme [200 50 80 100] t)]
+      (is (= 100.0 (r 3)) (str t))
+      (is (every? #(m/<= 0.0 % 255.0) r) (str t))))
+  (is (= [200 50 80] (mapv m/round (take 3 (c/apply-theme [200 50 80] [nil nil nil])))))
+  (is (throws-data? {:color-theme :nope} #(c/apply-theme [200 50 80] :nope))))
 
 (deftest docstrings-test
   (doseq [s '[whiten blacken brighten darken saturate desaturate adjust modulate tinter correct-luma apply-theme

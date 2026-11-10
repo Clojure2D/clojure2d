@@ -1,0 +1,9 @@
+{
+  "name": "clojure2d-color-oracles",
+  "private": true,
+  "description": "chroma.js oracle for utils/color/gen_filters.py",
+  "type": "module",
+  "dependencies": {
+    "chroma-js": "2.6.0"
+  }
+}

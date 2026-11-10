@@ -4913,11 +4913,24 @@
 
   - `cs` a key of [[colorspaces]] whose raw channels are lightness and two opponent axes (e.g. `:LAB`, `:LUV`, `:Oklab`, `:JAB`, `:IPT`)
 
-  Returns `[to from]`: `to` converts an sRGB color to `[L C H alpha]` (hue in degrees, see [[to-luma-color-hue]]), `from` converts back. For an unknown colorspace the functions fail when called."
+  Returns `[to from]`: `to` converts an sRGB color to `[L C H alpha]` (hue in degrees, see [[to-luma-color-hue]]), `from` converts back. Throws `ex-info` with `{:colorspace cs}` for an unknown colorspace."
   [cs]
-  (let [[to from] (colorspaces cs)]
+  (let [[to from] (colorspace-converters colorspaces cs)]
     [(partial to-luma-color-hue to)
      (partial from-luma-color-hue from)]))
+
+(defn- update-channel
+  "`c` with `channel` (0-3) replaced by `(f value)`; throws `ex-info` with `{:channel channel}` for another channel."
+  ^Vec4 [^Vec4 c ^long channel ^clojure.lang.IFn$DD f]
+  (case channel
+    0 (Vec4. (.invokePrim f (.x c)) (.y c) (.z c) (.w c))
+    1 (Vec4. (.x c) (.invokePrim f (.y c)) (.z c) (.w c))
+    2 (Vec4. (.x c) (.y c) (.invokePrim f (.z c)) (.w c))
+    3 (Vec4. (.x c) (.y c) (.z c) (.invokePrim f (.w c)))
+    (channel-error channel)))
+
+(def ^:private complementary-hue-channel
+  {:PalettonHSV 0 :HSB 0 :HSV 0 :HSL 0 :HWB 0 :GLHS 1})
 
 (defn complementary
   "Returns the complementary color: the hue rotated by 180°.
@@ -4925,14 +4938,14 @@
   - `c` color, any type accepted by [[to-color]]
   - `colorspace` (optional) where the hue is rotated: `:PalettonHSV` (default, the RYB-like wheel of [[paletton]]), `:HSB`, `:HSV`, `:HSL`, `:HWB` (hue in channel 0) or `:GLHS` (hue in channel 1)
 
-  Returns a `Vec4`, not clamped. Applying it twice gives the color back (up to rounding) in the hexagonal spaces."
+  Returns a `Vec4`, not clamped. Applying it twice gives the color back (up to rounding) in the hexagonal spaces. Throws `ex-info` with `{:colorspace colorspace}` for any other colorspace."
   (^Vec4 [c] (complementary c :PalettonHSV))
   (^Vec4 [c colorspace]
-   (let [[to from] (colorspaces colorspace)
-         ^Vec4 c (to c)]
-     (from (if (= colorspace :GLHS)
-             (Vec4. (.x c) (+ 180.0 (.y c)) (.z c) (.w c))
-             (Vec4. (+ 180.0 (.x c)) (.y c) (.z c) (.w c)))))))
+   (let [ch (or (complementary-hue-channel colorspace)
+                (throw (ex-info (str "Complementary color is not supported in colorspace: " colorspace)
+                                {:colorspace colorspace})))
+         [to from] (colorspaces colorspace)]
+     (from (update-channel (to c) ch (fn ^double [^double h] (+ 180.0 h)))))))
 
 (defn set-channel
   "Returns the color with one channel set to `val`, optionally in another colorspace.
@@ -6072,8 +6085,10 @@
 ;; colors
 
 (defn- hwb-step
-  "Linear step of an HWB whiteness or blackness `v` (0-1): `amt` (clamped to [-1, 1]) of the way to 1 for positive `amt`, to 0 for negative."
+  "Linear step of an HWB whiteness or blackness `v` (0-1): `amt` (clamped to [-1, 1]) of the way to 1 for positive `amt`, to 0 for negative. Throws `ex-info` with `{:amount amt}` for `NaN`."
   ^double [^double v ^double amt]
+  (when (m/nan? amt)
+    (throw (ex-info "Amount should be a number, got: NaN" {:amount amt})))
   (let [a (m/constrain amt -1.0 1.0)]
     (if (neg? a)
       (+ v (* a v))
@@ -6085,7 +6100,7 @@
   - `col` color, any type accepted by [[to-color]]
   - `amt` step, default `0.2`, clamped to [-1, 1]: 1 gives W = 1, -1 gives W = 0; the step is linear in `amt` and works for pure colors (W = 0)
 
-  Hue and blackness are kept; when W + B exceeds 1 the color becomes gray (HWB normalization). Returns a clamped `Vec4`. See also [[blacken]], [[brighten]]."
+  Hue and blackness are kept; when W + B exceeds 1 the color becomes gray (HWB normalization). Returns a clamped `Vec4`. Throws `ex-info` with `{:amount amt}` for `NaN`. See also [[blacken]], [[brighten]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col] (whiten col 0.2))
   (^Vec4 [col ^double amt]
@@ -6098,7 +6113,7 @@
   - `col` color, any type accepted by [[to-color]]
   - `amt` step, default `0.2`, clamped to [-1, 1]: 1 gives B = 1, -1 gives B = 0
 
-  Hue and whiteness are kept; when W + B exceeds 1 the color becomes gray (HWB normalization). Returns a clamped `Vec4`. See also [[whiten]], [[darken]]."
+  Hue and whiteness are kept; when W + B exceeds 1 the color becomes gray (HWB normalization). Returns a clamped `Vec4`. Throws `ex-info` with `{:amount amt}` for `NaN`. See also [[whiten]], [[darken]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col] (blacken col 0.2))
   (^Vec4 [col ^double amt]
@@ -6165,22 +6180,10 @@
   Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace and `{:channel channel}` for a channel outside 0-3. See also [[modulate]], [[set-channel]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col colorspace ^long channel ^double value]
-   (let [[to from] (colorspace-converters colorspaces colorspace)
-         ^Vec4 c (to col)]
-     (from (case channel
-             0 (Vec4. (+ value (.x c)) (.y c) (.z c) (.w c))
-             1 (Vec4. (.x c) (+ value (.y c)) (.z c) (.w c))
-             2 (Vec4. (.x c) (.y c) (+ value (.z c)) (.w c))
-             3 (Vec4. (.x c) (.y c) (.z c) (+ value (.w c)))
-             (channel-error channel)))))
+   (let [[to from] (colorspace-converters colorspaces colorspace)]
+     (from (update-channel (to col) channel (fn ^double [^double v] (+ value v))))))
   (^Vec4 [col ^long channel ^double value]
-   (let [^Vec4 c (pr/to-color col)]
-     (case channel
-       0 (Vec4. (+ value (.x c)) (.y c) (.z c) (.w c))
-       1 (Vec4. (.x c) (+ value (.y c)) (.z c) (.w c))
-       2 (Vec4. (.x c) (.y c) (+ value (.z c)) (.w c))
-       3 (Vec4. (.x c) (.y c) (.z c) (+ value (.w c)))
-       (channel-error channel)))))
+   (update-channel (pr/to-color col) channel (fn ^double [^double v] (+ value v)))))
 
 (defn modulate
   "Multiplies one channel of a color by `amount`, optionally in another colorspace.
@@ -6193,22 +6196,10 @@
   Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace and `{:channel channel}` for a channel outside 0-3. See also [[adjust]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col colorspace ^long channel ^double amount]
-   (let [[to from] (colorspace-converters colorspaces colorspace)
-         ^Vec4 c (to col)]
-     (from (case channel
-             0 (Vec4. (* amount (.x c)) (.y c) (.z c) (.w c))
-             1 (Vec4. (.x c) (* amount (.y c)) (.z c) (.w c))
-             2 (Vec4. (.x c) (.y c) (* amount (.z c)) (.w c))
-             3 (Vec4. (.x c) (.y c) (.z c) (* amount (.w c)))
-             (channel-error channel)))))
+   (let [[to from] (colorspace-converters colorspaces colorspace)]
+     (from (update-channel (to col) channel (fn ^double [^double v] (* amount v))))))
   (^Vec4 [col ^long channel ^double amount]
-   (let [^Vec4 c (pr/to-color col)]
-     (case channel
-       0 (Vec4. (* amount (.x c)) (.y c) (.z c) (.w c))
-       1 (Vec4. (.x c) (* amount (.y c)) (.z c) (.w c))
-       2 (Vec4. (.x c) (.y c) (* amount (.z c)) (.w c))
-       3 (Vec4. (.x c) (.y c) (.z c) (* amount (.w c)))
-       (channel-error channel)))))
+   (update-channel (pr/to-color col) channel (fn ^double [^double v] (* amount v)))))
 
 (defn adjust-temperature
   "Shifts a color toward the color of a blackbody temperature, keeping its lightness.
@@ -6458,7 +6449,7 @@
   0.05)
 
 (defn- lightness-inverse
-  "Inverse of the lightness profile `ls` sampled at `xs`, oriented by the overall direction (end minus start): `u = d L` is made monotonic by its running maximum (reversals up to [[correct-luma-max-reversal]] of the total change), plateaus are dropped. Returns `[u-start u-end inverse d]`, `inverse` mapping `u` to the position; throws `ex-info` with `{:lightness :non-monotonic}` for a larger reversal or no direction."
+  "Inverse of the lightness profile `ls` sampled at `xs`, oriented by the overall direction (end minus start): `u = d L` is made monotonic by its running maximum (reversals up to [[correct-luma-max-reversal]] of the total change), plateaus are dropped. Returns `[u-start u-end inverse d]`, `inverse` mapping `u` to the position (`u-end` to the last position, so the last sample is kept after a reversal at the end); throws `ex-info` with `{:lightness :non-monotonic}` for a larger reversal or no direction."
   [ls xs]
   (let [^double l0 (first ls)
         ^double l1 (peek ls)
@@ -6478,17 +6469,17 @@
                         (if (> u mx)
                           (recur lr xr u (conj us u) (conj ps x))
                           (recur lr xr mx us ps)))))]
-      [(first us) (peek us) (li/linear us ps) d])))
+      [(first us) (peek us) (li/linear us (assoc ps (dec (count ps)) (last xs))) d])))
 
 (defn correct-luma
   "Makes the CIELAB lightness of a gradient or palette change linearly.
 
-  G. Aisch, Mastering multi-hued color scales with chroma.js (vis4.net, 2013), lightness correction: the gradient is sampled at 200 points and re-parametrized so that L* goes linearly from its value at 0 to its value at 1.
+  G. Aisch, Mastering multi-hued color scales with chroma.js (vis4.net, 2013), lightness correction: the gradient is sampled at 200 points and re-parametrized so that L* goes linearly from its value at 0 to its value at 1. The colors at 0 and 1 are kept.
 
   - `palette-or-gradient` a gradient (function of t in [0, 1]) or a palette (sequence of colors)
   - `gradient-params` (optional) options of [[gradient]] used to turn a palette into a gradient
 
-  Returns a gradient for a gradient, a palette of the same size for a palette. The lightness must increase or decrease overall (a palette sorted by lightness, in either order); reversals against that direction up to 5 % of the total lightness change are smoothed out (a running maximum), larger ones, or equal lightness at both ends, throw `ex-info` with `{:lightness :non-monotonic}`."
+  Returns a gradient for a gradient, a palette of the same size for a palette. The lightness must increase or decrease overall (a palette sorted by lightness, in either order); reversals against that direction up to 5 % of the total lightness change are smoothed out (a running maximum), larger ones, equal lightness at both ends, or a palette of fewer than 2 colors throw `ex-info` with `{:lightness :non-monotonic}`."
   {:metadoc/categories #{:pal :gr}}
   ([palette-or-gradient] (correct-luma palette-or-gradient {}))
   ([palette-or-gradient gradient-params]
@@ -6498,6 +6489,8 @@
            [^double u0 ^double u1 inverse] (lightness-inverse ls xs)]
        (fn ^Vec4 [^double t] (palette-or-gradient (inverse (m/lerp u0 u1 t)))))
      (let [n (count palette-or-gradient)
+           _ (when (< n 2)
+               (throw (ex-info "A palette of fewer than 2 colors has no lightness direction" {:lightness :non-monotonic})))
            g (correct-luma (gradient palette-or-gradient gradient-params))]
        (palette g n)))))
 
@@ -6586,29 +6579,30 @@
     (set-alpha (from-LCH* (map random-channel-value [L C H] c)) (.w c))))
 
 (defn apply-theme
-  "Apply theme to the color, see [[color-themes]] for names.
+  "Returns a random color similar to `color`, following a color theme (global random generator).
 
-  Generates a random color similar to the provided one (global random generator).
-  All operations are done in the normalized LCH* space (channels 0-255).
+  - `color` color, any type accepted by [[to-color]]
+  - `color-theme` one of:
+      - a name of [[color-themes]]: a thi.ng preset draws the lightness and chroma of LCH* (channels 0-255) uniformly from the preset's ranges and keeps the hue; a [[paletton]] preset draws a color from the gradient of the monochromatic paletton palette of the color's hue (sorted by lightness)
+      - `[L C H]` a randomization scheme per LCH* channel: `[min max]` uniform in the range, a number `v` uniform in `[channel - v, channel + v]`, `nil` (or anything else) keeps the channel
 
-  Color theme can be one of:
-
-  * keyword - predefined color theme is used
-  * [L C H] - randomization scheme of given channel, which can be:
-      - [min-value max-value] - uniform random value from given range
-      - a number - [channel-value, channel+value] range is used for random selection
-      - nil, or anything else - keep original channel value"
+  Returns a clamped `Vec4`, alpha kept. Throws `ex-info` with `{:color-theme color-theme}` for an unknown name. See also [[random-color]]."
   [color color-theme]
   (clamp (if (keyword? color-theme)
-           (if (thing-presets-list color-theme)
+           (cond
+             (thing-presets-list color-theme)
              (let [[[l1 l2] [c1 c2]] (thing-presets color-theme)
                    ^Vec4 c (to-LCH* color)]
                (from-LCH* (Vec4. (r/drand l1 l2) (r/drand c1 c2) (.z c) (.w c))))
+
+             (contains? paletton-presets color-theme)
              (let [g (->> {:preset color-theme}
                           (paletton :monochromatic (hue-paletton color))
                           (sort-by luma)
                           (gradient))]
-               (set-alpha (g (r/drand)) (alpha color))))
+               (set-alpha (g (r/drand)) (alpha color)))
+
+             :else (throw (ex-info (str "Unknown color theme: " color-theme) {:color-theme color-theme})))
            (apply-LCH-theme color color-theme))))
 
 (defn random-color
@@ -6637,7 +6631,7 @@
 
   - `matrix` 20 numbers, row by row for the R, G, B, A outputs: `[r1 r2 r3 r4 r5 g1 ... a5]`; columns 1-4 multiply R, G, B, A (0-255), column 5 is an offset on the 0-255 scale
 
-  Returns a function of one color (any type accepted by [[to-color]]) returning the result clamped to [0, 255]. The CSS filter functions ([[sepia]], [[grayscale]], [[saturation]], [[hue-rotate]], [[contrast]], [[exposure]], [[brightness]]) are built with it."
+  Returns a function of one color (any type accepted by [[to-color]]) returning the result clamped to [0, 255]. The CSS filter functions ([[sepia]], [[grayscale]], [[saturation]], [[hue-rotate]], [[contrast]], [[exposure]], [[invert]], [[opacity]]) and the offset filter [[brightness]] are built with it."
   [[^double r1 ^double r2 ^double r3 ^double r4 ^double r5
     ^double g1 ^double g2 ^double g3 ^double g4 ^double g5
     ^double b1 ^double b2 ^double b3 ^double b4 ^double b5
@@ -6650,17 +6644,17 @@
                     (+ (* a1 (.x c)) (* a2 (.y c)) (* a3 (.z c)) (* a4 (.w c)) a5))))))
 
 (defn- check-amount
-  "Throws `ex-info` with `{:amount amount}` for a negative filter amount (not allowed by W3C Filter Effects)."
+  "Throws `ex-info` with `{:amount amount}` for a negative filter amount (not allowed by W3C Filter Effects) or `NaN`."
   [^double amount]
-  (when (neg? amount)
-    (throw (ex-info (str "Filter amount should not be negative, got: " amount) {:amount amount}))))
+  (when-not (m/not-neg? amount)
+    (throw (ex-info (str "Filter amount should be a non-negative number, got: " amount) {:amount amount}))))
 
 (defn sepia
   "Creates the CSS `sepia()` filter (W3C Filter Effects Level 1).
 
   - `amount` 0 (unchanged) to 1 (full sepia); values above 1 are clamped to 1, as the specification
 
-  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount."
+  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount or `NaN`."
   ([^double amount]
    (check-amount amount)
    (let [amount (- 1.0 (min amount 1.0))
@@ -6675,9 +6669,9 @@
 (defn contrast
   "Creates the CSS `contrast()` filter (W3C Filter Effects Level 1): `amount (c - 127.5) + 127.5` per channel.
 
-  - `amount` 1 keeps the color, 0 gives gray 127.5, above 1 increases contrast; negative values invert (not allowed by the specification)
+  - `amount` 1 keeps the color, 0 gives gray 127.5, above 1 increases contrast
 
-  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount."
+  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount or `NaN`."
   ([^double amount]
    (check-amount amount)
    (let [intercept (* 127.5 (- 1.0 amount))]
@@ -6691,7 +6685,7 @@
 
   - `amount` 1 keeps the color, 0 gives black, above 1 brightens
 
-  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount. Note: [[brightness]] of clojure2d adds an offset instead."
+  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount or `NaN`. Note: [[brightness]] of clojure2d adds an offset instead."
   ([^double amount]
    (check-amount amount)
    (fe-color-matrix [amount 0.0 0.0 0.0 0.0
@@ -6734,7 +6728,7 @@
 
   - `amount` 1 keeps the color, 0 gives gray, above 1 oversaturates
 
-  Weights 0.213, 0.715, 0.072 as the specification's saturate matrix. Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount."
+  Weights 0.213, 0.715, 0.072 as the specification's saturate matrix. Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount or `NaN`."
   ([^double amount]
    (check-amount amount)
    (saturation-matrix amount)))
@@ -6765,7 +6759,7 @@
 
   - `amount` 0 (unchanged) to 1 (gray); values above 1 are clamped to 1, as the specification
 
-  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount."
+  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount or `NaN`."
   ([^double amount]
    (check-amount amount)
    (let [a (- 1.0 (min amount 1.0))]
@@ -6779,7 +6773,7 @@
 
   - `amount` 0 (unchanged) to 1 (inverted, `255 - c`); 0.5 gives gray 127.5; values above 1 are clamped to 1, as the specification
 
-  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount."
+  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount or `NaN`."
   ([^double amount]
    (check-amount amount)
    (let [a (min amount 1.0)
@@ -6795,7 +6789,7 @@
 
   - `amount` 1 keeps the color, 0 makes it transparent; values above 1 are clamped to 1, as the specification
 
-  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount."
+  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount or `NaN`."
   ([^double amount]
    (check-amount amount)
    (fe-color-matrix [1.0 0.0 0.0 0.0 0.0
@@ -6829,13 +6823,6 @@
         ^doubles b (table (inc i))]
     (double-array (map (fn [^long k] (m/lerp (Array/aget a k) (Array/aget b k) f)) (range 9)))))
 
-(defn- brettel-tritanopia
-  "Brettel (1997) tritanopia of a linear sRGB color: one of two projections chosen by the side of the separation plane."
-  ^Vec3 [^Vec3 rgb]
-  (let [{:keys [^doubles wing1 ^doubles wing2 ^doubles separation]} (:brettel @cvd-tables)
-        side (+ (* (Array/aget separation 0) (.x rgb)) (* (Array/aget separation 1) (.y rgb)) (* (Array/aget separation 2) (.z rgb)))]
-    (mulv9 (if (neg? side) wing2 wing1) rgb)))
-
 (defn- linear-srgb-filter
   "Filter of colors through `f`, a function of linear sRGB (`Vec3`, 0-1): sRGB decoding, `f`, clipping to [0, 1], encoding; alpha kept."
   [f]
@@ -6855,29 +6842,22 @@
   (let [f (delay (make))]
     (fn ^Vec4 [c] (@f c))))
 
-(defn- machado-filter [deficiency ^double severity]
-  (lazy-filter #(let [m (machado-matrix deficiency severity)] (linear-srgb-filter (fn [rgb] (mulv9 m rgb))))))
-
-(defn- tritan-filter [^double severity]
-  (linear-srgb-filter (fn [^Vec3 rgb] (v/interpolate rgb (brettel-tritanopia rgb) severity))))
-
-(defn cvd-filter
-  "Creates a color vision deficiency filter of a given severity.
-
-  - `deficiency` `:protanomaly` (L cones), `:deuteranomaly` (M cones) or `:tritanomaly` (S cones)
-  - `severity` 0 (normal vision) to 1 (dichromacy: protanopia, deuteranopia, tritanopia)
-
-  Protan and deutan: Machado, Oliveira, Fernandes (2009) matrices, linearly interpolated between the published 0.1 severity steps. Tritan: Brettel, Vienot, Mollon (1997) tritanopia as DaltonLens, blended with the color by `severity`. Applied to linear sRGB, results clipped; alpha kept.
-
-  Returns a function of one color (any type accepted by [[to-color]]) returning a `Vec4`. Throws `ex-info` with `{:deficiency deficiency}` for an unknown deficiency and `{:severity severity}` for a severity outside [0, 1]. See also [[protanopia]], [[deuteranopia]], [[tritanopia]] and the other named filters."
+(defn- machado-filter
+  "Filter of the Machado (2009) matrix of `deficiency` (`:protanomaly`, `:deuteranomaly`) at `severity`."
   [deficiency ^double severity]
-  (when-not (<= 0.0 severity 1.0)
-    (throw (ex-info (str "Severity should be in [0, 1], got: " severity) {:severity severity})))
-  (case deficiency
-    (:protanomaly :deuteranomaly) (let [m (machado-matrix deficiency severity)]
-                                    (linear-srgb-filter (fn [rgb] (mulv9 m rgb))))
-    :tritanomaly (tritan-filter severity)
-    (throw (ex-info (str "Unknown color vision deficiency: " deficiency) {:deficiency deficiency}))))
+  (let [m (machado-matrix deficiency severity)]
+    (linear-srgb-filter (fn [rgb] (mulv9 m rgb)))))
+
+(defn- tritan-filter
+  "Filter of Brettel (1997) tritanopia (one of two projections, chosen by the side of the separation plane) blended with the color by `severity`."
+  [^double severity]
+  (let [{:keys [^doubles wing1 ^doubles wing2 ^doubles separation]} (:brettel @cvd-tables)]
+    (linear-srgb-filter
+     (fn [^Vec3 rgb]
+       (let [side (+ (* (Array/aget separation 0) (.x rgb))
+                     (* (Array/aget separation 1) (.y rgb))
+                     (* (Array/aget separation 2) (.z rgb)))]
+         (v/interpolate rgb (mulv9 (if (neg? side) wing2 wing1) rgb) severity))))))
 
 (defn- achromatic
   "Gray of the luminance Y of a linear sRGB color (Y row of the [[to-XYZ]] matrix)."
@@ -6885,22 +6865,57 @@
   (let [y (luma-fn (.x rgb) (.y rgb) (.z rgb))]
     (Vec3. y y y)))
 
+(defn- achromat-filter
+  "Filter of the luminance gray blended with the color by `severity`."
+  [^double severity]
+  (linear-srgb-filter (fn [^Vec3 rgb] (v/interpolate rgb (achromatic rgb) severity))))
+
+(defn- unknown-deficiency
+  [deficiency]
+  (throw (ex-info (str "Unknown color vision deficiency: " deficiency) {:deficiency deficiency})))
+
+(defn cvd-filter
+  "Creates a color vision deficiency filter, of a given severity for the anomalous conditions.
+
+  - `deficiency` with `severity`: `:protanomaly` (L cones), `:deuteranomaly` (M cones), `:tritanomaly` (S cones) or `:achromatomaly` (reduced color)
+  - `deficiency` alone (severity 1): `:protanopia`, `:deuteranopia`, `:tritanopia` or `:achromatopsia`
+  - `severity` 0 (normal vision) to 1 (dichromacy, or achromatopsia)
+
+  Protan and deutan: Machado, Oliveira, Fernandes (2009) matrices, linearly interpolated between the published 0.1 severity steps. Tritan: Brettel, Vienot, Mollon (1997) tritanopia as DaltonLens, blended with the color by `severity`. Achromat: the gray of the luminance Y, blended with the color by `severity` (not a physiological model). Applied to linear sRGB, results clipped; alpha kept.
+
+  Returns a function of one color (any type accepted by [[to-color]]) returning a `Vec4`. Throws `ex-info` with `{:deficiency deficiency}` for an unknown deficiency (or one given with the wrong arity) and `{:severity severity}` for a severity outside [0, 1]. See also [[protanopia]], [[deuteranopia]], [[tritanopia]] and the other named filters."
+  ([deficiency]
+   (case deficiency
+     :protanopia (machado-filter :protanomaly 1.0)
+     :deuteranopia (machado-filter :deuteranomaly 1.0)
+     :tritanopia (tritan-filter 1.0)
+     :achromatopsia (linear-srgb-filter achromatic)
+     (unknown-deficiency deficiency)))
+  ([deficiency ^double severity]
+   (when-not (<= 0.0 severity 1.0)
+     (throw (ex-info (str "Severity should be in [0, 1], got: " severity) {:severity severity})))
+   (case deficiency
+     (:protanomaly :deuteranomaly) (machado-filter deficiency severity)
+     :tritanomaly (tritan-filter severity)
+     :achromatomaly (achromat-filter severity)
+     (unknown-deficiency deficiency))))
+
 (def ^{:doc "Color vision deficiency filter for protanopia (no L cones): Machado, Oliveira, Fernandes (2009) at severity 1, applied to linear sRGB. Returns the filtered `Vec4` (alpha kept). See also [[cvd-filter]] for other severities."}
-  protanopia (machado-filter :protanomaly 1.0))
+  protanopia (lazy-filter #(cvd-filter :protanopia)))
 (def ^{:doc "Color vision deficiency filter for protanomaly (weak L cones): Machado, Oliveira, Fernandes (2009) at severity 0.6, applied to linear sRGB. Returns the filtered `Vec4` (alpha kept). See also [[protanopia]]."}
-  protanomaly (machado-filter :protanomaly 0.6))
+  protanomaly (lazy-filter #(cvd-filter :protanomaly 0.6)))
 (def ^{:doc "Color vision deficiency filter for deuteranopia (no M cones): Machado, Oliveira, Fernandes (2009) at severity 1, applied to linear sRGB. Returns the filtered `Vec4` (alpha kept)."}
-  deuteranopia (machado-filter :deuteranomaly 1.0))
+  deuteranopia (lazy-filter #(cvd-filter :deuteranopia)))
 (def ^{:doc "Color vision deficiency filter for deuteranomaly (weak M cones): Machado, Oliveira, Fernandes (2009) at severity 0.6, applied to linear sRGB. Returns the filtered `Vec4` (alpha kept)."}
-  deuteranomaly (machado-filter :deuteranomaly 0.6))
+  deuteranomaly (lazy-filter #(cvd-filter :deuteranomaly 0.6)))
 (def ^{:doc "Color vision deficiency filter for tritanopia (no S cones): Brettel, Vienot, Mollon (1997), as DaltonLens (Smith-Pokorny LMS, 485 and 660 nm anchors, sRGB white neutral), applied to linear sRGB. Returns the filtered `Vec4` (alpha kept)."}
-  tritanopia (lazy-filter #(tritan-filter 1.0)))
+  tritanopia (lazy-filter #(cvd-filter :tritanopia)))
 (def ^{:doc "Color vision deficiency filter for tritanomaly (weak S cones): linear sRGB 60 % of the way from the color to its Brettel (1997) tritanopia (DaltonLens convention for anomalous trichromacy). Returns the filtered `Vec4` (alpha kept)."}
-  tritanomaly (lazy-filter #(tritan-filter 0.6)))
+  tritanomaly (lazy-filter #(cvd-filter :tritanomaly 0.6)))
 (def ^{:doc "Color vision deficiency filter for achromatopsia (no color): the gray of the luminance Y of linear sRGB (the [[relative-luma]] weights). Returns the filtered `Vec4` (alpha kept)."}
-  achromatopsia (linear-srgb-filter achromatic))
+  achromatopsia (cvd-filter :achromatopsia))
 (def ^{:doc "Color vision deficiency filter for achromatomaly (reduced color): linear sRGB halfway between the color and [[achromatopsia]]. Not a physiological model (there is none for this condition). Returns the filtered `Vec4` (alpha kept)."}
-  achromatomaly (linear-srgb-filter (fn [^Vec3 rgb] (v/interpolate rgb (achromatic rgb) 0.5))))
+  achromatomaly (cvd-filter :achromatomaly 0.5))
 
 ;; some utils
 

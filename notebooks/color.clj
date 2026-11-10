@@ -1379,7 +1379,7 @@ c/temperature-names
 
 ;; # Color Vision Deficiency 
 
-;; To simulate how color, palette or gradient looks with given color blidness you can call `cvd-lens` function. There are 8 defined CVDs. Let's simulate CVD with a `rainbow` grandient.
+;; To simulate how a color, palette or gradient looks with a given color vision deficiency, call one of 8 filters: `protanopia`, `deuteranopia`, `tritanopia`, `achromatopsia` (complete loss) and `protanomaly`, `deuteranomaly`, `tritanomaly`, `achromatomaly` (anomalous, fixed severity). Protan and deutan follow Machado et al. (2009), tritan Brettel et al. (1997). Let's simulate them with a `rainbow` gradient.
 
 (def rainbow (c/gradient :grDevices/rainbow))
 
@@ -1392,6 +1392,13 @@ c/temperature-names
     (comp c/protanopia rainbow)
     (comp c/tritanomaly rainbow)
     (comp c/tritanopia rainbow))
+
+;; `cvd-filter` creates a filter of any severity from 0 (normal vision) to 1 (complete loss). Deuteranomaly at severities 0.2, 0.5 and 0.8:
+
+(🎨 rainbow
+    (comp (c/cvd-filter :deuteranomaly 0.2) rainbow)
+    (comp (c/cvd-filter :deuteranomaly 0.5) rainbow)
+    (comp (c/cvd-filter :deuteranomaly 0.8) rainbow))
 
 ;; # CSSGram
 
