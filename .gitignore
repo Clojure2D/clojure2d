@@ -25,3 +25,6 @@ utils/palettes/target
 /.clerk
 __pycache__/
 .eastwood
+
+# Node oracle environment (utils/color/package.json)
+utils/color/node_modules/

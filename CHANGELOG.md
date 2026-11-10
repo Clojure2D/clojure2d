@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color`: docstrings for the color differences and contrast (`delta-E*`, `delta-C*`, `delta-H*`, `delta-E-HyAB`, `delta-E*-94`, `delta-E*-euclidean`, `delta-C-RGB`, `delta-D-HCL`, `delta-E*-CMC`, `delta-E-z`, `delta-E*-2000`, `contrast-ratio`, `noticeably-different?`): formula, source, options and defaults, reference argument; `delta-E*-euclidean` had none
 * `clojure2d.color/contrast-ratio` option `:method`: `:wcag` (default), `:lstar` (L* difference), `:weber` (signed, target on background), `:michelson`; Weber and Michelson on the luminance Y of `to-XYZ`
 * `clojure2d.color`: docstrings for `temperature`, `temperature-names` (the named temperatures), `adjust-temperature` and `wavelength`
+* `clojure2d.color`: docstrings for the adjustments and filters (`whiten`, `blacken`, `brighten`, `darken`, `saturate`, `desaturate`, `adjust`, `modulate`, `tinter`, `correct-luma`, `apply-theme`, `color-themes`, `fe-color-matrix`, `sepia`, `contrast`, `exposure`, `brightness`, `saturation`, `hue-rotate`, `grayscale`, the color vision deficiency filters, `complementary`, `make-LCH`): sources (W3C Filter Effects, chroma.js, chromelens), formulas, ranges
 * `clojure2d.color/delta-E-HyCH`: HyCH color difference (Abasi, Amani Tehran, Fairchild 2020), CIEDE2000 terms with a city-block lightness term; option `:textiles?`
 
 ### Changed

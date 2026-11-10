@@ -4909,18 +4909,23 @@
 ;;
 
 (defn make-LCH
-  "Create LCH conversion functions pair from any luma based color space. "
+  "Creates the polar (LCH-like) form of a Lab-like colorspace.
+
+  - `cs` a key of [[colorspaces]] whose raw channels are lightness and two opponent axes (e.g. `:LAB`, `:LUV`, `:Oklab`, `:JAB`, `:IPT`)
+
+  Returns `[to from]`: `to` converts an sRGB color to `[L C H alpha]` (hue in degrees, see [[to-luma-color-hue]]), `from` converts back. For an unknown colorspace the functions fail when called."
   [cs]
   (let [[to from] (colorspaces cs)]
     [(partial to-luma-color-hue to)
      (partial from-luma-color-hue from)]))
 
 (defn complementary
-  "Create complementary color. Possible colorspaces are:
+  "Returns the complementary color: the hue rotated by 180°.
 
-  * `:PalettonHSV` (default)
-  * `:HSB`, `:HSV`, `:HSL` or `:HWB`
-  * `:GLHS`"
+  - `c` color, any type accepted by [[to-color]]
+  - `colorspace` (optional) where the hue is rotated: `:PalettonHSV` (default, the RYB-like wheel of [[paletton]]), `:HSB`, `:HSV`, `:HSL`, `:HWB` (hue in channel 0) or `:GLHS` (hue in channel 1)
+
+  Returns a `Vec4`, not clamped. Applying it twice gives the color back (up to rounding) in the hexagonal spaces."
   (^Vec4 [c] (complementary c :PalettonHSV))
   (^Vec4 [c colorspace]
    (let [[to from] (colorspaces colorspace)
@@ -6031,9 +6036,13 @@
 
 (def ^:private vec4-one (Vec4. 1.0 1.0 1.0 1.0))
 (defn tinter
-  "Creates fn to tint color using other color(s).
+  "Creates a function tinting colors with `tint-color`.
 
-  `tint-color`"
+  The author's soft multiply: each channel (alpha included) becomes `255 sqrt((c + 1) (t + 1) / 65536)`, the geometric mean of the color and the tint channel on 0-1 (shifted by 1/256 so black does not stay black). Tinting is symmetric in the color and the tint; a color tinted by itself is nearly unchanged.
+
+  - `tint-color` color, any type accepted by [[to-color]]
+
+  Returns a function of one color returning a clamped `Vec4`."
   {:metadoc/categories #{:pal}}
   ([tint-color]
    (let [tint (v/add (pr/to-color tint-color) vec4-one)]
@@ -6063,11 +6072,12 @@
 ;; colors
 
 (defn whiten
-  "Change color towards white.
+  "Moves a color toward white: adds `amt` to the whiteness W of [[to-HWB]], constrained to [0, 1].
 
-  Works in HSB color space. Default amount is set to 0.2 and changes W channel by this amount.
+  - `col` color, any type accepted by [[to-color]]
+  - `amt` change of whiteness, default `0.2`; negative values remove whiteness
 
-  See [[blacken]]."
+  Hue and blackness are kept; when W + B exceeds 1 the color becomes gray (HWB normalization). Returns a clamped `Vec4`. See also [[blacken]], [[brighten]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col] (whiten col 0.2))
   (^Vec4 [col ^double amt]
@@ -6075,9 +6085,12 @@
      (clamp (from-HWB (Vec4. (.x c) (m/constrain (+ (.y c) amt) 0.0 1.0) (.z c) (.w c)))))))
 
 (defn blacken
-  "Change color towards black.
+  "Moves a color toward black: adds `amt` to the blackness B of [[to-HWB]], constrained to [0, 1].
 
-  Works in HSB color space. Default amount is set to 0.2 and changes B channel by this amount."
+  - `col` color, any type accepted by [[to-color]]
+  - `amt` change of blackness, default `0.2`; negative values remove blackness
+
+  Hue and whiteness are kept; when W + B exceeds 1 the color becomes gray (HWB normalization). Returns a clamped `Vec4`. See also [[whiten]], [[darken]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col] (blacken col 0.2))
   (^Vec4 [col ^double amt]
@@ -6085,11 +6098,12 @@
      (clamp (from-HWB (Vec4. (.x c) (.y c) (m/constrain (+ (.z c) amt) 0.0 1.0) (.w c)))))))
 
 (defn brighten
-  "Change luma for givent color by given amount.
+  "Brightens a color: adds `18 amt` to the CIELAB lightness L* (chroma.js `brighten`, step Kn = 18).
 
-  Works in LAB color space. Default amount is 1.0 and means change luma in LAB of 18.0.
+  - `col` color, any type accepted by [[to-color]]
+  - `amt` number of steps, default `1.0`; negative values darken
 
-  See [[darken]]."
+  L* does not go below 0 (chroma.js lets it go negative). Returns a clamped `Vec4`. See also [[darken]], [[saturate]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col] (brighten col 1.0))
   (^Vec4 [col ^double amt]
@@ -6097,17 +6111,23 @@
      (clamp (from-LAB (Vec4. (max 0.0 (+ (.x c) (* 18.0 amt))) (.y c) (.z c) (.w c)))))))
 
 (defn darken
-  "Change luma for givent color by given amount.
-  
-  Works in LAB color space. Default amount is 1.0 and means change luma in LAB of -18.0.
+  "Darkens a color: subtracts `18 amt` from the CIELAB lightness L* (chroma.js `darken`, step Kn = 18).
 
-  See [[brighten]]."
+  - `col` color, any type accepted by [[to-color]]
+  - `amt` number of steps, default `1.0`
+
+  The same as `(brighten col (- amt))`: L* does not go below 0. Returns a clamped `Vec4`. See also [[brighten]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col] (brighten col -1.0))
   (^Vec4 [col ^double amt] (brighten col (- amt))))
 
 (defn saturate
-  "Change color saturation in LCH color space."
+  "Saturates a color: adds `18 amt` to the chroma C of [[to-LCH]] (chroma.js `saturate`, step Kn = 18), not below 0.
+
+  - `col` color, any type accepted by [[to-color]]
+  - `amt` number of steps, default `1.0`; negative values desaturate
+
+  Grays have hue 0, so saturating a gray gives a reddish pink (as chroma.js). Returns a clamped `Vec4`. See also [[desaturate]], [[brighten]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col] (saturate col 1.0))
   (^Vec4 [col ^double amt]
@@ -6116,13 +6136,25 @@
      (clamp (from-LCH (Vec4. (.x c) ns (.z c) (.w c)))))))
 
 (defn desaturate
-  "Change color saturation in LCH color space."
+  "Desaturates a color: subtracts `18 amt` from the chroma C of [[to-LCH]] (chroma.js `desaturate`), not below 0.
+
+  - `col` color, any type accepted by [[to-color]]
+  - `amt` number of steps, default `1.0`
+
+  The same as `(saturate col (- amt))`. Returns a clamped `Vec4`. See also [[saturate]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col] (saturate col -1.0))
   (^Vec4 [col ^double amt] (saturate col (- amt))))
 
 (defn adjust
-  "Adjust (add) given value to a chosen channel. Works with any color space."
+  "Adds `value` to one channel of a color, optionally in another colorspace.
+
+  - `col` color, any type accepted by [[to-color]]
+  - `colorspace` (optional) a key of [[colorspaces]]: the color is converted with the raw `to-` function, the channel changed and converted back
+  - `channel` 0, 1, 2 or 3 (alpha)
+  - `value` added to the channel, in the raw range of the colorspace
+
+  Returns a `Vec4`, not clamped. A channel outside 0-3 leaves the color unchanged; an unknown colorspace throws a `NullPointerException`. See also [[modulate]], [[set-channel]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col colorspace ^long channel ^double value]
    (let [[to from] (colorspaces colorspace)
@@ -6143,7 +6175,14 @@
        c))))
 
 (defn modulate
-  "Modulate (multiply) chosen channel by given amount. Works with any color space."
+  "Multiplies one channel of a color by `amount`, optionally in another colorspace.
+
+  - `col` color, any type accepted by [[to-color]]
+  - `colorspace` (optional) a key of [[colorspaces]]: the color is converted with the raw `to-` function, the channel changed and converted back
+  - `channel` 0, 1, 2 or 3 (alpha)
+  - `amount` factor
+
+  Returns a `Vec4`, not clamped. A channel outside 0-3 leaves the color unchanged; an unknown colorspace throws a `NullPointerException`. See also [[adjust]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col colorspace ^long channel ^double amount]
    (let [[to from] (colorspaces colorspace)
@@ -6407,9 +6446,14 @@
   ([pal number-of-colors gradient-params] (palette pal number-of-colors gradient-params)))
 
 (defn correct-luma
-  "Create palette or gradient with corrected luma to be linear.
+  "Makes the CIELAB lightness of a gradient or palette change linearly.
 
-  See [here](https://www.vis4.net/blog/2013/09/mastering-multi-hued-color-scales/#combining-bezier-interpolation-and-lightness-correction)"
+  G. Aisch, Mastering multi-hued color scales with chroma.js (vis4.net, 2013), lightness correction: the gradient is sampled at 200 points and re-parametrized so that L* goes linearly from its value at 0 to its value at 1.
+
+  - `palette-or-gradient` a gradient (function of t in [0, 1]) or a palette (sequence of colors)
+  - `gradient-params` (optional) options of [[gradient]] used to turn a palette into a gradient
+
+  Returns a gradient for a gradient, a palette of the same size for a palette. Only gradients whose lightness increases work: decreasing or non-monotonic lightness throws (fastmath interpolation requires increasing samples)."
   {:metadoc/categories #{:pal :gr}}
   ([palette-or-gradient] (correct-luma palette-or-gradient {}))
   ([palette-or-gradient gradient-params]
@@ -6490,7 +6534,8 @@
    :gray          [[76.5 178.5]  [0.0 0.0]]})
 
 (defonce thing-presets-list (set (keys thing-presets)))
-(defonce color-themes (sort (concat thing-presets-list paletton-presets-list)))
+(defonce ^{:doc "Sorted names of the color themes of [[apply-theme]] and [[random-color]]: thi.ng presets (lightness and chroma ranges in LCH*: `:intense-light`, `:intense-dark`, `:light`, `:dark`, `:bright`, `:weak`, `:neutral`, `:fresh`, `:soft`, `:hard`, `:warm`, `:cool`, `:all`, `:gray-light`, `:gray-dark`, `:gray`) and the presets of [[paletton]] ([[paletton-presets-list]])."}
+  color-themes (sort (concat thing-presets-list paletton-presets-list)))
 
 (defn- random-channel-value
   ^double [scheme ^double value]
@@ -6510,8 +6555,8 @@
 (defn apply-theme
   "Apply theme to the color, see [[color-themes]] for names.
 
-  Generates random color similar to provided one.
-  All operations are done in LSH* color space (normalized to have values between 0 and 255).
+  Generates a random color similar to the provided one (global random generator).
+  All operations are done in the normalized LCH* space (channels 0-255).
 
   Color theme can be one of:
 
@@ -6555,7 +6600,11 @@
                             (Vec4. (r/drand 255.0) (r/drand 255.0) (r/drand 255.0) 255.0)))))
 
 (defn fe-color-matrix
-  "Create a feColorMatrix operator."
+  "Creates a color filter from a 4 x 5 matrix, as SVG `feColorMatrix` (type matrix) on encoded sRGB.
+
+  - `matrix` 20 numbers, row by row for the R, G, B, A outputs: `[r1 r2 r3 r4 r5 g1 ... a5]`; columns 1-4 multiply R, G, B, A (0-255), column 5 is an offset on the 0-255 scale
+
+  Returns a function of one color (any type accepted by [[to-color]]) returning the result clamped to [0, 255]. The CSS filter functions ([[sepia]], [[grayscale]], [[saturation]], [[hue-rotate]], [[contrast]], [[exposure]], [[brightness]]) and the color vision deficiency filters are built with it."
   [[^double r1 ^double r2 ^double r3 ^double r4 ^double r5
     ^double g1 ^double g2 ^double g3 ^double g4 ^double g5
     ^double b1 ^double b2 ^double b3 ^double b4 ^double b5
@@ -6568,6 +6617,11 @@
                     (+ (* a1 (.x c)) (* a2 (.y c)) (* a3 (.z c)) (* a4 (.w c)) a5))))))
 
 (defn sepia
+  "Creates the CSS `sepia()` filter (W3C Filter Effects Level 1).
+
+  - `amount` 0 (unchanged) to 1 (full sepia); values above 1 extrapolate (the specification clamps them to 1)
+
+  Returns a filter function (see [[fe-color-matrix]])."
   ([^double amount]
    (let [amount (- 1.0 amount)
          a (+ 0.393 (* 0.607 amount)) b (- 0.769 (* 0.769 amount)) c (- 0.189 (* 0.189 amount))
@@ -6579,6 +6633,11 @@
                        0.0 0.0 0.0 1.0 0,0]))))
 
 (defn contrast
+  "Creates the CSS `contrast()` filter (W3C Filter Effects Level 1): `amount (c - 127.5) + 127.5` per channel.
+
+  - `amount` 1 keeps the color, 0 gives gray 127.5, above 1 increases contrast; negative values invert (not allowed by the specification)
+
+  Returns a filter function (see [[fe-color-matrix]])."
   ([^double amount]
    (let [intercept (* 127.5 (- 1.0 amount))]
      (fe-color-matrix [amount 0.0 0.0 0.0 intercept
@@ -6587,6 +6646,11 @@
                        0.0 0.0 0.0 1.0 0.0]))))
 
 (defn exposure
+  "Creates the CSS `brightness()` filter (W3C Filter Effects Level 1): multiplies the R, G, B channels by `amount`.
+
+  - `amount` 1 keeps the color, 0 gives black, above 1 brightens
+
+  Returns a filter function (see [[fe-color-matrix]]). Note: [[brightness]] of clojure2d adds an offset instead."
   ([^double amount]
    (fe-color-matrix [amount 0.0 0.0 0.0 0.0
                      0.0 amount 0.0 0.0 0.0
@@ -6594,6 +6658,13 @@
                      0.0 0.0 0.0 1.0 0.0])))
 
 (defn brightness
+  "Creates a brightness filter adding `255 amount` to the R, G, B channels.
+
+  Not the CSS `brightness()` filter, which multiplies: use [[exposure]] for it.
+
+  - `amount` offset as a fraction of 255, negative values darken
+
+  Returns a filter function (see [[fe-color-matrix]])."
   ([^double amount]
    (let [amount (* 255.0 amount)]
      (fe-color-matrix [1.0 0.0 0.0 0.0 amount
@@ -6603,6 +6674,11 @@
 
 
 (defn saturation
+  "Creates the CSS `saturate()` filter (W3C Filter Effects Level 1, `feColorMatrix` type saturate).
+
+  - `amount` 1 keeps the color, 0 gives gray, above 1 oversaturates
+
+  The weights are 0.2126, 0.7152, 0.0722 (the specification uses 0.213, 0.715, 0.072 for saturate). Returns a filter function (see [[fe-color-matrix]])."
   ([^double amount]
    (let [r+ (+ 0.2126 (* 0.7874 amount))
          r- (- 0.2126 (* 0.2126 amount))
@@ -6616,6 +6692,11 @@
                        0.0 0.0 0.0 1.0 0.0]))))
 
 (defn hue-rotate
+  "Creates the CSS `hue-rotate()` filter (W3C Filter Effects Level 1, `feColorMatrix` type hueRotate).
+
+  - `angle-degrees` rotation angle in degrees, any value
+
+  Returns a filter function (see [[fe-color-matrix]])."
   ([^double angle-degrees]
    (let [a (m/radians angle-degrees)
          sa (m/sin a)
@@ -6632,40 +6713,45 @@
                        0.0 0.0 0.0 1.0 0.0]))))
 
 (defn grayscale
+  "Creates the CSS `grayscale()` filter (W3C Filter Effects Level 1): [[saturation]] of `1 - amount`.
+
+  - `amount` 0 (unchanged) to 1 (gray); values above 1 extrapolate (the specification clamps them to 1)
+
+  Returns a filter function (see [[fe-color-matrix]])."
   ([^double amount] (saturation (- 1.0 amount))))
 
 ;; Color Vision Deficiency
 ;; https://github.com/chromelens/chromelens/blob/master/lenses/filters/
 
-(def achromatomaly (fe-color-matrix [0.618,0.320,0.062,0.0,0.0,
+(def ^{:doc "Color vision deficiency filter for achromatomaly (reduced color sensitivity): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} achromatomaly (fe-color-matrix [0.618,0.320,0.062,0.0,0.0,
                                    0.163,0.775,0.062,0.0,0.0,
                                    0.163,0.320,0.516,0.0,0.0,
                                    0.0,0.0,0.0,1.0,0.0]))
-(def achromatopsia (fe-color-matrix [0.299,0.587,0.114,0.0,0.0,
+(def ^{:doc "Color vision deficiency filter for achromatopsia (no color: BT.601 luma 0.299, 0.587, 0.114): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} achromatopsia (fe-color-matrix [0.299,0.587,0.114,0.0,0.0,
                                    0.299,0.587,0.114,0.0,0.0,
                                    0.299,0.587,0.114,0.0,0.0,
                                    0.0,0.0,0.0,1.0,0.0]))
-(def deuteranomaly (fe-color-matrix [0.8,0.2,0.0,0.0,0.0,
+(def ^{:doc "Color vision deficiency filter for deuteranomaly (weak green cones): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} deuteranomaly (fe-color-matrix [0.8,0.2,0.0,0.0,0.0,
                                    0.258,0.742,0.0,0.0,0.0,
                                    0.0,0.142,0.858,0.0,0.0,
                                    0.0,0.0,0.0,1.0,0.0]))
-(def deuteranopia  (fe-color-matrix [0.625,0.375,0.0,0.0,0.0,
+(def ^{:doc "Color vision deficiency filter for deuteranopia (no green cones): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} deuteranopia  (fe-color-matrix [0.625,0.375,0.0,0.0,0.0,
                                    0.7,0.3,0.0,0.0,0.0,
                                    0.0,0.3,0.7,0.0,0.0,
                                    0.0,0.0,0.0,1.0,0.0]))
-(def protanomaly   (fe-color-matrix [0.817,0.183,0.0,0.0,0.0,
+(def ^{:doc "Color vision deficiency filter for protanomaly (weak red cones): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} protanomaly   (fe-color-matrix [0.817,0.183,0.0,0.0,0.0,
                                    0.333,0.667,0.0,0.0,0.0,
                                    0.0,0.125,0.875,0.0,0.0,
                                    0.0,0.0,0.0,1.0,0.0]))
-(def protanopia    (fe-color-matrix [0.567,0.433,0.0,0.0,0.0,
+(def ^{:doc "Color vision deficiency filter for protanopia (no red cones): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} protanopia    (fe-color-matrix [0.567,0.433,0.0,0.0,0.0,
                                    0.558,0.442,0.0,0.0,0.0,
                                    0.0,0.242,0.758,0.0,0.0,
                                    0.0,0.0,0.0,1.0,0.0]))
-(def tritanomaly   (fe-color-matrix [0.967,0.033,0.0,0.0,0.0,
+(def ^{:doc "Color vision deficiency filter for tritanomaly (weak blue cones): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} tritanomaly   (fe-color-matrix [0.967,0.033,0.0,0.0,0.0,
                                    0.0,0.733,0.267,0.0,0.0,
                                    0.0,0.183,0.817,0.0,0.0,
                                    0.0,0.0,0.0,1.0,0.0]))
-(def tritanopia    (fe-color-matrix [0.95,0.05,0.0,0.0,0.0,
+(def ^{:doc "Color vision deficiency filter for tritanopia (no blue cones): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} tritanopia    (fe-color-matrix [0.95,0.05,0.0,0.0,0.0,
                                    0.0,0.433,0.567,0.0,0.0,
                                    0.0,0.475,0.525,0.0,0.0,
                                    0.0,0.0,0.0,1.0,0.0]))
