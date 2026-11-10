@@ -26,7 +26,8 @@ Oracle (:temperature-*, sRGB 0-255, colour cctf_encoding sRGB on the normalized 
   18 temperatures
 
 Normalized wavelength (:wavelength {observer [[lambda r g b] ...]}, sRGB 0-255): colour wavelength_to_XYZ (Sprague
-on the 1 nm data, as clojure2d wavelength-to-XYZ), clojure2d's sRGB matrix, the normalization above; zero XYZ
+on the 1 nm data, as clojure2d wavelength-to-XYZ), clojure2d's sRGB matrix, negative channels clipped to 0 (not
+lifted by adding white: that turns deep reds pink, user decision), the largest channel scaled to 1; zero XYZ
 (outside the observer range) gives black. Wavelengths 350-850 nm every 1 nm and 30 fractional ones (seed
 20261111), observers :CIE-2 and :CIE-10.
 """
@@ -75,6 +76,13 @@ def normalize(rgb):
     return rgb / mx if mx > 0.0 else np.zeros(3)
 
 
+def clip_normalize(rgb):
+    """Clip negative channels to 0, scale the largest channel to 1; zero light gives black."""
+    rgb = np.maximum(rgb, 0.0)
+    mx = rgb.max()
+    return rgb / mx if mx > 0.0 else np.zeros(3)
+
+
 def blackbody_linear(t):
     xyz = colour.colorimetry.planck_law(LAMBDAS * 1e-9, t) @ CMF_10
     return normalize(XYZ_TO_SRGB @ xyz)
@@ -89,7 +97,7 @@ def wavelength_srgb(lam, observer):
     if not 360.0 <= lam <= 830.0:
         return np.zeros(3)
     xyz = colour.wavelength_to_XYZ(lam, colour.MSDS_CMFS[OBSERVERS[observer]])
-    return encode(normalize(XYZ_TO_SRGB @ np.asarray(xyz)))
+    return encode(clip_normalize(XYZ_TO_SRGB @ np.asarray(xyz)))
 
 
 def num(x):

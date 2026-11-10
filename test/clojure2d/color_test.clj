@@ -337,14 +337,7 @@
   (is (= [0.0 0.0 0.0] (take 3 (c/wavelength-to-XYZ 900.0))))
   (is (throws-data? {:observer :nope} #(c/wavelength-to-XYZ 550.0 :nope))))
 
-(deftest wavelength-test
-  ;; ripple of wavelength-to-XYZ: sRGB of the colour XYZ, clamped
-  (doseq [k [:CIE-2 :CIE-10 :CIE-2015-2]
-          [l X Y Z] (take 20 (get-in @whitepoints-colour [:wavelength k]))]
-    (is (< (max-abs-diff (take 3 (c/clamp (c/from-XYZ (v/vec4 (* 100.0 X) (* 100.0 Y) (* 100.0 Z) 255.0))))
-                         (take 3 (c/wavelength l k)))
-           1e-9)
-        (str k " " l))))
+;; wavelength (normalized): clojure2d.color.temperature-test
 
 ;; RGB audit G3: builders and sRGB functions, oracle test/resources/rgb (utils/rgb/gen_reference.py)
 

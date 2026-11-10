@@ -137,7 +137,8 @@
   (:import [fastmath.vector Vec2 Vec3 Vec4]
            [java.awt Color]
            [clojure.lang APersistentVector ISeq Seqable]
-           [com.scrtwpns Mixbox]))
+           [com.scrtwpns Mixbox]
+           [fastmath.java Array]))
 
 (set! *unchecked-math* :warn-on-boxed)
 (m/use-primitive-operators)
@@ -4998,45 +4999,12 @@
 
 ;; black body
 
-(defn- kelvin-red
-  ^double [^double k ^double lnk]
-  (if (< k 0.65)
-    255.0
-    (min 255.0 (* 255.0 (rgb/linear-to-srgb (+ 0.32068362618584273
-                                               (* 0.19668730877673762 (m/pow (+ -0.21298613432655075 k) -1.5139012907556737))
-                                               (* -0.013883432789258415 lnk)))))))
-
-(defn- kelvin-green1
-  ^double [^double k ^double lnk]
-  (let [eek (+ k -0.44267061967913873)]
-    (max 0.0 (* 255.0 (rgb/linear-to-srgb (+ 1.226916242502167
-                                             (* -1.3109482654223614 eek eek eek (m/exp (* eek -5.089297600846147)))
-                                             (* 0.6453936305542096 lnk)))))))
-
-(defn- kelvin-green2
-  ^double [^double k ^double lnk]
-  (* 255.0 (rgb/linear-to-srgb (+ 0.4860175851734596
-                                  (* 0.1802139719519286 (m/pow (+ -0.14573069517701578 k) -1.397716496795082))
-                                  (* -0.00803698899233844 lnk)))))
-
-
-(defn- kelvin-green
-  ^double [^double k ^double lnk]
-  (cond
-    (< k 0.08) 0.0
-    (< k 0.655)(kelvin-green1 k lnk)
-    :else (kelvin-green2 k lnk)))
-
-(defn- kelvin-blue
-  ^double [^double k ^double lnk]
-  (cond
-    (< k 0.19) 0.0
-    (> k 0.66) 255.0
-    :else (let [eek (+ k -1.1367244820333684)]
-            (m/constrain (* 255.0 (rgb/linear-to-srgb (+ 1.677499032830161
-                                                         (* -0.02313594016938082 eek eek eek
-                                                            (m/exp (* eek -4.221279555918655)))
-                                                         (* 1.6550275798913296 lnk)))) 0.0 255.0))))
+(defonce ^:private blackbody-table
+  ;; normalized linear sRGB of a blackbody on a grid uniform in mired (utils/color/gen_temperature.py):
+  ;; [mired-min mired-step r g b], channels as double arrays
+  (delay (let [{:keys [mired-min mired-step rgb]} (read-edn "color/blackbody_srgb.edn")]
+           [(double mired-min) (double mired-step)
+            (double-array (map first rgb)) (double-array (map second rgb)) (double-array (map last rgb))])))
 
 (def ^:private temperature-name-to-K
   {:candle 1800.0
@@ -5067,24 +5035,29 @@
       (throw (ex-info (str "Invalid temperature: " t ", expected a positive number of K or one of temperature-names")
                       {:temperature t})))))
 
+(defn- blackbody-channel
+  "sRGB channel 0-255 at position `i + f` (node `i`, fraction `f`) of a column of the blackbody table: linear interpolation of the linear value, then sRGB encoding."
+  ^double [^doubles a ^long i ^double f]
+  (* 255.0 (rgb/linear-to-srgb (m/lerp (Array/aget a i) (Array/aget a (inc i)) f))))
+
 (defn temperature
-  "Color representing given black body temperature `t` in Kelvins (or name as keyword).
+  "Returns the color of a blackbody radiator at temperature `t`: its hue at full brightness, as sRGB.
 
-  Reference: CIE 1964 10 degree CMFs
-  
-  Using improved interpolation functions.
+  Mitchell Charity's blackbody colors (vendian.org, bbr_color): Planck spectrum, CIE 1964 10° color matching functions, XYZ to linear sRGB without chromatic adaptation, a negative channel lifted by adding white, the largest channel scaled to 1. The values come from a table uniform in mired (1e6 / T) from 500 to 40000 K (`utils/color/gen_temperature.py`), interpolated in linear RGB: within 0.1 of the exact model on 0-255. Below 500 K and above 40000 K the color of the end of the table is returned.
 
-  Possible temperature names: `:candle`, `:sunrise`, `:sunset`, `:lightbulb`, `:morning`, `:moonlight`, `:midday`, `:cloudy-sky`, `:blue-sky`, `:warm`, `:cool`, `:white`, `:sunlight`
+  Without adaptation, the D65 white of sRGB is not a blackbody color: 6500 K is slightly pink (255, 248.7, 253.4). Below about 900 K the lifted green makes the red slightly pink as well.
 
-  Throws `ex-info` with `{:temperature t}` for an unknown name, a value that is neither a number nor a keyword, a temperature not above 0 K and NaN."
+  - `t` temperature in K (positive number) or a name of [[temperature-names]], e.g. `:candle`, `:warm`, `:blue-sky`
+
+  Returns a `Vec4`, channels 0-255, alpha 255. Throws `ex-info` with `{:temperature t}` for an unknown name, a value that is neither a number nor a keyword, a temperature not above 0 K and NaN. See also [[adjust-temperature]], [[wavelength]], `clojure2d.color.whitepoints/blackbody-spectrum`."
   {:metadoc/categories #{:pal}}
   ^Vec4 [t]
-  (let [k (* 0.0001 (temperature-kelvin t))
-        lnk (m/ln k)]
-    (Vec4. (kelvin-red k lnk)
-           (kelvin-green k lnk)
-           (kelvin-blue k lnk)
-           255.0)))
+  (let [[^double mired-min ^double mired-step ^doubles r ^doubles g ^doubles b] @blackbody-table
+        last-node (dec (alength r))
+        pos (m/constrain (/ (- (/ 1.0e6 (temperature-kelvin t)) mired-min) mired-step) 0.0 last-node)
+        i (min (long pos) (dec last-node))
+        f (- pos i)]
+    (Vec4. (blackbody-channel r i f) (blackbody-channel g i f) (blackbody-channel b i f) 255.0)))
 
 (defn wavelength-to-XYZ
   "Returns the XYZ color of monochromatic light of a given wavelength: the values of the color matching functions.
@@ -5104,11 +5077,33 @@
    (let [[x y z] (wp/cmf observer)]
      (XYZ1-to-XYZ (Vec3. (x lambda) (y lambda) (z lambda))))))
 
+(defn- full-brightness-srgb
+  "sRGB `Vec4` (0-255, alpha 255) of a light with linear sRGB `rgb` (any scale): negative channels clipped to 0, the largest channel scaled to 1, then encoded; no light gives black."
+  ^Vec4 [^Vec3 rgb]
+  (let [r (max 0.0 (.x rgb))
+        g (max 0.0 (.y rgb))
+        b (max 0.0 (.z rgb))
+        mx (max r g b)]
+    (if (pos? mx)
+      (Vec4. (* 255.0 (rgb/linear-to-srgb (/ r mx)))
+             (* 255.0 (rgb/linear-to-srgb (/ g mx)))
+             (* 255.0 (rgb/linear-to-srgb (/ b mx)))
+             255.0)
+      (Vec4. 0.0 0.0 0.0 255.0))))
+
 (defn wavelength
-  "Returns color from given wavelength in nm"
+  "Returns the color of monochromatic light of a given wavelength: its hue at full brightness, as sRGB.
+
+  The XYZ of [[wavelength-to-XYZ]] converted to linear sRGB (the matrix of [[from-XYZ]]); monochromatic light lies outside the sRGB gamut, so negative channels are clipped to 0 and the largest channel is scaled to 1 before sRGB encoding. Brightness is lost: use [[wavelength-to-XYZ]] for the physical values.
+
+  - `lambda` wavelength in nm
+  - `observer` (optional) `:CIE-2` (default), `:CIE-10`, `:CIE-2015-2` or `:CIE-2015-10`
+
+  Returns a `Vec4`, channels 0-255, alpha 255. Outside the observer's range (360-830 nm, 390-830 nm for 2015 observers) the color is black. Throws `ex-info` with `{:observer observer}` for an unknown observer. See also [[temperature]]."
   (^Vec4 [^double lambda] (wavelength lambda :CIE-2))
   (^Vec4 [^double lambda observer]
-   (-> lambda (wavelength-to-XYZ observer) from-XYZ clamp)))
+   (let [^Vec4 xyz (wavelength-to-XYZ lambda observer)]
+     (full-brightness-srgb (from-XYZ- (Vec3. (.x xyz) (.y xyz) (.z xyz)))))))
 
 ;; http://iquilezles.org/www/articles/palettes/palettes.htm
 
@@ -6165,20 +6160,19 @@
        c))))
 
 (defn adjust-temperature
-  "Shifts a color toward the color of a blackbody temperature.
+  "Shifts a color toward the color of a blackbody temperature, keeping its lightness.
 
-  The result is `(lerp+ c (temperature temp) amount)`: the channels are interpolated by `amount` toward the temperature color, then the CIELAB lightness is set to that of the temperature color (not of `c`), so dark and light colors come out equally light. Channels are not clamped and can leave `[0,255]`.
+  The result is `(lerp- c (temperature temp) amount)`: the channels are interpolated by `amount` toward the temperature color, then the CIELAB lightness of `c` is restored. Channels are not clamped and can leave `[0,255]`.
 
   - `c` color, any type accepted by [[to-color]]
   - `temp` temperature in K or a name of [[temperature-names]], as accepted by [[temperature]]
   - `amount` interpolation weight, default `0.35`
 
-  Returns a `Vec4`. See also [[temperature]], [[lerp+]]."
+  Returns a `Vec4`. Throws `ex-info` with `{:temperature temp}` for an invalid temperature (see [[temperature]]). See also [[temperature]], [[lerp-]]."
   {:metadoc/categories meta-ops}
   ([c temp] (adjust-temperature c temp 0.35))
   ([c temp amount]
-   (let [t (temperature temp)]
-     (lerp+ (pr/to-color c) t amount))))
+   (lerp- (pr/to-color c) (temperature temp) amount)))
 
 ;;
 
