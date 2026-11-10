@@ -153,7 +153,7 @@
   (is (= "#dd0080" (c/format-hex (c/mix :red :blue 0.25))))
   (is (= "#8000dd" (c/format-hex (c/mix :red :blue 0.75))))
   (is (= "#800080" (c/format-hex (c/lerp :red :blue))))
-  (is (= "#00ff00" (c/format-hex (c/lerp :red :blue :HSL 0.5)))) ;; different than chroma, shortest path
+  (is (= "#ff00ff" (c/format-hex (c/lerp :red :blue :HSL 0.5)))) ;; shorter arc, as chroma.js
   (is (= "#ca0088" (c/format-hex (c/lerp :red :blue :LAB 0.5)))))
 
 (def average-colors ["#ddd", :yellow, :red, :teal])

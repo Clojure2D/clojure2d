@@ -5935,6 +5935,70 @@
   ([pal c] ((nearest-color-fn pal v/dist) c))
   ([pal] (nearest-color-fn pal v/dist)))
 
+(def ^:private hue-spaces
+  "Hue channels of the raw colorspaces of [[colorspaces]]: `:hue` channel index, `:lo` start and `:period` of its range, `:radial` saturation or chroma channel (or `:hwb?` for whiteness / blackness in channels 1, 2) and the `:tolerance` below which the hue is powerless (achromatic color). JCH grays reach chroma 1.6e-4, its smallest 8-bit color step 3.0e-4."
+  (let [deg {:lo 0.0 :period 360.0 :tolerance 1.0e-9}
+        unit {:lo 0.0 :period 1.0 :tolerance 1.0e-9}]
+    {:HSB (assoc deg :hue 0 :radial 1) :HSV (assoc deg :hue 0 :radial 1) :HSL (assoc deg :hue 0 :radial 1)
+     :HSI (assoc deg :hue 0 :radial 1) :PalettonHSV (assoc deg :hue 0 :radial 1) :Cubehelix (assoc deg :hue 0 :radial 1)
+     :Okhsl (assoc unit :hue 0 :radial 1) :Okhsv (assoc unit :hue 0 :radial 1)
+     :HWB (assoc deg :hue 0 :hwb? true) :Okhwb (assoc unit :hue 0 :hwb? true)
+     :GLHS (assoc deg :hue 1 :radial 2)
+     :HCL (assoc deg :hue 0 :radial 1 :lo -180.0)
+     :LCH (assoc deg :hue 2 :radial 1) :LCHuv (assoc deg :hue 2 :radial 1) :Oklch (assoc deg :hue 2 :radial 1)
+     :JCH (assoc deg :hue 2 :radial 1 :tolerance 2.2e-4)}))
+
+(defn- powerless-hue?
+  "Is the hue of the raw color `c` meaningless (achromatic color) by the rule of `hue-space`?"
+  [{:keys [radial hwb? ^double tolerance]} ^Vec4 c]
+  (if hwb?
+    (>= (+ (.y c) (.z c)) (- 1.0 tolerance))
+    (<= (m/abs (double (c radial))) tolerance)))
+
+(defn- with-channel
+  "`c` with `channel` set to `value`."
+  ^Vec4 [^Vec4 c ^long channel ^double value]
+  (update-channel c channel (fn ^double [^double _] value)))
+
+(defn- hue-lerp
+  "Linear interpolation of raw colors `a`, `b` of a hue space, the hue along the shorter arc (CSS `shorter`: a difference of exactly half a period is kept); a powerless hue takes the other hue, two powerless hues give the range start."
+  ^Vec4 [{:keys [^long hue ^double lo ^double period] :as hue-space} ^Vec4 a ^Vec4 b ^double t]
+  (let [pa (powerless-hue? hue-space a)
+        pb (powerless-hue? hue-space b)
+        ha (double (a hue))
+        hb (double (b hue))
+        h1 (if pa (if pb lo hb) ha)
+        h2 (if pb (if pa lo ha) hb)
+        diff (- h2 h1)
+        half (* 0.5 period)
+        d (if (> diff half) (- diff period) (if (< diff (- half)) (+ diff period) diff))]
+    (with-channel (v/interpolate a b t) hue (m/wrap lo (+ lo period) (+ h1 (* t d))))))
+
+(defn- make-achromatic
+  "Raw color `c` of a hue space made achromatic: saturation or chroma 0 (whiteness `1 - B` when W + B < 1 for HWB-like spaces)."
+  ^Vec4 [{:keys [radial hwb?]} ^Vec4 c]
+  (cond
+    (not hwb?) (with-channel c radial 0.0)
+    (< (+ (.y c) (.z c)) 1.0) (with-channel c 1 (- 1.0 (.z c)))
+    :else c))
+
+(defn- hue-average
+  "Weighted average of raw colors `vs` of a hue space: channels averaged, the hue by the circular mean of the colors whose hue is not powerless (as coloraide); no such color or a resultant below 1e-6 of the total weight gives the range start and an achromatic color."
+  ^Vec4 [{:keys [^long hue ^double lo ^double period] :as hue-space} vs weights ^double weights-total]
+  (let [avg (v/div (reduce v/add (map v/mult vs weights)) weights-total)
+        to-rad (/ m/TWO_PI period)
+        [sn cs] (reduce (fn [[^double sn ^double cs] [^Vec4 c ^double w]]
+                                          (if (powerless-hue? hue-space c)
+                                            [sn cs]
+                                            (let [a (* to-rad (double (c hue)))]
+                                              [(+ sn (* w (m/sin a))) (+ cs (* w (m/cos a)))])))
+                                        [0.0 0.0] (map vector vs weights))
+        sn (/ (double sn) weights-total)
+        cs (/ (double cs) weights-total)]
+    (if (and (< (m/abs sn) 1.0e-6) (< (m/abs cs) 1.0e-6))
+      (make-achromatic hue-space (with-channel avg hue lo))
+      (with-channel avg hue (m/wrap lo (+ lo period) (/ (m/atan2 sn cs) to-rad))))))
+
 (defn- check-colors-count
   "Throws `ex-info` with `{:colors 0}` for an empty sequence of colors."
   [cs]
@@ -5958,14 +6022,17 @@
   "Averages colors channel by channel, alpha included, optionally in another colorspace.
 
   - `cs` sequence of colors, any type accepted by [[to-color]]
-  - `colorspace` (optional) a key of [[colorspaces]]: colors are converted with the raw `to-` function, averaged and converted back with `from-`; hue channels are averaged as numbers
+  - `colorspace` (optional) a key of [[colorspaces]]: colors are converted with the raw `to-` function, averaged and converted back with `from-`
 
-  Without `colorspace` the sRGB values are averaged as they are (chroma.js `average` in mode `rgb`; the chroma.js default is `lrgb`, square-root mixing). Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colors 0}` for no colors and `{:colorspace colorspace}` for an unknown colorspace. See also [[weighted-average]], [[mix]]."
+  Without `colorspace` the sRGB values are averaged as they are (chroma.js `average` in mode `rgb`; the chroma.js default is `lrgb`, square-root mixing). In colorspaces with a hue (HSx, HWB, GLHS, HCL, LCH-like, Okhsl, Okhsv, Okhwb, Cubehelix) the hue is the circular mean of the hues of the chromatic colors (as chroma.js and coloraide); when the hues cancel out, or all colors are achromatic, the result is achromatic (saturation or chroma 0, as coloraide). Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colors 0}` for no colors and `{:colorspace colorspace}` for an unknown colorspace. See also [[weighted-average]], [[mix]]."
   {:metadoc/categories #{:interp}}
   ([cs colorspace]
    (let [[to from] (colorspace-converters colorspaces colorspace)]
      (check-colors-count cs)
-     (from (v/average-vectors (map to cs)))))
+     (if-let [hs (hue-spaces colorspace)]
+       (let [vs (map to cs)]
+         (from (hue-average hs vs (repeat 1.0) (count vs))))
+       (from (v/average-vectors (map to cs))))))
   ([cs]
    (check-colors-count cs)
    (v/average-vectors (map pr/to-color cs))))
@@ -5975,14 +6042,16 @@
 
   - `cs` sequence of colors, any type accepted by [[to-color]]
   - `weights` sequence of numbers, one per color; the weighted sum is divided by the sum of the weights
-  - `colorspace` (optional) a key of [[colorspaces]], as in [[average]]
+  - `colorspace` (optional) a key of [[colorspaces]], as in [[average]] (circular mean of hues)
 
   Without `colorspace` the sRGB values are averaged as they are (chroma.js `average` in mode `rgb` with weights). Negative weights are allowed. Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colors 0}` for no colors, `{:colors n :weights m}` when the counts differ, `{:weights-sum s}` for a sum of weights that is 0 or not finite and `{:colorspace colorspace}` for an unknown colorspace. See also [[average]]."
   {:metadoc/categories #{:interp}}
   ([cs weights colorspace]
    (let [[to from] (colorspace-converters colorspaces colorspace)
          s (weights-sum cs weights)]
-     (from (v/div (reduce v/add (map #(v/mult (to %1) %2) cs weights)) s))))
+     (if-let [hs (hue-spaces colorspace)]
+       (from (hue-average hs (map to cs) weights s))
+       (from (v/div (reduce v/add (map #(v/mult (to %1) %2) cs weights)) s)))))
   ([cs weights]
    (let [s (weights-sum cs weights)]
      (v/div (reduce v/add (map #(v/mult (pr/to-color %1) %2) cs weights)) s))))
@@ -5991,14 +6060,16 @@
   "Linear interpolation of two colors, alpha included, optionally in another colorspace.
 
   - `c1`, `c2` colors, any type accepted by [[to-color]]
-  - `colorspace` (optional) a key of [[colorspaces]]: colors are converted with the raw `to-` function, interpolated and converted back with `from-`; hue channels are interpolated as numbers
+  - `colorspace` (optional) a key of [[colorspaces]]: colors are converted with the raw `to-` function, interpolated and converted back with `from-`
   - `t` weight of `c2`, default `0.5`: 0 gives `c1`, 1 gives `c2`; values outside [0, 1] extrapolate
 
-  Without `colorspace` the sRGB values are interpolated (chroma.js `mix` in mode `rgb`). Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[lerp-]], [[lerp+]], [[mix]], [[gradient]]."
+  Without `colorspace` the sRGB values are interpolated (chroma.js `mix` in mode `rgb`). In colorspaces with a hue (HSx, HWB, GLHS, HCL, LCH-like, Okhsl, Okhsv, Okhwb, Cubehelix) the hue goes along the shorter arc (CSS `shorter`, chroma.js, coloraide); the hue of an achromatic color (powerless) is replaced by the hue of the other color. Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[lerp-]], [[lerp+]], [[mix]], [[gradient]]."
   {:metadoc/categories #{:interp}}
   ([c1 c2 colorspace ^double t]
    (let [[to from] (colorspace-converters colorspaces colorspace)]
-     (from (lerp (to c1) (to c2) t))))
+     (from (if-let [hs (hue-spaces colorspace)]
+             (hue-lerp hs (to c1) (to c2) t)
+             (lerp (to c1) (to c2) t)))))
   ([c1 c2] (lerp c1 c2 0.5))
   ([c1 c2 ^double t]
    (v/interpolate (pr/to-color c1) (pr/to-color c2) t)))
@@ -6044,14 +6115,15 @@
   chroma.js `mix` in its default mode `lrgb` (square-root mixing, an approximation of mixing linear light).
 
   - `c1`, `c2` colors, any type accepted by [[to-color]]
-  - `colorspace` (optional) a key of [[colorspaces*]]: the formula is applied to the normalized channels (0-255)
+  - `colorspace` (optional) `:RGB` (the same as no colorspace) or another key of [[colorspaces]]: then the colors are interpolated linearly there, the same as [[lerp]] (chroma.js `mix` in that mode)
   - `t` weight of `c2`, default `0.5`
 
   Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[lerp]], [[mixbox]], [[mixsub]]."
   {:metadoc/categories #{:interp}}
   (^Vec4 [c1 c2 colorspace ^double t]
-   (let [[to from] (colorspace-converters colorspaces* colorspace)]
-     (from (mix (to c1) (to c2) t))))
+   (if (= colorspace :RGB)
+     (mix c1 c2 t)
+     (lerp c1 c2 colorspace t)))
   (^Vec4 [c1 c2] (mix c1 c2 0.5))
   (^Vec4 [c1 c2 ^double t]
    (let [^Vec4 c1 (pr/to-color c1)
@@ -6098,9 +6170,9 @@
 
 ;; https://github.com/ProfJski/ArtColors/blob/master/RYB.cpp#L230
 (defn mixsub
-  "Mixes two colors subtractively, after ProfJski ArtColors `ColorMixSub` (https://github.com/ProfJski/ArtColors).
+  "Mixes two colors subtractively: ProfJski ArtColors `ColorMixSub` (https://github.com/ProfJski/ArtColors, RYB.cpp).
 
-  The linear mix of the colors is moved toward their product-like subtractive mix `max(0, a + b - 255)` (per channel) by `4 t (1 - t) d`, where `d` is the distance of the colors (R, G, B and alpha) divided by 510.
+  The linear mix of the colors is moved toward their subtractive mix `max(0, a + b - 255)` (per channel) by `4 t (1 - t) d`, where `d` is the RGB distance of the colors divided by `255 sqrt(3)` (0 to 1). Alpha is ignored and set to 255, as ArtColors.
 
   - `c1`, `c2` colors, any type accepted by [[to-color]]
   - `colorspace` (optional) a key of [[colorspaces]]: the formula is applied to the raw channels
@@ -6113,16 +6185,13 @@
      (from (mixsub (to c1) (to c2) t))))
   (^Vec4 [c1 c2] (mixsub c1 c2 0.5))
   (^Vec4 [c1 c2 ^double t]
-   (let [c1 (pr/to-color c1)
-         c2 (pr/to-color c2)
-         mixed (lerp c1 c2 t)
-         
-         c (negate c1)
-         d (negate c2)
-         ^Vec4 f (set-alpha (v/clamp (v/sub (v/sub (Vec4. 255.0 255.0 255.0 255.0) c) d) 0.0 255.0) (alpha mixed))
-         ;; normalized distance: opaque white - transparent black
-         cd (* 4.0 t (- 1.0 t) (/ (v/dist c1 c2) 510.0))]
-     (lerp mixed f cd))))
+   (let [^Vec4 a (pr/to-color c1)
+         ^Vec4 b (pr/to-color c2)
+         dist (m/sqrt (+ (m/sq (- (.x a) (.x b))) (m/sq (- (.y a) (.y b))) (m/sq (- (.z a) (.z b)))))
+         cd (* 4.0 t (- 1.0 t) (/ dist (* 255.0 m/SQRT3)))
+         channel (fn ^double [^double x ^double y]
+                   (m/lerp (m/lerp x y t) (max 0.0 (- (+ x y) 255.0)) cd))]
+     (Vec4. (channel (.x a) (.x b)) (channel (.y a) (.y b)) (channel (.z a) (.z b)) 255.0))))
 
 (declare gradient)
 
@@ -6152,25 +6221,30 @@
 (defn reduce-colors
   "Reduces a sequence of colors (e.g. the pixels of an image) to a palette by clustering.
 
-  - `xs` sequence of colors: `Vec4` values (or any vectors) without `:colorspace`
+  - `xs` sequence of colors, any type accepted by [[to-color]]
   - `number-of-colors` number of clusters, at least 1
   - `options` (map, optional), also passed to the `fastmath.ml.clustering` function:
-      - `:fuzzy?` - fuzzy k-means when true, k-means++ otherwise, default `true`
-      - `:colorspace` - a key of [[colorspaces*]] where colors are clustered (normalized channels), default none (sRGB as given)
-      - `:rng` - random number generator of the clustering
+      - `:fuzzy?` - fuzzy k-means when true, k-means++ otherwise (about 20 times faster), default `false`
+      - `:colorspace` - a key of [[colorspaces*]] where colors are clustered (normalized channels), default none (sRGB)
+      - `:rng` - random number generator of the clustering (e.g. `(fastmath.random/rng :mersenne 42)` for repeatable results); `nil` or none: fastmath creates one
       - other clustering options, e.g. `:max-iters`, `:distance`, `:fuzziness`, `:trials`
 
-  The color of a cluster is its most frequent color (channels rounded to integers), the average of the most frequent ones on ties; alpha is kept. Returns the cluster colors sorted by [[luma]]. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[resample]], [[nearest-color]]."
+  The color of a cluster is its most frequent color (channels rounded to integers), the average of the most frequent ones on ties; alpha is kept. When there are no more distinct (rounded) colors than `number-of-colors`, they are returned without clustering; empty clusters are dropped, so fewer colors may be returned. Returns the colors sorted by [[luma]]. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[resample]], [[nearest-color]]."
   {:metadoc/categories #{:pal}}
   ([xs number-of-colors] (reduce-colors xs number-of-colors nil))
-  ([xs number-of-colors {:keys [fuzzy? colorspace]
-                         :or {fuzzy? true}
-                         :as options}]
+  ([xs ^long number-of-colors {:keys [fuzzy? colorspace rng] :as options}]
    (let [[to from] (if colorspace (colorspace-converters colorspaces* colorspace) [identity identity])
-         clustering-fn (if fuzzy? cl/fuzzy-kmeans cl/kmeans++)]
+         points (map (comp to pr/to-color) xs)
+         distinct-points (distinct (map (fn [p] (mapv m/round p)) points))]
      (sort-by luma
-              (for [{:keys [data]} (clustering-fn (map to xs) (assoc options :clusters number-of-colors))]
-                (from (most-frequent-color data)))))))
+              (if (<= (long (bounded-count (inc number-of-colors) distinct-points)) number-of-colors)
+                (map (comp from pr/to-color) distinct-points)
+                (let [clustering-fn (if fuzzy? cl/fuzzy-kmeans cl/kmeans++)
+                      options (cond-> (assoc options :clusters number-of-colors)
+                                (nil? rng) (dissoc :rng))]
+                  (for [{:keys [data]} (clustering-fn points options)
+                        :when (seq data)]
+                    (from (most-frequent-color data)))))))))
 
 ;; colors
 

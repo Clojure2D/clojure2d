@@ -7,6 +7,7 @@
             [clojure.java.io :as io]
             [fastmath.core :as m]
             [fastmath.vector :as v]
+            [fastmath.random :as r]
             [clojure2d.color :as c]
             [clojure2d.test-predicates :refer [throws-data?]]))
 
@@ -125,6 +126,79 @@
   (is (= 3 (count (c/resample [:red :blue] 3))))
   (is (throws-data? {:number-of-colors 0} #(c/resample [:red :blue] 0)))
   (is (throws-data? {:number-of-colors -2} #(c/resample [:red :blue] -2 {}))))
+
+;; G3: values
+
+(def ^:private coloraide-spaces [:HSL :HSV :HWB :LCH :Oklch])
+
+(def ^:private coloraide-tolerance
+  ;; compared clipped: out of gamut, coloraide extends the sRGB curve symmetrically, clojure2d linearly (area B);
+  ;; LCH: coloraide lch-d65 builds XYZ from its own sRGB matrix (D65 0.3127, 0.3290), clojure2d from CIE-2-D65
+  {:HSL 1.0e-9 :HSV 1.0e-9 :HWB 1.0e-9 :LCH 0.1 :Oklch 1.0e-6})
+
+(deftest hue-lerp-test
+  (testing "shorter arc, powerless hues (coloraide mix, straight alpha)"
+    (doseq [cs coloraide-spaces]
+      (check-pairs (get-in @reference [:coloraide :mix cs]) #(c/lerp %1 %2 cs %3) (coloraide-tolerance cs) true)))
+  (testing "chroma.js hsl mix (shorter arc, gray hue undefined): hsl2rgb rounds to integers; skipped: pairs with white or
+            black (chroma.js keeps the saturation of the other color, coloraide and clojure2d interpolate it)"
+    (let [{:keys [colors pairs ts]} @reference
+          bw #{[255.0 255.0 255.0] [0.0 0.0 0.0]}]
+      (doseq [[[i j] per-t] (map vector pairs (get-in @reference [:chroma :mix :hsl]))
+              :when (not (or (bw (colors i)) (bw (colors j))))
+              [t e] (map vector ts per-t)]
+        (is (m/<= (max-diff (clip e) (clip (c/lerp (colors i) (colors j) :HSL t))) 0.5)
+            (str (colors i) " " (colors j) " " t)))))
+  (testing "hue wrapped into the range of the colorspace (every hue space)"
+    (doseq [[cs {:keys [hue lo period] :as spec}] @#'c/hue-spaces
+            :let [[to] (c/colorspaces cs)]
+            [c1 c2] [[[255 0 30] [200 0 255]] [[20 200 30] [250 240 10]] [[0 0 255] [255 0 0]]]
+            t [0.1 0.5 0.9 1.4 -0.3]
+            :let [h ((#'c/hue-lerp spec (to c1) (to c2) t) hue)]]
+      (is (and (m/<= lo h) (m/< h (+ lo period))) (str cs " " c1 " " c2 " " t " " h))))
+  (testing "lerp- and lerp+ use the same path"
+    (is (m/< (max-diff (take 3 (c/lerp- :red :blue :HSL 0.5))
+                       (take 3 (c/set-channel (c/lerp :red :blue :HSL 0.5) :LAB 0 ((c/to-LAB :red) 0)))) 1.0e-9))))
+
+(deftest hue-average-test
+  (testing "circular mean, cancelling hues achromatic (coloraide average)"
+    (doseq [cs coloraide-spaces]
+      (check-sets (get-in @reference [:coloraide :average cs]) (fn [cols _] (c/average cols cs)) (coloraide-tolerance cs) true)
+      (check-sets (get-in @reference [:coloraide :weighted-average cs]) #(c/weighted-average %1 %2 cs) (coloraide-tolerance cs) true)))
+  (testing "chroma.js hsl average: hsl2rgb rounds to integers; skipped: sets starting with an achromatic color (chroma.js
+            counts its undefined hue as 0) and the cancelling red + cyan (chroma.js keeps a noise hue)"
+    (let [{:keys [colors sets]} @reference]
+      (doseq [[s e] (map vector sets (get-in @reference [:chroma :average :hsl]))
+              :when (and (not= s [0 4]) (not (zero? ((c/to-HSL (colors (first s))) 1))))]
+        (is (m/<= (max-diff (clip e) (clip (c/average (map colors s) :HSL))) 0.5) (str s)))))
+  (testing "red + cyan in HSL: gray"
+    (is (m/< (max-diff [127.5 127.5 127.5] (c/average [:red :cyan] :HSL)) 1.0e-9))))
+
+(deftest mix-colorspace-test
+  (doseq [cs [:LAB :Oklab :HSL :LCH]]
+    (is (= (c/lerp :red :blue cs 0.3) (c/mix :red :blue cs 0.3)) (str cs)))
+  (is (= (c/mix :red :blue 0.3) (c/mix :red :blue :RGB 0.3))))
+
+(deftest mixsub-test
+  (check-pairs (:mixsub @reference) c/mixsub 1.0e-9 false)
+  (is (= 255.0 ((c/mixsub [255 0 0 10] [0 0 255 0]) 3)) "alpha 255"))
+
+(deftest reduce-colors-test
+  (let [vir (c/palette :viridis)]
+    (testing "k-means++ default; a seeded RNG repeats; nil RNG"
+      (is (= (c/reduce-colors vir 4 {:fuzzy? false :rng (r/rng :mersenne 5)}) (c/reduce-colors vir 4 {:rng (r/rng :mersenne 5)})))
+      (is (= (c/reduce-colors vir 4 {:rng (r/rng :mersenne 1)}) (c/reduce-colors vir 4 {:rng (r/rng :mersenne 1)})))
+      (is (= 4 (count (c/reduce-colors vir 4 {:rng nil})))))
+    (testing "any color type"
+      (is (= 2 (count (c/reduce-colors (concat (repeat 10 :red) (repeat 10 "#0000ff") [:yellow :green]) 2)))))
+    (testing "no more distinct colors than clusters: returned as they are"
+      (is (= [[10.0 20.0 30.0 255.0]] (mapv vec (c/reduce-colors (repeat 50 [10 20 30]) 3))))
+      (is (= #{[255.0 0.0 0.0 255.0] [0.0 0.0 255.0 255.0]} (set (map vec (c/reduce-colors [:red :blue :red] 2 {:fuzzy? true})))))
+      (is (= 1 (count (c/reduce-colors (repeat 50 [10 20 30]) 3 {:colorspace :LAB})))))
+    (testing "fuzzy k-means still available, sorted by luma"
+      (let [r (c/reduce-colors vir 3 {:fuzzy? true :rng (r/rng :mersenne 3)})]
+        (is (= 3 (count r)))
+        (is (apply <= (map c/luma r)))))))
 
 (deftest docstrings-test
   (doseq [s '[nearest-color average weighted-average lerp lerp- lerp+ mix mixbox mixsub negate reduce-colors resample]]
