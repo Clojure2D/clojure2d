@@ -1115,8 +1115,8 @@
            (* (.z c) 255.0)
            (.w c))))
 
-(def ^{:doc "linear RGB -> sRGB" :metadoc/categories meta-conv} to-sRGB* to-sRGB)
-(def ^{:doc "sRGB -> linear RGB" :metadoc/categories meta-conv} from-sRGB* from-sRGB)
+(def ^{:doc "The same as [[to-sRGB]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} to-sRGB* to-sRGB)
+(def ^{:doc "The same as [[from-sRGB]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} from-sRGB* from-sRGB)
 
 ;; ### Oklab
 
@@ -1193,7 +1193,14 @@
 ;;
 
 (defn to-luma-color-hue
-  "For given color space return polar representation of the color"
+  "Converts a Lab-like color to its polar form: lightness, chroma and hue in degrees.
+
+  `C = hypot(a, b)`, `H = atan2(b, a)` in `[0,360)`; the first channel and alpha are kept.
+
+  - `to` (optional): a conversion from sRGB (for example [[to-LAB]]) applied to `c` first
+  - `c` color, any type accepted by [[to-color]], channels `[L a b]`
+
+  Returns a `Vec4` `[L C H alpha]`. For `a = b = 0` the hue is 0. See also [[from-luma-color-hue]], [[to-LCH]]."
   (^Vec4 [to c] (to-luma-color-hue (to c)))
   (^Vec4 [c]
    (let [^Vec4 cc (pr/to-color c)
@@ -1203,7 +1210,14 @@
      (Vec4. (.x cc) C Hd (.w cc)))))
 
 (defn from-luma-color-hue
-  "For given color space convert from polar representation of the color"
+  "Converts the polar form `[L C H]` (hue in degrees) back to a Lab-like color, the inverse of [[to-luma-color-hue]].
+
+  `a = C cos(H)`, `b = C sin(H)`; the first channel and alpha are kept.
+
+  - `from` (optional): a conversion to sRGB (for example [[from-LAB]]) applied to the result
+  - `c` color, any type accepted by [[to-color]], channels `[L C H]`
+
+  Returns a `Vec4` `[L a b alpha]`, or the result of `from`."
   (^Vec4 [from c] (from (from-luma-color-hue c)))
   (^Vec4 [c]
    (let [^Vec4 c (pr/to-color c)
@@ -1271,7 +1285,7 @@
 (defn- inv-toe
   ^double [^double x]
   (/ (+ (* x x) (* 0.206 x))
-     (* 1.17087378640776 (+ x 0.03))))
+     (* 1.170873786407767 (+ x 0.03))))
 
 (def ^{:private true :const true :tag 'double} oklab-achromatic-chroma
   "Oklab chroma below which a color counts as gray in Okhsl and Okhsv (rounding noise of the matrices)."
@@ -1624,11 +1638,14 @@
 
   - `c` Okhsl color, any type accepted by [[to-color]], with channels in the ranges of [[to-Okhsl]]
 
-  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-Okhsl*]]."
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Lightness 0 gives black and lightness 1 white, for any hue and saturation. Alpha is kept. See also [[from-Okhsl*]]."
   ^Vec4 [okhsl]
   (let [^Vec4 hsl (pr/to-color okhsl)]
-    (if (zero? (.z hsl))
-      (Vec4. 0.0 0.0 0.0 (.w hsl))
+    (cond
+      (zero? (.z hsl)) (Vec4. 0.0 0.0 0.0 (.w hsl))
+      ;; lightness 1 is white for any saturation (1 - L = 0 in get-Cs)
+      (== 1.0 (.z hsl)) (Vec4. 255.0 255.0 255.0 (.w hsl))
+      :else
       (let [h (* m/TWO_PI (.x hsl))
             a- (m/cos h)
             b- (m/sin h)
@@ -1810,7 +1827,13 @@
 ;; https://en.wikipedia.org/wiki/CIE_1960_color_space#Relation_to_CIE_XYZ
 
 (defn XYZ-to-UCS
-  "XYZ -> UCS"
+  "Converts XYZ (0-100, as [[to-XYZ]]) to the CIE 1960 UCS tristimulus values.
+
+  `U = 2X / 3`, `V = Y`, `W = (-X + 3Y + Z) / 2`, on XYZ scaled to 0-1.
+
+  - `xyz` color, any type accepted by [[to-color]]
+
+  Returns a `Vec4` `[U V W alpha]`. See also [[UCS-to-XYZ]], [[to-UCS]]."
   ^Vec4 [xyz]
   (let [^Vec4 c (XYZ-to-XYZ1 xyz)]
     (Vec4. (* m/TWO_THIRD (.x c))
@@ -1847,6 +1870,11 @@
            (.w cc))))
 
 (defn UCS-to-XYZ
+  "Converts CIE 1960 UCS tristimulus values to XYZ (0-100), the inverse of [[XYZ-to-UCS]].
+
+  - `ucs` color, any type accepted by [[to-color]], channels `[U V W]`
+
+  Returns a `Vec4` `[X Y Z alpha]`. See also [[from-UCS]]."
   ^Vec4 [ucs]
   (let [^Vec4 c (pr/to-color ucs)]
     (XYZ1-to-XYZ (Vec4. (* 1.5 (.x c))
@@ -2039,7 +2067,12 @@
     (/ (+ 16.0 (* v CIEK)) 116.0)))
 
 (defn XYZ-to-LAB
-  "XYZ to LAB conversion for given white point (default: CIE-2-D65)"
+  "Converts XYZ (0-100, as [[to-XYZ]]) to CIE 1976 L*a*b* relative to a white point.
+
+  - `xyz` color, any type accepted by [[to-color]]
+  - `whitepoint` (`Vec4` `[X Z x y]`, optional): reference white from `clojure2d.color.whitepoints`, default `wp/CIE-2-D65`
+
+  Returns a `Vec4` `[L a b alpha]`, L 0 to 100 for colors not brighter than the white. See also [[LAB-to-XYZ]], [[to-LAB]]."
   (^Vec4 [xyz] (XYZ-to-LAB xyz wp/CIE-2-D65))
   (^Vec4 [xyz ^Vec4 whitepoint]
    (let [xyz (XYZ-to-XYZ1 xyz)
@@ -2074,9 +2107,9 @@
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-LAB srgb)]
-    (Vec4. (m/mnorm (.x cc) 0.0 100.0 0.0 255.0)
-           (m/mnorm (.y cc) -86.18463649762525 98.25421868616108 0.0 255.0)
-           (m/mnorm (.z cc) -107.86368104495168 94.48248544644461 0.0 255.0)
+    (Vec4. (m/mnorm (.x cc) 0.0 100.00000000000003 0.0 255.0)
+           (m/mnorm (.y cc) -86.18286702469524 98.2341915216855 0.0 255.0)
+           (m/mnorm (.z cc) -107.86017303214177 94.47797355519816 0.0 255.0)
            (.w cc))))
 
 (defn- from-lab-correct
@@ -2088,7 +2121,12 @@
       (/ (- (* 116.0 v) 16.0) CIEK))))
 
 (defn LAB-to-XYZ
-  "LAB to XYZ conversion for given white point (default: CIE-2-D65)"
+  "Converts CIE 1976 L*a*b* to XYZ (0-100) relative to a white point, the inverse of [[XYZ-to-LAB]].
+
+  - `lab` color, any type accepted by [[to-color]], channels `[L a b]`
+  - `whitepoint` (`Vec4` `[X Z x y]`, optional): reference white from `clojure2d.color.whitepoints`, default `wp/CIE-2-D65`
+
+  Returns a `Vec4` `[X Y Z alpha]`. See also [[from-LAB]]."
   (^Vec4 [lab] (LAB-to-XYZ lab wp/CIE-2-D65))
   (^Vec4 [lab ^Vec4 whitepoint]
    (let [^Vec4 c (pr/to-color lab)
@@ -2116,15 +2154,20 @@
   {:metadoc/categories meta-conv}
   ^Vec4 [lab*]
   (let [^Vec4 c (pr/to-color lab*)]
-    (from-LAB (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.0)
-                     (m/mnorm (.y c) 0.0 255.0 -86.18463649762525 98.25421868616108)
-                     (m/mnorm (.z c) 0.0 255.0 -107.86368104495168 94.48248544644461)
+    (from-LAB (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.00000000000003)
+                     (m/mnorm (.y c) 0.0 255.0 -86.18286702469524 98.2341915216855)
+                     (m/mnorm (.z c) 0.0 255.0 -107.86017303214177 94.47797355519816)
                      (.w c)))))
 
 ;;
 
 (defn XYZ-to-LUV
-  "XYZ to LUV conversion for given white point (default: CIE-2-D65)"
+  "Converts XYZ (0-100, as [[to-XYZ]]) to CIE 1976 L*u*v* relative to a white point.
+
+  - `xyz` color, any type accepted by [[to-color]]
+  - `whitepoint` (`Vec4` `[X Z x y]`, optional): reference white from `clojure2d.color.whitepoints`, default `wp/CIE-2-D65`
+
+  Returns a `Vec4` `[L u v alpha]`; black (`X + 15Y + 3Z = 0`) gives `[0 0 0]`. See also [[LUV-to-XYZ]], [[to-LUV]]."
   (^Vec4 [xyz] (XYZ-to-LUV xyz wp/CIE-2-D65))
   (^Vec4 [xyz ^Vec4 whitepoint]
    (let [^Vec4 cc (pr/to-color xyz)
@@ -2167,13 +2210,18 @@
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-LUV srgb)]
-    (Vec4. (m/mnorm (.x cc) 0.0 100.0 0.0 255.0)
-           (m/mnorm (.y cc) -83.07975193131836 175.05303573649485 0.0 255.0)
-           (m/mnorm (.z cc) -134.1160763907768 107.40136474095397 0.0 255.0)
+    (Vec4. (m/mnorm (.x cc) 0.0 100.00000000000003 0.0 255.0)
+           (m/mnorm (.y cc) -83.07787320021112 175.01527629434406 0.0 255.0)
+           (m/mnorm (.z cc) -134.1029792892179 107.39848324418001 0.0 255.0)
            (.w cc))))
 
 (defn LUV-to-XYZ
-  "LUV to XYZ conversion for given white point (default: CIE-2-D65)"
+  "Converts CIE 1976 L*u*v* to XYZ (0-100) relative to a white point, the inverse of [[XYZ-to-LUV]].
+
+  - `luv` color, any type accepted by [[to-color]], channels `[L u v]`
+  - `whitepoint` (`Vec4` `[X Z x y]`, optional): reference white from `clojure2d.color.whitepoints`, default `wp/CIE-2-D65`
+
+  Returns a `Vec4` `[X Y Z alpha]`; `L = 0` gives black. See also [[from-LUV]]."
   (^Vec4 [luv] (LUV-to-XYZ luv wp/CIE-2-D65))
   (^Vec4 [luv ^Vec4 whitepoint]
    (let [^Vec4 c (pr/to-color luv)]
@@ -2211,18 +2259,25 @@
   {:metadoc/categories meta-conv}
   ^Vec4 [luv*]
   (let [^Vec4 c (pr/to-color luv*)]
-    (from-LUV (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.0)
-                     (m/mnorm (.y c) 0.0 255.0 -83.07975193131836 175.05303573649485)
-                     (m/mnorm (.z c) 0.0 255.0 -134.1160763907768 107.40136474095397)
+    (from-LUV (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.00000000000003)
+                     (m/mnorm (.y c) 0.0 255.0 -83.07787320021112 175.01527629434406)
+                     (m/mnorm (.z c) 0.0 255.0 -134.1029792892179 107.39848324418001)
                      (.w c)))))
 
 ;; HunterLab
 
-(def ^{:private true :const true :tag 'double} Ka (* (/ 17500.0 198.04)))
-(def ^{:private true :const true :tag 'double} Kb (* (/ 7000.0 218.11)))
+(def ^{:private true :const true :tag 'double} Ka (/ 17500.0 198.04))
+(def ^{:private true :const true :tag 'double} Kb (/ 7000.0 218.11))
 
 (defn XYZ-to-HunterLAB
-  "XYZ to HunterLAB conversion for given white point (default: CIE-2-D65)"
+  "Converts XYZ (0-100, as [[to-XYZ]]) to Hunter Lab relative to a white point.
+
+  Ka and Kb are computed from the white point: `175 / 198.04 * (Xn + Yn)`, `70 / 218.11 * (Yn + Zn)`.
+
+  - `xyz` color, any type accepted by [[to-color]]
+  - `whitepoint` (`Vec4` `[X Z x y]`, optional): reference white from `clojure2d.color.whitepoints`, default `wp/CIE-2-D65`
+
+  Returns a `Vec4` `[L a b alpha]`; `Y = 0` gives `[0 0 0]`. See also [[HunterLAB-to-XYZ]], [[to-HunterLAB]]."
   (^Vec4 [xyz] (XYZ-to-HunterLAB xyz wp/CIE-2-D65))
   (^Vec4 [xyz ^Vec4 whitepoint]
    (let [cc (XYZ-to-XYZ1 xyz)]
@@ -2261,13 +2316,18 @@
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-HunterLAB srgb)]
-    (Vec4. (m/mnorm (.x cc) 0.0 100.0 0.0 255.0)
-           (m/mnorm (.y cc) -69.08211393661531 109.48378856734126 0.0 255.0)
-           (m/mnorm (.z cc) -199.78221402287008  55.7203132978682 0.0 255.0)
+    (Vec4. (m/mnorm (.x cc) 0.0 100.00000000000003 0.0 255.0)
+           (m/mnorm (.y cc) -69.07993055735508 109.4569884467629 0.0 255.0)
+           (m/mnorm (.z cc) -199.77816803831797 55.71963987860276 0.0 255.0)
            (.w cc))))
 
 (defn HunterLAB-to-XYZ
-  "HunterLAB to XYZ conversion for given white point (default: CIE-2-D65)"
+  "Converts Hunter Lab to XYZ (0-100) relative to a white point, the inverse of [[XYZ-to-HunterLAB]].
+
+  - `hunterlab` color, any type accepted by [[to-color]], channels `[L a b]`
+  - `whitepoint` (`Vec4` `[X Z x y]`, optional): reference white from `clojure2d.color.whitepoints`, default `wp/CIE-2-D65`
+
+  Returns a `Vec4` `[X Y Z alpha]`; `L = 0` gives black. See also [[from-HunterLAB]]."
   (^Vec4 [hunterlab] (HunterLAB-to-XYZ hunterlab wp/CIE-2-D65))
   (^Vec4 [hunterlab ^Vec4 whitepoint]
    (let [^Vec4 c (pr/to-color hunterlab)]
@@ -2300,14 +2360,20 @@
   {:metadoc/categories meta-conv}
   ^Vec4 [hunterlab*]
   (let [^Vec4 c (pr/to-color hunterlab*)]
-    (from-HunterLAB (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.0)
-                           (m/mnorm (.y c) 0.0 255.0 -69.08211393661531 109.48378856734126)
-                           (m/mnorm (.z c) 0.0 255.0 -199.78221402287008  55.7203132978682)
+    (from-HunterLAB (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.00000000000003)
+                           (m/mnorm (.y c) 0.0 255.0 -69.07993055735508 109.4569884467629)
+                           (m/mnorm (.z c) 0.0 255.0 -199.77816803831797 55.71963987860276)
                            (.w c)))))
 
 ;;
 
 (defn XYZ-to-LCH
+  "Converts XYZ (0-100, as [[to-XYZ]]) to CIE LCh(ab), the polar form of [[XYZ-to-LAB]].
+
+  - `xyz` color, any type accepted by [[to-color]]
+  - `whitepoint` (`Vec4` `[X Z x y]`, optional): reference white from `clojure2d.color.whitepoints`, default `wp/CIE-2-D65`
+
+  Returns a `Vec4` `[L C H alpha]`, hue in degrees. See also [[LCH-to-XYZ]], [[to-LCH]]."
   (^Vec4 [xyz] (XYZ-to-LCH xyz wp/CIE-2-D65))
   (^Vec4 [xyz whitepoint]
    (to-luma-color-hue (XYZ-to-LAB xyz whitepoint))))
@@ -2335,12 +2401,18 @@
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-LCH srgb)]
-    (Vec4. (m/mnorm (.x cc) 0.0 100.0 0.0 255.0)
-           (m/mnorm (.y cc) 0.0 133.81586201619493 0.0 255.0)
-           (m/mnorm (.z cc) 0.0 359.99994682530985 0.0 255.0)
+    (Vec4. (m/mnorm (.x cc) 0.0 100.00000000000003 0.0 255.0)
+           (m/mnorm (.y cc) 0.0 133.8075258647932 0.0 255.0)
+           (m/mnorm (.z cc) 0.0 359.9932032350659 0.0 255.0)
            (.w cc))))
 
 (defn LCH-to-XYZ
+  "Converts CIE LCh(ab) (hue in degrees) to XYZ (0-100), the inverse of [[XYZ-to-LCH]].
+
+  - `lch` color, any type accepted by [[to-color]], channels `[L C H]`
+  - `whitepoint` (`Vec4` `[X Z x y]`, optional): reference white from `clojure2d.color.whitepoints`, default `wp/CIE-2-D65`
+
+  Returns a `Vec4` `[X Y Z alpha]`. See also [[from-LCH]]."
   (^Vec4 [lch] (LCH-to-XYZ lch wp/CIE-2-D65))
   (^Vec4 [lch whitepoint]
    (LAB-to-XYZ (from-luma-color-hue lch) whitepoint)))
@@ -2364,14 +2436,20 @@
   {:metadoc/categories meta-conv}
   ^Vec4 [lch*]
   (let [^Vec4 c (pr/to-color lch*)]
-    (from-LCH (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.0)
-                     (m/mnorm (.y c) 0.0 255.0 0.0 133.81586201619493)
-                     (m/mnorm (.z c) 0.0 255.0 0.0 359.99994682530985)
+    (from-LCH (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.00000000000003)
+                     (m/mnorm (.y c) 0.0 255.0 0.0 133.8075258647932)
+                     (m/mnorm (.z c) 0.0 255.0 0.0 359.9932032350659)
                      (.w c)))))
 
 ;; LCHuv
 
 (defn XYZ-to-LCHuv
+  "Converts XYZ (0-100, as [[to-XYZ]]) to CIE LCh(uv), the polar form of [[XYZ-to-LUV]].
+
+  - `xyz` color, any type accepted by [[to-color]]
+  - `whitepoint` (`Vec4` `[X Z x y]`, optional): reference white from `clojure2d.color.whitepoints`, default `wp/CIE-2-D65`
+
+  Returns a `Vec4` `[L C H alpha]`, hue in degrees. See also [[LCHuv-to-XYZ]], [[to-LCHuv]]."
   (^Vec4 [xyz] (XYZ-to-LCHuv xyz wp/CIE-2-D65))
   (^Vec4 [xyz whitepoint]
    (to-luma-color-hue (XYZ-to-LUV xyz whitepoint))))
@@ -2405,6 +2483,12 @@
            (.w cc))))
 
 (defn LCHuv-to-XYZ
+  "Converts CIE LCh(uv) (hue in degrees) to XYZ (0-100), the inverse of [[XYZ-to-LCHuv]].
+
+  - `lchuv` color, any type accepted by [[to-color]], channels `[L C H]`
+  - `whitepoint` (`Vec4` `[X Z x y]`, optional): reference white from `clojure2d.color.whitepoints`, default `wp/CIE-2-D65`
+
+  Returns a `Vec4` `[X Y Z alpha]`. See also [[from-LCHuv]]."
   (^Vec4 [lchuv] (LCHuv-to-XYZ lchuv wp/CIE-2-D65))
   (^Vec4 [lchuv whitepoint]
    (LUV-to-XYZ (from-luma-color-hue lchuv) whitepoint)))
@@ -2436,6 +2520,14 @@
 ;; ### Yxy (xyY)
 
 (defn XYZ-to-Yxy
+  "Converts XYZ to CIE xyY: luminance Y (in the scale of the input) and chromaticity x, y.
+
+  For black (`X + Y + Z = 0`) the chromaticity of the white point is returned (Lindbloom convention).
+
+  - `xyz` color, any type accepted by [[to-color]]
+  - `whitepoint` (`Vec4` `[X Z x y]`, optional): white point used for black, default `wp/CIE-2-D65`
+
+  Returns a `Vec4` `[Y x y alpha]`. See also [[Yxy-to-XYZ]], [[to-Yxy]]."
   (^Vec4 [xyz] (XYZ-to-Yxy xyz wp/CIE-2-D65))
   (^Vec4 [xyz ^Vec4 whitepoint]
    (let [^Vec4 xyz (pr/to-color xyz)
@@ -2470,12 +2562,17 @@
   {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-Yxy srgb)]
-    (Vec4. (m/mnorm (.x cc) 0.0 100.0 0.0 255.0)
-           (m/mnorm (.y cc) 0.0 0.640074499456775 0.0 255.0)
-           (m/mnorm (.z cc) 0.0 0.6000000000000001 0.0 255.0)
+    (Vec4. (m/mnorm (.x cc) 0.0 100.00000000000004 0.0 255.0)
+           (m/mnorm (.y cc) 0.14999999999999994 0.6400000000000001 0.0 255.0)
+           (m/mnorm (.z cc) 0.05999999999999998 0.6000000000000001 0.0 255.0)
            (.w cc))))
 
 (defn Yxy-to-XYZ
+  "Converts CIE xyY to XYZ (in the scale of Y), the inverse of [[XYZ-to-Yxy]].
+
+  - `yxy` color, any type accepted by [[to-color]], channels `[Y x y]`
+
+  Returns a `Vec4` `[X Y Z alpha]`; `Y = 0` gives black. Infinite for `y = 0` with `Y > 0`. See also [[from-Yxy]]."
   ^Vec4 [yxy]
   (let [^Vec4 c (pr/to-color yxy)]
     (if (zero? (.x c))
@@ -2504,9 +2601,9 @@
   {:metadoc/categories meta-conv}
   ^Vec4 [yxy*]
   (let [^Vec4 c (pr/to-color yxy*)]
-    (from-Yxy (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.0)
-                     (m/mnorm (.y c) 0.0 255.0 0.0 0.640074499456775)
-                     (m/mnorm (.z c) 0.0 255.0 0.0 0.6000000000000001)
+    (from-Yxy (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.00000000000004)
+                     (m/mnorm (.y c) 0.0 255.0 0.14999999999999994 0.6400000000000001)
+                     (m/mnorm (.z c) 0.0 255.0 0.05999999999999998 0.6000000000000001)
                      (.w c)))))
 
 ;; ### Munsell
@@ -2573,6 +2670,14 @@
             (* 2.0 v d)))))
 
 (defn XYZ-to-UVW
+  "Converts XYZ (0-100, as [[to-XYZ]]) to CIE 1964 U*V*W* relative to a white point.
+
+  `W = 25 Y^(1/3) - 17`, `U = 13 W (u - u0)`, `V = 13 W (v - v0)` with CIE 1960 u, v chromaticities; black takes the white chromaticity (U = V = 0, W = -17).
+
+  - `xyz` color, any type accepted by [[to-color]]
+  - `whitepoint` (`Vec4` `[X Z x y]`, optional): reference white from `clojure2d.color.whitepoints`, default `wp/CIE-2-D65`
+
+  Returns a `Vec4` `[U V W alpha]`. See also [[UVW-to-XYZ]], [[to-UVW]]."
   (^Vec4 [xyz] (XYZ-to-UVW xyz wp/CIE-2-D65))
   (^Vec4 [xyz ^Vec4 whitepoint]
    (let [^Vec4 c (XYZ-to-Yxy xyz whitepoint)
@@ -2610,14 +2715,24 @@
            (.w cc))))
 
 (defn UVW-to-XYZ
+  "Converts CIE 1964 U*V*W* to XYZ (0-100) relative to a white point, the inverse of [[XYZ-to-UVW]].
+
+  For `W = 0` the chromaticity is undetermined; the white chromaticity is used.
+
+  - `uvw` color, any type accepted by [[to-color]], channels `[U V W]`
+  - `whitepoint` (`Vec4` `[X Z x y]`, optional): reference white from `clojure2d.color.whitepoints`, default `wp/CIE-2-D65`
+
+  Returns a `Vec4` `[X Y Z alpha]`. See also [[from-UVW]]."
   (^Vec4 [uvw] (UVW-to-XYZ uvw wp/CIE-2-D65))
   (^Vec4 [uvw ^Vec4 whitepoint]
    (let [^Vec4 c (pr/to-color uvw)
          ^Vec2 uv0 (xy->uv (Vec2. (.z whitepoint) (.w whitepoint)))
          Y (m/cb (/ (+ 17.0 (.z c)) 25.0))
-         W13 (/ (* 13.0 (.z c)))
-         ^Vec2 xy (uv->xy (Vec2. (+ (* (.x c) W13) (.x uv0))
-                                 (+ (* (.y c) W13) (.y uv0))))]
+         ^Vec2 xy (if (zero? (.z c))
+                    (uv->xy uv0)
+                    (let [W13 (/ (* 13.0 (.z c)))]
+                      (uv->xy (Vec2. (+ (* (.x c) W13) (.x uv0))
+                                     (+ (* (.y c) W13) (.y uv0))))))]
      (Yxy-to-XYZ (Vec4. Y (.x xy) (.y xy) (.w c))))))
 
 (defn from-UVW
@@ -3013,9 +3128,9 @@
   (let [^Vec4 c (pr/to-color c)
         J+ (+ jab-d0 (.x c))
         I (/ J+ (- jab-d+ (* jab-d J+)))
-        ^Vec3 LMS (-> (Vec3. (+ (* 1.0000000000000002 I) (* 0.1386050432715393 (.y c)) (* 0.05804731615611886 (.z c)))
-                             (+ (* 0.9999999999999999 I) (* -0.1386050432715393 (.y c)) (* -0.05804731615611886 (.z c)))
-                             (+ (* 0.9999999999999998 I) (* -0.09601924202631895 (.y c)) (* -0.8118918960560388 (.z c))))
+        ^Vec3 LMS (-> (Vec3. (+ I (* 0.1386050432715393 (.y c)) (* 0.05804731615611886 (.z c)))
+                             (+ I (* -0.1386050432715393 (.y c)) (* -0.05804731615611886 (.z c)))
+                             (+ I (* -0.09601924202631895 (.y c)) (* -0.8118918960560388 (.z c))))
                       (v/fmap jab-lms'->lms))
         ^Vec3 XYZ' (Vec3. (+ (* 1.9242264357876069 (.x LMS)) (* -1.0047923125953657 (.y LMS)) (* 0.037651404030617994 (.z LMS)))
                           (+ (* 0.350316762094999 (.x LMS)) (* 0.7264811939316552 (.y LMS)) (* -0.06538442294808501 (.z LMS)))
@@ -3669,8 +3784,8 @@
   ^Vec4 [c]
   (let [cc (to-YPbPr c)]
     (Vec4. (.x cc)
-           (m/mnorm (.y cc) -127.49999999999999 127.5 0.0 255.0)
-           (m/mnorm (.z cc) -127.49999999999999 127.5 0.0 255.0)
+           (m/mnorm (.y cc) -127.5 127.5 0.0 255.0)
+           (m/mnorm (.z cc) -127.5 127.5 0.0 255.0)
            (.w cc))))
 
 (defn from-YPbPr
@@ -3697,8 +3812,8 @@
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-YPbPr (Vec4. (.x c)
-                       (m/mnorm (.y c) 0.0 255.0 -127.49999999999999 127.5)
-                       (m/mnorm (.z c) 0.0 255.0 -127.49999999999999 127.5)
+                       (m/mnorm (.y c) 0.0 255.0 -127.5 127.5)
+                       (m/mnorm (.z c) 0.0 255.0 -127.5 127.5)
                        (.w c)))))
 
 ;; ### YDbDr
@@ -3731,8 +3846,8 @@
   ^Vec4 [c]
   (let [cc (to-YDbDr c)]
     (Vec4. (.x cc)
-           (m/mnorm (.y cc) -339.91499999999996 339.91499999999996 0.0 255.0)
-           (m/mnorm (.z cc) -339.91499999999996 339.915 0.0 255.0)
+           (m/mnorm (.y cc) -339.915 339.915 0.0 255.0)
+           (m/mnorm (.z cc) -339.915 339.915 0.0 255.0)
            (.w cc))))
 
 (defn from-YDbDr
@@ -3759,11 +3874,11 @@
 
   Returns an RGB `Vec4`, not clamped. See also [[from-YDbDr]]."
   {:metadoc/categories meta-conv}
-  [c]
+  ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-YDbDr (Vec4. (.x c)
-                       (m/mnorm (.y c) 0.0 255.0 -339.91499999999996 339.91499999999996)
-                       (m/mnorm (.z c) 0.0 255.0 -339.91499999999996 339.915)
+                       (m/mnorm (.y c) 0.0 255.0 -339.915 339.915)
+                       (m/mnorm (.z c) 0.0 255.0 -339.915 339.915)
                        (.w c)))))
 
 
@@ -3855,8 +3970,8 @@
   ^Vec4 [c]
   (let [cc (to-YUV c)]
     (Vec4. (.x cc)
-           (m/mnorm (.y cc) -111.17999999999999 111.17999999999999 0.0 255.0)
-           (m/mnorm (.z cc) -156.82500000000002 156.825 0.0 255.0)
+           (m/mnorm (.y cc) -111.18 111.18 0.0 255.0)
+           (m/mnorm (.z cc) -156.825 156.825 0.0 255.0)
            (.w cc))))
 
 (defn from-YUV
@@ -3883,8 +3998,8 @@
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-YUV (Vec4. (.x c)
-                     (m/mnorm (.y c) 0.0 255.0 -111.17999999999999 111.17999999999999)
-                     (m/mnorm (.z c) 0.0 255.0 -156.82500000000002 156.825)
+                     (m/mnorm (.y c) 0.0 255.0 -111.18 111.18)
+                     (m/mnorm (.z c) 0.0 255.0 -156.825 156.825)
                      (.w c)))))
 
 ;; ### YIQ
@@ -4033,7 +4148,7 @@
         k (/ (- (* ch-e (- g l)) (* ch-c bl)) ch-d)
         s (/ (m/sqrt (+ (* k k) (* bl bl)))
              (* ch-e l (- 1.0 l)))]
-    (if (Double/isNaN s)
+    (if (m/nan? s)
       (Vec4. 0.0 0.0 l (.w c))
       (let [h (- (* (m/atan2 k bl) m/rad-in-deg) 120.0)]
         (Vec4. (if (neg? h) (+ h 360.0) h) s l (.w c))))))
@@ -4266,19 +4381,44 @@
             :r [0.0 99.99966889479349], :g [-40.09004621173093 45.50144853911036], :b [-40.46972646264244 44.34399530319826]}
    :din99c {:l99mult 317.65 :lmult 0.0037
             :cosc 1.0 :sinc 0.0
-            :fmult 0.94 :c99mult 23.0 :gmult 0.066 :hshift 0.0 :gdiv 1.0
-            :r [0.0 99.99963151018667], :g [-38.442150748774765 43.672984883149326], :b [-40.79042147823036 43.593916250376374]}
+            :fmult 0.94 :c99mult 23.0 :gmult 0.066 :hshift 0.0 :gdiv 1.0 :kuehni 1.1
+            :r [0.0 99.99963151018667], :g [-38.50249399671165 45.17090440252161], :b [-45.676929680471495 44.22399928478519]}
    :din99d {:l99mult 325.22 :lmult 0.0036
             :cosc (m/cos (m/radians 50.0)) :sinc (m/sin (m/radians 50.0))
-            :fmult 1.14 :c99mult 22.5 :gmult 0.06 :hshift (m/radians 50.0) :gdiv 1.0
-            :r [0.0 100.0001740520318], :g [-37.35107341091223 42.323305011648586], :b [-41.0360885813404 43.03758966737312]}})
+            :fmult 1.14 :c99mult 22.5 :gmult 0.06 :hshift (m/radians 50.0) :gdiv 1.0 :kuehni 1.12
+            :r [0.0 100.0001740520318], :g [-37.5279922707718 44.1720101745847], :b [-45.79074026102887 43.68393527066125]}})
+
+(defn- kuehni-whitepoint
+  "CIE-2-D65 with Kuehni's correction of X (`c0 Xn - (c0 - 1) Zn`), the white of DIN99c and DIN99d."
+  ^Vec4 [^double c0]
+  (let [^Vec4 w wp/CIE-2-D65]
+    (wp/XZ->coordinates (- (* c0 (.x w)) (* (dec c0) (.y w))) (.y w))))
+
+(defn- make-to-kuehni-LAB
+  "sRGB to CIELAB with Kuehni's correction `X' = c0 X - (c0 - 1) Z` applied to the color and the white (Cui et al. 2002, DIN99c and DIN99d)."
+  [^double c0]
+  (let [white (kuehni-whitepoint c0)
+        c0- (dec c0)]
+    (fn ^Vec4 [c]
+      (let [^Vec4 xyz (to-XYZ c)]
+        (XYZ-to-LAB (Vec4. (- (* c0 (.x xyz)) (* c0- (.z xyz))) (.y xyz) (.z xyz) (.w xyz)) white)))))
+
+(defn- make-from-kuehni-LAB
+  "Inverse of [[make-to-kuehni-LAB]]: CIELAB relative to the corrected white, then `X = (X' + (c0 - 1) Z) / c0`."
+  [^double c0]
+  (let [white (kuehni-whitepoint c0)
+        c0- (dec c0)]
+    (fn ^Vec4 [lab]
+      (let [^Vec4 xyz (LAB-to-XYZ lab white)]
+        (from-XYZ (Vec4. (/ (+ (.x xyz) (* c0- (.z xyz))) c0) (.y xyz) (.z xyz) (.w xyz)))))))
 
 (defn- make-to-DIN99
   [n]
   (let [{:keys [^double cosc ^double sinc ^double fmult ^double hshift ^double c99mult
-                ^double gmult ^double gdiv ^double l99mult ^double lmult]} (din99-config n)]
+                ^double gmult ^double gdiv ^double l99mult ^double lmult kuehni]} (din99-config n)
+        ->lab (if kuehni (make-to-kuehni-LAB kuehni) to-LAB)]
     (fn ^Vec4 [c]
-      (let [^Vec4 c (to-LAB c)
+      (let [^Vec4 c (->lab c)
             e (+ (* cosc (.y c)) (* sinc (.z c)))
             f (* fmult (- (* cosc (.z c)) (* sinc (.y c))))
             G (m/hypot-sqrt e f)
@@ -4304,8 +4444,9 @@
 (defn- make-from-DIN99
   [n]
   (let [{:keys [^double cosc ^double sinc ^double fmult ^double hshift ^double c99mult
-                ^double gmult ^double gdiv ^double l99mult ^double lmult]} (din99-config n)
-        C99mult (/ gdiv c99mult)]
+                ^double gmult ^double gdiv ^double l99mult ^double lmult kuehni]} (din99-config n)
+        C99mult (/ gdiv c99mult)
+        lab-> (if kuehni (make-from-kuehni-LAB kuehni) from-LAB)]
     (fn ^Vec4 [c]
       (let [^Vec4 c (pr/to-color c)
             h99 (- (m/atan2 (.z c) (.y c)) hshift)
@@ -4316,7 +4457,7 @@
             a (- (* e cosc) (* f sinc))
             b (+ (* e sinc) (* f cosc))
             L (/ (m/expm1 (/ (.x c) l99mult)) lmult)]
-        (from-LAB (Vec4. L a b (.w c)))))))
+        (lab-> (Vec4. L a b (.w c)))))))
 
 (defn- make-from-DIN99*
   [f n]
@@ -4353,18 +4494,18 @@
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -40.09 to 45.50, b -40.47 to 44.34. See also [[from-DIN99o]], [[to-DIN99o*]]." :metadoc/categories meta-conv} to-DIN99o (make-to-DIN99 :din99o))
 (def ^{:doc "Converts an sRGB color to DIN99c, a CIELAB-based uniform space (Cui et al. 2002).
 
-  Computed from XYZ with the DIN99c modification of X, then CIELAB (CIE 1931 2° D65) and the DIN99c constants.
+  Computed from [[to-XYZ]] with Kuehni's correction `X' = 1.1 X - 0.1 Z` applied to the color and to the CIE 1931 2° D65 white, then CIELAB and the DIN99c constants (as colour-science).
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -38.44 to 43.67, b -40.79 to 43.59. See also [[from-DIN99c]], [[to-DIN99c*]]." :metadoc/categories meta-conv} to-DIN99c (make-to-DIN99 :din99c))
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -38.50 to 45.17, b -45.68 to 44.22. See also [[from-DIN99c]], [[to-DIN99c*]]." :metadoc/categories meta-conv} to-DIN99c (make-to-DIN99 :din99c))
 (def ^{:doc "Converts an sRGB color to DIN99d, a CIELAB-based uniform space (Cui et al. 2002).
 
-  Computed from XYZ with the DIN99d modification of X, then CIELAB (CIE 1931 2° D65) and the DIN99d constants, 50° hue rotation.
+  Computed from [[to-XYZ]] with Kuehni's correction `X' = 1.12 X - 0.12 Z` applied to the color and to the CIE 1931 2° D65 white, then CIELAB and the DIN99d constants, 50° hue rotation (as colour-science).
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -37.35 to 42.32, b -41.04 to 43.04. See also [[from-DIN99d]], [[to-DIN99d*]]." :metadoc/categories meta-conv} to-DIN99d (make-to-DIN99 :din99d))
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -37.53 to 44.17, b -45.79 to 43.68. See also [[from-DIN99d]], [[to-DIN99d*]]." :metadoc/categories meta-conv} to-DIN99d (make-to-DIN99 :din99d))
 (def ^{:doc "Converts an sRGB color to DIN99 with channels mapped to `[0,255]`.
 
   Each channel of [[to-DIN99]] is mapped linearly from its range (L 0 to 100, a -27.45 to 36.18, b -33.40 to 31.15) to `[0,255]`. Alpha is kept.
@@ -4388,14 +4529,14 @@
   Returns a `Vec4`. Inverse: [[from-DIN99o*]]." :metadoc/categories meta-conv} to-DIN99o* (make-to-DIN99* to-DIN99o :din99o))
 (def ^{:doc "Converts an sRGB color to DIN99c with channels mapped to `[0,255]`.
 
-  Each channel of [[to-DIN99c]] is mapped linearly from its range (L 0 to 100, a -38.44 to 43.67, b -40.79 to 43.59) to `[0,255]`. Alpha is kept.
+  Each channel of [[to-DIN99c]] is mapped linearly from its range (L 0 to 100, a -38.50 to 45.17, b -45.68 to 44.22) to `[0,255]`. Alpha is kept.
 
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-DIN99c*]]." :metadoc/categories meta-conv} to-DIN99c* (make-to-DIN99* to-DIN99c :din99c))
 (def ^{:doc "Converts an sRGB color to DIN99d with channels mapped to `[0,255]`.
 
-  Each channel of [[to-DIN99d]] is mapped linearly from its range (L 0 to 100, a -37.35 to 42.32, b -41.04 to 43.04) to `[0,255]`. Alpha is kept.
+  Each channel of [[to-DIN99d]] is mapped linearly from its range (L 0 to 100, a -37.53 to 44.17, b -45.79 to 43.68) to `[0,255]`. Alpha is kept.
 
   - `c` color, any type accepted by [[to-color]]
 
@@ -4593,10 +4734,10 @@
 (def ^{:doc "Alias for [[to-color]]" :metadoc/categories meta-conv} to-RGB* pr/to-color)
 (def ^{:doc "Alias for [[to-color]]" :metadoc/categories meta-conv} from-RGB* pr/to-color)
 
-(def ^{:doc "sRGB -> linearRGB" :metadoc/categories meta-conv} to-linearRGB from-sRGB)
-(def ^{:doc "linearRGB -> sRGB" :metadoc/categories meta-conv} from-linearRGB to-sRGB)
-(def ^{:doc "sRGB -> linearRGB" :metadoc/categories meta-conv} to-linearRGB* from-sRGB)
-(def ^{:doc "linearRGB -> sRGB" :metadoc/categories meta-conv} from-linearRGB* to-sRGB)
+(def ^{:doc "Decodes sRGB to linear RGB, the same function as [[from-sRGB]] (the `:linearRGB` entry of [[colorspaces]])." :metadoc/categories meta-conv} to-linearRGB from-sRGB)
+(def ^{:doc "Encodes linear RGB to sRGB, the same function as [[to-sRGB]]." :metadoc/categories meta-conv} from-linearRGB to-sRGB)
+(def ^{:doc "The same as [[to-linearRGB]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} to-linearRGB* from-sRGB)
+(def ^{:doc "The same as [[from-linearRGB]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} from-linearRGB* to-sRGB)
 
 ;; List of all color spaces with functions
 (def ^{:doc "Colorspace conversions by name: keyword to `[to-XXX from-XXX]`, the raw converters.

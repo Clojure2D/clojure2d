@@ -66,15 +66,32 @@
       (is (every? #(m/<= % tol) (map #(m/abs (m/- %1 %2)) x (from (to x)))) (str k " " rgb))
       (is (every? #(m/<= % tol) (map #(m/abs (m/- %1 %2)) x (from* (to* x)))) (str k "* " rgb)))))
 
+(def ^:private range-grid
+  ;; 16^3 grid and every cube edge at step 1
+  (let [edges (for [t (range 256) [a b] [[0 0] [0 255] [255 0] [255 255]] p [[t a b] [a t b] [a b t]]] p)]
+    (mapv c/color (concat (for [r (range 0 256 17) g (range 0 256 17) b (range 0 256 17)] [r g b]) edges))))
+
+(def ^:private range-not-reached
+  ;; channels whose sampled extrema are not reached on range-grid: hue (maximum just below 360 / 1), OSA j and g
+  ;; (extrema near black, inside the cube), Okhsl and Okhsv saturation (extrema inside the cube)
+  {:HSV #{0} :HSB #{0} :HSL #{0} :HSI #{0} :HWB #{0} :PalettonHSV #{0} :LCH #{2} :LCHuv #{2} :JCH #{2} :Oklch #{2}
+   :Okhsl #{0 1} :Okhsv #{0 1} :Okhwb #{0} :OSA #{1 2}})
+
 (deftest normalized-range-test
-  ;; to-X* of sRGB colors stays in [0,255]: ranges are sampled extrema (utils/color/gen_normalized_ranges.clj,
-  ;; 64^3 grid + cube edges); this grid differs, overshoot <= 1e-6
-  (let [grid (for [r (range 0 256 17) g (range 0 256 17) b (range 0 256 17)] (c/color r g b))]
-    (doseq [k (keys c/colorspaces*)
-            :let [to* (first (c/colorspaces* k))
-                  vs (mapcat #(take 3 (to* %)) grid)]]
-      (is (m/<= -1.0e-6 (reduce min vs)) (str k " min"))
-      (is (m/<= (reduce max vs) (+ 255.0 1.0e-6)) (str k " max")))))
+  ;; ranges are sampled extrema (utils/color/gen_normalized_ranges.clj, 64^3 grid + cube edges): on another grid
+  ;; to-X* stays within [0,255] (overshoot <= 1e-6) and reaches 0 and 255 within 1e-6 (stale ranges fail)
+  (doseq [k (keys c/colorspaces*)
+          :let [to* (first (c/colorspaces* k))
+                vs (mapv to* range-grid)]
+          ch [0 1 2]
+          :let [xs (map #(% ch) vs)
+                mn (reduce min xs)
+                mx (reduce max xs)]]
+    (is (m/<= -1.0e-6 mn) (str k " " ch " min"))
+    (is (m/<= mx (+ 255.0 1.0e-6)) (str k " " ch " max"))
+    (when-not (contains? (range-not-reached k) ch)
+      (is (m/<= mn 1.0e-6) (str k " " ch " min reached"))
+      (is (m/<= (- 255.0 1.0e-6) mx) (str k " " ch " max reached")))))
 
 (deftest edge-cases-test
   (testing "grays: hexagonal hue and saturation 0"
@@ -83,10 +100,22 @@
       (is (zero? (x 0)) (str k g))
       (when (not= k :HWB) (is (zero? (x 1)) (str k g)))))
   (testing "Yxy and UVW of black: white-point chromaticity (Lindbloom), black round-trips"
-    (let [yxy (c/to-Yxy :black)]
+    (let [yxy (c/to-Yxy :black)
+          uvw (c/to-UVW :black)]
       (is (zero? (yxy 0)))
       (is (m/< 0.3 (yxy 1) 0.32))
-      (is (= (c/to-color :black) (c/from-Yxy yxy)))))
+      (is (= (c/to-color :black) (c/from-Yxy yxy)))
+      (is (zero? (uvw 0)))
+      (is (zero? (uvw 1)))
+      (is (== -17.0 (uvw 2)))
+      (is (= (c/to-color :black) (c/from-UVW uvw)))))
+  (testing "UVW with W = 0: white chromaticity, gray with Y = (17/25)^3"
+    (let [rgb (c/from-UVW [0 0 0])
+          xyz (c/to-XYZ rgb)]
+      (is (not-any? m/nan? rgb))
+      (is (rel-close? 1.0e-9 (rgb 0) (rgb 1)))
+      (is (rel-close? 1.0e-9 (rgb 1) (rgb 2)))
+      (is (rel-close? 1.0e-9 (m/cb (/ 17.0 25.0)) (xyz 1)))))
   (testing "Gray is lossy: from-Gray is the same function"
     (is (identical? c/to-Gray c/from-Gray)))
   (testing "CMY is its own inverse"
@@ -104,10 +133,16 @@
 
 (deftest docstrings-test
   (doseq [k (keys c/colorspaces)
-          :when (not (#{:pass :RGB :sRGB :linearRGB} k))
-          f ["to-" "from-" "to-" "from-"]
-          :let [star (if (#{0 1} (.indexOf ["to-" "from-" "to-" "from-"] f)) "" "*")]]
-    (is (some? (:doc (meta (ns-resolve 'clojure2d.color (symbol (str f (name k) star)))))) (str f (name k) star))))
+          :when (not= k :pass)
+          prefix ["to-" "from-"]
+          suffix ["" "*"]
+          :let [n (str prefix (name k) suffix)]]
+    (is (some? (:doc (meta (ns-resolve 'clojure2d.color (symbol n))))) n))
+  (testing "XYZ helpers"
+    (doseq [s '[XYZ-to-LAB LAB-to-XYZ XYZ-to-LUV LUV-to-XYZ XYZ-to-HunterLAB HunterLAB-to-XYZ XYZ-to-LCH LCH-to-XYZ
+                XYZ-to-LCHuv LCHuv-to-XYZ XYZ-to-Yxy Yxy-to-XYZ XYZ-to-UVW UVW-to-XYZ XYZ-to-UCS UCS-to-XYZ
+                to-luma-color-hue from-luma-color-hue]]
+      (is (some? (:doc (meta (ns-resolve 'clojure2d.color s)))) (str s)))))
 
 ;; G2: one sRGB matrix, CIE-2-D65 white
 
@@ -133,6 +168,9 @@
             :let [x (f (c/gray g))]]
       (is (zero? (x 0)) (str g))
       (is (zero? (x 1)) (str g))))
+  (testing "Okhsl: lightness 0 is black, 1 is white, for any hue and saturation"
+    (is (= (c/to-color :black) (c/from-Okhsl [0.3 0.7 0.0])))
+    (is (= (c/to-color :white) (c/from-Okhsl [0.3 0.7 1.0]))))
   (testing "Okhsl, Okhsv saturation stays within 1 (up to rounding)"
     (doseq [rgb (:samples @reference) f [c/to-Okhsl c/to-Okhsv]]
       (is (m/<= ((f rgb) 1) (+ 1.0 1.0e-6)) (str rgb))))

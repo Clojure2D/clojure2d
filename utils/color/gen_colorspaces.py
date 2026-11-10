@@ -15,7 +15,9 @@ Oracles ({space [[c1 c2 c3] ...]} in :oracle, raw clojure2d ranges):
 * colour-science on that XYZ: LAB, LCH, LUV, LCHuv, Yxy and UVW (black: white chromaticity, Lindbloom), UCS,
   HunterLAB (Ka, Kb from the white point by formula; black gives 0, 0, 0 as in clojure2d), IPT, IgPgTg, JAB / JCH (XYZ x 100 cd/m2), OSA
   (L shifted by (14.4 - 14.3993) / sqrt(2): clojure2d uses colorio's 14.3993), DIN99 (ASTMD2244-07),
-  DIN99b, DIN99c, DIN99d
+  DIN99b, DIN99c, DIN99d (DIN99c, DIN99d: Kuehni's correction X' = c0 X - (c0 - 1) Z, c0 1.1 and 1.12, on the
+  color and the white before CIELAB, Cui et al. 2002; transcribed from colour develop XYZ_to_DIN99, 0.4.7
+  lacks it)
 * colour-science on encoded sRGB: HCL (Sarifuddin, hue in degrees), YCgCo (channels reordered Y Cg Co)
 * coloraide 8.14: HSV, HSL, HSI, HWB, Cubehelix, DIN99o (coloraide's D65 white: tested at 1e-2), Okhsl, Okhsv (hue / 360), CMY (x 255), Oklab, Oklch, XYB (raw B = coloraide b + y)
 * matrices: YDbDr (SECAM), OHTA (Ohta 1980), LMS (Hunt-Pointer-Estevez normalized to D65, on XYZ 0-100),
@@ -82,6 +84,15 @@ def rgb2ryb(r, g, b):
     return [r + w, y + w, b + w]
 
 
+def din99_kuehni(xyz, c0, method):
+    """colour develop XYZ_to_DIN99 for DIN99c / DIN99d: Kuehni's correction of X on the color and the white."""
+    X, Y, Z = xyz[:, 0], xyz[:, 1], xyz[:, 2]
+    xyz_c = np.column_stack([c0 * X - (c0 - 1.0) * Z, Y, Z])
+    w = WP_XYZ
+    white = colour.XYZ_to_xy(np.array([c0 * w[0] - (c0 - 1.0) * w[2], w[1], w[2]]))
+    return colour.Lab_to_DIN99(colour.XYZ_to_Lab(xyz_c, white), method=method)
+
+
 def oracle(RGB):
     S = RGB / 255.0
     lin = colour.cctf_decoding(S, function="sRGB")
@@ -117,8 +128,8 @@ def oracle(RGB):
         "JAB": jab, "JCH": colour.Jzazbz_to_JzCHab(jab), "OSA": osa,
         "DIN99": colour.XYZ_to_DIN99(xyz, WP_XY, method="ASTMD2244-07"),
         "DIN99b": colour.XYZ_to_DIN99(xyz, WP_XY, method="DIN99b"),
-        "DIN99c": colour.XYZ_to_DIN99(xyz, WP_XY, method="DIN99c"),
-        "DIN99d": colour.XYZ_to_DIN99(xyz, WP_XY, method="DIN99d"),
+        "DIN99c": din99_kuehni(xyz, 1.1, "DIN99c"),
+        "DIN99d": din99_kuehni(xyz, 1.12, "DIN99d"),
         "HCL": hcl, "YCgCo": yco[:, [0, 2, 1]],
         "HSV": coloraide_coords("hsv", S), "HSL": coloraide_coords("hsl", S), "HSI": coloraide_coords("hsi", S),
         "HWB": coloraide_coords("hwb", S), "Cubehelix": coloraide_coords("cubehelix", S),

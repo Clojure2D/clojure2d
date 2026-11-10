@@ -23,7 +23,7 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color.cssgram`: filters `brannan` and `perpetua` (gradient approximated); `filter-definitions` (filters as data: overlays, filter steps, approximation notes); docstrings for the namespace, every filter, `filters`, `filters-list`, `custom-filter`; `custom-filter` accepts the W3C whole-color modes and `:darker-color`, `:lighter-color`
 * `clojure2d.color`: docstrings for the representation layer (named colors, accessors, setters, AWT colors, clamping, scaling, `hue`, `hue-polar`, `format-hex`, `pack`, `black?`) and the `ColorProto` protocol; namespace docstring corrected for packed integers and hex strings
 * `clojure2d.color/to-color` (and every color function) accepts color names as strings, case-insensitive, for names without a namespace (`"red"`, `"Dark-Blue"`), and `float` arrays
-* `clojure2d.color`: docstrings for the colorspace conversions (model, source, conventions, ranges; `to-`, `from-`, normalized `*` variants) and a convention table in `colorspaces`, `colorspaces*`, `colorspaces-list`; `to-OSA`/`from-OSA` docstrings no longer swapped
+* `clojure2d.color`: docstrings for the colorspace conversions (model, source, conventions, ranges; `to-`, `from-`, normalized `*` variants) and a convention table in `colorspaces`, `colorspaces*`, `colorspaces-list`; `to-OSA`/`from-OSA` docstrings no longer swapped; docstrings for the XYZ helpers (`XYZ-to-LAB`, `LAB-to-XYZ`, `XYZ-to-LUV`, `LUV-to-XYZ`, `XYZ-to-HunterLAB`, `HunterLAB-to-XYZ`, `XYZ-to-LCH`, `LCH-to-XYZ`, `XYZ-to-LCHuv`, `LCHuv-to-XYZ`, `XYZ-to-Yxy`, `Yxy-to-XYZ`, `XYZ-to-UVW`, `UVW-to-XYZ`, `XYZ-to-UCS`, `UCS-to-XYZ`), `to-luma-color-hue`, `from-luma-color-hue`
 
 ### Changed
 
@@ -41,7 +41,9 @@ All notable changes to this project will be documented in this file. This change
 * [breaking] `clojure2d.color` YPbPr uses the standard BT.709 scaling `Pb = (B - Y) / 1.8556`, `Pr = (R - Y) / 1.5748` (Pb, Pr within 127.5; were unscaled differences)
 * [breaking] `clojure2d.color` Oklab family (Oklab, Oklch, Okhsl, Okhsv, Okhwb) uses coloraide's high-precision matrices and gamut coefficients: grays map to a = b = 0, round trips are exact; Okhsl, Okhsv saturation changes by up to 1e-3
 * [breaking] `clojure2d.color/from-HCL` solves the Sarifuddin-Missaoui Q exactly (the published inverse estimates it and round-trips within about 0.06); `from-XYB` and `from-OSA` use exact inverse matrices
-* `clojure2d.color` normalized `to-X*`/`from-X*` ranges recomputed from sampled extrema (`utils/color/gen_normalized_ranges.clj`) for the DIN99 family, IPT, IgPgTg, JAB, JCH, LCHuv, LMS, OSA, the Oklab family, UCS, UVW, YPbPr: normalized values stay within `[0,255]`
+* [breaking] `clojure2d.color` DIN99c and DIN99d apply Kuehni's correction `X' = c0 X - (c0 - 1) Z` (c0 1.1 and 1.12) to the color and the white before CIELAB (Cui et al. 2002, as colour-science); the docstrings described it, the code skipped it: a, b change by up to about 21
+* `clojure2d.color` normalized `to-X*`/`from-X*` ranges recomputed from sampled extrema (`utils/color/gen_normalized_ranges.clj`) for the DIN99 family, IPT, IgPgTg, JAB, JCH, LAB, LCH, LCHuv, LUV, HunterLAB, LMS, OSA, the Oklab family, UCS, UVW, YPbPr: normalized values stay within `[0,255]` and reach 0 and 255
+* [breaking] `clojure2d.color/to-Yxy*`, `from-Yxy*` map x from 0.15-0.64 and y from 0.06-0.60 (the sRGB range) instead of from 0: normalized x, y change by up to 60 and 26
 
 ### Fixed
 
@@ -63,6 +65,7 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color/from-HCL` returned NaN for black
 * `clojure2d.color/from-OSA` stopped its Newton iteration on a negative residual (signed test); now the absolute residual
 * `clojure2d.color/from-JAB` returned NaN for colors within rounding noise of black
+* `clojure2d.color/from-UVW` (`UVW-to-XYZ`) returned NaN for W* = 0; the white chromaticity is used
   - D-series `CIE-2-D50`, `CIE-2-D55`, `CIE-2-D60`, `CIE-2-D75`, `CIE-10-D50`, `CIE-10-D55`, `CIE-10-D60`, `CIE-10-D65`, `CIE-10-D75` are now full precision 1 nm integrations of the CIE spectra (xy change 1e-5 to 3e-5; the former values were the CIE 15:2004 Table T.3 values, 5 nm sums over 380-780 nm, which the new values match to 4 decimals); `CIE-2-D65` is unchanged; RGB spaces based on `CIE-2-D50` (Adobe Wide Gamut, Best, Beta, ColorMatch, Don, Ekta Space PS5, ECI v2, Xtreme) change by less than 0.01 on 0-255
   - computed (`*`) white points recomputed with the fixed integration: `*-ISO-SP*` were off by about 0.24 in xy, `CIE-2015-*-E*` were not 1/3, other ISO 7589 entries off by about 8e-4, the rest by about 2e-7
 * `clojure2d.color.whitepoints/chromatic-adaptation-matrix` (and `->XYZ-to-XYZ`) failed with a `ClassCastException` mixing `RealMatrix` and `Mat3x3`
