@@ -18,6 +18,7 @@
    :E94 c/delta-E*-94
    :E94-textiles #(c/delta-E*-94 %1 %2 {:textiles? true})
    :E2000 c/delta-E*-2000
+   :E2000-textiles #(c/delta-E*-2000 %1 %2 {:l 2.0})
    :CMC11 c/delta-E*-CMC
    :CMC21 #(c/delta-E*-CMC %1 %2 {:l 2.0})
    :HyAB c/delta-E-HyAB
@@ -95,9 +96,24 @@
     (testing "delta-C* changes sign with the argument order"
       (doseq [[a b] pairs]
         (is (== (c/delta-C* a b) (- (c/delta-C* b a))) (str a " " b))))
-    (testing "CIE94 and CMC: the first color is the reference"
-      (is (m/> (m/abs (- (c/delta-E*-94 :red :orange) (c/delta-E*-94 :orange :red))) 1.0))
-      (is (m/> (m/abs (- (c/delta-E*-CMC :red :orange) (c/delta-E*-CMC :orange :red))) 1.0e-3)))
+    (testing "CIE94 and CMC: the first color is the reference, both orders match the oracle"
+      (let [{all :pairs oracle :oracle} @reference
+            idx (fn [p] (.indexOf ^java.util.List all p))
+            red-orange (idx [[255.0 0.0 0.0] [255.0 165.0 0.0]])
+            orange-red (idx [[255.0 165.0 0.0] [255.0 0.0 0.0]])]
+        (doseq [[k f] [[:E94 c/delta-E*-94] [:CMC11 c/delta-E*-CMC]]
+                :let [e-ro (nth (oracle k) red-orange)
+                      e-or (nth (oracle k) orange-red)]]
+          (is (not (rel-close? 1.0e-6 e-ro e-or)) (str k " oracle orders differ"))
+          (is (rel-close? 1.0e-12 e-ro (f [255 0 0] [255 165 0])) (str k " red, orange"))
+          (is (rel-close? 1.0e-12 e-or (f [255 165 0] [255 0 0])) (str k " orange, red")))))
+    (testing "CIEDE2000 weights: a larger kC or kH lowers the difference of a chroma-only or hue-only pair"
+      (let [lab {:colorspace :pass}
+            chroma-pair [[50.0 20.0 0.0] [50.0 30.0 0.0]]
+            hue-pair [[50.0 20.0 0.0] [50.0 0.0 20.0]]]
+        (is (m/< (apply c/delta-E*-2000 (conj chroma-pair (assoc lab :c 2.0))) (apply c/delta-E*-2000 (conj chroma-pair lab))))
+        (is (m/< (apply c/delta-E*-2000 (conj hue-pair (assoc lab :h 2.0))) (apply c/delta-E*-2000 (conj hue-pair lab))))
+        (is (== (apply c/delta-E*-2000 (conj hue-pair (assoc lab :l 5.0))) (apply c/delta-E*-2000 (conj hue-pair lab))) "kL: no lightness difference")))
     (testing "contrast-ratio: 1 for equal colors, 21 for black and white, symmetric"
       (is (== 1.0 (c/contrast-ratio :red :red)))
       (is (rel-close? 1.0e-12 21.0 (c/contrast-ratio :black :white)))
@@ -131,6 +147,11 @@
     (doseq [f option-fns]
       (is (throws-data? {:options :YUV} #(f :red :blue :YUV)) (str f))
       (is (throws-data? {:options 2.0} #(f :red :blue 2.0)) (str f))))
+  (testing "noticeably-different?: :s positive, :p in (0, 1]"
+    (is (throws-data? {:s 0.0 :p 0.5} #(c/noticeably-different? :red :red {:s 0.0})))
+    (is (throws-data? {:s 0.1 :p 0.0} #(c/noticeably-different? :red :red {:p 0.0})))
+    (is (throws-data? {:s 0.1 :p 1.5} #(c/noticeably-different? :red :red {:p 1.5})))
+    (is (not (c/noticeably-different? :red :red {:p 1.0}))))
   (testing "nil and {} mean defaults"
     (doseq [f option-fns]
       (is (= (f :red :blue) (f :red :blue nil) (f :red :blue {})) (str f)))))

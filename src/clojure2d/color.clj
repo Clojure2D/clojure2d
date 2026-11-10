@@ -5403,7 +5403,7 @@
     (throw (ex-info (str "Options should be a map, got: " options) {:options options}))))
 
 (defn- difference-converter
-  "The `to-` conversion of `colorspace` applied to both colors of a difference measure. Throws `ex-info` with `{:options options}` when `options` is neither a map nor nil, and `{:colorspace colorspace}` for an unknown colorspace."
+  "The `to-` conversion of `colorspace` applied to both colors of a difference measure or of [[noticeably-different?]]. Throws `ex-info` with `{:options options}` when `options` is neither a map nor nil, and `{:colorspace colorspace}` for an unknown colorspace."
   [options colorspace]
   (check-options-map options)
   (first (colorspace-converters colorspaces colorspace)))
@@ -5576,7 +5576,8 @@
     (min (+ (m/abs h1) (m/abs h2))
          (+ (- 180.0 (m/abs h1)) (- 180.0 (m/abs h2))))))
 
-;; http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.125.3833&rep=rep1&type=pdf
+;; Sarifuddin, Missaoui (2005), A New Perceptually Uniform Color Space with Associated Color Similarity Measure for
+;; Content-Based Image and Video Retrieval; no reachable copy (see the docstring)
 (defn delta-D-HCL
   "Returns the HCL color difference DHCL of Sarifuddin and Missaoui (2005).
 
@@ -5808,7 +5809,7 @@
   Methods (`:method` option):
 
   - `:wcag` (default) - WCAG 2 contrast ratio `(L1 + 0.05) / (L2 + 0.05)`, L1 the lighter, from 1 (equal luminance) to 21 (black and white); symmetric. The relative luminance is computed as WCAG defines it: sRGB decoding and the weights 0.2126, 0.7152, 0.0722; it differs from [[relative-luma]] / 255 (the Y row of the [[to-XYZ]] matrix) by up to 5e-4 relative. Common thresholds: 3 (large text), 4.5 (text, AA), 7 (text, AAA).
-  - `:lstar` - lightness difference `|L*1 - L*2|` of [[to-LAB]], 0 to 100; symmetric (as the L* contrast of coloraide and Material Design).
+  - `:lstar` - lightness difference `|L*1 - L*2|` of [[to-LAB]], 0 to 100; symmetric. The L* contrast of coloraide and Material Design; coloraide's own sRGB matrix gives values up to 5e-3 apart.
   - `:weber` - Weber contrast `(Y1 - Y2) / Y2` of `c1` (target) on `c2` (background), Y the luminance of [[to-XYZ]] scaled to 0-1; signed, not symmetric. A black background gives infinity (NaN for black on black).
   - `:michelson` - Michelson contrast `(Ymax - Ymin) / (Ymax + Ymin)`, Y as for `:weber`, 0 to 1; symmetric. NaN for two blacks.
 
@@ -5838,7 +5839,7 @@
      (throw (ex-info (str "Unknown contrast method: " method) {:method method})))))
 
 (defn- nd-lab-interval
-  "Minimal difference values"
+  "The d3-jnd noticeable-difference interval `p (A + B / s)` per CIELAB channel, `A = (10.16, 10.68, 10.70)`, `B = (1.50, 3.08, 5.74)`, as `Vec3`."
   [^double s ^double p]
   (v/mult (Vec3. (+ 10.16 (/ 1.5 s))
                  (+ 10.68 (/ 3.08 s))
@@ -5851,16 +5852,18 @@
 
   - `c1`, `c2` colors, any type accepted by [[to-color]]
   - `options` (map, optional):
-      - `:s` - size in degrees of visual angle, default `0.1`
-      - `:p` - share of observers who should see the difference, 0 to 1, default `0.5`
+      - `:s` - size in degrees of visual angle, positive, default `0.1`
+      - `:p` - share of observers who should see the difference, in (0, 1], default `0.5`
       - `:colorspace` - conversion applied to both colors, default `:LAB`. Use `:pass` for colors already in CIELAB.
 
-  Returns a boolean, symmetric in `c1`, `c2`. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map."
+  Returns a boolean, symmetric in `c1`, `c2`. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace`, options that are not a map, and with `{:s s :p p}` for `:s` not positive or `:p` outside (0, 1] (`:p` 0 made identical colors different, `:s` 0 made no colors different)."
   {:metadoc/categories #{:dist}}
   ([c1 c2] (noticeably-different? c1 c2 nil))
   ([c1 c2 {:keys [^double s ^double p colorspace]
            :or {s 0.1 p 0.5 colorspace :LAB}
-                   :as options}]
+           :as options}]
+   (when-not (and (pos? s) (pos? p) (<= p 1.0))
+     (throw (ex-info (str "Size :s should be positive and share :p in (0, 1], got " s ", " p) {:s s :p p})))
    (let [to (difference-converter options colorspace)
          c1 (to c1)
          c2 (to c2)

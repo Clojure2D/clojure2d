@@ -14,7 +14,8 @@ oracles test the difference formulas, not the colorspace conversion (tested in g
 
 Oracles ({key [value ...]} in :oracle, one value per pair):
 
-* colour-science: :E76 (CIE 1976), :E94, :E94-textiles (CIE 1994), :E2000 (CIE 2000), :CMC11, :CMC21
+* colour-science: :E76 (CIE 1976), :E94, :E94-textiles (CIE 1994), :E2000, :E2000-textiles (CIE 2000, kL 1
+  and 2), :CMC11, :CMC21
   (CMC l:c 1:1 and 2:1), :HyAB, :HyCH, :HyCH-textiles, :DIN99 (Euclidean in DIN99, ASTM D2244-07)
 * CIE 1976 definitions: :C* (C1 - C2) and :H* (sqrt(da^2 + db^2 - dC^2))
 * coloraide 8.14: :OK (Euclidean in Oklab), :lstar-coloraide (L* contrast, coloraide's own D65 Lab)
@@ -154,6 +155,7 @@ def oracle(A, B):
         "E94": E(la, lb, method="CIE 1994"),
         "E94-textiles": E(la, lb, method="CIE 1994", textiles=True),
         "E2000": E(la, lb, method="CIE 2000"),
+        "E2000-textiles": E(la, lb, method="CIE 2000", textiles=True),
         "CMC11": E(la, lb, method="CMC", l=1, c=1),
         "CMC21": E(la, lb, method="CMC", l=2, c=1),
         "HyAB": E(la, lb, method="HyAB"),

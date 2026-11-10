@@ -294,6 +294,7 @@
 ;; * `delta-E*-CMC` - ${\Delta}E^*_{CMC}$, CMC l:c 1984 difference, two optional weights can be provided in the options map, `:l` for lightness and `:c` for chroma. By default they are set to `1.0`.
 ;; * `delta-E-z` - ${\Delta}E_{z}$, difference in JzAzBz color space
 ;; * `delta-E-HyAB` - ${\Delta}E_{HyAB}$, hybrid difference in LAB color space
+;; * `delta-E-HyCH` - ${\Delta}E_{HyCH}$, hybrid difference built on the CIEDE2000 terms, for large differences
 ;; * `delta-E*-euclidean` - general, euclidean, distance in selected color space (`Oklab` by default)
 ;; * `delta-C-RGB` - ${\Delta}C$, difference in RGB color space ("redmean")
 ;; * `delta-D-HCL` - ${\Delta}D_{HCL}$, difference in HCL (Sarifuddin and Missaou) color space
@@ -313,15 +314,24 @@
          ['(c/delta-E*-CMC :yellow :blue {:l 2.0})         (c/delta-E*-CMC :yellow :blue {:l 2.0})]
          ['(c/delta-E-z :yellow :blue)                     (c/delta-E-z :yellow :blue)]
          ['(c/delta-E-HyAB :yellow :blue)                  (c/delta-E-HyAB :yellow :blue)]
+         ['(c/delta-E-HyCH :yellow :blue)                  (c/delta-E-HyCH :yellow :blue)]
          ['(c/delta-E*-euclidean :yellow :blue)            (c/delta-E*-euclidean :yellow :blue)]
          ['(c/delta-E*-euclidean :yellow :blue {:colorspace :YUV}) (c/delta-E*-euclidean :yellow :blue {:colorspace :YUV})]
          ['(c/delta-C-RGB :yellow :blue)                   (c/delta-C-RGB :yellow :blue)]
          ['(c/delta-D-HCL :yellow :blue)                   (c/delta-D-HCL :yellow :blue)]]})
 
-;; There are two more measures: `contrast-ratio` from WCAG (the value below 3.0 means that contrast is too low) and `noticeably-different?` to check if colors are visually different, as described in this [paper](https://research.tableau.com/sites/default/files/2014CIC_48_Stone_v3.pdf).
+;; There are two more measures: `contrast-ratio` and `noticeably-different?` to check if colors are visually different, as described in this [paper](https://research.tableau.com/sites/default/files/2014CIC_48_Stone_v3.pdf).
+;;
+;; `contrast-ratio` returns the WCAG 2 contrast ratio by default (the value below 3.0 means that contrast is too low). Other measures are selected with `:method`: `:lstar` (difference of CIELAB lightness), `:weber` (target on background, signed) and `:michelson`.
 
 [(c/contrast-ratio :yellow :blue)
  (c/contrast-ratio :yellow :lightyellow)]
+
+^{::clerk/visibility :hide}
+(clerk/table
+ {:head [:method :value]
+  :rows (for [method [:wcag :lstar :weber :michelson]]
+          [method (c/contrast-ratio :yellow :blue {:method method})])})
 
 ;; Let's draw a chart showing how `contrast-ratio` values change when we compare given color to grays.
 
