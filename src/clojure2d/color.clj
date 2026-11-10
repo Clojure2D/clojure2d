@@ -6493,6 +6493,16 @@
 
 ;;
 
+(defn- random-nth
+  "Random element of `coll` drawn with the random generator `rng`."
+  [rng coll]
+  (nth coll (r/irandom rng (count coll))))
+
+(defn- options-rng
+  "Random generator of `options` (`:rng`), a fresh `(fastmath.random/rng :default)` when none."
+  [options]
+  (or (:rng options) (r/rng :default)))
+
 (defn- segment-hue-fn
   "Hue at `t` of a linear gradient of raw stops `cs` at increasing positions `xs` in a hue space: each segment by [[interpolate-hue]] (as coloraide; a powerless stop takes the hue of the other end of each of its segments); outside the positions the end hues."
   [hue-space mode xs cs]
@@ -6525,7 +6535,7 @@
           (recur more h (conj out h)))))))
 
 (defn- interpolated-gradient
-  [palette-or-gradient-name {:keys [colorspace interpolation domain to? from?]
+  [palette-or-gradient-name {:keys [colorspace interpolation domain to? from? premultiplied?]
                              hue-mode :hue
                              :or {colorspace :RGB
                                   to? true from? true
@@ -6539,7 +6549,11 @@
         cpalette (mapv (comp to pr/to-color) palette-or-gradient-name)
         n (count cpalette)
         easing? (and (keyword? interpolation) (contains? e/easings-list interpolation))
-        hue-space (when-not (= hue-mode :raw) (hue-spaces colorspace))]
+        hue-space (when-not (= hue-mode :raw) (hue-spaces colorspace))
+        ;; the hue channel is never premultiplied
+        hue-index (long (get (hue-spaces colorspace) :hue -1))
+        stops (if premultiplied? (mapv #(premultiply % hue-index) cpalette) cpalette)
+        unpremultiplied (fn ^Vec4 [^Vec4 c] (if premultiplied? (unpremultiply c hue-index) c))]
     (check-colors-count cpalette)
     (when (and easing? (not= n 2))
       (throw (ex-info (str "Easing interpolation needs 2 colors, got: " n) {:interpolation interpolation :colors n})))
@@ -6555,10 +6569,12 @@
       easing?
       (let [c1 (first cpalette)
             c2 (second cpalette)
+            s1 (first stops)
+            s2 (second stops)
             easing (e/easings-list interpolation)]
         (fn ^Vec4 [^double t]
           (let [et (double (easing (m/constrain t 0.0 1.0)))
-                c (v/interpolate c1 c2 et)]
+                c (unpremultiplied (v/interpolate s1 s2 et))]
             (v/fmap (from (if hue-space
                             (with-channel c (:hue hue-space) (interpolate-hue hue-space hue-mode c1 c2 et))
                             c)) clamp255))))
@@ -6566,10 +6582,10 @@
       :else
       (let [r (or domain 
                   (map (fn [^long v] (m/mnorm v 0.0 (dec (count cpalette)) 0.0 1.0)) (range (count cpalette))))
-            c0 (map pr/red cpalette)
-            c1 (map pr/green cpalette)
-            c2 (map pr/blue cpalette)
-            c3 (map pr/alpha cpalette)
+            c0 (map pr/red stops)
+            c1 (map pr/green stops)
+            c2 (map pr/blue stops)
+            c3 (map pr/alpha stops)
             ifn (if (keyword? interpolation) (partial i/interpolation interpolation) interpolation)
             i0 (ifn r c0)
             i1 (ifn r c1)
@@ -6584,7 +6600,7 @@
             hue-channel (long (get hue-space :hue -1))]
         (fn ^Vec4 [^double t]
           (let [ct (m/constrain t 0.0 1.0)
-                c (v/vec4 (i0 ct) (i1 ct) (i2 ct) (i3 ct))]
+                c (unpremultiplied (v/vec4 (i0 ct) (i1 ct) (i2 ct) (i3 ct)))]
             (v/fmap (from (if hue-fn (with-channel c hue-channel (hue-fn ct)) c)) clamp255)))))))
 
 (def ^{:metadoc/categories #{:gr}
@@ -6687,15 +6703,16 @@
       - `:interpolation` - a `fastmath.interpolation` method name (e.g. `:linear`, `:cubic`, `:monotone`, `:b-spline`; some need more points), a `fastmath.easings` easing name (only the first two colors are used), `:iq` (cosine gradient of two colors, [[iq-gradient]]) or a function of `xs` and `ys` returning an interpolator; default `:linear`
       - `:domain` - positions of the colors, increasing; default evenly spaced 0-1
       - `:to?`, `:from?` - convert the colors to / from `colorspace`, default `true` (`false` when the colors are already in it)
+      - `:premultiplied?` - when true the colors are weighted by alpha (premultiplied alpha, as CSS gradients and coloraide; the hue channel is not premultiplied), default `false` (straight alpha)
       - `:hue` - hue interpolation in colorspaces with a hue (HSx, HWB, GLHS, HCL, LCH-like, Okhsl, Okhsv, Okhwb, Cubehelix), as CSS Color 4: `:shorter` (default), `:longer`, `:increasing`, `:decreasing` arc, or `:raw` (the hue as a number); an achromatic (powerless) stop takes the hue of its neighbour: with `:linear` interpolation per segment (as coloraide), with other methods the previous stop's hue
 
-  Channels are interpolated separately (alpha straight) and clamped to [0, 255]; `t` is limited to [0, 1]. Without arguments a random gradient name is used.
+  Channels are interpolated separately and clamped to [0, 255]; `t` is limited to [0, 1]. Without arguments a random gradient name is used.
 
   Built-in gradients without a namespace: the thi.ng/color cosine presets (`:rainbow1` to `:rainbow4`, `:yellow-magenta-cyan`, `:orange-blue`, `:green-magenta`, `:green-red`, `:green-cyan`, `:yellow-red`, `:blue-cyan`, `:red-blue`, `:yellow-green-blue`, `:blue-white-red`, `:cyan-magenta`, `:yellow-purple-magenta`, `:green-blue-orange`, `:orange-magenta-blue`, `:blue-magenta-orange`, `:magenta-green`), I. Quilez's cosine palettes `:iq-1` to `:iq-7`, d3-scale-chromatic `:cubehelix`, `:warm`, `:cool`, `:rainbow`, and `:black-body` ([[temperature]] from 1000 to 15000 K). Namespaced names (e.g. `:pals/kovesi.cyclic_mrybm_35_75_c68`) come from resource files.
 
   Returns a function of one double returning a `Vec4`. Throws `ex-info` with `{:gradient k}` for an unknown name, `{:colors 0}` for no colors, `{:domain d}` for a domain that is not strictly increasing or not one value per color, `{:interpolation k :colors n}` for `:iq` or an easing with other than 2 colors, `{:hue h}` for an unknown hue interpolation, `{:colorspace cs}` and `{:options o}`. See also [[palette]], [[merge-gradients]], [[gradient-cubehelix]]."
   {:metadoc/categories #{:gr}}
-  ([] (gradient (rand-nth (:seq @gradients-list-))))
+  ([] (gradient (random-nth (r/rng :default) (:seq @gradients-list-))))
   ([palette-or-gradient-name] (gradient palette-or-gradient-name {}))
   ([palette-or-gradient-name options]
    (check-options-map options)
@@ -6747,7 +6764,7 @@
 
   Without arguments a random palette name is used. Returns a vector of `Vec4`. Throws `ex-info` with `{:palette p}` for an unknown name and `{:number-of-colors n}` for fewer than 1 color. See also [[resample]], [[gradient]], [[random-palette]]."
   {:metadoc/categories #{:pal}}
-  ([] (palette (rand-nth (:seq @palettes-list-))))
+  ([] (palette (random-nth (r/rng :default) (:seq @palettes-list-))))
   ([p]
    (cond
      (or (keyword? p)
@@ -6850,52 +6867,63 @@
 ;;;
 
 (defn- iq-random-gradient
-  "Create random iq gradient."
-  {:metadoc/categories #{:gr}}
-  []
-  (r/randval
-   (let [a (v/generate-vec3 (partial r/drand 0.2 0.8))
-         b (v/generate-vec3 (partial r/drand 0.2 0.8))
-         c (v/generate-vec3 (partial r/drand 2))
-         d (v/generate-vec3 r/drand)]
-     (iq-gradient a b c d))
-   (let [pal (paletton :monochromatic (r/irand 360) {:compl true :preset (rand-nth [:pastels :pastels-med :full :shiny :dark :pastels-mid-dark :dark-neon :darker])})]
-     (iq-gradient (first pal) (first (drop 5 pal))))))
+  "Random cosine gradient drawn with `rng`: random coefficients, or the cosine gradient between two shades of a random paletton palette."
+  [rng]
+  (r/randval-rng rng
+                 (let [a (v/generate-vec3 #(r/drandom rng 0.2 0.8))
+                       b (v/generate-vec3 #(r/drandom rng 0.2 0.8))
+                       c (v/generate-vec3 #(r/drandom rng 2.0))
+                       d (v/generate-vec3 #(r/drandom rng))]
+                   (iq-gradient a b c d))
+                 (let [pal (paletton :monochromatic (r/irandom rng 360)
+                                     {:compl true
+                                      :preset (random-nth rng [:pastels :pastels-med :full :shiny :dark :pastels-mid-dark :dark-neon :darker])})]
+                   (iq-gradient (first pal) (first (drop 5 pal))))))
 
 (defn random-palette
-  "Returns a random palette (global random generators): with probability 0.1 a resampled random cosine gradient, 0.2 a colourlovers palette, 0.3 a preset palette (resampled to 15 colors when longer), 0.2 a resampled random gradient, otherwise a random [[paletton]] palette.
+  "Returns a random palette: with probability 0.1 a resampled random cosine gradient, 0.2 a colourlovers palette, 0.3 a preset palette (resampled to 15 colors when longer), 0.2 a resampled random gradient, otherwise a random [[paletton]] palette.
 
-  Returns a vector of `Vec4` (3 to 15 colors or a whole palette). See also [[random-gradient]], [[palette]]."
+  - `options` (map, optional): `:rng` - random number generator (e.g. `(fastmath.random/rng :mersenne 42)` for repeatable results); none or `nil`: a fresh `(fastmath.random/rng :default)`
+
+  Returns a vector of `Vec4` (3 to 15 colors or a whole palette). Throws `ex-info` with `{:options options}` for options that are not a map. See also [[random-gradient]], [[palette]]."
   {:metadoc/categories #{:gr}}
-  []
-  (condp clojure.core/> (r/drand)
-    0.1 (resample (iq-random-gradient) (r/irand 3 10))
-    0.3 (palette (int (rand 500)))
-    0.6 (let [p (palette)]
-          (if (> (count p) 15) (resample p 15) p))
-    0.8 (resample (gradient) (r/irand 3 10))
-    (let [h (r/drand 360)
-          t (rand-nth [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
-          conf {:compl (r/brand 0.6)
-                :angle (r/drand 10.0 90.0)
-                :adj (r/brand)
-                :preset (rand-nth paletton-presets-list)}]
-      (paletton t h conf))))
+  ([] (random-palette nil))
+  ([options]
+   (check-options-map options)
+   (let [rng (options-rng options)]
+     (condp clojure.core/> (r/drandom rng)
+       0.1 (resample (iq-random-gradient rng) (r/irandom rng 3 10))
+       0.3 (palette (r/irandom rng 500))
+       0.6 (let [p (palette (random-nth rng (:seq @palettes-list-)))]
+             (if (> (count p) 15) (resample p 15) p))
+       0.8 (resample (gradient (random-nth rng (:seq @gradients-list-))) (r/irandom rng 3 10))
+       (let [h (r/drandom rng 360.0)
+             t (random-nth rng [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
+             conf {:compl (r/brandom rng 0.6)
+                   :angle (r/drandom rng 10.0 90.0)
+                   :adj (r/brandom rng)
+                   :preset (random-nth rng paletton-presets-list)}]
+         (paletton t h conf))))))
 
 (defn random-gradient
-  "Returns a random gradient (global random generators): with probability 0.1 a random cosine gradient, 0.5 a random palette as a gradient, 0.1 a paletton palette as a gradient, otherwise a preset gradient; palettes are interpolated in a random colorspace (or `:RGB`) with `:linear` or `:cubic` interpolation.
+  "Returns a random gradient: with probability 0.1 a random cosine gradient, 0.5 a random palette as a gradient, 0.1 a paletton palette as a gradient, otherwise a preset gradient; palettes are interpolated in a random colorspace (or `:RGB`) with `:linear` or `:cubic` interpolation.
 
-  Returns a function of `t` (0-1) returning a `Vec4`. See also [[random-palette]], [[gradient]]."
+  - `options` (map, optional): `:rng` - random number generator; none or `nil`: a fresh `(fastmath.random/rng :default)`
+
+  Returns a function of `t` (0-1) returning a `Vec4`. Throws `ex-info` with `{:options options}` for options that are not a map. See also [[random-palette]], [[gradient]]."
   {:metadoc/categories #{:pal}}
-  []
-  (let [gpars {:colorspace (r/randval :RGB (rand-nth colorspaces-list))
-               :interpolation (r/randval :linear :cubic)}]
-    (condp clojure.core/> (r/drand)
-      0.1 (iq-random-gradient)
-      0.6 (gradient (palette) gpars)
-      0.7 (gradient (sort-by luma (paletton :monochromatic (r/drand 360)
-                                            {:preset (rand-nth paletton-presets-list)})) gpars)
-      (gradient))))
+  ([] (random-gradient nil))
+  ([options]
+   (check-options-map options)
+   (let [rng (options-rng options)
+         gpars {:colorspace (r/randval-rng rng :RGB (random-nth rng colorspaces-list))
+                :interpolation (r/randval-rng rng :linear :cubic)}]
+     (condp clojure.core/> (r/drandom rng)
+       0.1 (iq-random-gradient rng)
+       0.6 (gradient (palette (random-nth rng (:seq @palettes-list-))) gpars)
+       0.7 (gradient (sort-by luma (paletton :monochromatic (r/drandom rng 360.0)
+                                             {:preset (random-nth rng paletton-presets-list)})) gpars)
+       (gradient (random-nth rng (:seq @gradients-list-)))))))
 
 (defonce ^:private thing-presets
   ;; L range and C range
@@ -6921,69 +6949,86 @@
   color-themes (sort (concat thing-presets-list paletton-presets-list)))
 
 (defn- random-channel-value
-  ^double [scheme ^double value]
+  "Random channel value drawn with `rng` by a randomization `scheme`: a number `v` (uniform in `value ± v`), `[min max]` (uniform), anything else keeps `value`."
+  ^double [rng scheme ^double value]
   (cond
     (number? scheme) (let [v (double scheme)]
-                       (r/drand (- value v)
-                                (+ value v)))
+                       (r/drandom rng (- value v) (+ value v)))
     (sequential? scheme) (let [[mn mx] scheme]
-                           (r/drand mn mx))
+                           (r/drandom rng mn mx))
     :else value))
 
 (defn- apply-LCH-theme
-  [color [L C H]]
+  [rng color [L C H]]
   (let [^Vec4 c (to-LCH* color)]
-    (set-alpha (from-LCH* (map random-channel-value [L C H] c)) (.w c))))
+    (set-alpha (from-LCH* (map (partial random-channel-value rng) [L C H] c)) (.w c))))
 
 (defn apply-theme
-  "Returns a random color similar to `color`, following a color theme (global random generator).
+  "Returns a random color similar to `color`, following a color theme.
 
   - `color` color, any type accepted by [[to-color]]
   - `color-theme` one of:
       - a name of [[color-themes]]: a thi.ng preset draws the lightness and chroma of LCH* (channels 0-255) uniformly from the preset's ranges and keeps the hue; a [[paletton]] preset draws a color from the gradient of the monochromatic paletton palette of the color's hue (sorted by lightness)
       - `[L C H]` a randomization scheme per LCH* channel: `[min max]` uniform in the range, a number `v` uniform in `[channel - v, channel + v]`, `nil` (or anything else) keeps the channel
+  - `options` (map, optional): `:rng` - random number generator; none or `nil`: a fresh `(fastmath.random/rng :default)`
 
-  Returns a clamped `Vec4`, alpha kept. Throws `ex-info` with `{:color-theme color-theme}` for an unknown name. See also [[random-color]]."
-  [color color-theme]
-  (clamp (if (keyword? color-theme)
-           (cond
-             (thing-presets-list color-theme)
-             (let [[[l1 l2] [c1 c2]] (thing-presets color-theme)
-                   ^Vec4 c (to-LCH* color)]
-               (from-LCH* (Vec4. (r/drand l1 l2) (r/drand c1 c2) (.z c) (.w c))))
+  Returns a clamped `Vec4`, alpha kept. Throws `ex-info` with `{:color-theme color-theme}` for an unknown name and `{:options options}` for options that are not a map. See also [[random-color]]."
+  ([color color-theme] (apply-theme color color-theme nil))
+  ([color color-theme options]
+   (check-options-map options)
+   (let [rng (options-rng options)]
+     (clamp (if (keyword? color-theme)
+              (cond
+                (thing-presets-list color-theme)
+                (let [[[l1 l2] [c1 c2]] (thing-presets color-theme)
+                      ^Vec4 c (to-LCH* color)]
+                  (from-LCH* (Vec4. (r/drandom rng l1 l2) (r/drandom rng c1 c2) (.z c) (.w c))))
 
-             (contains? paletton-presets color-theme)
-             (let [g (->> {:preset color-theme}
-                          (paletton :monochromatic (hue-paletton color))
-                          (sort-by luma)
-                          (gradient))]
-               (set-alpha (g (r/drand)) (alpha color)))
+                (contains? paletton-presets color-theme)
+                (let [g (->> {:preset color-theme}
+                             (paletton :monochromatic (hue-paletton color))
+                             (sort-by luma)
+                             (gradient))]
+                  (set-alpha (g (r/drandom rng)) (alpha color)))
 
-             :else (throw (ex-info (str "Unknown color theme: " color-theme) {:color-theme color-theme})))
-           (apply-LCH-theme color color-theme))))
+                :else (throw (ex-info (str "Unknown color theme: " color-theme) {:color-theme color-theme})))
+              (apply-LCH-theme rng color color-theme))))))
+
+(defn- random-any-color
+  "Random color drawn with `rng`: a named color (0.2), a color of a random palette (0.4) or a random sRGB color (0.4)."
+  ^Vec4 [rng]
+  (r/randval-rng rng 0.2
+                 (pr/to-color (random-nth rng (named-colors-list)))
+                 (r/randval-rng rng 0.5
+                                (random-nth rng (random-palette {:rng rng}))
+                                (Vec4. (r/drandom rng 255.0) (r/drandom rng 255.0) (r/drandom rng 255.0) 255.0))))
 
 (defn random-color
-  "Returns a random color (global random generators).
+  "Returns a random color.
 
-  - no argument: a named color with probability 0.2, otherwise a color of a random palette or a random sRGB color
+  - no argument, or `options` only: a named color with probability 0.2, otherwise a color of a random palette or a random sRGB color
   - `alpha-or-color-theme` a number (alpha of a random color) or a name of [[color-themes]]
-  - `color-theme`, `alpha` a thi.ng theme gives random lightness and chroma from its ranges and a random hue in LCH*; a [[paletton]] preset gives a random color of the monochromatic paletton palette of a random hue
+  - `color-theme`, `alpha` a thi.ng theme gives random lightness and chroma from its ranges and a random hue in LCH*; a [[paletton]] preset gives a random color of the monochromatic paletton palette of a random hue; `nil` theme: a random color as without arguments, with `alpha`
+  - `options` (map): `:rng` - random number generator; none or `nil`: a fresh `(fastmath.random/rng :default)`
 
-  Returns a `Vec4` (clamped for a theme). See also [[apply-theme]], [[random-palette]]."
+  Returns a `Vec4` (clamped for a theme). Throws `ex-info` with `{:options options}` for options that are not a map. See also [[apply-theme]], [[random-palette]]."
   {:metadoc/categories #{:pal}}
-  ([color-theme alpha]
-   (clamp (if (thing-presets-list color-theme)
-            (let [[[l1 l2] [c1 c2]] (thing-presets color-theme)]
-              (from-LCH* [(r/drand l1 l2) (r/drand c1 c2) (r/drand 255.0) alpha]))
-            (set-alpha (rand-nth (paletton :monochromatic (r/drand 360.0) {:preset color-theme})) alpha))))
-  ([alpha-or-color-theme]
-   (if (keyword? alpha-or-color-theme)
-     (random-color alpha-or-color-theme 255.0)
-     (set-alpha (random-color) alpha-or-color-theme)))
-  ([] (r/randval 0.2 (pr/to-color (rand-nth (named-colors-list)))
-                 (r/randval 0.5
-                            (rand-nth (random-palette))
-                            (Vec4. (r/drand 255.0) (r/drand 255.0) (r/drand 255.0) 255.0)))))
+  ([] (random-any-color (r/rng :default)))
+  ([alpha-or-color-theme-or-options]
+   (let [x alpha-or-color-theme-or-options]
+     (cond
+       (map? x) (do (check-options-map x) (random-any-color (options-rng x)))
+       (keyword? x) (random-color x 255.0 nil)
+       :else (random-color nil x nil))))
+  ([color-theme alpha] (random-color color-theme alpha nil))
+  ([color-theme alpha options]
+   (check-options-map options)
+   (let [rng (options-rng options)]
+     (cond
+       (nil? color-theme) (set-alpha (random-any-color rng) alpha)
+       (thing-presets-list color-theme) (let [[[l1 l2] [c1 c2]] (thing-presets color-theme)]
+                                          (clamp (from-LCH* [(r/drandom rng l1 l2) (r/drandom rng c1 c2) (r/drandom rng 255.0) alpha])))
+       :else (clamp (set-alpha (random-nth rng (paletton :monochromatic (r/drandom rng 360.0) {:preset color-theme})) alpha))))))
 
 (defn fe-color-matrix
   "Creates a color filter from a 4 x 5 matrix, as SVG `feColorMatrix` (type matrix) on encoded sRGB.

@@ -7,6 +7,7 @@
             [clojure.edn :as edn]
             [clojure.java.io :as io]
             [fastmath.core :as m]
+            [fastmath.random :as r]
             [clojure2d.color :as c]
             [clojure2d.test-predicates :refer [throws-data?]]))
 
@@ -168,6 +169,51 @@
   (is (every? #(instance? fastmath.vector.Vec4 %) (repeatedly 2000 c/random-color)))
   (is (= [(c/to-color :red) (c/to-color "#00ff00")] (c/palette [:red "#00ff00"])))
   (is (= c/paletton-presets-list (sort c/paletton-presets-list))))
+
+;; G4: premultiplied alpha, random generators
+
+(deftest premultiplied-gradient-test
+  (let [{:keys [ts alpha-stops coloraide-alpha]} @reference
+        tol {:RGB 1.0e-9 :HSL 1.0e-9 :LCH 0.2 :Oklch 1.0e-6}]
+    (doseq [[cs flags] coloraide-alpha
+            [flag rows] flags
+            :let [opts {:colorspace cs :premultiplied? (= flag :premultiplied)}]
+            [st per-t] (map vector alpha-stops rows)
+            [t e] (map vector ts per-t)
+            :let [a ((c/gradient st opts) t)]]
+      (is (m/<= (max (max-diff (clip e) (clip a)) (m/abs (m/- (double (e 3)) (double (a 3))))) (tol cs))
+          (str cs " " flag " " st " " t))))
+  (testing "transparent red to blue: blue at half alpha; easing path too"
+    (is (= [0.0 0.0 255.0 127.5] (vec ((c/gradient [[255 0 0 0] :blue] {:premultiplied? true}) 0.5))))
+    (is (= (c/to-color :blue) (c/set-alpha ((c/gradient [[255 0 0 0] :blue] {:premultiplied? true :interpolation :sin-in-out}) 0.3) 255.0))))
+  (testing "default straight"
+    (is (= ((c/gradient [[255 0 0 0] :blue]) 0.5) ((c/gradient [[255 0 0 0] :blue] {:premultiplied? false}) 0.5)))))
+
+(defn- same-results?
+  "`f` called twice with the same seeded generator gives the same result (gradients compared at 11 points)."
+  [f]
+  (let [run (fn [] (let [res (f {:rng (r/rng :mersenne 1234)})]
+                     (if (fn? res) (mapv #(vec (res %)) (range 0.0 1.01 0.1)) res)))]
+    (= (run) (run))))
+
+(deftest random-generator-test
+  (testing "the same seeded generator repeats the result"
+    (dotimes [_ 20]
+      (is (same-results? c/random-palette))
+      (is (same-results? c/random-gradient))
+      (is (same-results? c/random-color))
+      (is (same-results? #(c/random-color :pastels 100.0 %)))
+      (is (same-results? #(c/random-color :warm 100.0 %)))
+      (is (same-results? #(c/random-color nil 100.0 %)))
+      (is (same-results? #(c/apply-theme [200 50 80] :warm %)))
+      (is (same-results? #(c/apply-theme [200 50 80] :pastels %)))
+      (is (same-results? #(c/apply-theme [200 50 80] [10 [0 50] nil] %)))))
+  (testing "without a generator: random results"
+    (is (< 1 (count (set (repeatedly 20 c/random-color)))))
+    (is (< 1 (count (set (repeatedly 20 #(c/apply-theme [200 50 80] :warm)))))))
+  (testing "options checked"
+    (doseq [f [#(c/random-palette :x) #(c/random-gradient :x) #(c/random-color :warm 100.0 :x) #(c/apply-theme :red :warm :x)]]
+      (is (throws-data? {:options :x} f)))))
 
 (deftest docstrings-test
   (doseq [s '[gradient palette merge-gradients iq-gradient gradient-cubehelix find-gradient find-palette random-color
