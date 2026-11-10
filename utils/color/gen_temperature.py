@@ -10,8 +10,9 @@ Outputs:
   blackbody on a grid uniform in mired (1e6 / T), 25 to 2000 mired (40000 to 500 K) every 0.5 mired.
 * test/resources/color/temperature_reference.edn - oracle for the tests.
 
-Blackbody color, Mitchell Charity's method (vendian.org bbr_color, reproduced to 2.8e-4 from the values kept in
-the author's gist https://gist.github.com/genmeblog/b6f55912ae02406bba329b2860fb11e6): Planck spectrum
+Blackbody color, Mitchell Charity's method (vendian.org bbr_color; with colour's sRGB matrix the values kept in the
+author's gist https://gist.github.com/genmeblog/b6f55912ae02406bba329b2860fb11e6 are reproduced to 2.8e-4, with
+clojure2d's matrix used here to 4.5e-4): Planck spectrum
 (colour planck_law) 360-830 nm every 1 nm, CIE 1964 10 degree color matching functions (summed, the scale is
 irrelevant), XYZ to linear sRGB with clojure2d's matrix (sRGB primaries, CIE-2-D65 white from
 resources/color/whitepoints.edn, no chromatic adaptation), a negative channel lifted by adding white (the minimum
@@ -28,8 +29,8 @@ Oracle (:temperature-*, sRGB 0-255, colour cctf_encoding sRGB on the normalized 
 Normalized wavelength (:wavelength {observer [[lambda r g b] ...]}, sRGB 0-255): colour wavelength_to_XYZ (Sprague
 on the 1 nm data, as clojure2d wavelength-to-XYZ), clojure2d's sRGB matrix, negative channels clipped to 0 (not
 lifted by adding white: that turns deep reds pink, user decision), the largest channel scaled to 1; zero XYZ
-(outside the observer range) gives black. Wavelengths 350-850 nm every 1 nm and 30 fractional ones (seed
-20261111), observers :CIE-2 and :CIE-10.
+(outside the observer range: 360-830 nm, 390-830 nm for the 2015 observers) gives black. Wavelengths 350-850 nm
+every 1 nm and 30 fractional ones (seed 20261111), observers :CIE-2, :CIE-10, :CIE-2015-2 and :CIE-2015-10.
 """
 
 import re
@@ -46,7 +47,8 @@ OUT = "test/resources/color/temperature_reference.edn"
 MIRED_MIN, MIRED_MAX, MIRED_STEP = 25.0, 2000.0, 0.5
 LAMBDAS = np.arange(360.0, 831.0, 1.0)
 CMF_10 = colour.MSDS_CMFS["CIE 1964 10 Degree Standard Observer"].copy().align(colour.SpectralShape(360, 830, 1)).values
-OBSERVERS = {"CIE-2": "CIE 1931 2 Degree Standard Observer", "CIE-10": "CIE 1964 10 Degree Standard Observer"}
+OBSERVERS = {"CIE-2": "CIE 1931 2 Degree Standard Observer", "CIE-10": "CIE 1964 10 Degree Standard Observer",
+             "CIE-2015-2": "CIE 2015 2 Degree Standard Observer", "CIE-2015-10": "CIE 2015 10 Degree Standard Observer"}
 
 # Charity's table values kept in the gist (linear, 0-1): [T r g b], None where the gist has no entry
 GIST = [(1000, None, 0.0401, None), (1500, None, 0.1515, None), (1900, None, 0.2272, None),
@@ -67,7 +69,7 @@ def xyz_to_srgb_matrix():
 XYZ_TO_SRGB = xyz_to_srgb_matrix()
 
 
-def normalize(rgb):
+def lift_normalize(rgb):
     """Lift a negative channel by adding white, scale the largest channel to 1; zero light gives black."""
     m = rgb.min()
     if m < 0.0:
@@ -85,7 +87,7 @@ def clip_normalize(rgb):
 
 def blackbody_linear(t):
     xyz = colour.colorimetry.planck_law(LAMBDAS * 1e-9, t) @ CMF_10
-    return normalize(XYZ_TO_SRGB @ xyz)
+    return lift_normalize(XYZ_TO_SRGB @ xyz)
 
 
 def encode(v):
@@ -93,10 +95,11 @@ def encode(v):
 
 
 def wavelength_srgb(lam, observer):
-    # outside 360-830 nm clojure2d wavelength-to-XYZ gives zero light (colour raises)
-    if not 360.0 <= lam <= 830.0:
+    # outside the observer range clojure2d wavelength-to-XYZ gives zero light (colour raises)
+    cmfs = colour.MSDS_CMFS[OBSERVERS[observer]]
+    if not cmfs.shape.start <= lam <= cmfs.shape.end:
         return np.zeros(3)
-    xyz = colour.wavelength_to_XYZ(lam, colour.MSDS_CMFS[OBSERVERS[observer]])
+    xyz = colour.wavelength_to_XYZ(lam, cmfs)
     return encode(clip_normalize(XYZ_TO_SRGB @ np.asarray(xyz)))
 
 

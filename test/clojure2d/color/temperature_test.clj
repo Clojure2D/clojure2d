@@ -6,6 +6,7 @@
   (:require [clojure.test :refer [deftest is testing]]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
+            [clojure.string]
             [fastmath.core :as m]
             [clojure2d.color :as c]
             [clojure2d.color.rgb :as rgb]
@@ -43,7 +44,7 @@
       (is (every? (fn [[a b]] (m/<= a (+ b 1.0e-9))) (partition 2 1 (map #((c/temperature %) 2) ts))))))
   (testing "outside 500-40000 K the end of the table"
     (is (= (c/temperature 500.0) (c/temperature 499.0) (c/temperature 1.0)))
-    (is (= (c/temperature 40000.0) (c/temperature 50000.0) (c/temperature 1.0e9))))
+    (is (= (c/temperature 40000.0) (c/temperature 50000.0) (c/temperature 1.0e9) (c/temperature ##Inf))))
   (testing "full brightness: the largest channel is 255"
     (doseq [t (range 500.0 40000.0 997.0)]
       (is (m/< (m/abs (m/- 255.0 (reduce max (take 3 (c/temperature t))))) 1.0e-9) (str t))))
@@ -52,6 +53,10 @@
 
 (deftest names-test
   (is (= 13 (count c/temperature-names)))
+  (testing "the docstring lists every name with its temperature"
+    (let [doc (:doc (meta #'c/temperature-names))]
+      (doseq [n c/temperature-names]
+        (is (clojure.string/includes? doc (str "`" n "` ")) (str n)))))
   (doseq [[n t] {:candle 1800.0 :sunrise 2500.0 :sunset 2500.0 :lightbulb 2900.0 :warm 2900.0 :morning 3500.0
                  :moonlight 4000.0 :white 4250.0 :sunlight 4800.0 :midday 5500.0 :cloudy-sky 6500.0 :cool 7250.0
                  :blue-sky 10000.0}]
@@ -66,14 +71,19 @@
   (is (throws-data? {:temperature :foo} #(c/adjust-temperature :red :foo))))
 
 (deftest adjust-temperature-test
-  (testing "lerp- toward the temperature color, default amount 0.35"
+  (testing "lerp- toward the temperature color, clamped, default amount 0.35"
     (doseq [col [[30 60 200] [10 10 10] [250 250 250]] t [1800.0 :warm 10000.0]]
-      (is (= (c/lerp- col (c/temperature t) 0.35) (c/adjust-temperature col t)) (str col " " t))
-      (is (= (c/lerp- col (c/temperature t) 0.8) (c/adjust-temperature col t 0.8)) (str col " " t))))
-  (testing "the CIELAB lightness of the color is kept"
-    (doseq [col [[30 60 200] [10 10 10] [250 250 250]]]
+      (is (= (c/clamp (c/lerp- col (c/temperature t) 0.35)) (c/adjust-temperature col t)) (str col " " t))
+      (is (= (c/clamp (c/lerp- col (c/temperature t) 0.8)) (c/adjust-temperature col t 0.8)) (str col " " t))))
+  (testing "the CIELAB lightness of the color is kept when the result is in gamut"
+    (doseq [col [[30 60 200] [120 80 60]]]
       (is (m/< (m/abs (m/- ((c/to-LAB col) 0) ((c/to-LAB (c/adjust-temperature col 3000.0)) 0))) 1.0e-9)
-          (str col)))))
+          (str col))))
+  (testing "out of gamut results are clamped"
+    (let [r (c/adjust-temperature [10 10 10] 3000.0)]
+      (is (m/neg? ((c/lerp- [10 10 10] (c/temperature 3000.0) 0.35) 2)))
+      (is (zero? (r 2)))
+      (is (every? #(m/<= 0.0 % 255.0) r)))))
 
 (deftest wavelength-test
   (doseq [[o rows] (:wavelength @reference)

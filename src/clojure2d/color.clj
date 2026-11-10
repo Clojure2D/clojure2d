@@ -133,6 +133,7 @@
             [clojure2d.color.munsell :as munsell]
             [clojure.java.io :refer [input-stream resource]]
             [clojure.edn :as edn]
+            [clojure.string]
             [fastmath.matrix :as mat])
   (:import [fastmath.vector Vec2 Vec3 Vec4]
            [java.awt Color]
@@ -199,7 +200,7 @@
   See also [[lclamp255]], [[clamp]] and [[lclamp]]."
   {:metadoc/categories meta-ops}
   ^double [^double a]
-  (m/constrain a 0 255))
+  (m/constrain a 0.0 255.0))
 
 (defn- lclamp255
   "Constrain value `a` to 0-255 long (rounding if necessary).
@@ -5021,9 +5022,12 @@
    :sunlight 4800.0
    :cool 7250.0})
 
-(def ^{:doc "Sorted names accepted by [[temperature]] instead of a temperature in K.
-
-  The author's approximate choices for common light sources: `:candle` 1800, `:sunrise` and `:sunset` 2500, `:lightbulb` and `:warm` 2900, `:morning` 3500, `:moonlight` 4000, `:white` 4250, `:sunlight` 4800, `:midday` 5500, `:cloudy-sky` 6500, `:cool` 7250, `:blue-sky` 10000 K."}
+(def ^{:doc (str "Sorted names accepted by [[temperature]] instead of a temperature in K.\n\n  The author's approximate choices for common light sources: "
+                (->> temperature-name-to-K
+                     (sort-by (juxt val key))
+                     (map (fn [[k t]] (str "`" k "` " (long t))))
+                     (clojure.string/join ", "))
+                " K.")}
   temperature-names (sort (keys temperature-name-to-K)))
 
 (defn- temperature-kelvin
@@ -5043,11 +5047,11 @@
 (defn temperature
   "Returns the color of a blackbody radiator at temperature `t`: its hue at full brightness, as sRGB.
 
-  Mitchell Charity's blackbody colors (vendian.org, bbr_color): Planck spectrum, CIE 1964 10° color matching functions, XYZ to linear sRGB without chromatic adaptation, a negative channel lifted by adding white, the largest channel scaled to 1. The values come from a table uniform in mired (1e6 / T) from 500 to 40000 K (`utils/color/gen_temperature.py`), interpolated in linear RGB: within 0.1 of the exact model on 0-255. Below 500 K and above 40000 K the color of the end of the table is returned.
+  Mitchell Charity's method (vendian.org, bbr_color): Planck spectrum, CIE 1964 10° color matching functions, XYZ to linear sRGB with the matrix of [[from-XYZ]] and without chromatic adaptation, a negative channel lifted by adding white, the largest channel scaled to 1 (his own table, with a 4-digit D65 white, differs by up to 4.5e-4 in linear values). The values come from a table uniform in mired (1e6 / T) from 500 to 40000 K (`utils/color/gen_temperature.py`), interpolated in linear RGB: within 0.1 of the exact model on 0-255. Below 500 K and above 40000 K, including infinity, the color of the end of the table is returned.
 
-  Without adaptation, the D65 white of sRGB is not a blackbody color: 6500 K is slightly pink (255, 248.7, 253.4). Below about 900 K the lifted green makes the red slightly pink as well.
+  Without adaptation, the D65 white of sRGB is not a blackbody color: 6500 K is slightly pink (255, 248.7, 253.4). Below about 900 K green is the most negative channel, so adding white makes blue positive and the red turns pink: 700 K (255, 0, 44.5), 500 K (255, 0, 68.6).
 
-  - `t` temperature in K (positive number) or a name of [[temperature-names]], e.g. `:candle`, `:warm`, `:blue-sky`
+  - `t` temperature in K (positive number, `##Inf` allowed) or a name of [[temperature-names]], e.g. `:candle`, `:warm`, `:blue-sky`
 
   Returns a `Vec4`, channels 0-255, alpha 255. Throws `ex-info` with `{:temperature t}` for an unknown name, a value that is neither a number nor a keyword, a temperature not above 0 K and NaN. See also [[adjust-temperature]], [[wavelength]], `clojure2d.color.whitepoints/blackbody-spectrum`."
   {:metadoc/categories #{:pal}}
@@ -6162,7 +6166,7 @@
 (defn adjust-temperature
   "Shifts a color toward the color of a blackbody temperature, keeping its lightness.
 
-  The result is `(lerp- c (temperature temp) amount)`: the channels are interpolated by `amount` toward the temperature color, then the CIELAB lightness of `c` is restored. Channels are not clamped and can leave `[0,255]`.
+  The result is `(lerp- c (temperature temp) amount)`: the channels are interpolated by `amount` toward the temperature color, then the CIELAB lightness of `c` is restored; channels are clamped to `[0,255]` (dark colors leave the sRGB gamut, e.g. `[10 10 10]` toward 3000 K).
 
   - `c` color, any type accepted by [[to-color]]
   - `temp` temperature in K or a name of [[temperature-names]], as accepted by [[temperature]]
@@ -6172,7 +6176,7 @@
   {:metadoc/categories meta-ops}
   ([c temp] (adjust-temperature c temp 0.35))
   ([c temp amount]
-   (lerp- (pr/to-color c) (temperature temp) amount)))
+   (v/fmap (lerp- (pr/to-color c) (temperature temp) amount) clamp255)))
 
 ;;
 
