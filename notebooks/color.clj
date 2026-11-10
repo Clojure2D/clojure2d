@@ -318,7 +318,7 @@
          ['(c/delta-C-RGB :yellow :blue)                   (c/delta-C-RGB :yellow :blue)]
          ['(c/delta-D-HCL :yellow :blue)                   (c/delta-D-HCL :yellow :blue)]]})
 
-;; There are two more measures: `contrast-ratio` from WCAG (the value below 3.0 means that contrast is too low) and `noticable-different?` to check if colors are visually different, as described in this [paper](https://research.tableau.com/sites/default/files/2014CIC_48_Stone_v3.pdf).
+;; There are two more measures: `contrast-ratio` from WCAG (the value below 3.0 means that contrast is too low) and `noticeably-different?` to check if colors are visually different, as described in this [paper](https://research.tableau.com/sites/default/files/2014CIC_48_Stone_v3.pdf).
 
 [(c/contrast-ratio :yellow :blue)
  (c/contrast-ratio :yellow :lightyellow)]
@@ -349,11 +349,11 @@
                               :scale {:range [:black :blue :green
                                               :red :lightgray :yellowgreen]}}}})
 
-;; To check if two colors are visually different we can call `noticable-different?` function.
+;; To check if two colors are visually different we can call `noticeably-different?` function.
 
-[(c/noticable-different? :yellow :blue)
- (c/noticable-different? :yellow :lightyellow)
- (c/noticable-different? (c/gray 245.0) (c/gray 235.0))]
+[(c/noticeably-different? :yellow :blue)
+ (c/noticeably-different? :yellow :lightyellow)
+ (c/noticeably-different? (c/gray 245.0) (c/gray 235.0))]
 
 ;; ## Color space conversions
 

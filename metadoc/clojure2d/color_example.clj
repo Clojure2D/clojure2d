@@ -358,20 +358,20 @@
 
 ;; ----
 
-#_(add-examples delta-c
-                (example "Distance between colors" (delta-c :maroon :amber)))
+#_(add-examples delta-C*
+                (example "Distance between colors" (delta-C* :maroon :amber)))
 
-#_(add-examples delta-h
-                (example "Distance between colors" (delta-h :maroon :amber)))
+#_(add-examples delta-H*
+                (example "Distance between colors" (delta-H* :maroon :amber)))
 
-#_(add-examples delta-e-cie
-                (example "Distance between colors" (delta-e-cie :maroon :amber)))
+#_(add-examples delta-E*
+                (example "Distance between colors" (delta-E* :maroon :amber)))
 
-#_(add-examples delta-e-jab
-                (example "Distance between colors" (delta-e-jab :maroon :amber)))
+#_(add-examples delta-E-z
+                (example "Distance between colors" (delta-E-z :maroon :amber)))
 
-#_(add-examples delta-e-cmc
-                (example "Distance between colors" (delta-e-cmc :maroon :amber)))
+#_(add-examples delta-E*-CMC
+                (example "Distance between colors" (delta-E*-CMC :maroon :amber)))
 
 #_(add-examples euclidean
                 (example "Distance between colors" (euclidean :maroon :amber)))
@@ -380,19 +380,19 @@
               (example "Contrast ratio" (contrast-ratio :pink :hotpink))
               (example "Contrast ratio" (contrast-ratio :pink :purple)))
 
-(add-examples noticable-different?
-  (example "Contrast ratio" (noticable-different? :pink :hotpink))
-  (example "Contrast ratio" (noticable-different? "00aabb" "00baba")))
+(add-examples noticeably-different?
+  (example "Noticeable difference" (noticeably-different? :pink :hotpink))
+  (example "Noticeable difference" (noticeably-different? "00aabb" "00baba")))
 
 (def some-palette (paletton :triad 210 {:angle 40}))
 
 (add-examples nearest-color
   (example-color "Find nearest color to given color from below palette." [120 0 80])
   (example-palette "All below examples are using this palette" some-palette)
-  (example-color "With Delta C" (nearest-color some-palette [120 0 80] delta-c))
-  (example-color "With Delta H" (nearest-color some-palette [120 0 80] delta-h))
-  (example-color "With Delta E CIE" (nearest-color some-palette [120 0 80] delta-e-cie))
-  (example-color "With Delta E CMC" (nearest-color some-palette [120 0 80] delta-e-cmc))
+  (example-color "With Delta C" (nearest-color some-palette [120 0 80] delta-C*))
+  (example-color "With Delta H" (nearest-color some-palette [120 0 80] delta-H*))
+  (example-color "With Delta E CIE" (nearest-color some-palette [120 0 80] delta-E*))
+  (example-color "With Delta E CMC" (nearest-color some-palette [120 0 80] delta-E*-CMC))
   (example-color "With euclidean" (nearest-color some-palette [120 0 80])))
 
 (add-examples reduce-colors

@@ -106,7 +106,7 @@
   
   ## Distances
 
-  Color differences: [[delta-E*]] (CIE 1976), [[delta-E*-94]], [[delta-E*-2000]], [[delta-E*-CMC]], [[delta-E-HyAB]], [[delta-E-z]] (Jzazbz), [[delta-E*-euclidean]] (any colorspace, Oklab by default), [[delta-C*]] and [[delta-H*]] (chroma and hue parts), [[delta-C-RGB]] (redmean), [[delta-D-HCL]]. Contrast: [[contrast-ratio]] (WCAG). Visibility: [[noticable-different?]].
+  Color differences: [[delta-E*]] (CIE 1976), [[delta-E*-94]], [[delta-E*-2000]], [[delta-E*-CMC]], [[delta-E-HyAB]], [[delta-E-z]] (Jzazbz), [[delta-E*-euclidean]] (any colorspace, Oklab by default), [[delta-C*]] and [[delta-H*]] (chroma and hue parts), [[delta-C-RGB]] (redmean), [[delta-D-HCL]]. Contrast: [[contrast-ratio]] (WCAG). Visibility: [[noticeably-different?]].
 
   ## References
 
@@ -5396,6 +5396,13 @@
 ;; ## Additional functions
 ;; https://www.imatest.com/docs/colorcheck_ref/
 
+(defn- difference-converter
+  "The `to-` conversion of `colorspace` applied to both colors of a difference or contrast measure. Throws `ex-info` with `{:options options}` when `options` is neither a map nor nil, and `{:colorspace colorspace}` for an unknown colorspace."
+  [options colorspace]
+  (when-not (or (nil? options) (map? options))
+    (throw (ex-info (str "Options should be a map, got: " options) {:options options})))
+  (first (colorspace-converters colorspaces colorspace)))
+
 (defn delta-E*
   "Returns the CIE 1976 color difference ΔE*ab: the Euclidean distance in CIELAB.
 
@@ -5405,11 +5412,12 @@
   - `options` (map, optional):
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
 
-  Returns a non-negative double, symmetric in `c1`, `c2`; up to about 259 for sRGB colors (blue to green; black to white 100). Alpha is ignored. See also [[delta-E*-euclidean]], [[delta-E*-94]], [[delta-E*-2000]]."
+  Returns a non-negative double, symmetric in `c1`, `c2`; up to about 259 for sRGB colors (blue to green; black to white 100). Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-E*-euclidean]], [[delta-E*-94]], [[delta-E*-2000]]."
   (^double [c1 c2] (delta-E* c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
-                   :or {colorspace :LAB}}]
-   (let [to (first (colorspaces colorspace))
+                   :or {colorspace :LAB}
+                   :as options}]
+   (let [to (difference-converter options colorspace)
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)]
      (m/hypot-sqrt (- (.x c2) (.x c1))
@@ -5430,15 +5438,14 @@
   - `options` (map, optional):
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
 
-  Returns a double. Alpha is ignored. See also [[delta-H*]], [[delta-E*]]."
+  Returns a double. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-H*]], [[delta-E*]]."
   {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-C* c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
-                   :or {colorspace :LAB}}]
-   (let [to (first (colorspaces colorspace))]
+                   :or {colorspace :LAB}
+                   :as options}]
+   (let [to (difference-converter options colorspace)]
      (delta-ab (to c1) (to c2)))))
-
-(def ^{:deprecated "Use delta-C*"} delta-c delta-C*)
 
 (defn delta-H*
   "Returns the CIE 1976 hue difference ΔH*ab = sqrt(Δa² + Δb² - ΔC*²).
@@ -5449,19 +5456,18 @@
   - `options` (map, optional):
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
 
-  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. See also [[delta-C*]]."
+  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-C*]]."
   {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-H* c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
-                   :or {colorspace :LAB}}]
-   (let [to (first (colorspaces colorspace))
+                   :or {colorspace :LAB}
+                   :as options}]
+   (let [to (difference-converter options colorspace)
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)]
      (m/safe-sqrt (- (+ (m/sq (- (.y c2) (.y c1)))
                         (m/sq (- (.z c2) (.z c1))))
                      (m/sq (delta-ab c1 c2)))))))
-
-(def ^{:deprecated "Use delta-H*"} delta-h delta-H*)
 
 (defn delta-E-HyAB
   "Returns the HyAB color difference: `|ΔL| + sqrt(Δa² + Δb²)` in CIELAB.
@@ -5472,11 +5478,12 @@
   - `options` (map, optional):
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
 
-  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. See also [[delta-E*]]."
+  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-E*]]."
   (^double [c1 c2] (delta-E-HyAB c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
-                   :or {colorspace :LAB}}]
-   (let [to (first (colorspaces colorspace))
+                   :or {colorspace :LAB}
+                   :as options}]
+   (let [to (difference-converter options colorspace)
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)]
      (+ (m/hypot-sqrt (- (.y c2) (.y c1))
@@ -5493,14 +5500,15 @@
       - `:textiles?` - textile constants instead of graphic arts, default `false`
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
 
-  Returns a non-negative double. Alpha is ignored. See also [[delta-E*-2000]], [[delta-E*-CMC]]."
+  Returns a non-negative double. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-E*-2000]], [[delta-E*-CMC]]."
   {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-E*-94 c1 c2 nil))
   (^double [c1 c2 {:keys [textiles? colorspace]
-                   :or {textiles? false colorspace :LAB}}]
+                   :or {textiles? false colorspace :LAB}
+                   :as options}]
    (let [k1 (if textiles? 0.048 0.045)
          k2 (if textiles? 0.014 0.015)
-         to (first (colorspaces colorspace))
+         to (difference-converter options colorspace)
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)
          C1* (m/hypot-sqrt (.y c1) (.z c1))
@@ -5515,10 +5523,6 @@
                                             (m/sq (- (.z c2) (.z c1))))
                                          (m/sq dab))) Sh)))))))
 
-(def ^{:metadoc/categories #{:dist} :deprecated "Use delta-E*"
-     :doc "Delta E CIE distance (euclidean in LAB colorspace."}
-  delta-e-cie delta-E*)
-
 (defn delta-E*-euclidean
   "Returns the Euclidean distance of two colors in a colorspace, by default Oklab.
 
@@ -5528,12 +5532,13 @@
   - `options` (map, optional):
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:Oklab`. Use `:pass` to measure the channels as given.
 
-  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. Hue channels are treated as linear (no wrap-around)."
+  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. Hue channels are treated as linear (no wrap-around)."
   {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-E*-euclidean c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
-                   :or {colorspace :Oklab}}]
-   (let [to (first (colorspaces colorspace))
+                   :or {colorspace :Oklab}
+                   :as options}]
+   (let [to (difference-converter options colorspace)
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)]
      (m/hypot-sqrt (- (.x c2) (.x c1))
@@ -5576,11 +5581,12 @@
   - `options` (map, optional):
       - `:colorspace` - conversion applied to both colors, default `:HCL`; it must return the [[to-HCL]] layout (H in degrees, C, L).
 
-  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. See also [[delta-E*]]."
+  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-E*]]."
   (^double [c1 c2] (delta-D-HCL c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
-                   :or {colorspace :HCL}}]
-   (let [to (first (colorspaces colorspace))
+                   :or {colorspace :HCL}
+                   :as options}]
+   (let [to (difference-converter options colorspace)
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)
          dH (diff-H (.x c2) (.x c1))
@@ -5602,12 +5608,13 @@
       - `:c` - chroma factor, default `1.0`
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
 
-  Returns a non-negative double. Alpha is ignored. See also [[delta-E*-94]], [[delta-E*-2000]]."
+  Returns a non-negative double. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-E*-94]], [[delta-E*-2000]]."
   {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-E*-CMC c1 c2 nil))
   (^double [c1 c2 {:keys [^double l ^double c colorspace]
-                   :or {l 1.0 c 1.0 colorspace :LAB}}]
-   (let [to (first (colorspaces colorspace))
+                   :or {l 1.0 c 1.0 colorspace :LAB}
+                   :as options}]
+   (let [to (difference-converter options colorspace)
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)
          L1 (.x c1)
@@ -5640,8 +5647,6 @@
          SH (* SC (inc (* F (dec T))))]
      (m/sqrt (+ (m/sq (/ dL (* l SL))) (m/sq (/ dC (* c SC))) (/ dH (m/sq SH)))))))
 
-(def ^{:deprecated "Use delta-E*-CMC"} delta-e-cmc delta-E*-CMC)
-
 (defn delta-E-z
   "Returns the Jzazbz color difference ΔEz (Safdar et al. 2017).
 
@@ -5651,12 +5656,13 @@
   - `options` (map, optional):
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:JAB`. Use `:pass` for colors already in Jzazbz.
 
-  Returns a non-negative double, symmetric in `c1`, `c2`; small numbers (black to white about 0.17). Alpha is ignored. See also [[delta-E*-2000]]."
+  Returns a non-negative double, symmetric in `c1`, `c2`; small numbers (black to white about 0.17). Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-E*-2000]]."
   {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-E-z c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
-                   :or {colorspace :JAB}}]
-   (let [to (first (colorspaces colorspace))
+                   :or {colorspace :JAB}
+                   :as options}]
+   (let [to (difference-converter options colorspace)
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)
          J1 (.x c1)
@@ -5672,8 +5678,6 @@
      (m/hypot-sqrt (- J2 J1)
                    (- C2 C1)
                    (* 2.0 (m/sqrt (* C1 C2)) (m/sin (* 0.5 (- h2 h1))))))))
-
-(def ^{:deprecated "Use delta-e-jab"} delta-e-jab delta-E-z)
 
 (def ^{:private true :const true :tag 'long} p25_7 (* 25 25 25 25 25 25 25))
 (def ^{:private true :const true :tag 'double} r30 (m/radians 30.0))
@@ -5697,11 +5701,12 @@
       - `:l`, `:c`, `:h` - parametric factors kL, kC, kH, default `1.0` each (textiles: `:l 2.0`)
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
 
-  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. See also [[delta-E*-94]], [[delta-E*-CMC]], [[delta-E*]]."
+  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-E*-94]], [[delta-E*-CMC]], [[delta-E*]]."
   (^double [c1 c2] (delta-E*-2000 c1 c2 nil))
   (^double [c1 c2 {:keys [^double l ^double c ^double h colorspace]
-                   :or {l 1.0 c 1.0 h 1.0 colorspace :LAB}}]
-   (let [to (first (colorspaces colorspace))
+                   :or {l 1.0 c 1.0 h 1.0 colorspace :LAB}
+                   :as options}]
+   (let [to (difference-converter options colorspace)
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)
          C1* (m/hypot-sqrt (.y c1) (.z c1))
@@ -5778,7 +5783,7 @@
                  (+ 10.68 (/ 3.08 s))
                  (+ 10.70 (/ 5.74 s))) p))
 
-(defn noticable-different?
+(defn noticeably-different?
   "Tests whether two colors are noticeably different for a given mark size.
 
   M. Stone, D. A. Szafir, V. Setlur, An Engineering Model for Color Difference as a Function of Size (2014), as d3-jnd: the colors differ when any of `|ΔL|`, `|Δa|`, `|Δb|` in CIELAB reaches `p (A + B / s)`, with `A = (10.16, 10.68, 10.70)`, `B = (1.50, 3.08, 5.74)`. The model was fitted for sizes from 1/3 to 6 degrees; the default size is an extrapolation. CIELAB here uses the D65 white (d3-jnd computes it with d3-color).
@@ -5789,12 +5794,13 @@
       - `:p` - share of observers who should see the difference, 0 to 1, default `0.5`
       - `:colorspace` - conversion applied to both colors, default `:LAB`. Use `:pass` for colors already in CIELAB.
 
-  Returns a boolean, symmetric in `c1`, `c2`. Alpha is ignored."
+  Returns a boolean, symmetric in `c1`, `c2`. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map."
   {:metadoc/categories #{:dist}}
-  ([c1 c2] (noticable-different? c1 c2 nil))
+  ([c1 c2] (noticeably-different? c1 c2 nil))
   ([c1 c2 {:keys [^double s ^double p colorspace]
-           :or {s 0.1 p 0.5 colorspace :LAB}} ]
-   (let [to (first (colorspaces colorspace))
+           :or {s 0.1 p 0.5 colorspace :LAB}
+                   :as options}]
+   (let [to (difference-converter options colorspace)
          c1 (to c1)
          c2 (to c2)
          ^Vec4 diff (v/abs (v/sub c1 c2))

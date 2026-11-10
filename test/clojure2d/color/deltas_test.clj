@@ -7,7 +7,7 @@
             [clojure.java.io :as io]
             [fastmath.core :as m]
             [clojure2d.color :as c]
-            [clojure2d.test-predicates :refer [rel-close?]]))
+            [clojure2d.test-predicates :refer [rel-close? throws-data?]]))
 
 (def reference (delay (-> "color/deltas_reference.edn" io/resource slurp edn/read-string)))
 
@@ -61,13 +61,13 @@
           :let [opts {:p p :s s :colorspace :pass}
                 base [50.0 0.0 0.0]
                 shifted (fn [^double f] (update base ch + (* f (double (interval ch)))))]]
-    (is (not (c/noticable-different? base (shifted (- 1.0 1.0e-9)) opts)) (str [p s] " " ch " below"))
-    (is (c/noticable-different? base (shifted (+ 1.0 1.0e-9)) opts) (str [p s] " " ch " above"))
-    (is (c/noticable-different? (shifted (+ 1.0 1.0e-9)) base opts) (str [p s] " " ch " symmetric")))
+    (is (not (c/noticeably-different? base (shifted (- 1.0 1.0e-9)) opts)) (str [p s] " " ch " below"))
+    (is (c/noticeably-different? base (shifted (+ 1.0 1.0e-9)) opts) (str [p s] " " ch " above"))
+    (is (c/noticeably-different? (shifted (+ 1.0 1.0e-9)) base opts) (str [p s] " " ch " symmetric")))
   (testing "defaults: p 0.5, s 0.1, CIELAB"
-    (is (c/noticable-different? :pink :hotpink))
-    (is (not (c/noticable-different? "00aabb" "00baba")))
-    (is (not (c/noticable-different? :red :red)))))
+    (is (c/noticeably-different? :pink :hotpink))
+    (is (not (c/noticeably-different? "00aabb" "00baba")))
+    (is (not (c/noticeably-different? :red :red)))))
 
 (def ^:private deltas
   [c/delta-E* c/delta-C* c/delta-H* c/delta-E-HyAB c/delta-E*-94 c/delta-E*-euclidean c/delta-C-RGB
@@ -110,8 +110,26 @@
 
 (deftest docstrings-test
   (doseq [s '[delta-E* delta-C* delta-H* delta-E-HyAB delta-E*-94 delta-E*-euclidean delta-C-RGB delta-D-HCL
-              delta-E*-CMC delta-E-z delta-E*-2000 contrast-ratio noticable-different?]]
+              delta-E*-CMC delta-E-z delta-E*-2000 contrast-ratio noticeably-different?]]
     (is (some? (:doc (meta (ns-resolve 'clojure2d.color s)))) (str s))))
+
+;; G2: options contract
+
+(def ^:private option-fns
+  [c/delta-E* c/delta-C* c/delta-H* c/delta-E-HyAB c/delta-E*-94 c/delta-E*-euclidean c/delta-D-HCL
+   c/delta-E*-CMC c/delta-E-z c/delta-E*-2000 c/noticeably-different?])
+
+(deftest options-contract-test
+  (testing "unknown colorspace"
+    (doseq [f option-fns]
+      (is (throws-data? {:colorspace :Foo} #(f :red :blue {:colorspace :Foo})) (str f))))
+  (testing "options not a map (e.g. a positional colorspace)"
+    (doseq [f option-fns]
+      (is (throws-data? {:options :YUV} #(f :red :blue :YUV)) (str f))
+      (is (throws-data? {:options 2.0} #(f :red :blue 2.0)) (str f))))
+  (testing "nil and {} mean defaults"
+    (doseq [f option-fns]
+      (is (= (f :red :blue) (f :red :blue nil) (f :red :blue {})) (str f)))))
 
 ;; point values moved from clojure2d.color-test
 
