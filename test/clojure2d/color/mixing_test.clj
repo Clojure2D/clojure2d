@@ -253,6 +253,37 @@
                #(c/mix :red :blue :RGB 0.5 :x) #(c/average [:red] :RGB :x) #(c/weighted-average [:red] [1] :RGB :x)]]
       (is (throws-data? {:options :x} f)))))
 
+;; review fixes
+
+(deftest premultiplied-weighted-average-test
+  (let [{:keys [alpha-sets alpha-weights alpha-weighted-average]} (:coloraide @reference)]
+    (doseq [[cs flags] alpha-weighted-average
+            [flag rows] flags
+            :let [opts {:premultiplied? (= flag :premultiplied)}]
+            [st w e] (map vector alpha-sets alpha-weights rows)
+            :when (or (= flag :premultiplied) (every? #(pos? (double (% 3))) st))]
+      (is (m/<= (rgba-diff e (c/weighted-average st w cs opts)) (alpha-tolerance cs)) (str cs " " flag " " st)))))
+
+(deftest review-contracts-test
+  (testing "reduce-colors: options, count, no colors"
+    (is (throws-data? {:options :OSA} #(c/reduce-colors (c/palette :viridis) 3 :OSA)))
+    (is (throws-data? {:number-of-colors 0} #(c/reduce-colors (c/palette :viridis) 0)))
+    (is (throws-data? {:colors 0} #(c/reduce-colors [] 3))))
+  (testing "mixsub in a colorspace: the formula on the normalized channels"
+    (let [[to from] (c/colorspaces* :LAB)]
+      (doseq [t [0.0 0.3 0.5 1.0]]
+        (is (m/< (max-diff (from (c/mixsub (to :red) (to :blue) t)) (c/mixsub :red :blue :LAB t)) 1.0e-9) (str t))))
+    (is (m/< (max-diff [255 0 0 255] (c/mixsub :red :blue :LAB 0.0)) 1.0e-9)))
+  (testing "premultiplied weights cancelling out"
+    (is (throws-data? {:alpha-weights-sum 0.0}
+                      #(c/weighted-average [[255 0 0 255] [0 0 255 51]] [1 -5] :RGB {:premultiplied? true})))
+    (is (= [0.0 0.0 0.0 0.0] (vec (c/weighted-average [[255 0 0 0] [0 0 255 0]] [1 2] :RGB {:premultiplied? true})))))
+  (testing "nearest-color: NaN distances skipped, all NaN throws"
+    (is (= :blue (c/nearest-color [:red :blue] :navy (fn [a b] (if (= (vec b) [255.0 0.0 0.0 255.0]) ##NaN (v/dist a b))))))
+    (is (throws-data? {:distance :nan} #(c/nearest-color [:red :blue] :pink (fn [_ _] ##NaN)))))
+  (testing "resample a gradient"
+    (is (= 3 (count (c/resample (c/gradient [:red :blue]) 3))))))
+
 (deftest docstrings-test
   (doseq [s '[nearest-color average weighted-average lerp lerp- lerp+ mix mixbox mixsub negate reduce-colors resample]]
     (is (some? (:doc (meta (ns-resolve 'clojure2d.color s)))) (str s))))

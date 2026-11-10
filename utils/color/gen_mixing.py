@@ -23,7 +23,8 @@ gray-blue, white-black and 10 random sets of 3-5 colors; :weights, positive rand
   :average {space [[r g b a] per set]} and :weighted-average (with :weights) - Color.average (circular hue mean);
   :alpha - premultiplied vs straight: :alpha-pairs [[[r g b a] [r g b a]] ...], :alpha-mix {space {flag [[[r g b a]
   per t] per pair]}} for spaces RGB (coloraide srgb), HSL, LCH, Oklch and flags :premultiplied / :straight;
-  :alpha-sets [[[r g b a] ...] ...], :alpha-average {space {flag [[r g b a] per set]}}.
+  :alpha-sets [[[r g b a] ...] ...], :alpha-average {space {flag [[r g b a] per set]}}; :alpha-weights (positive,
+  random) and :alpha-weighted-average {space {flag [[r g b a] per set]}} - Color.average with the weights.
 * :mixsub [[[r g b a] per t] per pair] - ProfJski ArtColors ColorMixSub (RYB.cpp) in floating point: f = max(0,
   a + b - 255) per channel, cd = 4 t (1 - t) |a - b| / (sqrt(3) 255) (RGB distance), lerp(lerp(a, b, t), f, cd),
   alpha 255.
@@ -110,8 +111,14 @@ def coloraide_oracle(C, pairs, sets, weights):
     alpha_average = {k: {f: [out_rgba(Color.average([ca(c) for c in st], space=s, premultiplied=p)) for st in alpha_sets]
                          for f, p in flags.items()}
                      for k, s in ALPHA_SPACES.items()}
+    alpha_weights = [[float(w) for w in rng.uniform(0.1, 3.0, len(st))] for st in alpha_sets]
+    alpha_weighted = {k: {f: [out_rgba(Color.average([ca(c) for c in st], w, space=s, premultiplied=p))
+                              for st, w in zip(alpha_sets, alpha_weights)]
+                          for f, p in flags.items()}
+                      for k, s in ALPHA_SPACES.items()}
     return {"mix": mix, "average": average, "weighted-average": weighted, "alpha-pairs": alpha_pairs,
-            "alpha-mix": alpha_mix, "alpha-sets": alpha_sets, "alpha-average": alpha_average}
+            "alpha-mix": alpha_mix, "alpha-sets": alpha_sets, "alpha-average": alpha_average,
+            "alpha-weights": alpha_weights, "alpha-weighted-average": alpha_weighted}
 
 
 def mixsub(a, b, t):
@@ -176,7 +183,9 @@ def main():
            "             :alpha-pairs [" + " ".join(rows(p) for p in co["alpha-pairs"]) + "]",
            "             :alpha-mix " + keyed(co["alpha-mix"], lambda d: keyed(d, nested, 24), 24),
            "             :alpha-sets [" + " ".join(rows(s) for s in co["alpha-sets"]) + "]",
-           "             :alpha-average " + keyed(co["alpha-average"], lambda d: keyed(d, rows, 28), 28) + "}",
+           "             :alpha-average " + keyed(co["alpha-average"], lambda d: keyed(d, rows, 28), 28),
+           "             :alpha-weights " + rows(co["alpha-weights"]),
+           "             :alpha-weighted-average " + keyed(co["alpha-weighted-average"], lambda d: keyed(d, rows, 37), 37) + "}",
            " :mixsub " + nested([[mixsub(C[i], C[j], t) for t in TS] for i, j in pairs]),
            " :nearest {:palette " + rows(palette) + "\n           :index [" + " ".join(map(str, index)) + "]}}"]
     with open(OUT, "w") as f:

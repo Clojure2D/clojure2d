@@ -5905,7 +5905,7 @@
          (>= (.z diff) (.z nd))))))
 
 (defn- nearest-color-fn
-  "Function of a color returning the entry of `pal` nearest to it by `dist-fn` (on `Vec4` values), the first one on ties; throws `ex-info` with `{:palette-size 0}` for an empty palette."
+  "Function of a color returning the entry of `pal` nearest to it by `dist-fn` (on `Vec4` values), the first one on ties, NaN distances skipped; throws `ex-info` with `{:palette-size 0}` for an empty palette and `{:distance :nan}` when every distance is NaN."
   [pal dist-fn]
   (let [entries (vec pal)
         colors (mapv pr/to-color entries)
@@ -5914,13 +5914,15 @@
       (throw (ex-info "Palette is empty" {:palette-size 0})))
     (fn [c]
       (let [c (pr/to-color c)]
-        (loop [i 0 best 0 best-dist ##Inf]
+        (loop [i 0 best -1 best-dist ##Inf]
           (if (< i n)
             (let [d (m/abs (double (dist-fn c (colors i))))]
-              (if (< d best-dist)
+              (if (or (< d best-dist) (and (neg? best) (not (m/nan? d))))
                 (recur (inc i) i d)
                 (recur (inc i) best best-dist)))
-            (entries best)))))))
+            (if (neg? best)
+              (throw (ex-info "Distance to every palette color is NaN" {:distance :nan}))
+              (entries best))))))))
 
 (defn nearest-color
   "Finds the color of a palette nearest to a given color.
@@ -5929,7 +5931,7 @@
   - `c` color, any type accepted by [[to-color]]
   - `dist-fn` (optional) distance of two colors (`Vec4` values), default `fastmath.vector/dist` (Euclidean distance of R, G, B and alpha)
 
-  Returns the palette entry with the smallest absolute distance to `c`, as given in the palette (e.g. a keyword), the first one on ties. With only `pal` returns a function of a color; the palette is converted once. Throws `ex-info` with `{:palette-size 0}` for an empty palette. See also [[delta-E*]], [[reduce-colors]]."
+  Returns the palette entry with the smallest absolute distance to `c`, as given in the palette (e.g. a keyword), the first one on ties. NaN distances are skipped. With only `pal` returns a function of a color (default distance) and the palette is converted once; the other arities convert the palette with [[to-color]] on every call, so for many colors with a custom `dist-fn` pass a palette of `Vec4` values (cheap to convert). Throws `ex-info` with `{:palette-size 0}` for an empty palette and `{:distance :nan}` when every distance is NaN. See also [[delta-E*]], [[reduce-colors]]."
   {:metadoc/categories #{:dist}}
   ([pal c dist-fn] ((nearest-color-fn pal dist-fn) c))
   ([pal c] ((nearest-color-fn pal v/dist) c))
@@ -6017,6 +6019,8 @@
         alpha (/ (double (reduce m/+ 0.0 (map (fn [^Vec4 c ^double w] (* w (.w c))) vs weights))) weights-total)
         cws (if premultiplied? (map (fn [^Vec4 c ^double w] (* w (/ (.w c) 255.0))) vs weights) weights)
         cw-total (double (reduce m/+ 0.0 cws))
+        _ (when (and (zero? cw-total) (some (fn [^double w] (not (zero? w))) cws))
+            (throw (ex-info "Sum of the alpha-weighted weights is 0 (negative weights)" {:alpha-weights-sum 0.0})))
         avg (if (zero? cw-total)
               (Vec4. 0.0 0.0 0.0 alpha)
               (with-channel (v/div (reduce v/add (map v/mult vs cws)) cw-total) 3 alpha))]
@@ -6040,7 +6044,13 @@
   "Throws `ex-info` with `{:colors 0}` for an empty sequence of colors."
   [cs]
   (when-not (seq cs)
-    (throw (ex-info "No colors to average" {:colors 0}))))
+    (throw (ex-info "No colors given" {:colors 0}))))
+
+(defn- check-number-of-colors
+  "Throws `ex-info` with `{:number-of-colors n}` when the requested number of colors `n` is below 1."
+  [^long n]
+  (when (< n 1)
+    (throw (ex-info (str "Number of colors should be at least 1, got: " n) {:number-of-colors n}))))
 
 (defn- weights-sum
   "Sum of `weights`; throws `ex-info` with `{:colors 0}` for no colors, `{:colors n :weights m}` when the counts differ and `{:weights-sum s}` for a sum that is 0 or not finite."
@@ -6086,7 +6096,7 @@
   - `colorspace` (optional) a key of [[colorspaces]], as in [[average]] (circular mean of hues)
   - `options` (optional, map; requires `colorspace`, `:RGB` for sRGB): `:premultiplied?` - when true the colors are weighted by alpha (premultiplied alpha, as CSS `color-mix()` and coloraide; the hue channel is not premultiplied); default false (straight alpha, as chroma.js)
 
-  Without `colorspace` the sRGB values are averaged as they are (chroma.js `average` in mode `rgb` with weights). Negative weights are allowed. Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colors 0}` for no colors, `{:colors n :weights m}` when the counts differ, `{:weights-sum s}` for a sum of weights that is 0 or not finite, `{:colorspace colorspace}` for an unknown colorspace and `{:options options}` for options that are not a map. See also [[average]]."
+  Without `colorspace` the sRGB values are averaged as they are (chroma.js `average` in mode `rgb` with weights). Negative weights are allowed. Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colors 0}` for no colors, `{:colors n :weights m}` when the counts differ, `{:weights-sum s}` for a sum of weights that is 0 or not finite, `{:alpha-weights-sum 0.0}` when with premultiplied alpha the weights times alphas cancel out (negative weights), `{:colorspace colorspace}` for an unknown colorspace and `{:options options}` for options that are not a map. See also [[average]]."
   {:metadoc/categories #{:interp}}
   ([cs weights colorspace] (weighted-average cs weights colorspace nil))
   ([cs weights colorspace {:keys [premultiplied?] :as options}]
@@ -6239,13 +6249,13 @@
   The linear mix of the colors is moved toward their subtractive mix `max(0, a + b - 255)` (per channel) by `4 t (1 - t) d`, where `d` is the RGB distance of the colors divided by `255 sqrt(3)` (0 to 1). Alpha is ignored and set to 255, as ArtColors.
 
   - `c1`, `c2` colors, any type accepted by [[to-color]]
-  - `colorspace` (optional) a key of [[colorspaces]]: the formula is applied to the raw channels
+  - `colorspace` (optional) a key of [[colorspaces*]]: the formula is applied to the normalized channels (0-255, as the formula expects)
   - `t` weight of `c2`, default `0.5`
 
   Returns a `Vec4`. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[mix]], [[mixbox]]."
   {:metadoc/categories #{:interp}}
   (^Vec4 [c1 c2 colorspace ^double t]
-   (let [[to from] (colorspace-converters colorspaces colorspace)]
+   (let [[to from] (colorspace-converters colorspaces* colorspace)]
      (from (mixsub (to c1) (to c2) t))))
   (^Vec4 [c1 c2] (mixsub c1 c2 0.5))
   (^Vec4 [c1 c2 ^double t]
@@ -6293,10 +6303,13 @@
       - `:rng` - random number generator of the clustering (e.g. `(fastmath.random/rng :mersenne 42)` for repeatable results); `nil` or none: fastmath creates one
       - other clustering options, e.g. `:max-iters`, `:distance`, `:fuzziness`, `:trials`
 
-  The color of a cluster is its most frequent color (channels rounded to integers), the average of the most frequent ones on ties; alpha is kept. When there are no more distinct (rounded) colors than `number-of-colors`, they are returned without clustering; empty clusters are dropped, so fewer colors may be returned. Returns the colors sorted by [[luma]]. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[resample]], [[nearest-color]]."
+  The color of a cluster is its most frequent color (channels rounded to integers), the average of the most frequent ones on ties; alpha is kept. When there are no more distinct (rounded) colors than `number-of-colors`, they are returned without clustering; empty clusters are dropped, so fewer colors may be returned. Returns the colors sorted by [[luma]]. Throws `ex-info` with `{:colors 0}` for no colors, `{:number-of-colors n}` for fewer than 1 color, `{:options options}` for options that are not a map and `{:colorspace colorspace}` for an unknown colorspace. See also [[resample]], [[nearest-color]]."
   {:metadoc/categories #{:pal}}
   ([xs number-of-colors] (reduce-colors xs number-of-colors nil))
   ([xs ^long number-of-colors {:keys [fuzzy? colorspace rng] :as options}]
+   (check-options-map options)
+   (check-number-of-colors number-of-colors)
+   (check-colors-count xs)
    (let [[to from] (if colorspace (colorspace-converters colorspaces* colorspace) [identity identity])
          points (map (comp to pr/to-color) xs)
          distinct-points (distinct (map (fn [p] (mapv m/round p)) points))]
@@ -6667,16 +6680,15 @@
 (defn resample
   "Resamples a palette to a given number of colors.
 
-  - `pal` palette (sequence of colors) or a name accepted by [[palette]]
+  - `pal` palette (sequence of colors), a name accepted by [[palette]] or a gradient
   - `number-of-colors` size of the result
   - `gradient-params` (optional) options of [[gradient]] (e.g. `:colorspace`, `:interpolation`)
 
-  The palette is turned into a [[gradient]] and sampled at `number-of-colors` evenly spaced points; one color is the [[average]] of the palette (in `:colorspace` when given). The same as `(palette pal number-of-colors gradient-params)`. Returns a vector of `Vec4`. Throws `ex-info` with `{:number-of-colors n}` for fewer than 1 color. See also [[reduce-colors]]."
+  A palette is turned into a [[gradient]] and sampled at `number-of-colors` evenly spaced points (a gradient is sampled directly, `gradient-params` ignored); one color is the [[average]] of the palette (in `:colorspace` when given). The same as `(palette pal number-of-colors gradient-params)`. Returns a vector of `Vec4`. Throws `ex-info` with `{:number-of-colors n}` for fewer than 1 color. See also [[reduce-colors]]."
   {:metadoc/categories #{:pal}}
   ([pal number-of-colors] (resample pal number-of-colors {}))
   ([pal ^long number-of-colors gradient-params]
-   (when (< number-of-colors 1)
-     (throw (ex-info (str "Number of colors should be at least 1, got: " number-of-colors) {:number-of-colors number-of-colors})))
+   (check-number-of-colors number-of-colors)
    (palette pal number-of-colors gradient-params)))
 
 (def ^{:private true :const true :tag 'double} correct-luma-max-reversal
