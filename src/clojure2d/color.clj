@@ -4323,8 +4323,8 @@
                            (* -2.5643 dy))
                      df (+ (* dY K) (* Y dK))]
                  (OSAFDF. f df X Y Z)))]
-    (loop [iter (int 0)
-           omega (double OSA-omega)]
+    (loop [iter (long 0)
+           omega OSA-omega]
       (let [^OSAFDF res (f-df omega)]
         (if (and (< iter 50)
                  (> (m/abs (.fomega res)) 1.0e-12))
@@ -5053,7 +5053,10 @@
    :sunlight 4800.0
    :cool 7250.0})
 
-(def temperature-names (sort (keys temperature-name-to-K)))
+(def ^{:doc "Sorted names accepted by [[temperature]] instead of a temperature in K.
+
+  The author's approximate choices for common light sources: `:candle` 1800, `:sunrise` and `:sunset` 2500, `:lightbulb` and `:warm` 2900, `:morning` 3500, `:moonlight` 4000, `:white` 4250, `:sunlight` 4800, `:midday` 5500, `:cloudy-sky` 6500, `:cool` 7250, `:blue-sky` 10000 K."}
+  temperature-names (sort (keys temperature-name-to-K)))
 
 (defn temperature
   "Color representing given black body temperature `t` in Kelvins (or name as keyword).
@@ -6151,11 +6154,15 @@
        c))))
 
 (defn adjust-temperature
-  "Adjust temperature of color.
+  "Shifts a color toward the color of a blackbody temperature.
 
-  Default amount: 0.35
-  
-  See [[temperature]] and [[lerp+]]."
+  The result is `(lerp+ c (temperature temp) amount)`: the channels are interpolated by `amount` toward the temperature color, then the CIELAB lightness is set to that of the temperature color (not of `c`), so dark and light colors come out equally light. Channels are not clamped and can leave `[0,255]`.
+
+  - `c` color, any type accepted by [[to-color]]
+  - `temp` temperature in K or a name of [[temperature-names]], as accepted by [[temperature]]
+  - `amount` interpolation weight, default `0.35`
+
+  Returns a `Vec4`. See also [[temperature]], [[lerp+]]."
   {:metadoc/categories meta-ops}
   ([c temp] (adjust-temperature c temp 0.35))
   ([c temp amount]
@@ -6505,7 +6512,7 @@
       - a number - [channel-value, channel+value] range is used for random selection
       - nil, or anything else - keep original channel value"
   [color color-theme]
-  (clamp (if (keyword color-theme)
+  (clamp (if (keyword? color-theme)
            (if (thing-presets-list color-theme)
              (let [[[l1 l2] [c1 c2]] (thing-presets color-theme)
                    ^Vec4 c (to-LCH* color)]
