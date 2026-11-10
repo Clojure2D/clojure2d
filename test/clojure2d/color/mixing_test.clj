@@ -7,7 +7,8 @@
             [clojure.java.io :as io]
             [fastmath.core :as m]
             [fastmath.vector :as v]
-            [clojure2d.color :as c]))
+            [clojure2d.color :as c]
+            [clojure2d.test-predicates :refer [throws-data?]]))
 
 (def reference (delay (-> "color/mixing_reference.edn" io/resource slurp edn/read-string)))
 
@@ -72,6 +73,58 @@
     (is (m/<= (max-diff (take 3 ((c/invert 1.0) col)) (take 3 (c/negate col))) 1.0e-9) (str col)))
   (is (= [-45.0 255.0 0.0 100.0] (vec (c/negate [300 0 255 100]))) "not clamped, alpha kept")
   (is (= [55.0 255.0 0.0 155.0] (vec (c/negate [200 0 255 100] true))) "alpha negated"))
+
+;; G2: contracts and bugs
+
+(deftest lerp+-test
+  (doseq [[a b] [[:red :blue] [:yellow :navy] [[30 60 200] [250 240 10]]]]
+    (is (= (c/lerp+ a b) (c/lerp+ a b 0.5)) (str a " " b))
+    (is (m/< (m/abs (m/- ((c/to-LAB b) 0) ((c/to-LAB (c/lerp+ a b)) 0))) 1.0e-9) (str a " " b))
+    (is (m/< (m/abs (m/- ((c/to-LAB a) 0) ((c/to-LAB (c/lerp- a b)) 0))) 1.0e-9) (str a " " b))))
+
+(deftest nearest-color-contract-test
+  (testing "entries of any color type, returned as given"
+    (is (= :red (c/nearest-color [:red :blue] :pink)))
+    (is (= [0 0 255] (c/nearest-color [[255 0 0] [0 0 255]] :navy)))
+    (is (= "#00ff00" (c/nearest-color [:red "#00ff00"] [10 200 10] c/delta-E*))))
+  (testing "1-arity: the same result, first entry on ties"
+    (let [pal (map #(vector % (- 255 %) 100) (range 0 256 5))
+          f (c/nearest-color pal)]
+      (doseq [r (range 0 256 26) g (range 0 256 26) b (range 0 256 26)
+              :let [col [r g b]]]
+        (is (= (c/nearest-color pal col) (f col)) (str col)))
+      (is (= [10 10 10] (c/nearest-color [[10 10 10] [10 10 10 255]] [10 10 10])))))
+  (testing "empty palette"
+    (is (throws-data? {:palette-size 0} #(c/nearest-color [] :red)))
+    (is (throws-data? {:palette-size 0} #(c/nearest-color [])))))
+
+(deftest transparency-test
+  (is (= 0.0 ((c/mixbox [0 0 255 0] [255 255 0 0]) 3)) "mixbox: transparent stays transparent")
+  (is (= [78.0 150.0 100.0 255.0] (vec (c/mixbox :blue :yellow))) "mixbox: pigment green")
+  (is (= 102.0 ((c/mixbox [0 0 255 51] [255 255 0 153]) 3)))
+  (let [cols (concat (repeat 5 [255 0 0 100]) (repeat 5 [250 0 0 100]) (repeat 5 [0 0 255 0]) (repeat 3 [0 0 250 0]))
+        r (c/reduce-colors cols 2 {:fuzzy? false})]
+    (is (= #{[0.0 0.0 255.0 0.0] [252.5 0.0 0.0 100.0]} (set (map vec r))) "reduce-colors: modes, alpha kept, ties averaged")))
+
+(deftest colorspace-errors-test
+  (doseq [f [#(c/average [:red] :Foo) #(c/weighted-average [:red] [1] :Foo) #(c/lerp :red :blue :Foo 0.5)
+             #(c/lerp- :red :blue :Foo 0.5) #(c/lerp+ :red :blue :Foo 0.5) #(c/mix :red :blue :Foo 0.5)
+             #(c/mixsub :red :blue :Foo 0.5) #(c/reduce-colors [[1 2 3 255] [4 5 6 255]] 1 {:colorspace :Foo})]]
+    (is (throws-data? {:colorspace :Foo} f))))
+
+(deftest average-errors-test
+  (is (throws-data? {:colors 0} #(c/average [])))
+  (is (throws-data? {:colors 0} #(c/average [] :LAB)))
+  (is (throws-data? {:colors 0} #(c/weighted-average [] [])))
+  (is (throws-data? {:colors 2 :weights 1} #(c/weighted-average [:red :blue] [1])))
+  (is (throws-data? {:weights-sum 0.0} #(c/weighted-average [:red :blue] [1 -1])))
+  (is (throws-data? {:weights-sum ##Inf} #(c/weighted-average [:red :blue] [1 ##Inf])))
+  (is (= [510.0 0.0 -255.0 255.0] (vec (c/weighted-average [:red :blue] [2 -1]))) "negative weights allowed"))
+
+(deftest resample-test
+  (is (= 3 (count (c/resample [:red :blue] 3))))
+  (is (throws-data? {:number-of-colors 0} #(c/resample [:red :blue] 0)))
+  (is (throws-data? {:number-of-colors -2} #(c/resample [:red :blue] -2 {}))))
 
 (deftest docstrings-test
   (doseq [s '[nearest-color average weighted-average lerp lerp- lerp+ mix mixbox mixsub negate reduce-colors resample]]
