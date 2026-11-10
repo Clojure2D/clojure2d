@@ -21,6 +21,8 @@
    :CMC11 c/delta-E*-CMC
    :CMC21 #(c/delta-E*-CMC %1 %2 {:l 2.0})
    :HyAB c/delta-E-HyAB
+   :HyCH c/delta-E-HyCH
+   :HyCH-textiles #(c/delta-E-HyCH %1 %2 {:textiles? true})
    :DIN99 #(c/delta-E*-euclidean %1 %2 {:colorspace :DIN99})
    :C* c/delta-C*
    :H* c/delta-H*
@@ -72,11 +74,11 @@
     (is (not (c/noticeably-different? :red :red)))))
 
 (def ^:private deltas
-  [c/delta-E* c/delta-C* c/delta-H* c/delta-E-HyAB c/delta-E*-94 c/delta-E*-euclidean c/delta-C-RGB
+  [c/delta-E* c/delta-C* c/delta-H* c/delta-E-HyAB c/delta-E-HyCH c/delta-E*-94 c/delta-E*-euclidean c/delta-C-RGB
    c/delta-D-HCL c/delta-E*-CMC c/delta-E-z c/delta-E*-2000])
 
 (def ^:private symmetric-deltas
-  [c/delta-E* c/delta-H* c/delta-E-HyAB c/delta-E*-euclidean c/delta-C-RGB c/delta-D-HCL c/delta-E-z
+  [c/delta-E* c/delta-H* c/delta-E-HyAB c/delta-E-HyCH c/delta-E*-euclidean c/delta-C-RGB c/delta-D-HCL c/delta-E-z
    c/delta-E*-2000])
 
 (deftest properties-test
@@ -111,14 +113,14 @@
     (is (rel-close? 1.0e-12 e (c/delta-D-HCL a b)) (str a " " b))))
 
 (deftest docstrings-test
-  (doseq [s '[delta-E* delta-C* delta-H* delta-E-HyAB delta-E*-94 delta-E*-euclidean delta-C-RGB delta-D-HCL
+  (doseq [s '[delta-E* delta-C* delta-H* delta-E-HyAB delta-E-HyCH delta-E*-94 delta-E*-euclidean delta-C-RGB delta-D-HCL
               delta-E*-CMC delta-E-z delta-E*-2000 contrast-ratio noticeably-different?]]
     (is (some? (:doc (meta (ns-resolve 'clojure2d.color s)))) (str s))))
 
 ;; G2: options contract
 
 (def ^:private option-fns
-  [c/delta-E* c/delta-C* c/delta-H* c/delta-E-HyAB c/delta-E*-94 c/delta-E*-euclidean c/delta-D-HCL
+  [c/delta-E* c/delta-C* c/delta-H* c/delta-E-HyAB c/delta-E-HyCH c/delta-E*-94 c/delta-E*-euclidean c/delta-D-HCL
    c/delta-E*-CMC c/delta-E-z c/delta-E*-2000 c/noticeably-different?])
 
 (deftest options-contract-test
@@ -132,6 +134,38 @@
   (testing "nil and {} mean defaults"
     (doseq [f option-fns]
       (is (= (f :red :blue) (f :red :blue nil) (f :red :blue {})) (str f)))))
+
+;; G4: contrast methods
+
+(defn- same-or-close?
+  "rel-close? for finite values, equality for infinities, both NaN for NaN."
+  [^double tol ^double e ^double a]
+  (cond (m/nan? e) (m/nan? a)
+        (m/inf? e) (== e a)
+        :else (rel-close? tol e a)))
+
+(deftest contrast-methods-test
+  (let [{:keys [pairs oracle]} @reference]
+    (doseq [[method k] [[:lstar :lstar] [:weber :weber] [:michelson :michelson]]
+            [[a b] e] (map vector pairs (oracle k))]
+      (is (same-or-close? 1.0e-12 e (c/contrast-ratio a b {:method method})) (str method " " a " " b)))
+    (testing "lstar vs coloraide: within 1e-2"
+      ;; coloraide's sRGB matrix comes from its own D65 white: Y of blue 0.0721923 vs 0.0721750 (colour, clojure2d),
+      ;; L* differs by up to ~5e-3
+      (doseq [[[a b] e] (map vector pairs (:lstar-coloraide oracle))]
+        (is (m/<= (m/abs (m/- e (c/contrast-ratio a b {:method :lstar}))) 1.0e-2) (str a " " b))))
+    (testing "the 2-argument form is :wcag"
+      (doseq [[a b] (take 30 pairs)]
+        (is (== (c/contrast-ratio a b) (c/contrast-ratio a b {:method :wcag}) (c/contrast-ratio a b nil))))))
+  (testing "black: Weber infinite on black, NaN for two blacks; Michelson NaN for two blacks"
+    (is (m/pos-inf? (c/contrast-ratio :white :black {:method :weber})))
+    (is (m/nan? (c/contrast-ratio :black :black {:method :weber})))
+    (is (m/nan? (c/contrast-ratio :black :black {:method :michelson})))
+    (is (== -1.0 (c/contrast-ratio :black :white {:method :weber})))
+    (is (== 1.0 (c/contrast-ratio :black :white {:method :michelson}))))
+  (testing "errors"
+    (is (throws-data? {:method :apca} #(c/contrast-ratio :red :blue {:method :apca})))
+    (is (throws-data? {:options :lstar} #(c/contrast-ratio :red :blue :lstar)))))
 
 ;; point values moved from clojure2d.color-test
 

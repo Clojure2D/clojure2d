@@ -106,7 +106,7 @@
   
   ## Distances
 
-  Color differences: [[delta-E*]] (CIE 1976), [[delta-E*-94]], [[delta-E*-2000]], [[delta-E*-CMC]], [[delta-E-HyAB]], [[delta-E-z]] (Jzazbz), [[delta-E*-euclidean]] (any colorspace, Oklab by default), [[delta-C*]] and [[delta-H*]] (chroma and hue parts), [[delta-C-RGB]] (redmean), [[delta-D-HCL]]. Contrast: [[contrast-ratio]] (WCAG). Visibility: [[noticeably-different?]].
+  Color differences: [[delta-E*]] (CIE 1976), [[delta-E*-94]], [[delta-E*-2000]], [[delta-E*-CMC]], [[delta-E-HyAB]], [[delta-E-HyCH]], [[delta-E-z]] (Jzazbz), [[delta-E*-euclidean]] (any colorspace, Oklab by default), [[delta-C*]] and [[delta-H*]] (chroma and hue parts), [[delta-C-RGB]] (redmean), [[delta-D-HCL]]. Contrast: [[contrast-ratio]] (WCAG, L*, Weber, Michelson). Visibility: [[noticeably-different?]].
 
   ## References
 
@@ -5396,11 +5396,16 @@
 ;; ## Additional functions
 ;; https://www.imatest.com/docs/colorcheck_ref/
 
-(defn- difference-converter
-  "The `to-` conversion of `colorspace` applied to both colors of a difference or contrast measure. Throws `ex-info` with `{:options options}` when `options` is neither a map nor nil, and `{:colorspace colorspace}` for an unknown colorspace."
-  [options colorspace]
+(defn- check-options-map
+  "Throws `ex-info` with `{:options options}` when `options` is neither a map nor nil."
+  [options]
   (when-not (or (nil? options) (map? options))
-    (throw (ex-info (str "Options should be a map, got: " options) {:options options})))
+    (throw (ex-info (str "Options should be a map, got: " options) {:options options}))))
+
+(defn- difference-converter
+  "The `to-` conversion of `colorspace` applied to both colors of a difference measure. Throws `ex-info` with `{:options options}` when `options` is neither a map nor nil, and `{:colorspace colorspace}` for an unknown colorspace."
+  [options colorspace]
+  (check-options-map options)
   (first (colorspace-converters colorspaces colorspace)))
 
 (defn delta-E*
@@ -5691,6 +5696,62 @@
         v7 (* v4 v2 v)]
     (m/sqrt (/ v7 (+ v7 p25_7)))))
 
+(defn- ciede2000-terms
+  "Weighted CIEDE2000 terms of two CIELAB colors after Sharma, Wu, Dalal (2005): `[ΔL'/(kL SL) ΔC'/(kC SC) ΔH'/(kH SH) RT]`, `k` the parametric factors `[kL kC kH]`. Shared by [[delta-E*-2000]] and [[delta-E-HyCH]]."
+  ^Vec4 [^Vec4 c1 ^Vec4 c2 ^Vec3 k]
+  (let [l (.x k)
+        c (.y k)
+        h (.z k)
+        C1* (m/hypot-sqrt (.y c1) (.z c1))
+        C2* (m/hypot-sqrt (.y c2) (.z c2))
+        Cm* (* 0.5 (+ C1* C2*))
+        G+ (inc (* 0.5 (- 1.0 (de2000p7 Cm*))))
+        a1' (* G+ (.y c1))
+        a2' (* G+ (.y c2))
+        C1' (m/hypot-sqrt a1' (.z c1))
+        C2' (m/hypot-sqrt a2' (.z c2))
+        h1' (m/degrees (m/atan2 (.z c1) a1'))
+        h1' (if (neg? h1') (+ h1' 360.0) h1')
+        h2' (m/degrees (m/atan2 (.z c2) a2'))
+        h2' (if (neg? h2') (+ h2' 360.0) h2')
+        dL' (- (.x c2) (.x c1))
+        dC' (- C2' C1')
+        diffh' (- h2' h1')
+        adiffh' (m/abs diffh')
+        C1'C2' (* C1' C2')
+        dh' (m/radians (double (cond
+                                 (zero? C1'C2') 0.0
+                                 (<= adiffh' 180.0) diffh'
+                                 (> diffh' 180.0) (- diffh' 360.0)
+                                 :else (+ diffh' 360.0))))
+        dH' (* 2.0 (m/sqrt C1'C2') (m/sin (* 0.5 dh')))
+        Lm' (* 0.5 (+ (.x c1) (.x c2)))
+        Cm' (* 0.5 (+ C1' C2'))
+        h1'+h2' (+ h1' h2')
+        ^double hm' (cond
+                      (zero? C1'C2') h1'+h2'
+                      (<= adiffh' 180.0) (* 0.5 h1'+h2')
+                      (< h1'+h2' 360.0) (* 0.5 (+ h1'+h2' 360.0))
+                      :else (* 0.5 (- h1'+h2' 360.0)))
+        hm'r (m/radians hm')
+        T (+ 1.0
+             (* -0.17 (m/cos (- hm'r r30)))
+             (* 0.24 (m/cos (* 2.0 hm'r)))
+             (* 0.32 (m/cos (+ (* 3.0 hm'r) r6)))
+             (* -0.2 (m/cos (- (* 4.0 hm'r) r63))))
+        dtheta (* r30 (m/exp (- (m/sq (/ (- hm' 275.0) 25.0)))))
+        Rc (* 2.0 (de2000p7 Cm'))
+        Lm'-50sq (m/sq (- Lm' 50.0))
+        Sl (inc (/ (* 0.015 Lm'-50sq)
+                   (m/sqrt (+ 20.0 Lm'-50sq))))
+        Sc (inc (* 0.045 Cm'))
+        Sh (inc (* 0.015 Cm' T))
+        Rt (- (* (m/sin (* 2.0 dtheta)) Rc))
+        l' (/ dL' (* l Sl))
+        c' (/ dC' (* c Sc))
+        h' (/ dH' (* h Sh))]
+    (Vec4. l' c' h' Rt)))
+
 (defn delta-E*-2000
   "Returns the CIEDE2000 color difference ΔE00 (CIE 142-2001).
 
@@ -5709,56 +5770,29 @@
    (let [to (difference-converter options colorspace)
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)
-         C1* (m/hypot-sqrt (.y c1) (.z c1))
-         C2* (m/hypot-sqrt (.y c2) (.z c2))
-         Cm* (* 0.5 (+ C1* C2*))
-         G+ (inc (* 0.5 (- 1.0 (de2000p7 Cm*))))
-         a1' (* G+ (.y c1))
-         a2' (* G+ (.y c2))
-         C1' (m/hypot-sqrt a1' (.z c1))
-         C2' (m/hypot-sqrt a2' (.z c2))
-         h1' (m/degrees (m/atan2 (.z c1) a1'))
-         h1' (if (neg? h1') (+ h1' 360.0) h1')
-         h2' (m/degrees (m/atan2 (.z c2) a2'))
-         h2' (if (neg? h2') (+ h2' 360.0) h2')
-         dL' (- (.x c2) (.x c1))
-         dC' (- C2' C1')
-         diffh' (- h2' h1')
-         adiffh' (m/abs diffh')
-         C1'C2' (* C1' C2')
-         dh' (m/radians (double (cond
-                                  (zero? C1'C2') 0.0
-                                  (<= adiffh' 180.0) diffh'
-                                  (> diffh' 180.0) (- diffh' 360.0)
-                                  :else (+ diffh' 360.0))))
-         dH' (* 2.0 (m/sqrt C1'C2') (m/sin (* 0.5 dh')))
-         Lm' (* 0.5 (+ (.x c1) (.x c2)))
-         Cm' (* 0.5 (+ C1' C2'))
-         h1'+h2' (+ h1' h2')
-         ^double hm' (cond
-                       (zero? C1'C2') h1'+h2'
-                       (<= adiffh' 180.0) (* 0.5 h1'+h2')
-                       (< h1'+h2' 360.0) (* 0.5 (+ h1'+h2' 360.0))
-                       :else (* 0.5 (- h1'+h2' 360.0)))
-         hm'r (m/radians hm')
-         T (+ 1.0
-              (* -0.17 (m/cos (- hm'r r30)))
-              (* 0.24 (m/cos (* 2.0 hm'r)))
-              (* 0.32 (m/cos (+ (* 3.0 hm'r) r6)))
-              (* -0.2 (m/cos (- (* 4.0 hm'r) r63))))
-         dtheta (* r30 (m/exp (- (m/sq (/ (- hm' 275.0) 25.0)))))
-         Rc (* 2.0 (de2000p7 Cm'))
-         Lm'-50sq (m/sq (- Lm' 50.0))
-         Sl (inc (/ (* 0.015 Lm'-50sq)
-                    (m/sqrt (+ 20.0 Lm'-50sq))))
-         Sc (inc (* 0.045 Cm'))
-         Sh (inc (* 0.015 Cm' T))
-         Rt (- (* (m/sin (* 2.0 dtheta)) Rc))
-         l' (/ dL' (* l Sl))
-         c' (/ dC' (* c Sc))
-         h' (/ dH' (* h Sh))]
-     (m/sqrt (+ (m/sq l') (m/sq c') (m/sq h')
-                (* Rt c' h'))))))
+         ^Vec4 t (ciede2000-terms c1 c2 (Vec3. l c h))]
+     (m/sqrt (+ (m/sq (.x t)) (m/sq (.y t)) (m/sq (.z t))
+                (* (.w t) (.y t) (.z t)))))))
+
+(defn delta-E-HyCH
+  "Returns the HyCH color difference of Abasi, Amani Tehran and Fairchild (2020).
+
+  `|ΔL' / (kL SL)| + sqrt((ΔC' / SC)² + (ΔH' / SH)²)` with the weighted lightness, chroma and hue terms of [[delta-E*-2000]] (without its rotation term): a city-block lightness term with a Euclidean chromatic term, meant for large differences (about 10 ΔE and more). As colour-science.
+
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `options` (map, optional):
+      - `:textiles?` - kL 2 instead of 1, default `false`
+      - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
+
+  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-E-HyAB]], [[delta-E*-2000]]."
+  {:metadoc/categories #{:dist}}
+  (^double [c1 c2] (delta-E-HyCH c1 c2 nil))
+  (^double [c1 c2 {:keys [textiles? colorspace]
+                   :or {colorspace :LAB}
+                   :as options}]
+   (let [to (difference-converter options colorspace)
+         ^Vec4 t (ciede2000-terms (to c1) (to c2) (Vec3. (if textiles? 2.0 1.0) 1.0 1.0))]
+     (+ (m/abs (.x t)) (m/hypot-sqrt (.y t) (.z t))))))
 
 (defn- wcag-luminance
   "WCAG 2 relative luminance, 0-1: sRGB decoding and the weights 0.2126, 0.7152, 0.0722 as written in WCAG (not the Y row of the `to-XYZ` matrix used by [[relative-luma]])."
@@ -5769,20 +5803,39 @@
        (* 0.0722 (rgb/srgb-to-linear (/ (.z c) 255.0))))))
 
 (defn contrast-ratio
-  "Returns the WCAG 2 contrast ratio of two colors: `(L1 + 0.05) / (L2 + 0.05)`, L1 the lighter.
+  "Returns the contrast of two colors, by default the WCAG 2 contrast ratio.
 
-  The relative luminance is computed as WCAG defines it: sRGB decoding and the weights 0.2126, 0.7152, 0.0722. It differs from [[relative-luma]] / 255 (the Y row of the [[to-XYZ]] matrix) by up to 5e-4 relative. Common thresholds: 3 (large text), 4.5 (text, AA), 7 (text, AAA).
+  Methods (`:method` option):
+
+  - `:wcag` (default) - WCAG 2 contrast ratio `(L1 + 0.05) / (L2 + 0.05)`, L1 the lighter, from 1 (equal luminance) to 21 (black and white); symmetric. The relative luminance is computed as WCAG defines it: sRGB decoding and the weights 0.2126, 0.7152, 0.0722; it differs from [[relative-luma]] / 255 (the Y row of the [[to-XYZ]] matrix) by up to 5e-4 relative. Common thresholds: 3 (large text), 4.5 (text, AA), 7 (text, AAA).
+  - `:lstar` - lightness difference `|L*1 - L*2|` of [[to-LAB]], 0 to 100; symmetric (as the L* contrast of coloraide and Material Design).
+  - `:weber` - Weber contrast `(Y1 - Y2) / Y2` of `c1` (target) on `c2` (background), Y the luminance of [[to-XYZ]] scaled to 0-1; signed, not symmetric. A black background gives infinity (NaN for black on black).
+  - `:michelson` - Michelson contrast `(Ymax - Ymin) / (Ymax + Ymin)`, Y as for `:weber`, 0 to 1; symmetric. NaN for two blacks.
+
+  Parameters:
 
   - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `options` (map, optional): `:method`, default `:wcag`
 
-  Returns a double from 1 (equal luminance) to 21 (black and white), symmetric in `c1`, `c2`. Alpha is ignored: colors are not composited on a background."
+  Returns a double. Alpha is ignored: colors are not composited on a background. Throws `ex-info` with `{:method method}` for an unknown method and `{:options options}` when the options are not a map."
   {:metadoc/categories #{:dist}}
-  ^double [c1 c2]
-  (let [l1 (wcag-luminance c1)
-        l2 (wcag-luminance c2)]
-    (if (> l1 l2)
-      (/ (+ l1 0.05) (+ l2 0.05))
-      (/ (+ l2 0.05) (+ l1 0.05)))))
+  (^double [c1 c2] (contrast-ratio c1 c2 nil))
+  (^double [c1 c2 {:keys [method] :or {method :wcag} :as options}]
+   (check-options-map options)
+   (case method
+     :wcag (let [l1 (wcag-luminance c1)
+                 l2 (wcag-luminance c2)]
+             (if (> l1 l2)
+               (/ (+ l1 0.05) (+ l2 0.05))
+               (/ (+ l2 0.05) (+ l1 0.05))))
+     :lstar (m/abs (- (.x ^Vec4 (to-LAB c1)) (.x ^Vec4 (to-LAB c2))))
+     :weber (let [y1 (.y ^Vec4 (to-XYZ1 c1))
+                  y2 (.y ^Vec4 (to-XYZ1 c2))]
+              (/ (- y1 y2) y2))
+     :michelson (let [y1 (.y ^Vec4 (to-XYZ1 c1))
+                      y2 (.y ^Vec4 (to-XYZ1 c2))]
+                  (/ (- (max y1 y2) (min y1 y2)) (+ y1 y2)))
+     (throw (ex-info (str "Unknown contrast method: " method) {:method method})))))
 
 (defn- nd-lab-interval
   "Minimal difference values"

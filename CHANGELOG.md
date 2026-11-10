@@ -25,6 +25,8 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color/to-color` (and every color function) accepts color names as strings, case-insensitive, for names without a namespace (`"red"`, `"Dark-Blue"`), and `float` arrays
 * `clojure2d.color`: docstrings for the colorspace conversions (model, source, conventions, ranges; `to-`, `from-`, normalized `*` variants) and a convention table in `colorspaces`, `colorspaces*`, `colorspaces-list`; `to-OSA`/`from-OSA` docstrings no longer swapped; docstrings for the XYZ helpers (`XYZ-to-LAB`, `LAB-to-XYZ`, `XYZ-to-LUV`, `LUV-to-XYZ`, `XYZ-to-HunterLAB`, `HunterLAB-to-XYZ`, `XYZ-to-LCH`, `LCH-to-XYZ`, `XYZ-to-LCHuv`, `LCHuv-to-XYZ`, `XYZ-to-Yxy`, `Yxy-to-XYZ`, `XYZ-to-UVW`, `UVW-to-XYZ`, `XYZ-to-UCS`, `UCS-to-XYZ`), `to-luma-color-hue`, `from-luma-color-hue`
 * `clojure2d.color`: docstrings for the color differences and contrast (`delta-E*`, `delta-C*`, `delta-H*`, `delta-E-HyAB`, `delta-E*-94`, `delta-E*-euclidean`, `delta-C-RGB`, `delta-D-HCL`, `delta-E*-CMC`, `delta-E-z`, `delta-E*-2000`, `contrast-ratio`, `noticeably-different?`): formula, source, options and defaults, reference argument; `delta-E*-euclidean` had none
+* `clojure2d.color/contrast-ratio` option `:method`: `:wcag` (default), `:lstar` (L* difference), `:weber` (signed, target on background), `:michelson`; Weber and Michelson on the luminance Y of `to-XYZ`
+* `clojure2d.color/delta-E-HyCH`: HyCH color difference (Abasi, Amani Tehran, Fairchild 2020), CIEDE2000 terms with a city-block lightness term; option `:textiles?`
 
 ### Changed
 
