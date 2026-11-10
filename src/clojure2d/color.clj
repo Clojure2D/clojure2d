@@ -5369,9 +5369,9 @@
    :almost-gray-light   [[0.03501 1.59439] [0.23204 1.10483] [0.14935 1.33784] [0.07371 1.04897] [0.09635 0.91368]]})
 
 ;; List of preset names
-(def ^{:doc "Names of the [[paletton]] presets (lightness and saturation variants of paletton.com, the same values and names), in no particular order."
+(def ^{:doc "Names of the [[paletton]] presets (lightness and saturation variants of paletton.com, the same values and names), sorted."
        :metadoc/categories #{:pal}}
-  paletton-presets-list (keys paletton-presets))
+  paletton-presets-list (vec (sort (keys paletton-presets))))
 
 (defn- paletton-monochromatic-palette
   "Create monochromatic palette for given `hue` (0-360) and `preset` values."
@@ -5984,19 +5984,31 @@
   ^Vec4 [^Vec4 c ^long channel ^double value]
   (update-channel c channel (fn ^double [^double _] value)))
 
-(defn- shorter-arc-hue
-  "Hue between raw colors `a`, `b` of a hue space at `t`, along the shorter arc (CSS `shorter`: a difference of exactly half a period is kept); a powerless hue takes the other hue, two powerless hues give the range start."
-  ^double [{:keys [^long hue ^double lo ^double period] :as hue-space} ^Vec4 a ^Vec4 b ^double t]
-  (let [pa (powerless-hue? hue-space a)
+(def ^:private hue-modes #{:shorter :longer :increasing :decreasing :raw})
+
+(defn- hue-difference
+  "Hue difference `diff` (second minus first) adjusted by the hue `mode` (CSS Color 4 hue interpolation): `:shorter` and `:longer` arc, `:increasing`, `:decreasing` hue, `:raw` as is; `period` 360 or 1."
+  ^double [mode ^double diff ^double period]
+  (let [half (* 0.5 period)]
+    (case mode
+      :shorter (cond (> diff half) (- diff period) (< diff (- half)) (+ diff period) :else diff)
+      :longer (cond (and (pos? diff) (< diff half)) (- diff period) (and (> diff (- half)) (<= diff 0.0)) (+ diff period) :else diff)
+      :increasing (if (neg? diff) (+ diff period) diff)
+      :decreasing (if (pos? diff) (- diff period) diff)
+      :raw diff)))
+
+(defn- interpolate-hue
+  "Hue between raw colors `a`, `b` of a hue space at `t` by the hue `mode` (see [[hue-difference]]), wrapped into the range (not for `:raw`); a powerless hue takes the other hue, two powerless hues give the range start."
+  [{:keys [^long hue ^double lo ^double period] :as hue-space} mode ^Vec4 a ^Vec4 b t]
+  (let [t (double t)
+        pa (powerless-hue? hue-space a)
         pb (powerless-hue? hue-space b)
         ha (double (a hue))
         hb (double (b hue))
         h1 (if pa (if pb lo hb) ha)
         h2 (if pb (if pa lo ha) hb)
-        diff (- h2 h1)
-        half (* 0.5 period)
-        d (if (> diff half) (- diff period) (if (< diff (- half)) (+ diff period) diff))]
-    (m/wrap lo (+ lo period) (+ h1 (* t d)))))
+        h (+ h1 (* t (hue-difference mode (- h2 h1) period)))]
+    (if (= mode :raw) h (m/wrap lo (+ lo period) h))))
 
 (defn- premultiply
   "Raw color `c` with every channel but alpha and the hue (index `hue`, -1 for none) multiplied by alpha / 255."
@@ -6015,7 +6027,7 @@
         (Vec4. (f 0 (.x c)) (f 1 (.y c)) (f 2 (.z c)) (.w c))))))
 
 (defn- interpolate-raw
-  "Linear interpolation of raw colors `a`, `b` at `t`, with premultiplied alpha when `premultiplied?`; in a hue space (`hue-space` not nil) the hue from [[shorter-arc-hue]] of the colors as given."
+  "Linear interpolation of raw colors `a`, `b` at `t`, with premultiplied alpha when `premultiplied?`; in a hue space (`hue-space` not nil) the hue from [[interpolate-hue]] (`:shorter`) of the colors as given."
   ^Vec4 [hue-space ^Vec4 a ^Vec4 b t premultiplied?]
   (let [t (double t)
         hue (long (get hue-space :hue -1))
@@ -6023,7 +6035,7 @@
                 (unpremultiply (v/interpolate (premultiply a hue) (premultiply b hue) t) hue)
                 (v/interpolate a b t))]
     (if hue-space
-      (with-channel mixed hue (shorter-arc-hue hue-space a b t))
+      (with-channel mixed hue (interpolate-hue hue-space :shorter a b t))
       mixed)))
 
 (defn- make-achromatic
@@ -6481,17 +6493,53 @@
 
 ;;
 
+(defn- segment-hue-fn
+  "Hue at `t` of a linear gradient of raw stops `cs` at increasing positions `xs` in a hue space: each segment by [[interpolate-hue]] (as coloraide; a powerless stop takes the hue of the other end of each of its segments); outside the positions the end hues."
+  [hue-space mode xs cs]
+  (let [xs (double-array xs)
+        last-segment (- (alength xs) 2)
+        cs (vec cs)]
+    (fn ^double [^double t]
+      (let [k (long (loop [k 0]
+                      (if (and (< k last-segment) (> t (Array/aget xs (inc k)))) (recur (inc k)) k)))
+            x0 (Array/aget xs k)
+            u (m/constrain (/ (- t x0) (- (Array/aget xs (inc k)) x0)) 0.0 1.0)]
+        (interpolate-hue hue-space mode (cs k) (cs (inc k)) u)))))
+
+(defn- unwrapped-hues
+  "Hues of raw stops `cs` of a hue space made continuous by the hue `mode` (see [[hue-difference]]), each relative to the previous stop; a powerless stop keeps the previous hue (leading ones the first chromatic hue; all powerless: the range start)."
+  [{:keys [hue lo period] :as hue-space} mode cs]
+  (let [lo (double lo)
+        period (double period)
+        first-hue (if-let [c (first (remove #(powerless-hue? hue-space %) cs))] (double (c hue)) lo)]
+    (loop [[c & more] cs
+           prev nil
+           out []]
+      (if-not c
+        out
+        (let [h (cond
+                  (powerless-hue? hue-space c) (or prev first-hue)
+                  (nil? prev) (double (c hue))
+                  :else (let [p (double prev)]
+                          (+ p (hue-difference mode (- (double (c hue)) (m/wrap lo (+ lo period) p)) period))))]
+          (recur more h (conj out h)))))))
+
 (defn- interpolated-gradient
   [palette-or-gradient-name {:keys [colorspace interpolation domain to? from?]
+                             hue-mode :hue
                              :or {colorspace :RGB
                                   to? true from? true
-                                  interpolation :linear}}]
+                                  interpolation :linear
+                                  hue-mode :shorter}}]
+  (when-not (hue-modes hue-mode)
+    (throw (ex-info (str "Unknown hue interpolation: " hue-mode) {:hue hue-mode})))
   (let [[to from] (colorspace-converters colorspaces colorspace)
         to (if to? to identity)
         from (if from? from identity)
         cpalette (mapv (comp to pr/to-color) palette-or-gradient-name)
         n (count cpalette)
-        easing? (and (keyword? interpolation) (contains? e/easings-list interpolation))]
+        easing? (and (keyword? interpolation) (contains? e/easings-list interpolation))
+        hue-space (when-not (= hue-mode :raw) (hue-spaces colorspace))]
     (check-colors-count cpalette)
     (when (and easing? (not= n 2))
       (throw (ex-info (str "Easing interpolation needs 2 colors, got: " n) {:interpolation interpolation :colors n})))
@@ -6509,7 +6557,11 @@
             c2 (second cpalette)
             easing (e/easings-list interpolation)]
         (fn ^Vec4 [^double t]
-          (v/fmap (from (v/interpolate c1 c2 (easing t))) clamp255)))
+          (let [et (double (easing (m/constrain t 0.0 1.0)))
+                c (v/interpolate c1 c2 et)]
+            (v/fmap (from (if hue-space
+                            (with-channel c (:hue hue-space) (interpolate-hue hue-space hue-mode c1 c2 et))
+                            c)) clamp255))))
 
       :else
       (let [r (or domain 
@@ -6522,17 +6574,22 @@
             i0 (ifn r c0)
             i1 (ifn r c1)
             i2 (ifn r c2)
-            i3 (ifn r c3)] 
+            i3 (ifn r c3)
+            hue-fn (when hue-space
+                     (if (= interpolation :linear)
+                       (segment-hue-fn hue-space hue-mode r cpalette)
+                       (let [{:keys [^double lo ^double period]} hue-space
+                             ih (ifn r (unwrapped-hues hue-space hue-mode cpalette))]
+                         (fn ^double [^double t] (m/wrap lo (+ lo period) (double (ih t)))))))
+            hue-channel (long (get hue-space :hue -1))]
         (fn ^Vec4 [^double t]
-          (let [ct (m/constrain t 0.0 1.0)]
-            (v/fmap (from (v/vec4 (i0 ct)
-                                  (i1 ct)
-                                  (i2 ct)
-                                  (i3 ct))) clamp255)))))))
+          (let [ct (m/constrain t 0.0 1.0)
+                c (v/vec4 (i0 ct) (i1 ct) (i2 ct) (i3 ct))]
+            (v/fmap (from (if hue-fn (with-channel c hue-channel (hue-fn ct)) c)) clamp255)))))))
 
 (def ^{:metadoc/categories #{:gr}
-     :doc "Creates a gradient in the Cubehelix colorspace from raw Cubehelix values (`[hue saturation lightness alpha]`, see [[to-Cubehelix]]), not sRGB colors: two or more stops, interpolated linearly, the hue as a number (d3 `interpolateCubehelixLong`). Returns a gradient function as [[gradient]]."}
-  gradient-cubehelix #(interpolated-gradient % {:colorspace :Cubehelix :to? false :interpolation :linear}))
+     :doc "Creates a gradient in the Cubehelix colorspace from raw Cubehelix values (`[hue saturation lightness alpha]`, see [[to-Cubehelix]]), not sRGB colors: two or more stops, interpolated linearly, the hue as a number (`:hue :raw`, d3 `interpolateCubehelixLong`). Returns a gradient function as [[gradient]]."}
+  gradient-cubehelix #(interpolated-gradient % {:colorspace :Cubehelix :to? false :interpolation :linear :hue :raw}))
 
 (defonce ^{:private true} basic-gradients-delay
   (delay (merge (into {} (for [[k v] {:rainbow1              [[0.5 0.5 0.5] [0.5 0.5 0.5] [1.0 1.0 1.0] [0 0.3333 0.6666]]
@@ -6630,12 +6687,13 @@
       - `:interpolation` - a `fastmath.interpolation` method name (e.g. `:linear`, `:cubic`, `:monotone`, `:b-spline`; some need more points), a `fastmath.easings` easing name (only the first two colors are used), `:iq` (cosine gradient of two colors, [[iq-gradient]]) or a function of `xs` and `ys` returning an interpolator; default `:linear`
       - `:domain` - positions of the colors, increasing; default evenly spaced 0-1
       - `:to?`, `:from?` - convert the colors to / from `colorspace`, default `true` (`false` when the colors are already in it)
+      - `:hue` - hue interpolation in colorspaces with a hue (HSx, HWB, GLHS, HCL, LCH-like, Okhsl, Okhsv, Okhwb, Cubehelix), as CSS Color 4: `:shorter` (default), `:longer`, `:increasing`, `:decreasing` arc, or `:raw` (the hue as a number); an achromatic (powerless) stop takes the hue of its neighbour: with `:linear` interpolation per segment (as coloraide), with other methods the previous stop's hue
 
-  Channels are interpolated separately (hue as a number, alpha straight) and clamped to [0, 255]; `t` is limited to [0, 1] for the interpolation methods. Without arguments a random gradient name is used.
+  Channels are interpolated separately (alpha straight) and clamped to [0, 255]; `t` is limited to [0, 1]. Without arguments a random gradient name is used.
 
   Built-in gradients without a namespace: the thi.ng/color cosine presets (`:rainbow1` to `:rainbow4`, `:yellow-magenta-cyan`, `:orange-blue`, `:green-magenta`, `:green-red`, `:green-cyan`, `:yellow-red`, `:blue-cyan`, `:red-blue`, `:yellow-green-blue`, `:blue-white-red`, `:cyan-magenta`, `:yellow-purple-magenta`, `:green-blue-orange`, `:orange-magenta-blue`, `:blue-magenta-orange`, `:magenta-green`), I. Quilez's cosine palettes `:iq-1` to `:iq-7`, d3-scale-chromatic `:cubehelix`, `:warm`, `:cool`, `:rainbow`, and `:black-body` ([[temperature]] from 1000 to 15000 K). Namespaced names (e.g. `:pals/kovesi.cyclic_mrybm_35_75_c68`) come from resource files.
 
-  Returns a function of one double returning a `Vec4`. See also [[palette]], [[merge-gradients]], [[gradient-cubehelix]]."
+  Returns a function of one double returning a `Vec4`. Throws `ex-info` with `{:gradient k}` for an unknown name, `{:colors 0}` for no colors, `{:domain d}` for a domain that is not strictly increasing or not one value per color, `{:interpolation k :colors n}` for `:iq` or an easing with other than 2 colors, `{:hue h}` for an unknown hue interpolation, `{:colorspace cs}` and `{:options o}`. See also [[palette]], [[merge-gradients]], [[gradient-cubehelix]]."
   {:metadoc/categories #{:gr}}
   ([] (gradient (rand-nth (:seq @gradients-list-))))
   ([palette-or-gradient-name] (gradient palette-or-gradient-name {}))
@@ -6683,11 +6741,11 @@
 (defn palette
   "Returns a palette: a vector of colors.
 
-  - `p` a palette name (keyword, see [[find-palette]]), a colourlovers palette number (integer), a gradient (sampled) or a sequence of colors (returned as a vector)
+  - `p` a palette name (keyword, see [[find-palette]]), a colourlovers palette number (integer), a gradient (sampled) or a sequence of colors (converted with [[to-color]])
   - `number-of-colors` (optional) number of colors: a palette is resampled through a [[gradient]], a gradient sampled at evenly spaced points; one color is the [[average]] (of 100 samples of a gradient); default for a gradient 5
   - `gradient-params` (optional) options of [[gradient]] used for resampling (`:colorspace` also for the average)
 
-  Without arguments a random palette name is used. Returns a vector of `Vec4` (a sequence of colors is returned as given; an unknown name gives nil). See also [[resample]], [[gradient]], [[random-palette]]."
+  Without arguments a random palette name is used. Returns a vector of `Vec4`. Throws `ex-info` with `{:palette p}` for an unknown name and `{:number-of-colors n}` for fewer than 1 color. See also [[resample]], [[gradient]], [[random-palette]]."
   {:metadoc/categories #{:pal}}
   ([] (palette (rand-nth (:seq @palettes-list-))))
   ([p]
@@ -6696,7 +6754,7 @@
          (integer? p)) (or (get-palette p)
                            (throw (ex-info (str "Unknown palette: " p) {:palette p})))
      (fn? p) (palette p 5)
-     :else (vec p)))
+     :else (mapv pr/to-color p)))
   ([p number-of-colors] (palette p number-of-colors {}))
   ([p ^long number-of-colors gradient-params]
    (check-number-of-colors number-of-colors)
@@ -6907,11 +6965,11 @@
 (defn random-color
   "Returns a random color (global random generators).
 
-  - no argument: a named color (keyword) with probability 0.2, otherwise a color of a random palette or a random sRGB color (`Vec4`)
+  - no argument: a named color with probability 0.2, otherwise a color of a random palette or a random sRGB color
   - `alpha-or-color-theme` a number (alpha of a random color) or a name of [[color-themes]]
   - `color-theme`, `alpha` a thi.ng theme gives random lightness and chroma from its ranges and a random hue in LCH*; a [[paletton]] preset gives a random color of the monochromatic paletton palette of a random hue
 
-  Returns a clamped `Vec4` (or a keyword, see above). See also [[apply-theme]], [[random-palette]]."
+  Returns a `Vec4` (clamped for a theme). See also [[apply-theme]], [[random-palette]]."
   {:metadoc/categories #{:pal}}
   ([color-theme alpha]
    (clamp (if (thing-presets-list color-theme)
@@ -6922,7 +6980,7 @@
    (if (keyword? alpha-or-color-theme)
      (random-color alpha-or-color-theme 255.0)
      (set-alpha (random-color) alpha-or-color-theme)))
-  ([] (r/randval 0.2 (rand-nth (named-colors-list))
+  ([] (r/randval 0.2 (pr/to-color (rand-nth (named-colors-list)))
                  (r/randval 0.5
                             (rand-nth (random-palette))
                             (Vec4. (r/drand 255.0) (r/drand 255.0) (r/drand 255.0) 255.0)))))

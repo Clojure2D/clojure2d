@@ -128,6 +128,47 @@
   (is (seq (c/find-gradient "cubehelix")))
   (is (= (c/find-palette "pals" #"kovesi") (c/find-palette "pals" "kovesi"))))
 
+;; G3: values
+
+(def ^:private coloraide-tolerance
+  ;; compared clipped (out of gamut coloraide extends the sRGB curve, area B); LCH: coloraide lch-d65 white point
+  {:HSL 1.0e-9 :HWB 1.0e-9 :LCH 0.2 :Oklch 1.0e-6})
+
+(deftest hue-modes-test
+  (let [{:keys [stops ts coloraide]} @reference]
+    (testing "linear, all hue modes, per-segment powerless hues (coloraide)"
+      (doseq [[cs modes] coloraide
+              [mode rows] modes
+              [st per-t] (map vector stops rows)]
+        (check-gradient (c/gradient st {:colorspace cs :hue mode}) ts per-t (coloraide-tolerance cs)
+                        (str cs " " mode " " st))))
+    (testing "chroma.js hsl scale (shorter hue): chromatic stop lists, chroma.js rounds to integers"
+      (doseq [[st rows] (map vector stops (get-in @reference [:chroma :hsl]))
+              :when rows]
+        (check-gradient (c/gradient st {:colorspace :HSL}) ts rows 0.5 st)))
+    (testing "default :shorter; :raw is the hue as a number"
+      (is (= (c/to-color :magenta) ((c/gradient [:red :blue] {:colorspace :HSL}) 0.5)))
+      (is (= (c/to-color :lime) ((c/gradient [:red :blue] {:colorspace :HSL :hue :raw}) 0.5))))
+    (testing "other interpolators: continuous hues, wrapped into the range"
+      (let [g (c/gradient [:red :blue :lime :yellow] {:colorspace :HSL :interpolation :cubic})]
+        (doseq [t (range 0.0 1.0 0.01)
+                :let [h ((c/to-HSL (g t)) 0)]]
+          (is (and (m/<= 0.0 h) (m/< h 360.0)) (str t))))
+      (is (= (c/to-color :magenta) ((c/gradient [:red :blue] {:colorspace :HSL :interpolation :cubic}) 0.5))))
+    (testing "unknown hue mode"
+      (is (throws-data? {:hue :around} #(c/gradient [:red :blue] {:colorspace :HSL :hue :around}))))))
+
+(deftest gradient-range-test
+  (doseq [k [:cubic-in :quad-out :sin-in-out]]
+    (let [g (c/gradient [:red :blue] {:interpolation k})]
+      (is (= (g 1.0) (g 1.5)) (str k))
+      (is (= (g 0.0) (g -0.5)) (str k)))))
+
+(deftest outputs-test
+  (is (every? #(instance? fastmath.vector.Vec4 %) (repeatedly 2000 c/random-color)))
+  (is (= [(c/to-color :red) (c/to-color "#00ff00")] (c/palette [:red "#00ff00"])))
+  (is (= c/paletton-presets-list (sort c/paletton-presets-list))))
+
 (deftest docstrings-test
   (doseq [s '[gradient palette merge-gradients iq-gradient gradient-cubehelix find-gradient find-palette random-color
               random-palette random-gradient paletton hue-paletton paletton-presets-list]]
