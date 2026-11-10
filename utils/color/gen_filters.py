@@ -29,8 +29,10 @@ saturate, desaturate (utils/color/chroma_oracle.mjs, Node), unrounded clipped sR
 
 Color vision deficiency, linear sRGB (colour cctf_decoding / cctf_encoding), results clipped to [0, 1]:
 
-* :cvd {deficiency [[severity [[r g b a] ...]] ...]} - protanomaly, deuteranomaly: colour matrix_cvd_Machado2009
-  (linear interpolation between the published 0.1 severity steps); tritanomaly: DaltonLens Brettel 1997 dichromat
+* :cvd {deficiency [[severity [[r g b a] ...]] ...]} - protanomaly, deuteranomaly: the published Machado matrices
+  (colour CVD_MATRICES_MACHADO2010) linearly interpolated between the enclosing 0.1 severity steps (colour 0.4.7
+  matrix_cvd_Machado2009 brackets with searchsorted and extrapolates from the next interval between the steps,
+  e.g. 0.35 from [0.4, 0.5]); tritanomaly: DaltonLens Brettel 1997 dichromat
   blended with the color by severity (DaltonLens convention); severities 0, 0.35, 0.7, 1
 * :cvd-vars {name [[r g b a] ...]} - the named filters: protanopia, deuteranopia (Machado 1), protanomaly,
   deuteranomaly (Machado 0.6), tritanopia (Brettel), tritanomaly (Brettel blend 0.6), achromatopsia (Y of
@@ -164,8 +166,16 @@ def encode_rows(lin):
     return [list(r) + [255.0] for r in enc]
 
 
+def machado_matrix(name, severity):
+    table = colour.blindness.CVD_MATRICES_MACHADO2010[name]
+    lo = min(int(np.floor(severity * 10.0 + 1e-9)), 9) / 10.0
+    hi = round(lo + 0.1, 1)
+    f = (severity - lo) / 0.1
+    return np.asarray(table[lo]) + f * (np.asarray(table[hi]) - np.asarray(table[lo]))
+
+
 def machado(lin, name, severity):
-    return lin @ colour.blindness.matrix_cvd_Machado2009(name, severity).T
+    return lin @ machado_matrix(name, severity).T
 
 
 def cvd(C):

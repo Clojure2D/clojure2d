@@ -98,6 +98,32 @@
             [col e] (map vector colors (cvd-vars k))]
       (is (m/<= (max-diff e (vec (f col))) 1.0e-9) (str k " " col)))))
 
+;; G4: additions
+
+(deftest invert-opacity-test
+  (check-filter :invert c/invert 1.0e-9 any?)
+  (check-filter :opacity c/opacity 1.0e-9 any?)
+  (is (throws-data? {:amount -0.5} #(c/invert -0.5)))
+  (is (throws-data? {:amount -0.5} #(c/opacity -0.5))))
+
+(deftest cvd-filter-test
+  (let [{:keys [colors cvd]} @reference]
+    (doseq [[k rows-by-severity] cvd
+            [severity rows] rows-by-severity
+            :let [f (c/cvd-filter k severity)]
+            [col e] (map vector colors rows)]
+      (is (m/<= (max-diff e (vec (f col))) 1.0e-9) (str k " " severity " " col))))
+  (testing "severity 0 keeps the color; named filters are severity 1 and 0.6"
+    (doseq [k [:protanomaly :deuteranomaly :tritanomaly] col (take 10 (:colors @reference))]
+      (is (m/<= (max-diff col (take 3 ((c/cvd-filter k 0.0) col))) 1.0e-9) (str k " " col)))
+    (doseq [[f k s] [[c/protanopia :protanomaly 1.0] [c/deuteranomaly :deuteranomaly 0.6] [c/tritanopia :tritanomaly 1.0]]
+            col (take 10 (:colors @reference))]
+      (is (= (f col) ((c/cvd-filter k s) col)) (str k " " col))))
+  (testing "errors"
+    (is (throws-data? {:deficiency :foo} #(c/cvd-filter :foo 0.5)))
+    (is (throws-data? {:severity 1.5} #(c/cvd-filter :protanomaly 1.5)))
+    (is (throws-data? {:severity -0.1} #(c/cvd-filter :tritanomaly -0.1)))))
+
 (deftest make-LCH-test
   (doseq [cs [:LAB :LUV :Oklab] col [[200 50 50] [30 160 90] [40 60 220]]
           :let [[to from] (c/make-LCH cs)]]
@@ -140,5 +166,6 @@
   (doseq [s '[whiten blacken brighten darken saturate desaturate adjust modulate tinter correct-luma apply-theme
               color-themes fe-color-matrix sepia contrast exposure brightness saturation hue-rotate grayscale
               achromatomaly achromatopsia deuteranomaly deuteranopia protanomaly protanopia tritanomaly tritanopia
+              invert opacity cvd-filter
               complementary make-LCH]]
     (is (some? (:doc (meta (ns-resolve 'clojure2d.color s)))) (str s))))
