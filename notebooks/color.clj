@@ -696,7 +696,7 @@ c/color-themes
 
 ;; ### k-Means
 
-;; In case you have very big palette or a sequence of colors (possibly an image), you can use `reduce-colors` to construct a smaller palette. The algorithm uses `x-means` and number of colors returned may be lower than requested.
+;; In case you have very big palette or a sequence of colors (possibly an image), you can use `reduce-colors` to construct a smaller palette. The colors are clustered with fuzzy k-means (k-means++ with `{:fuzzy? false}`) and the most frequent color of each cluster is taken.
 
 ;; Let's start with very long palette
 
@@ -717,23 +717,14 @@ c/color-themes
 
 ;; Reduce in `OSA` color space
 
-(apply 🎨 (map #(c/reduce-colors cat-pixels % :OSA) [2 3 5 10]))
+(apply 🎨 (map #(c/reduce-colors cat-pixels % {:colorspace :OSA}) [2 3 5 10]))
 
-;; ### Clarans
+;; ### Clustering options
 
-;; Instead of providing a color space you can also provide distance function (either own function or one for `fastmath.distance`). For a reduction `clarans` algorithm is used.
+;; Other options are passed to the clustering function of `fastmath.ml.clustering`, for example k-means++ with the Manhattan distance and a seeded random number generator.
 
-;; Warning: it can be very slow.
-
-(require '[fastmath.distance])
-
-(apply 🎨 (map (partial c/reduce-colors (c/palette :viridis) 10)
-               [c/contrast-ratio
-                c/delta-E*
-                c/delta-E-z
-                fastmath.distance/chebyshev
-                fastmath.distance/manhattan
-                fastmath.distance/canberra]))
+(apply 🎨 (map #(c/reduce-colors (c/palette :viridis) % {:fuzzy? false :distance :manhattan :rng (r/rng :mersenne 42)})
+               [2 3 5 10]))
 
 ;; ## Random palette.
 

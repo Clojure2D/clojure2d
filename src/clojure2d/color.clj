@@ -5905,7 +5905,13 @@
          (>= (.z diff) (.z nd))))))
 
 (defn nearest-color
-  "Find nearest color from a set. Input: distance function (default euclidean), list of target colors and source color."
+  "Finds the color of a palette nearest to a given color.
+
+  - `pal` sequence of colors (`Vec4` values for the default distance)
+  - `c` color, any type accepted by [[to-color]]
+  - `dist-fn` (optional) distance of two colors, default `fastmath.vector/dist` (Euclidean distance of R, G, B and alpha)
+
+  Returns the palette entry with the smallest absolute distance to `c`, as given in the palette, the first one on ties. With only `pal` returns a function of a color. An empty palette returns `c` as a `Vec4`. See also [[delta-E*]], [[reduce-colors]]."
   {:metadoc/categories #{:dist}}
   ([pal c dist-fn]
    (let [s (count pal)
@@ -5924,7 +5930,12 @@
   ([pal] (partial nearest-color pal)))
 
 (defn average
-  "Average colors in given `colorspace` (default: `:sRGB`)"
+  "Averages colors channel by channel, alpha included, optionally in another colorspace.
+
+  - `cs` sequence of colors, any type accepted by [[to-color]]
+  - `colorspace` (optional) a key of [[colorspaces]]: colors are converted with the raw `to-` function, averaged and converted back with `from-`; hue channels are averaged as numbers
+
+  Without `colorspace` the sRGB values are averaged as they are (chroma.js `average` in mode `rgb`; the chroma.js default is `lrgb`, square-root mixing). Returns a `Vec4`, not clamped. See also [[weighted-average]], [[mix]]."
   {:metadoc/categories #{:interp}}
   ([cs colorspace]
    (let [[to from] (colorspaces colorspace)]
@@ -5933,7 +5944,13 @@
    (v/average-vectors (map pr/to-color cs))))
 
 (defn weighted-average
-  "Average colors with weights in given `colorspace` (default: `:sRGB`)"
+  "Weighted average of colors channel by channel, alpha included, optionally in another colorspace.
+
+  - `cs` sequence of colors, any type accepted by [[to-color]]
+  - `weights` sequence of numbers, one per color; the weighted sum is divided by the sum of the weights
+  - `colorspace` (optional) a key of [[colorspaces]], as in [[average]]
+
+  Without `colorspace` the sRGB values are averaged as they are (chroma.js `average` in mode `rgb` with weights). Returns a `Vec4`, not clamped. See also [[average]]."
   {:metadoc/categories #{:interp}}
   ([cs weights colorspace]
    (let [[to from] (colorspaces colorspace)]
@@ -5942,9 +5959,13 @@
    (v/div (reduce v/add (map #(v/mult (pr/to-color %1) %2) cs weights)) (reduce m/+ weights))))
 
 (defn lerp
-  "Linear interpolation of two colors.
+  "Linear interpolation of two colors, alpha included, optionally in another colorspace.
 
-  See also [[lerp+]], [[lerp-]], [[gradient]] and [[mix]]"
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `colorspace` (optional) a key of [[colorspaces]]: colors are converted with the raw `to-` function, interpolated and converted back with `from-`; hue channels are interpolated as numbers
+  - `t` weight of `c2`, default `0.5`: 0 gives `c1`, 1 gives `c2`; values outside [0, 1] extrapolate
+
+  Without `colorspace` the sRGB values are interpolated (chroma.js `mix` in mode `rgb`). Returns a `Vec4`, not clamped. See also [[lerp-]], [[lerp+]], [[mix]], [[gradient]]."
   {:metadoc/categories #{:interp}}
   ([c1 c2 colorspace ^double t]
    (let [[to from] (colorspaces colorspace)]
@@ -5954,11 +5975,13 @@
    (v/interpolate (pr/to-color c1) (pr/to-color c2) t)))
 
 (defn lerp-
-  "Linear interpolation of two colors conserving luma of the first color.
+  "Linear interpolation of two colors keeping the CIELAB lightness L* of the first color.
 
-  Amount: strength of the blend (defaults to 0.5)
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `colorspace` (optional) where the colors are interpolated, as in [[lerp]]
+  - `amount` weight of `c2`, default `0.5`
 
-  See also [[lerp+]]."
+  The colors are interpolated with [[lerp]], then L* of the result is set to L* of `c1`. Returns a `Vec4`, not clamped (the result may leave the sRGB gamut). See also [[lerp+]], [[adjust-temperature]]."
   {:metadoc/categories #{:interp}}
   ([c1 c2 colorspace ^double amount]
    (let [[to from] (colorspaces colorspace)
@@ -5972,11 +5995,13 @@
      (set-channel res :LAB 0 (ch0 (to-LAB c1))))))
 
 (defn lerp+
-  "Linear interpolation of two colors conserving luma of the second color.
+  "Linear interpolation of two colors keeping the CIELAB lightness L* of the second color.
 
-  Amount: strength of the blend (defaults to 0.5).
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `colorspace` (optional) where the colors are interpolated, as in [[lerp]]
+  - `amount` weight of `c2`, default `0.5`
 
-  See also [[lerp-]]."
+  The same as `(lerp- c2 c1 (- 1 amount))`. Returns a `Vec4`, not clamped. See also [[lerp-]]."
   ([c1 c2 colorspace ^double amount]
    (lerp- c2 c1 colorspace (- 1.0 amount)))
   ([c1 c2] (lerp- c1 c2 0.5))
@@ -5989,9 +6014,15 @@
              (* b b t))))
 
 (defn mix
-  "Mix colors in given optional `colorspace` (default: `:RGB`) and optional ratio (default: 0.5).
+  "Mixes two colors by squares: each channel becomes `sqrt((1 - t) a^2 + t b^2)`, alpha is interpolated linearly.
 
-  chroma.js way"
+  chroma.js `mix` in its default mode `lrgb` (square-root mixing, an approximation of mixing linear light).
+
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `colorspace` (optional) a key of [[colorspaces*]]: the formula is applied to the normalized channels (0-255)
+  - `t` weight of `c2`, default `0.5`
+
+  Returns a `Vec4`, not clamped. See also [[lerp]], [[mixbox]], [[mixsub]]."
   {:metadoc/categories #{:interp}}
   (^Vec4 [c1 c2 colorspace ^double t]
    (let [[to from] (colorspaces* colorspace)]
@@ -6006,9 +6037,14 @@
             (m/mlerp (.w c1) (.w c2) t)))))
 
 (defn mixbox
-  "Pigment based color mixing.
+  "Mixes two colors as pigments: Mixbox 2.0 by Secret Weapons (S. Sochorova, O. Jamriska), https://github.com/scrtwpns/mixbox, licensed CC BY-NC 4.0 (non-commercial use).
 
-  https://github.com/scrtwpns/mixbox"
+  The colors are mapped to a latent pigment space, interpolated there and mapped back, so blue and yellow give green.
+
+  - `col1`, `col2` colors, any type accepted by [[to-color]]; rounded to 8 bits
+  - `t` weight of `col2`, default `0.5`; values outside [0, 1] extrapolate in the latent space
+
+  Alpha is interpolated linearly. Returns a `Vec4` with 8-bit channel values. See also [[mix]], [[mixsub]]."
   (^Vec4 [col1 col2] (mixbox col1 col2 0.5))
   (^Vec4 [col1 col2 ^double t]
    (let [^int c1 (pack col1)
@@ -6016,7 +6052,12 @@
      (pr/to-color (Mixbox/lerp c1 c2 (float t))))))
 
 (defn negate
-  "Negate color (subract from 255.0)"
+  "Negates a color: each channel becomes `255 - c`.
+
+  - `c` color, any type accepted by [[to-color]]
+  - `alpha?` (optional) when true alpha is negated too, default `false`
+
+  Returns a `Vec4`, not clamped. For colors in [0, 255] the same as `((invert 1.0) c)`. See also [[invert]]."
   (^Vec4 [c] (negate c false))
   (^Vec4 [c alpha?]
    (let [^Vec4 c (pr/to-color c)]
@@ -6027,7 +6068,15 @@
 
 ;; https://github.com/ProfJski/ArtColors/blob/master/RYB.cpp#L230
 (defn mixsub
-  "Subtractive color mix in given optional `colorspace` (default: `:RGB`) and optional ratio (default: 0.5)"
+  "Mixes two colors subtractively, after ProfJski ArtColors `ColorMixSub` (https://github.com/ProfJski/ArtColors).
+
+  The linear mix of the colors is moved toward their product-like subtractive mix `max(0, a + b - 255)` (per channel) by `4 t (1 - t) d`, where `d` is the distance of the colors (R, G, B and alpha) divided by 510.
+
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `colorspace` (optional) a key of [[colorspaces]]: the formula is applied to the raw channels
+  - `t` weight of `c2`, default `0.5`
+
+  Returns a `Vec4`. See also [[mix]], [[mixbox]]."
   {:metadoc/categories #{:interp}}
   (^Vec4 [c1 c2 colorspace ^double t]
    (let [[to from] (colorspaces colorspace)]
@@ -6064,9 +6113,17 @@
          (clamp (v/mult (v/sqrt (v/div (v/emult c tint) 65536.0)) 255.0)))))))
 
 (defn reduce-colors
-  "Reduce colors using k-means++ (or fuzzy-kmeans) clustering in given `colorspace` (default `:RGB`).
+  "Reduces a sequence of colors (e.g. the pixels of an image) to a palette by clustering.
 
-  Use for long sequences (for example to generate palette from image)."
+  - `xs` sequence of colors: `Vec4` values (or any vectors) without `:colorspace`
+  - `number-of-colors` number of clusters, at least 1
+  - `options` (map, optional), also passed to the `fastmath.ml.clustering` function:
+      - `:fuzzy?` - fuzzy k-means when true, k-means++ otherwise, default `true`
+      - `:colorspace` - a key of [[colorspaces*]] where colors are clustered (normalized channels), default none (sRGB as given)
+      - `:rng` - random number generator of the clustering
+      - other clustering options, e.g. `:max-iters`, `:distance`, `:fuzziness`, `:trials`
+
+  The color of a cluster is its most frequent color (channels rounded to 8 bits), the average of the most frequent ones on ties. Returns the cluster colors sorted by [[luma]]. See also [[resample]], [[nearest-color]]."
   {:metadoc/categories #{:pal}}
   ([xs number-of-colors] (reduce-colors xs number-of-colors nil))
   ([xs number-of-colors {:keys [fuzzy? colorspace]
@@ -6437,9 +6494,13 @@
 (def find-palette (partial find-gradient-or-palette palettes-list-))
 
 (defn resample
-  "Resample palette.
+  "Resamples a palette to a given number of colors.
 
-  Internally it's done by creating gradient and sampling back to colors. You can pass [[gradient]] parameters like colorspace, interpolator name and domain."
+  - `pal` palette (sequence of colors) or a name accepted by [[palette]]
+  - `number-of-colors` size of the result
+  - `gradient-params` (optional) options of [[gradient]] (e.g. `:colorspace`, `:interpolation`)
+
+  The palette is turned into a [[gradient]] and sampled at `number-of-colors` evenly spaced points; one color is the [[average]] of the palette (in `:colorspace` when given). The same as `(palette pal number-of-colors gradient-params)`. Returns a vector of `Vec4`. See also [[reduce-colors]]."
   {:metadoc/categories #{:pal}}
   ([pal number-of-colors] (resample pal number-of-colors {}))
   ([pal number-of-colors gradient-params] (palette pal number-of-colors gradient-params)))
