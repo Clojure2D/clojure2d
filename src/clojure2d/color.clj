@@ -5150,11 +5150,14 @@
       (v/vec3)])))
 
 (defn iq-gradient
-  "Create gradient generator function with given parametrization or two colors.
+  "Creates a cosine gradient: each channel is `a + b cos(2 pi (c t + d))` on 0-1, clamped and scaled to 0-255.
 
-  See http://iquilezles.org/www/articles/palettes/palettes.htm and https://github.com/thi-ng/color/blob/master/src/gradients.org#gradient-coefficient-calculation
+  I. Quilez, Palettes (iquilezles.org/articles/palettes); coefficients between two colors as thi.ng/color `cosine-coefficients` (https://github.com/thi-ng/color/blob/master/src/gradients.org): `a = c1 - (c1 - c2) / 2`, `b = (c1 - c2) / 2`, `c = -0.5`, `d = 0`, so the gradient goes from `c1` at 0 to `c2` at 1.
 
-  Parameters should be `Vec3` type."
+  - `c1`, `c2` colors, any type accepted by [[to-color]] (alpha ignored)
+  - `a`, `b`, `c`, `d` offset, amplitude, frequency and phase, three numbers each (`Vec3` or vectors)
+
+  Returns a function of `t` (any value, periodic) returning a `Vec4` with alpha 255. See also [[gradient]]."
   {:metadoc/categories #{:gr}}
   ([c1 c2]
    (apply iq-gradient (cosine-coefficients c1 c2)))
@@ -5274,7 +5277,13 @@
    (paletton-hsv-to-rgb hue ks kv 255.0)))
 
 (defn hue-paletton
-  "Convert color to paletton HUE (which is different than hexagon or polar conversion)."
+  "Returns the hue of the paletton.com color wheel (0-360), a red-yellow-blue artist's wheel unlike the hue of [[to-HSV]].
+
+  The wheel is split at 120 (yellow), 180 (green), 210 (cyan), 255 (blue) and 315 (magenta); within each segment the hue follows the ratio of the middle to the extreme channels through paletton's tangent maps (reverse-engineered from paletton.com).
+
+  - `r`, `g`, `b` channels 0-255, or `c` a color, any type accepted by [[to-color]]
+
+  Returns a double; 0 for grays. See also [[paletton]]."
   {:metadoc/categories meta-ops}
   (^double [^double r ^double g ^double b]
    (if (== r g b)
@@ -5360,7 +5369,7 @@
    :almost-gray-light   [[0.03501 1.59439] [0.23204 1.10483] [0.14935 1.33784] [0.07371 1.04897] [0.09635 0.91368]]})
 
 ;; List of preset names
-(def ^{:doc "Paletton presets names"
+(def ^{:doc "Names of the [[paletton]] presets (lightness and saturation variants of paletton.com, the same values and names), in no particular order."
        :metadoc/categories #{:pal}}
   paletton-presets-list (keys paletton-presets))
 
@@ -5370,20 +5379,22 @@
   (mapv (fn [[ks kv]] (paletton-hsv-to-rgb hue ks kv)) preset))
 
 (defmulti paletton
-  "Create [paletton](http://paletton.com/) palette.
+  "Creates a palette as paletton.com: five shades (a preset) of one to four hues of its red-yellow-blue color wheel.
 
-  Input:
+  The color model is reverse-engineered from paletton.com and verified against its own code (shades of all presets equal within its rounding to integers). Unlike paletton.com, fractional hues are kept (paletton.com rounds the hue to whole degrees) and the angle is not limited (paletton.com: 5-175).
 
-  * type - one of: `:monochromatic` (one hue), `:triad` (three hues), `:tetrad` (four hues)
-  * hue - paletton version of hue (use [[hue-paletton]] to get hue value).
-  * configuration as a map
+  - `type` scheme:
+      - `:monochromatic` - one hue (paletton mono), with `:compl` also its complement (monocompl)
+      - `:triad` - the hue and two hues: `hue ± angle` with `:adj` true (paletton analog), `hue + 180 ± angle` with `:adj` false (paletton triad); with `:compl` also the complement
+      - `:tetrad` - the hue, `hue + angle` and their complements (paletton tetrad; `:compl` ignored)
+  - `hue` paletton hue in degrees, see [[hue-paletton]]
+  - `conf` (map, optional):
+      - `:preset` - a name of [[paletton-presets-list]] or a sequence of five `[ks kv]` pairs (saturation and brightness factors, 0-2), default `:full`
+      - `:compl` - add the complementary hue, default `false`
+      - `:angle` - angle of the secondary hues in degrees, default `30`
+      - `:adj` - `:triad` only, default `true`
 
-  Configuration consist:
-
-  * `:preset` - one of [[paletton-presets-list]], default `:full`.
-  * `:compl` - generate complementary color?, default `false`. Works with `:monochromatic` and `:triad`
-  * `:angle` - hue angle for additional colors for `:triad` and `:tetrad`.
-  * `:adj` - for `:triad` only, generate adjacent (default `true`) values or not."
+  Returns a vector of `Vec4`: five colors per hue in the order main hue, secondary hues, complement (for `:tetrad`: hue, complement, `hue + angle`, its complement). See also [[hue-paletton]], [[palette]]."
   {:metadoc/categories #{:pal}}
   (fn [m _ & _] m))
 
@@ -6498,7 +6509,7 @@
                                   (i3 ct))) clamp255)))))))
 
 (def ^{:metadoc/categories #{:gr}
-     :doc "Cubehelix gradient generator from two colors."}
+     :doc "Creates a gradient in the Cubehelix colorspace from raw Cubehelix values (`[hue saturation lightness alpha]`, see [[to-Cubehelix]]), not sRGB colors: two or more stops, interpolated linearly, the hue as a number (d3 `interpolateCubehelixLong`). Returns a gradient function as [[gradient]]."}
   gradient-cubehelix #(interpolated-gradient % {:colorspace :Cubehelix :to? false :interpolation :linear}))
 
 (defonce ^{:private true} basic-gradients-delay
@@ -6584,21 +6595,20 @@
             :seq (vec (sort g))})))
 
 (defn gradient
-  "Return gradient function.
-  
-  Grandient function accepts value from 0 to 1 and returns interpolated color.
+  "Returns a gradient: a function of `t` (0-1) returning a color.
 
-  Parameters;
+  - `palette-or-gradient-name` a name of a gradient (see [[find-gradient]], [predefined gradients](../static/gradients.html)) or a palette (sequence of colors)
+  - `options` (map, optional) for a palette:
+      - `:colorspace` - a key of [[colorspaces]] where the colors are interpolated, default `:RGB`
+      - `:interpolation` - a `fastmath.interpolation` method name (e.g. `:linear`, `:cubic`, `:monotone`, `:b-spline`; some need more points), a `fastmath.easings` easing name (only the first two colors are used), `:iq` (cosine gradient of two colors, [[iq-gradient]]) or a function of `xs` and `ys` returning an interpolator; default `:linear`
+      - `:domain` - positions of the colors, increasing; default evenly spaced 0-1
+      - `:to?`, `:from?` - convert the colors to / from `colorspace`, default `true` (`false` when the colors are already in it)
 
-  * `palette-or-gradient-name` - name of the [predefined gradient](../static/gradients.html) or palette (seq of colors).
-  * (optional) additional parameters map:
-      * `:colorspace` - operate in given color space. Default: `:RGB`.
-      * `:interpolation` - interpolation name or interpolation function. Interpolation can be one of [[interpolators-1d-list]] or [[easings-list]]. When easings is used, only first two colors are interpolated. Default: `:linear`.
-      * `:to?` - turn on/off conversion to given color space. Default: `true`.
-      * `:from?` - turn on/off conversion from given color space. Default: `true`.
-      * `:domain` - interpolation domain as seq of values for each color.
+  Channels are interpolated separately (hue as a number, alpha straight) and clamped to [0, 255]; `t` is limited to [0, 1] for the interpolation methods. Without arguments a random gradient name is used.
 
-  When called without parameters random gradient is returned."
+  Built-in gradients without a namespace: the thi.ng/color cosine presets (`:rainbow1` to `:rainbow4`, `:yellow-magenta-cyan`, `:orange-blue`, `:green-magenta`, `:green-red`, `:green-cyan`, `:yellow-red`, `:blue-cyan`, `:red-blue`, `:yellow-green-blue`, `:blue-white-red`, `:cyan-magenta`, `:yellow-purple-magenta`, `:green-blue-orange`, `:orange-magenta-blue`, `:blue-magenta-orange`, `:magenta-green`), I. Quilez's cosine palettes `:iq-1` to `:iq-7`, d3-scale-chromatic `:cubehelix`, `:warm`, `:cool`, `:rainbow`, and `:black-body` ([[temperature]] from 1000 to 15000 K). Namespaced names (e.g. `:pals/kovesi.cyclic_mrybm_35_75_c68`) come from resource files.
+
+  Returns a function of one double returning a `Vec4`. See also [[palette]], [[merge-gradients]], [[gradient-cubehelix]]."
   {:metadoc/categories #{:gr}}
   ([] (gradient (rand-nth (:seq @gradients-list-))))
   ([palette-or-gradient-name] (gradient palette-or-gradient-name {}))
@@ -6610,9 +6620,12 @@
          :else (interpolated-gradient palette-or-gradient-name options))))
 
 (defn merge-gradients
-  "Combine two gradients, optionally select `midpoint` (0.5 by default).
+  "Joins two gradients: `g1` stretched over `[0, midpoint)` and `g2` over `[midpoint, 1]`.
 
-  Resulting gradient has colors from `g1` for values lower than `midpoint` and from `g2` for values higher than `midpoint`"
+  - `g1`, `g2` gradients (functions of `t`)
+  - `midpoint` (optional) default `0.5`
+
+  Returns a function of `t`. See also [[gradient]]."
   {:metadoc/categories #{:gr}}
   ([g1 g2 ^double midpoint]
    (fn [^double t]
@@ -6636,15 +6649,13 @@
 (defonce ^:private get-palette (memoize get-palette-))
 
 (defn palette
-  "Get palette.
+  "Returns a palette: a vector of colors.
 
-  If argument is a keyword, returns one from palette presets.
-  If argument is a number, returns one from colourlovers palettes.
-  If argument is a gradient, returns 5 or `number-of-colors` samples.
+  - `p` a palette name (keyword, see [[find-palette]]), a colourlovers palette number (integer), a gradient (sampled) or a sequence of colors (returned as a vector)
+  - `number-of-colors` (optional) number of colors: a palette is resampled through a [[gradient]], a gradient sampled at evenly spaced points; one color is the [[average]] (of 100 samples of a gradient); default for a gradient 5
+  - `gradient-params` (optional) options of [[gradient]] used for resampling (`:colorspace` also for the average)
 
-  If called without argument, random palette is returned
-  
-  Optionally you can pass number of requested colors and other parameters as in [[resample]]"
+  Without arguments a random palette name is used. Returns a vector of `Vec4` (a sequence of colors is returned as given; an unknown name gives nil). See also [[resample]], [[gradient]], [[random-palette]]."
   {:metadoc/categories #{:pal}}
   ([] (palette (rand-nth (:seq @palettes-list-))))
   ([p]
@@ -6674,8 +6685,10 @@
                                (and (= (namespace k) group)
                                     (re-find regex (name k)))) (:seq @lst))))
 
-(def find-gradient (partial find-gradient-or-palette gradients-list-))
-(def find-palette (partial find-gradient-or-palette palettes-list-))
+(def ^{:doc "Lists gradient names: without arguments all of them (sorted), with a `regex` those whose name (with the colon and namespace) matches it, with a `group` (namespace string) and a `regex` those of that namespace whose name matches. See also [[gradient]], [[find-palette]]."}
+  find-gradient (partial find-gradient-or-palette gradients-list-))
+(def ^{:doc "Lists palette names: without arguments all of them (sorted), with a `regex` those whose name (with the colon and namespace) matches it, with a `group` (namespace string) and a `regex` those of that namespace whose name matches. See also [[palette]], [[find-gradient]]."}
+  find-palette (partial find-gradient-or-palette palettes-list-))
 
 (defn resample
   "Resamples a palette to a given number of colors.
@@ -6757,7 +6770,9 @@
      (iq-gradient (first pal) (first (drop 5 pal))))))
 
 (defn random-palette
-  "Generate random palette from all collections defined in clojure2d.color namespace."
+  "Returns a random palette (global random generators): with probability 0.1 a resampled random cosine gradient, 0.2 a colourlovers palette, 0.3 a preset palette (resampled to 15 colors when longer), 0.2 a resampled random gradient, otherwise a random [[paletton]] palette.
+
+  Returns a vector of `Vec4` (3 to 15 colors or a whole palette). See also [[random-gradient]], [[palette]]."
   {:metadoc/categories #{:gr}}
   []
   (condp clojure.core/> (r/drand)
@@ -6775,7 +6790,9 @@
       (paletton t h conf))))
 
 (defn random-gradient
-  "Generate random gradient function."
+  "Returns a random gradient (global random generators): with probability 0.1 a random cosine gradient, 0.5 a random palette as a gradient, 0.1 a paletton palette as a gradient, otherwise a preset gradient; palettes are interpolated in a random colorspace (or `:RGB`) with `:linear` or `:cubic` interpolation.
+
+  Returns a function of `t` (0-1) returning a `Vec4`. See also [[random-palette]], [[gradient]]."
   {:metadoc/categories #{:pal}}
   []
   (let [gpars {:colorspace (r/randval :RGB (rand-nth colorspaces-list))
@@ -6853,11 +6870,13 @@
            (apply-LCH-theme color color-theme))))
 
 (defn random-color
-  "Generate random color.
+  "Returns a random color (global random generators).
 
-  Optionally color theme or alpha can be provided.
+  - no argument: a named color (keyword) with probability 0.2, otherwise a color of a random palette or a random sRGB color (`Vec4`)
+  - `alpha-or-color-theme` a number (alpha of a random color) or a name of [[color-themes]]
+  - `color-theme`, `alpha` a thi.ng theme gives random lightness and chroma from its ranges and a random hue in LCH*; a [[paletton]] preset gives a random color of the monochromatic paletton palette of a random hue
 
-  List of possible color themes is stored in `color-themes` var. These are taken from thi.ng and paletton."
+  Returns a clamped `Vec4` (or a keyword, see above). See also [[apply-theme]], [[random-palette]]."
   {:metadoc/categories #{:pal}}
   ([color-theme alpha]
    (clamp (if (thing-presets-list color-theme)

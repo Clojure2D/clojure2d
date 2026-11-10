@@ -905,13 +905,13 @@ c/color-themes
 
 ;; Let's create diverging multi-hue color palette as desribed in [this chapter](https://www.vis4.net/blog/2013/09/mastering-multi-hued-color-scales/#update-diverging-multi-hue-color-palettes).
 
-(let [opts {:interpolation :b-spline :colorspace :LAB}
+(let [opts {:interpolation :cubic :colorspace :LAB}
       g1 (-> (c/gradient [:darkred :deeppink :light-yellow] opts) c/correct-luma)
       g2 (-> (c/gradient [:light-yellow :lightgreen :teal] opts) c/correct-luma)]
   (🎨 (c/palette (c/merge-gradients g1 g2) 13)))
 
 ^{::clerk/visibility :hide}
-(let [opts {:interpolation :b-spline :colorspace :LAB}
+(let [opts {:interpolation :cubic :colorspace :LAB}
       g (c/merge-gradients
          (-> (c/gradient [:darkred :deeppink :light-yellow] opts) c/correct-luma)
          (-> (c/gradient [:light-yellow :lightgreen :teal] opts) c/correct-luma))]

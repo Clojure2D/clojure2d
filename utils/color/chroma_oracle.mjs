@@ -8,6 +8,8 @@
 //   {"mix": {mode [[[r g b] per t] per pair]}, "average": {mode [[r g b] per set]},
 //    "weighted": [[r g b] per set]}, modes of mix: lrgb (default), rgb, lab, hsl; of average: rgb, lrgb, lab, hsl;
 //   weighted: average in rgb with the weights.
+// gen_gradients.py: {"scale": {"stops": [[[r g b] ...] ...], "modes": [...], "ts": [...]}} ->
+//   {"scale": {mode [[[r g b] per t] per stop list]}} - chroma.scale(stops).mode(mode)(t).
 import chroma from "chroma-js";
 
 const MIX_MODES = ["lrgb", "rgb", "lab", "hsl"];
@@ -31,6 +33,18 @@ let input = "";
 process.stdin.on("data", (d) => (input += d));
 process.stdin.on("end", () => {
   const data = JSON.parse(input);
+  if (data.scale) {
+    const { stops, modes, ts } = data.scale;
+    const scale = {};
+    for (const mode of modes) {
+      scale[mode] = stops.map((st) => {
+        const f = chroma.scale(st.map((c) => chroma(c, "rgb"))).mode(mode);
+        return ts.map((t) => f(t).rgb(false));
+      });
+    }
+    process.stdout.write(JSON.stringify({ scale }));
+    return;
+  }
   if (data.mixing) {
     process.stdout.write(JSON.stringify(mixing(data.mixing)));
     return;
