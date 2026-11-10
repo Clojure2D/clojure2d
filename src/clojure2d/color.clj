@@ -5058,6 +5058,15 @@
   The author's approximate choices for common light sources: `:candle` 1800, `:sunrise` and `:sunset` 2500, `:lightbulb` and `:warm` 2900, `:morning` 3500, `:moonlight` 4000, `:white` 4250, `:sunlight` 4800, `:midday` 5500, `:cloudy-sky` 6500, `:cool` 7250, `:blue-sky` 10000 K."}
   temperature-names (sort (keys temperature-name-to-K)))
 
+(defn- temperature-kelvin
+  "Temperature in K of `t`: a positive number, or a name of [[temperature-names]]. Throws `ex-info` with `{:temperature t}` for an unknown name, a value that is neither a number nor a keyword, a temperature not above 0 K and NaN."
+  ^double [t]
+  (let [k (if (keyword? t) (temperature-name-to-K t) t)]
+    (if (and (number? k) (m/pos? (double k)))
+      (double k)
+      (throw (ex-info (str "Invalid temperature: " t ", expected a positive number of K or one of temperature-names")
+                      {:temperature t})))))
+
 (defn temperature
   "Color representing given black body temperature `t` in Kelvins (or name as keyword).
 
@@ -5065,10 +5074,12 @@
   
   Using improved interpolation functions.
 
-  Possible temperature names: `:candle`, `:sunrise`, `:sunset`, `:lightbulb`, `:morning`, `:moonlight`, `:midday`, `:cloudy-sky`, `:blue-sky`, `:warm`, `:cool`, `:white`, `:sunlight`"
+  Possible temperature names: `:candle`, `:sunrise`, `:sunset`, `:lightbulb`, `:morning`, `:moonlight`, `:midday`, `:cloudy-sky`, `:blue-sky`, `:warm`, `:cool`, `:white`, `:sunlight`
+
+  Throws `ex-info` with `{:temperature t}` for an unknown name, a value that is neither a number nor a keyword, a temperature not above 0 K and NaN."
   {:metadoc/categories #{:pal}}
   ^Vec4 [t]
-  (let [k (* 0.0001 ^double (get temperature-name-to-K t t))
+  (let [k (* 0.0001 (temperature-kelvin t))
         lnk (m/ln k)]
     (Vec4. (kelvin-red k lnk)
            (kelvin-green k lnk)

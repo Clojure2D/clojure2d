@@ -6,7 +6,8 @@
             [clojure.edn :as edn]
             [clojure.java.io :as io]
             [fastmath.core :as m]
-            [clojure2d.color :as c]))
+            [clojure2d.color :as c]
+            [clojure2d.test-predicates :refer [throws-data?]]))
 
 (def reference (delay (-> "color/temperature_reference.edn" io/resource slurp edn/read-string)))
 
@@ -38,6 +39,13 @@
     (doseq [col [[30 60 200] [10 10 10] [250 250 250]]]
       (is (m/< (m/abs (m/- ((c/to-LAB (c/temperature 3000.0)) 0) ((c/to-LAB (c/adjust-temperature col 3000.0)) 0))) 1.0e-9)
           (str col)))))
+
+(deftest invalid-temperature-test
+  (doseq [t [:foo "warm" 0 0.0 -100 -100.0 ##NaN ##-Inf nil]]
+    (is (throws-data? {:temperature t} #(c/temperature t)) (str t)))
+  (testing "valid: positive numbers of any type and names"
+    (is (= (c/temperature 3000) (c/temperature 3000.0) (c/temperature (float 3000.0))))
+    (is (= (c/temperature 1800.0) (c/temperature :candle)))))
 
 (deftest docstrings-test
   (doseq [s '[temperature temperature-names adjust-temperature wavelength]]
