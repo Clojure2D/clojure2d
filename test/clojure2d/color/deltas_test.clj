@@ -42,10 +42,12 @@
       (is (rel-close? tol e (f a b)) (str k " " a " " b)))))
 
 (deftest contrast-ratio-test
-  ;; WCAG weights 0.2126 0.7152 0.0722 vs relative-luma (Y row of the to-XYZ matrix): up to 4.7e-4 relative
+  ;; WCAG formula: sRGB threshold 0.04045, weights 0.2126 0.7152 0.0722
   (let [{:keys [pairs oracle]} @reference]
     (doseq [[[a b] e] (map vector pairs (:wcag oracle))]
-      (is (rel-close? 5.0e-4 e (c/contrast-ratio a b)) (str a " " b)))))
+      (is (rel-close? 1.0e-12 e (c/contrast-ratio a b)) (str a " " b))))
+  (testing "relative-luma keeps the Y row of to-XYZ (area A)"
+    (is (rel-close? 1.0e-12 (* 2.55 ((c/to-XYZ :red) 1)) (c/relative-luma :red)))))
 
 (deftest sharma-test
   (let [{:keys [sharma sharma-colour]} @reference]

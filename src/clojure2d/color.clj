@@ -5760,18 +5760,26 @@
      (m/sqrt (+ (m/sq l') (m/sq c') (m/sq h')
                 (* Rt c' h'))))))
 
+(defn- wcag-luminance
+  "WCAG 2 relative luminance, 0-1: sRGB decoding and the weights 0.2126, 0.7152, 0.0722 as written in WCAG (not the Y row of the `to-XYZ` matrix used by [[relative-luma]])."
+  ^double [c]
+  (let [^Vec4 c (pr/to-color c)]
+    (+ (* 0.2126 (rgb/srgb-to-linear (/ (.x c) 255.0)))
+       (* 0.7152 (rgb/srgb-to-linear (/ (.y c) 255.0)))
+       (* 0.0722 (rgb/srgb-to-linear (/ (.z c) 255.0))))))
+
 (defn contrast-ratio
   "Returns the WCAG 2 contrast ratio of two colors: `(L1 + 0.05) / (L2 + 0.05)`, L1 the lighter.
 
-  The relative luminance is [[relative-luma]] divided by 255. Common thresholds: 3 (large text), 4.5 (text, AA), 7 (text, AAA).
+  The relative luminance is computed as WCAG defines it: sRGB decoding and the weights 0.2126, 0.7152, 0.0722. It differs from [[relative-luma]] / 255 (the Y row of the [[to-XYZ]] matrix) by up to 5e-4 relative. Common thresholds: 3 (large text), 4.5 (text, AA), 7 (text, AAA).
 
   - `c1`, `c2` colors, any type accepted by [[to-color]]
 
   Returns a double from 1 (equal luminance) to 21 (black and white), symmetric in `c1`, `c2`. Alpha is ignored: colors are not composited on a background."
   {:metadoc/categories #{:dist}}
   ^double [c1 c2]
-  (let [l1 (/ (relative-luma c1) 255.0)
-        l2 (/ (relative-luma c2) 255.0)]
+  (let [l1 (wcag-luminance c1)
+        l2 (wcag-luminance c2)]
     (if (> l1 l2)
       (/ (+ l1 0.05) (+ l2 0.05))
       (/ (+ l2 0.05) (+ l1 0.05)))))
