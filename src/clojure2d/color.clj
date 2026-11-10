@@ -4931,8 +4931,8 @@
    (let [[to from] (colorspaces colorspace)
          ^Vec4 c (to c)]
      (from (if (= colorspace :GLHS)
-             (Vec4. (+ 180.0 (.x c)) (.y c) (.z c) (.w c))
-             (Vec4. (.x c) (+ 180.0 (.y c)) (.z c) (.w c)))))))
+             (Vec4. (.x c) (+ 180.0 (.y c)) (.z c) (.w c))
+             (Vec4. (+ 180.0 (.x c)) (.y c) (.z c) (.w c)))))))
 
 (defn set-channel
   "Returns the color with one channel set to `val`, optionally in another colorspace.
@@ -6071,31 +6071,39 @@
 
 ;; colors
 
+(defn- hwb-step
+  "Linear step of an HWB whiteness or blackness `v` (0-1): `amt` (clamped to [-1, 1]) of the way to 1 for positive `amt`, to 0 for negative."
+  ^double [^double v ^double amt]
+  (let [a (m/constrain amt -1.0 1.0)]
+    (if (neg? a)
+      (+ v (* a v))
+      (+ v (* a (- 1.0 v))))))
+
 (defn whiten
-  "Moves a color toward white: adds `amt` to the whiteness W of [[to-HWB]], constrained to [0, 1].
+  "Moves a color toward white: the whiteness W of [[to-HWB]] goes `amt` of the way to 1 (`W + amt (1 - W)`); negative `amt` goes toward 0 (`W + amt W`).
 
   - `col` color, any type accepted by [[to-color]]
-  - `amt` change of whiteness, default `0.2`; negative values remove whiteness
+  - `amt` step, default `0.2`, clamped to [-1, 1]: 1 gives W = 1, -1 gives W = 0; the step is linear in `amt` and works for pure colors (W = 0)
 
   Hue and blackness are kept; when W + B exceeds 1 the color becomes gray (HWB normalization). Returns a clamped `Vec4`. See also [[blacken]], [[brighten]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col] (whiten col 0.2))
   (^Vec4 [col ^double amt]
    (let [c (to-HWB col)]
-     (clamp (from-HWB (Vec4. (.x c) (m/constrain (+ (.y c) amt) 0.0 1.0) (.z c) (.w c)))))))
+     (clamp (from-HWB (Vec4. (.x c) (hwb-step (.y c) amt) (.z c) (.w c)))))))
 
 (defn blacken
-  "Moves a color toward black: adds `amt` to the blackness B of [[to-HWB]], constrained to [0, 1].
+  "Moves a color toward black: the blackness B of [[to-HWB]] goes `amt` of the way to 1 (`B + amt (1 - B)`); negative `amt` goes toward 0 (`B + amt B`).
 
   - `col` color, any type accepted by [[to-color]]
-  - `amt` change of blackness, default `0.2`; negative values remove blackness
+  - `amt` step, default `0.2`, clamped to [-1, 1]: 1 gives B = 1, -1 gives B = 0
 
   Hue and whiteness are kept; when W + B exceeds 1 the color becomes gray (HWB normalization). Returns a clamped `Vec4`. See also [[whiten]], [[darken]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col] (blacken col 0.2))
   (^Vec4 [col ^double amt]
    (let [c (to-HWB col)]
-     (clamp (from-HWB (Vec4. (.x c) (.y c) (m/constrain (+ (.z c) amt) 0.0 1.0) (.w c)))))))
+     (clamp (from-HWB (Vec4. (.x c) (.y c) (hwb-step (.z c) amt) (.w c)))))))
 
 (defn brighten
   "Brightens a color: adds `18 amt` to the CIELAB lightness L* (chroma.js `brighten`, step Kn = 18).
@@ -6629,7 +6637,7 @@
 
   - `matrix` 20 numbers, row by row for the R, G, B, A outputs: `[r1 r2 r3 r4 r5 g1 ... a5]`; columns 1-4 multiply R, G, B, A (0-255), column 5 is an offset on the 0-255 scale
 
-  Returns a function of one color (any type accepted by [[to-color]]) returning the result clamped to [0, 255]. The CSS filter functions ([[sepia]], [[grayscale]], [[saturation]], [[hue-rotate]], [[contrast]], [[exposure]], [[brightness]]) and the color vision deficiency filters are built with it."
+  Returns a function of one color (any type accepted by [[to-color]]) returning the result clamped to [0, 255]. The CSS filter functions ([[sepia]], [[grayscale]], [[saturation]], [[hue-rotate]], [[contrast]], [[exposure]], [[brightness]]) are built with it."
   [[^double r1 ^double r2 ^double r3 ^double r4 ^double r5
     ^double g1 ^double g2 ^double g3 ^double g4 ^double g5
     ^double b1 ^double b2 ^double b3 ^double b4 ^double b5
@@ -6650,19 +6658,19 @@
 (defn sepia
   "Creates the CSS `sepia()` filter (W3C Filter Effects Level 1).
 
-  - `amount` 0 (unchanged) to 1 (full sepia); values above 1 extrapolate (the specification clamps them to 1)
+  - `amount` 0 (unchanged) to 1 (full sepia); values above 1 are clamped to 1, as the specification
 
   Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount."
   ([^double amount]
    (check-amount amount)
-   (let [amount (- 1.0 amount)
+   (let [amount (- 1.0 (min amount 1.0))
          a (+ 0.393 (* 0.607 amount)) b (- 0.769 (* 0.769 amount)) c (- 0.189 (* 0.189 amount))
          d (- 0.349 (* 0.349 amount)) e (+ 0.686 (* 0.314 amount)) f (- 0.168 (* 0.168 amount))
          g (- 0.272 (* 0.272 amount)) h (- 0.534 (* 0.534 amount)) i (+ 0.131 (* 0.869 amount))]
      (fe-color-matrix [a b c 0.0 0.0
                        d e f 0.0 0.0
                        g h i 0.0 0.0
-                       0.0 0.0 0.0 1.0 0,0]))))
+                       0.0 0.0 0.0 1.0 0.0]))))
 
 (defn contrast
   "Creates the CSS `contrast()` filter (W3C Filter Effects Level 1): `amount (c - 127.5) + 127.5` per channel.
@@ -6708,14 +6716,14 @@
 
 
 (defn- saturation-matrix
-  "Filter of the `feColorMatrix` saturate matrix for `amount` (any value)."
+  "Filter of the `feColorMatrix` saturate matrix (W3C Filter Effects, weights 0.213, 0.715, 0.072) for `amount` (any value)."
   ([^double amount]
-   (let [r+ (+ 0.2126 (* 0.7874 amount))
-         r- (- 0.2126 (* 0.2126 amount))
-         g+ (+ 0.7152 (* 0.2848 amount))
-         g- (- 0.7152 (* 0.7152 amount))
-         b+ (+ 0.0722 (* 0.9278 amount))
-         b- (- 0.0722 (* 0.0722 amount))]
+   (let [r+ (+ 0.213 (* 0.787 amount))
+         r- (- 0.213 (* 0.213 amount))
+         g+ (+ 0.715 (* 0.285 amount))
+         g- (- 0.715 (* 0.715 amount))
+         b+ (+ 0.072 (* 0.928 amount))
+         b- (- 0.072 (* 0.072 amount))]
      (fe-color-matrix [r+ g- b- 0.0 0.0
                        r- g+ b- 0.0 0.0
                        r- g- b+ 0.0 0.0
@@ -6726,7 +6734,7 @@
 
   - `amount` 1 keeps the color, 0 gives gray, above 1 oversaturates
 
-  The weights are 0.2126, 0.7152, 0.0722 (the specification uses 0.213, 0.715, 0.072 for saturate). Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount."
+  Weights 0.213, 0.715, 0.072 as the specification's saturate matrix. Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount."
   ([^double amount]
    (check-amount amount)
    (saturation-matrix amount)))
@@ -6749,54 +6757,103 @@
          cb- (+ 0.072 (* -0.072 ca))]
      (fe-color-matrix [(+ cr+ (* -0.213 sa)) (+ cg- (* -0.715 sa)) (+ cb- (* 0.928 sa)) 0.0 0.0
                        (+ cr- (* 0.143 sa)) (+ cg+ (* 0.140 sa)) (+ cb- (* -0.283 sa)) 0.0 0.0
-                       (+ cr- (* -0.787 sa)) (+ cg- (* 0.715 sa)) (+ cb+ (* 0.071 sa)) 0.0 0.0
+                       (+ cr- (* -0.787 sa)) (+ cg- (* 0.715 sa)) (+ cb+ (* 0.072 sa)) 0.0 0.0
                        0.0 0.0 0.0 1.0 0.0]))))
 
 (defn grayscale
-  "Creates the CSS `grayscale()` filter (W3C Filter Effects Level 1): [[saturation]] of `1 - amount`.
+  "Creates the CSS `grayscale()` filter (W3C Filter Effects Level 1, weights 0.2126, 0.7152, 0.0722).
 
-  - `amount` 0 (unchanged) to 1 (gray); values above 1 extrapolate (the specification clamps them to 1)
+  - `amount` 0 (unchanged) to 1 (gray); values above 1 are clamped to 1, as the specification
 
   Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount."
   ([^double amount]
    (check-amount amount)
-   (saturation-matrix (- 1.0 amount))))
+   (let [a (- 1.0 (min amount 1.0))]
+     (fe-color-matrix [(+ 0.2126 (* 0.7874 a)) (- 0.7152 (* 0.7152 a)) (- 0.0722 (* 0.0722 a)) 0.0 0.0
+                       (- 0.2126 (* 0.2126 a)) (+ 0.7152 (* 0.2848 a)) (- 0.0722 (* 0.0722 a)) 0.0 0.0
+                       (- 0.2126 (* 0.2126 a)) (- 0.7152 (* 0.7152 a)) (+ 0.0722 (* 0.9278 a)) 0.0 0.0
+                       0.0 0.0 0.0 1.0 0.0]))))
 
 ;; Color Vision Deficiency
-;; https://github.com/chromelens/chromelens/blob/master/lenses/filters/
+;; protan, deutan: Machado, Oliveira, Fernandes (2009); tritan: Brettel, Vienot, Mollon (1997), as DaltonLens;
+;; tables generated by utils/color/gen_filters.py
 
-(def ^{:doc "Color vision deficiency filter for achromatomaly (reduced color sensitivity): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} achromatomaly (fe-color-matrix [0.618,0.320,0.062,0.0,0.0,
-                                   0.163,0.775,0.062,0.0,0.0,
-                                   0.163,0.320,0.516,0.0,0.0,
-                                   0.0,0.0,0.0,1.0,0.0]))
-(def ^{:doc "Color vision deficiency filter for achromatopsia (no color: BT.601 luma 0.299, 0.587, 0.114): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} achromatopsia (fe-color-matrix [0.299,0.587,0.114,0.0,0.0,
-                                   0.299,0.587,0.114,0.0,0.0,
-                                   0.299,0.587,0.114,0.0,0.0,
-                                   0.0,0.0,0.0,1.0,0.0]))
-(def ^{:doc "Color vision deficiency filter for deuteranomaly (weak green cones): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} deuteranomaly (fe-color-matrix [0.8,0.2,0.0,0.0,0.0,
-                                   0.258,0.742,0.0,0.0,0.0,
-                                   0.0,0.142,0.858,0.0,0.0,
-                                   0.0,0.0,0.0,1.0,0.0]))
-(def ^{:doc "Color vision deficiency filter for deuteranopia (no green cones): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} deuteranopia  (fe-color-matrix [0.625,0.375,0.0,0.0,0.0,
-                                   0.7,0.3,0.0,0.0,0.0,
-                                   0.0,0.3,0.7,0.0,0.0,
-                                   0.0,0.0,0.0,1.0,0.0]))
-(def ^{:doc "Color vision deficiency filter for protanomaly (weak red cones): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} protanomaly   (fe-color-matrix [0.817,0.183,0.0,0.0,0.0,
-                                   0.333,0.667,0.0,0.0,0.0,
-                                   0.0,0.125,0.875,0.0,0.0,
-                                   0.0,0.0,0.0,1.0,0.0]))
-(def ^{:doc "Color vision deficiency filter for protanopia (no red cones): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} protanopia    (fe-color-matrix [0.567,0.433,0.0,0.0,0.0,
-                                   0.558,0.442,0.0,0.0,0.0,
-                                   0.0,0.242,0.758,0.0,0.0,
-                                   0.0,0.0,0.0,1.0,0.0]))
-(def ^{:doc "Color vision deficiency filter for tritanomaly (weak blue cones): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} tritanomaly   (fe-color-matrix [0.967,0.033,0.0,0.0,0.0,
-                                   0.0,0.733,0.267,0.0,0.0,
-                                   0.0,0.183,0.817,0.0,0.0,
-                                   0.0,0.0,0.0,1.0,0.0]))
-(def ^{:doc "Color vision deficiency filter for tritanopia (no blue cones): a fixed matrix of the chromelens extension (lenses/filters), applied to encoded sRGB (chromelens applies it as an SVG filter). The origin of the matrices is not documented; they are not a physiological model. Returns the filtered `Vec4` of a color."} tritanopia    (fe-color-matrix [0.95,0.05,0.0,0.0,0.0,
-                                   0.0,0.433,0.567,0.0,0.0,
-                                   0.0,0.475,0.525,0.0,0.0,
-                                   0.0,0.0,0.0,1.0,0.0]))
+(defonce ^:private cvd-tables
+  (delay {:machado (into {} (map (fn [[k ms]] [k (mapv double-array ms)])) (read-edn "color/cvd_machado2009.edn"))
+          :brettel (update-vals (:tritan (read-edn "color/cvd_brettel1997.edn")) double-array)}))
+
+(defn- mulv9
+  "Product of a 3 x 3 matrix (9 values, row by row) and a `Vec3`."
+  ^Vec3 [^doubles m ^Vec3 v]
+  (Vec3. (+ (* (Array/aget m 0) (.x v)) (* (Array/aget m 1) (.y v)) (* (Array/aget m 2) (.z v)))
+         (+ (* (Array/aget m 3) (.x v)) (* (Array/aget m 4) (.y v)) (* (Array/aget m 5) (.z v)))
+         (+ (* (Array/aget m 6) (.x v)) (* (Array/aget m 7) (.y v)) (* (Array/aget m 8) (.z v)))))
+
+(defn- machado-matrix
+  "Machado (2009) matrix (9 values) of `deficiency` (`:protanomaly`, `:deuteranomaly`) at `severity` in [0, 1], linearly interpolated between the published 0.1 steps."
+  ^doubles [deficiency ^double severity]
+  (let [table (get-in @cvd-tables [:machado deficiency])
+        pos (* 10.0 severity)
+        i (min (long pos) 9)
+        f (- pos i)
+        ^doubles a (table i)
+        ^doubles b (table (inc i))]
+    (double-array (map (fn [^long k] (m/lerp (Array/aget a k) (Array/aget b k) f)) (range 9)))))
+
+(defn- brettel-tritanopia
+  "Brettel (1997) tritanopia of a linear sRGB color: one of two projections chosen by the side of the separation plane."
+  ^Vec3 [^Vec3 rgb]
+  (let [{:keys [^doubles wing1 ^doubles wing2 ^doubles separation]} (:brettel @cvd-tables)
+        side (+ (* (Array/aget separation 0) (.x rgb)) (* (Array/aget separation 1) (.y rgb)) (* (Array/aget separation 2) (.z rgb)))]
+    (mulv9 (if (neg? side) wing2 wing1) rgb)))
+
+(defn- linear-srgb-filter
+  "Filter of colors through `f`, a function of linear sRGB (`Vec3`, 0-1): sRGB decoding, `f`, clipping to [0, 1], encoding; alpha kept."
+  [f]
+  (fn ^Vec4 [c]
+    (let [^Vec4 c (pr/to-color c)
+          ^Vec3 out (f (Vec3. (rgb/srgb-to-linear (/ (.x c) 255.0))
+                              (rgb/srgb-to-linear (/ (.y c) 255.0))
+                              (rgb/srgb-to-linear (/ (.z c) 255.0))))]
+      (Vec4. (* 255.0 (rgb/linear-to-srgb (m/constrain (.x out) 0.0 1.0)))
+             (* 255.0 (rgb/linear-to-srgb (m/constrain (.y out) 0.0 1.0)))
+             (* 255.0 (rgb/linear-to-srgb (m/constrain (.z out) 0.0 1.0)))
+             (.w c)))))
+
+(defn- lazy-filter
+  "Filter built by `make` on first use (the CVD tables are loaded lazily)."
+  [make]
+  (let [f (delay (make))]
+    (fn ^Vec4 [c] (@f c))))
+
+(defn- machado-filter [deficiency ^double severity]
+  (lazy-filter #(let [m (machado-matrix deficiency severity)] (linear-srgb-filter (fn [rgb] (mulv9 m rgb))))))
+
+(defn- tritan-filter [^double severity]
+  (linear-srgb-filter (fn [^Vec3 rgb] (v/interpolate rgb (brettel-tritanopia rgb) severity))))
+
+(defn- achromatic
+  "Gray of the luminance Y of a linear sRGB color (Y row of the [[to-XYZ]] matrix)."
+  ^Vec3 [^Vec3 rgb]
+  (let [y (luma-fn (.x rgb) (.y rgb) (.z rgb))]
+    (Vec3. y y y)))
+
+(def ^{:doc "Color vision deficiency filter for protanopia (no L cones): Machado, Oliveira, Fernandes (2009) at severity 1, applied to linear sRGB. Returns the filtered `Vec4` (alpha kept). See also [[cvd-filter]] for other severities."}
+  protanopia (machado-filter :protanomaly 1.0))
+(def ^{:doc "Color vision deficiency filter for protanomaly (weak L cones): Machado, Oliveira, Fernandes (2009) at severity 0.6, applied to linear sRGB. Returns the filtered `Vec4` (alpha kept). See also [[protanopia]]."}
+  protanomaly (machado-filter :protanomaly 0.6))
+(def ^{:doc "Color vision deficiency filter for deuteranopia (no M cones): Machado, Oliveira, Fernandes (2009) at severity 1, applied to linear sRGB. Returns the filtered `Vec4` (alpha kept)."}
+  deuteranopia (machado-filter :deuteranomaly 1.0))
+(def ^{:doc "Color vision deficiency filter for deuteranomaly (weak M cones): Machado, Oliveira, Fernandes (2009) at severity 0.6, applied to linear sRGB. Returns the filtered `Vec4` (alpha kept)."}
+  deuteranomaly (machado-filter :deuteranomaly 0.6))
+(def ^{:doc "Color vision deficiency filter for tritanopia (no S cones): Brettel, Vienot, Mollon (1997), as DaltonLens (Smith-Pokorny LMS, 485 and 660 nm anchors, sRGB white neutral), applied to linear sRGB. Returns the filtered `Vec4` (alpha kept)."}
+  tritanopia (lazy-filter #(tritan-filter 1.0)))
+(def ^{:doc "Color vision deficiency filter for tritanomaly (weak S cones): linear sRGB 60 % of the way from the color to its Brettel (1997) tritanopia (DaltonLens convention for anomalous trichromacy). Returns the filtered `Vec4` (alpha kept)."}
+  tritanomaly (lazy-filter #(tritan-filter 0.6)))
+(def ^{:doc "Color vision deficiency filter for achromatopsia (no color): the gray of the luminance Y of linear sRGB (the [[relative-luma]] weights). Returns the filtered `Vec4` (alpha kept)."}
+  achromatopsia (linear-srgb-filter achromatic))
+(def ^{:doc "Color vision deficiency filter for achromatomaly (reduced color): linear sRGB halfway between the color and [[achromatopsia]]. Not a physiological model (there is none for this condition). Returns the filtered `Vec4` (alpha kept)."}
+  achromatomaly (linear-srgb-filter (fn [^Vec3 rgb] (v/interpolate rgb (achromatic rgb) 0.5))))
 
 ;; some utils
 

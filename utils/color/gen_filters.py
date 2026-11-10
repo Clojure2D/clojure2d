@@ -7,8 +7,11 @@ Run from the repository root (needs `npm install` in utils/color for the chroma.
 Outputs:
 
 * test/resources/color/filters_reference.edn - oracle for the tests
-* resources/color/cvd_machado2009.edn - Machado et al. (2009) color vision deficiency matrices used by
-  clojure2d.color/cvd-filter
+* resources/color/cvd_machado2009.edn - Machado et al. (2009) color vision deficiency matrices (protanomaly,
+  deuteranomaly) used by clojure2d.color/cvd-filter and the protan / deutan filters
+* resources/color/cvd_brettel1997.edn - Brettel, Viénot, Mollon (1997) tritanopia as two linear sRGB matrices and
+  the normal of the separation plane (DaltonLens Simulator_Brettel1997, Smith-Pokorny LMS, 485 / 660 nm anchors,
+  RGB white as neutral), used by the tritan filters
 
 Colors (:colors, sRGB 0-255, alpha 255): primaries, secondaries, black, white, grays and 40 random colors
 (numpy default_rng, seed 20261112).
@@ -24,28 +27,70 @@ given (the specification clamps grayscale, sepia, invert, opacity amounts above 
 chroma.js (:chroma {op [[[r g b] per amount] per color]}, :chroma-amounts): chroma-js 2.6.0 brighten, darken,
 saturate, desaturate (utils/color/chroma_oracle.mjs, Node), unrounded clipped sRGB.
 
-Machado (:cvd {deficiency [[severity [[r g b a] ...]] ...]}): colour matrix_cvd_Machado2009 (linear interpolation
-between the published 0.1 severity steps) applied to linear sRGB (colour cctf_decoding / cctf_encoding), clipped
-to [0, 1]; severities 0, 0.35, 0.7, 1.
+Color vision deficiency, linear sRGB (colour cctf_decoding / cctf_encoding), results clipped to [0, 1]:
+
+* :cvd {deficiency [[severity [[r g b a] ...]] ...]} - protanomaly, deuteranomaly: colour matrix_cvd_Machado2009
+  (linear interpolation between the published 0.1 severity steps); tritanomaly: DaltonLens Brettel 1997 dichromat
+  blended with the color by severity (DaltonLens convention); severities 0, 0.35, 0.7, 1
+* :cvd-vars {name [[r g b a] ...]} - the named filters: protanopia, deuteranopia (Machado 1), protanomaly,
+  deuteranomaly (Machado 0.6), tritanopia (Brettel), tritanomaly (Brettel blend 0.6), achromatopsia (Y of
+  clojure2d's sRGB matrix, CIE-2-D65), achromatomaly (50 % blend toward achromatopsia)
 """
 
 import json
 import subprocess
 import warnings
 
+import re
+
 import numpy as np
 import colour
+from daltonlens import convert as dl_convert, simulate as dl
 
 warnings.filterwarnings("ignore")
 
 OUT = "test/resources/color/filters_reference.edn"
 CVD_TABLE = "resources/color/cvd_machado2009.edn"
+BRETTEL_TABLE = "resources/color/cvd_brettel1997.edn"
 
 AMOUNTS = [0.0, 0.25, 0.5, 1.0, 1.5, 2.0]
 ANGLES = [0.0, 30.0, 90.0, 180.0, -20.0]
 CHROMA_AMOUNTS = [-1.0, -0.5, 0.5, 1.0, 2.0]
 SEVERITIES = [0.0, 0.35, 0.7, 1.0]
-DEFICIENCIES = {"protanomaly": "Protanomaly", "deuteranomaly": "Deuteranomaly", "tritanomaly": "Tritanomaly"}
+DEFICIENCIES = {"protanomaly": "Protanomaly", "deuteranomaly": "Deuteranomaly"}
+BRETTEL = dl.Simulator_Brettel1997()
+
+
+def luminance_row():
+    txt = open("resources/color/whitepoints.edn").read()
+    xn, zn, x, y = (float(v) for v in re.search(r":CIE-2-D65 \[([^\]]+)\]", txt).group(1).split())
+    return colour.normalised_primary_matrix(np.array([0.64, 0.33, 0.30, 0.60, 0.15, 0.06]), np.array([x, y]))[1]
+
+
+Y_ROW = luminance_row()
+
+
+def brettel_tritan_rgb():
+    """DaltonLens Simulator_Brettel1997 tritan projection as linear sRGB matrices: (wing1, wing2, separation normal);
+    wing2 where dot(separation, rgb) < 0 (transcribed from DaltonLens _simulate_dichromacy_linear_rgb)."""
+    model = BRETTEL.color_model
+    lms_neutral = model.LMS_from_linearRGB @ np.array([1.0, 1.0, 1.0])
+    lms_485 = model.LMS_from_XYZ @ np.array([0.05795, 0.1693, 0.6162])
+    lms_660 = model.LMS_from_XYZ @ np.array([0.1649, 0.0610, 0.0000])
+    n1, n2 = np.cross(lms_neutral, lms_485), np.cross(lms_neutral, lms_660)
+    n_sep = np.cross(lms_neutral, dl.lms_confusion_axis(dl.Deficiency.TRITAN))
+    if np.dot(n_sep, lms_485) < 0:
+        n1, n2 = n2, n1
+    h1 = dl.plane_projection_matrix(n1, dl.Deficiency.TRITAN)
+    h2 = dl.plane_projection_matrix(n2, dl.Deficiency.TRITAN)
+    to_lms, from_lms = model.LMS_from_linearRGB, model.linearRGB_from_LMS
+    return from_lms @ h1 @ to_lms, from_lms @ h2 @ to_lms, to_lms.T @ n_sep
+
+
+def brettel_tritan(lin, severity):
+    """DaltonLens itself (float64 linear RGB entry point), dichromat blended by severity."""
+    return BRETTEL._simulate_cvd_linear_rgb(np.array(lin, dtype=np.float64)[None, :, :], dl.Deficiency.TRITAN,
+                                            severity)[0]
 
 
 def colors():
@@ -114,16 +159,33 @@ def chroma(C):
     return json.loads(res.stdout)
 
 
+def encode_rows(lin):
+    enc = 255.0 * colour.cctf_encoding(np.clip(lin, 0.0, 1.0), function="sRGB")
+    return [list(r) + [255.0] for r in enc]
+
+
+def machado(lin, name, severity):
+    return lin @ colour.blindness.matrix_cvd_Machado2009(name, severity).T
+
+
 def cvd(C):
     lin = colour.cctf_decoding(C / 255.0, function="sRGB")
-    out = {}
-    for k, name in DEFICIENCIES.items():
-        out[k] = []
-        for s in SEVERITIES:
-            m = colour.blindness.matrix_cvd_Machado2009(name, s)
-            enc = 255.0 * colour.cctf_encoding(np.clip(lin @ m.T, 0.0, 1.0), function="sRGB")
-            out[k].append((s, [list(r) + [255.0] for r in enc]))
+    out = {k: [(s, encode_rows(machado(lin, name, s))) for s in SEVERITIES] for k, name in DEFICIENCIES.items()}
+    out["tritanomaly"] = [(s, encode_rows(brettel_tritan(lin, s))) for s in SEVERITIES]
     return out
+
+
+def cvd_vars(C):
+    lin = colour.cctf_decoding(C / 255.0, function="sRGB")
+    gray = np.repeat((lin @ Y_ROW)[:, None], 3, axis=1)
+    return {"protanopia": encode_rows(machado(lin, "Protanomaly", 1.0)),
+            "deuteranopia": encode_rows(machado(lin, "Deuteranomaly", 1.0)),
+            "protanomaly": encode_rows(machado(lin, "Protanomaly", 0.6)),
+            "deuteranomaly": encode_rows(machado(lin, "Deuteranomaly", 0.6)),
+            "tritanopia": encode_rows(brettel_tritan(lin, 1.0)),
+            "tritanomaly": encode_rows(brettel_tritan(lin, 0.6)),
+            "achromatopsia": encode_rows(gray),
+            "achromatomaly": encode_rows(0.5 * lin + 0.5 * gray)}
 
 
 def num(x):
@@ -148,6 +210,12 @@ def main():
                                                   for s in sorted(colour.blindness.CVD_MATRICES_MACHADO2010[name])) + "]"
                            for k, name in DEFICIENCIES.items()))
         f.write("}\n")
+    w1, w2, n = brettel_tritan_rgb()
+    with open(BRETTEL_TABLE, "w") as f:
+        f.write(f";; generated by utils/color/gen_filters.py, daltonlens Simulator_Brettel1997\n")
+        f.write(";; Brettel, Vienot, Mollon (1997) tritanopia in linear sRGB: wing2 where dot(separation, rgb) < 0\n")
+        f.write("{:tritan {:wing1 " + vec(w1.ravel()) + "\n          :wing2 " + vec(w2.ravel())
+                + "\n          :separation " + vec(n) + "}}\n")
     ch = chroma(C)
     out = [f";; generated by utils/color/gen_filters.py, colour {colour.__version__}, chroma-js 2.6.0, numpy {np.__version__}",
            "{:colors [" + " ".join(vec(c) for c in C) + "]",
@@ -156,7 +224,9 @@ def main():
            " :chroma {" + "\n          ".join(f":{op} [" + " ".join("[" + " ".join(vec(r) for r in per_color) + "]"
                                                                   for per_color in ch[op]) + "]"
                                              for op in ["brighten", "darken", "saturate", "desaturate"]) + "}",
-           " :cvd {" + "\n       ".join(f":{k} {table(v)}" for k, v in cvd(C).items()) + "}}"]
+           " :cvd {" + "\n       ".join(f":{k} {table(v)}" for k, v in cvd(C).items()) + "}",
+           " :cvd-vars {" + "\n            ".join(f":{k} [" + " ".join(vec(r) for r in rows) + "]"
+                                                 for k, rows in cvd_vars(C).items()) + "}}"]
     with open(OUT, "w") as f:
         f.write("\n".join(out) + "\n")
 

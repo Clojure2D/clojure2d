@@ -23,14 +23,16 @@
       (is (m/<= (max-diff e (vec ((f amount) col))) tol) (str k " " amount " " col)))))
 
 (deftest css-filters-test
-  ;; spec matrices on encoded sRGB, results clamped; amounts above 1 only where the code follows the spec
-  (check-filter :sepia c/sepia 1.0e-9 #(m/<= % 1.0))
-  (check-filter :grayscale c/grayscale 1.0e-9 #(m/<= % 1.0))
+  ;; spec matrices on encoded sRGB, results clamped; sepia and grayscale amounts above 1 clamped to 1
+  (check-filter :sepia c/sepia 1.0e-9 any?)
+  (check-filter :grayscale c/grayscale 1.0e-9 any?)
   (check-filter :contrast c/contrast 1.0e-9 any?)
   (check-filter :brightness c/exposure 1.0e-9 any?)
-  ;; saturation weights 0.2126 vs the specification's 0.213 (saturate), hue-rotate 0.071 vs 0.072
-  (check-filter :saturate c/saturation 0.25 any?)
-  (check-filter :hue-rotate c/hue-rotate 0.3 any?))
+  (check-filter :saturate c/saturation 1.0e-9 any?)
+  (check-filter :hue-rotate c/hue-rotate 1.0e-9 any?)
+  (testing "hue-rotate keeps grays"
+    (doseq [g [0 64 128 200 255] a [17.0 90.0 180.0 -45.0]]
+      (is (m/<= (max-diff [g g g] (take 3 ((c/hue-rotate a) [g g g]))) 1.0e-9) (str g " " a)))))
 
 (deftest chroma-test
   ;; chroma.js brighten / darken / saturate / desaturate: its own Lab white point; darken below L* 0 differs
@@ -60,6 +62,41 @@
   (testing "whiten / blacken keep the hue of saturated colors"
     (doseq [col [[200 50 50] [30 160 90] [40 60 220]] f [c/whiten c/blacken]]
       (is (m/<= (m/abs (m/- ((c/to-HWB col) 0) ((c/to-HWB (f col 0.1)) 0))) 1.0e-9) (str f " " col)))))
+
+(deftest whiten-blacken-test
+  (doseq [col [[255 0 0] [200 50 80] [40 160 90] [200 150 160]] amt [0.2 0.7 -0.3 -0.8]
+          [f ch] [[c/whiten 1] [c/blacken 2]]
+          :let [v ((c/to-HWB col) ch)
+                expected (if (neg? amt) (+ v (* amt v)) (+ v (* amt (- 1.0 v))))
+                actual ((c/to-HWB (f col amt)) ch)]
+          :when (m/< (+ ((c/to-HWB col) (- 3 ch)) expected) 0.99)]
+    (is (m/<= (m/abs (m/- expected actual)) 1.0e-9) (str f " " col " " amt)))
+  (testing "ends and clamping"
+    (let [g (c/whiten [200 50 80] 1.0)]
+      (is (m/<= (max-diff [(g 0) (g 0)] [(g 1) (g 2)]) 1.0e-9) "amount 1: W = 1, a gray (B kept, HWB normalization)"))
+    (is (m/<= (max-diff [255 255 255] (take 3 (c/whiten [255 0 0] 1.0))) 1.0e-9) "B = 0: white")
+    (is (= (c/whiten [200 50 80] 1.0) (c/whiten [200 50 80] 5.0)))
+    (is (= (c/blacken [200 50 80] -1.0) (c/blacken [200 50 80] -3.0)))
+    (is (m/< 0.1 ((c/to-HWB (c/whiten [255 0 0] 0.2)) 1)) "pure red whitens")))
+
+(deftest complementary-test
+  (doseq [cs [:HSV :HSL :HWB :GLHS] col [[200 50 50] [30 160 90] [40 60 220]]]
+    (is (m/<= (max-diff col (take 3 (c/complementary (c/complementary col cs) cs))) 1.0e-9) (str cs " " col)))
+  (testing "PalettonHSV (default): hue turned, saturation and value kept"
+    (let [col [200 50 80]
+          a (c/to-PalettonHSV col)
+          b (c/to-PalettonHSV (c/complementary col))]
+      (is (m/< (m/abs (m/- 180.0 (m/abs (m/- (a 0) (b 0))))) 1.0e-6))
+      (is (m/< (m/abs (m/- (a 1) (b 1))) 1.0e-6))
+      (is (m/< (m/abs (m/- (a 2) (b 2))) 1.0e-6)))))
+
+(deftest cvd-vars-test
+  (let [{:keys [colors cvd-vars]} @reference]
+    (doseq [[k f] {:protanopia c/protanopia :deuteranopia c/deuteranopia :protanomaly c/protanomaly
+                   :deuteranomaly c/deuteranomaly :tritanopia c/tritanopia :tritanomaly c/tritanomaly
+                   :achromatopsia c/achromatopsia :achromatomaly c/achromatomaly}
+            [col e] (map vector colors (cvd-vars k))]
+      (is (m/<= (max-diff e (vec (f col))) 1.0e-9) (str k " " col)))))
 
 (deftest make-LCH-test
   (doseq [cs [:LAB :LUV :Oklab] col [[200 50 50] [30 160 90] [40 60 220]]
