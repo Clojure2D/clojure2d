@@ -5398,12 +5398,23 @@
   {:metadoc/categories #{:pal}}
   (fn [m _ & _] m))
 
+(defn- paletton-preset
+  "The `[ks kv]` pairs of a paletton `preset` (a name or the pairs); throws `ex-info` with `{:preset preset}` for an unknown name."
+  [preset]
+  (if (keyword? preset)
+    (or (paletton-presets preset)
+        (throw (ex-info (str "Unknown paletton preset: " preset) {:preset preset})))
+    preset))
+
+(defmethod paletton :default [t & _]
+  (throw (ex-info (str "Unknown paletton scheme: " t) {:type t})))
+
 (defmethod paletton :monochromatic [_ hue & conf]
   (let [{compl :compl 
          preset :preset
          :or {compl false
               preset :full}} (first conf)
-        ppreset (if (keyword? preset) (paletton-presets preset) preset)
+        ppreset (paletton-preset preset)
         p (paletton-monochromatic-palette hue ppreset)]
     (if compl (vec (concat p (paletton-monochromatic-palette (+ ^double hue 180.0) ppreset))) p)))
 
@@ -5419,7 +5430,7 @@
         chue (+ 180.0 ^double hue)
         hue1 (if adj (+ ^double hue angle) (+ chue angle))
         hue2 (if adj (- ^double hue angle) (- chue angle))
-        ppreset (if (keyword? preset) (paletton-presets preset) preset)
+        ppreset (paletton-preset preset)
         p1 (paletton-monochromatic-palette hue ppreset)
         p2 (paletton-monochromatic-palette hue1 ppreset)
         p3 (paletton-monochromatic-palette hue2 ppreset)
@@ -6475,21 +6486,32 @@
                              :or {colorspace :RGB
                                   to? true from? true
                                   interpolation :linear}}]
-  (let [[to from] (colorspaces colorspace)
+  (let [[to from] (colorspace-converters colorspaces colorspace)
         to (if to? to identity)
         from (if from? from identity)
-        cpalette (map (comp to pr/to-color) palette-or-gradient-name)]
-    (if (and (keyword? interpolation)
-             (contains? e/easings-list interpolation))
+        cpalette (mapv (comp to pr/to-color) palette-or-gradient-name)
+        n (count cpalette)
+        easing? (and (keyword? interpolation) (contains? e/easings-list interpolation))]
+    (check-colors-count cpalette)
+    (when (and easing? (not= n 2))
+      (throw (ex-info (str "Easing interpolation needs 2 colors, got: " n) {:interpolation interpolation :colors n})))
+    (when domain
+      (when-not (and (== (count domain) n) (apply < domain))
+        (throw (ex-info "Domain should be strictly increasing, one value per color" {:domain domain}))))
+    (cond
+      ;; one color: constant gradient
+      (== n 1)
+      (let [c (v/fmap (from (first cpalette)) clamp255)]
+        (fn ^Vec4 [^double _] c))
 
-      ;; easings
+      easing?
       (let [c1 (first cpalette)
             c2 (second cpalette)
             easing (e/easings-list interpolation)]
         (fn ^Vec4 [^double t]
           (v/fmap (from (v/interpolate c1 c2 (easing t))) clamp255)))
 
-      ;; interpolation
+      :else
       (let [r (or domain 
                   (map (fn [^long v] (m/mnorm v 0.0 (dec (count cpalette)) 0.0 1.0)) (range (count cpalette))))
             c0 (map pr/red cpalette)
@@ -6582,8 +6604,13 @@
 
 (defonce ^:private get-gradient-from-file (memoize get-gradient-from-file-))
 
+(declare gradients-list-)
+
 (defn- get-gradient
+  "Gradient of the name `k`; throws `ex-info` with `{:gradient k}` for an unknown name."
   [k]
+  (when-not (contains? (:set @gradients-list-) k)
+    (throw (ex-info (str "Unknown gradient: " k) {:gradient k})))
   (if (namespace k)
     (get-gradient-from-file k)
     (@basic-gradients-delay k)))
@@ -6613,10 +6640,13 @@
   ([] (gradient (rand-nth (:seq @gradients-list-))))
   ([palette-or-gradient-name] (gradient palette-or-gradient-name {}))
   ([palette-or-gradient-name options]
+   (check-options-map options)
    (cond (keyword? palette-or-gradient-name) (get-gradient palette-or-gradient-name)
-         (and (= (:interpolation options) :iq)
-              (seqable? palette-or-gradient-name)
-              (every? valid-color? palette-or-gradient-name)) (apply iq-gradient palette-or-gradient-name)       
+         (= (:interpolation options) :iq) (let [n (count palette-or-gradient-name)]
+                                            (when-not (== n 2)
+                                              (throw (ex-info (str "Interpolation :iq needs 2 colors, got: " n)
+                                                              {:interpolation :iq :colors n})))
+                                            (apply iq-gradient palette-or-gradient-name))
          :else (interpolated-gradient palette-or-gradient-name options))))
 
 (defn merge-gradients
@@ -6628,6 +6658,8 @@
   Returns a function of `t`. See also [[gradient]]."
   {:metadoc/categories #{:gr}}
   ([g1 g2 ^double midpoint]
+   (when-not (< 0.0 midpoint 1.0)
+     (throw (ex-info (str "Midpoint should be in (0, 1), got: " midpoint) {:midpoint midpoint})))
    (fn [^double t]
      (if (< t midpoint)
        (g1 (m/norm t 0.0 midpoint))
@@ -6661,11 +6693,13 @@
   ([p]
    (cond
      (or (keyword? p)
-         (integer? p)) (get-palette p)
+         (integer? p)) (or (get-palette p)
+                           (throw (ex-info (str "Unknown palette: " p) {:palette p})))
      (fn? p) (palette p 5)
      :else (vec p)))
   ([p number-of-colors] (palette p number-of-colors {}))
   ([p ^long number-of-colors gradient-params]
+   (check-number-of-colors number-of-colors)
    (vec (if (fn? p)
           (if (m/one? number-of-colors)
             [(if-let [cs (:colorspace gradient-params)]
@@ -6680,10 +6714,13 @@
 
 (defn- find-gradient-or-palette
   ([lst] (:seq @lst))
-  ([lst regex] (filter (comp (partial re-find regex) str) (:seq @lst)))
-  ([lst group regex] (filter (fn [k]
-                               (and (= (namespace k) group)
-                                    (re-find regex (name k)))) (:seq @lst))))
+  ([lst regex] (let [regex (re-pattern regex)]
+                 (filter (comp (partial re-find regex) str) (:seq @lst))))
+  ([lst group regex] (let [regex (re-pattern regex)]
+                       (filter (fn [k]
+                                 (and (keyword? k)
+                                      (= (namespace k) group)
+                                      (re-find regex (name k)))) (:seq @lst)))))
 
 (def ^{:doc "Lists gradient names: without arguments all of them (sorted), with a `regex` those whose name (with the colon and namespace) matches it, with a `group` (namespace string) and a `regex` those of that namespace whose name matches. See also [[gradient]], [[find-palette]]."}
   find-gradient (partial find-gradient-or-palette gradients-list-))
@@ -6700,9 +6737,7 @@
   A palette is turned into a [[gradient]] and sampled at `number-of-colors` evenly spaced points (a gradient is sampled directly, `gradient-params` ignored); one color is the [[average]] of the palette (in `:colorspace` when given). The same as `(palette pal number-of-colors gradient-params)`. Returns a vector of `Vec4`. Throws `ex-info` with `{:number-of-colors n}` for fewer than 1 color. See also [[reduce-colors]]."
   {:metadoc/categories #{:pal}}
   ([pal number-of-colors] (resample pal number-of-colors {}))
-  ([pal ^long number-of-colors gradient-params]
-   (check-number-of-colors number-of-colors)
-   (palette pal number-of-colors gradient-params)))
+  ([pal number-of-colors gradient-params] (palette pal number-of-colors gradient-params)))
 
 (def ^{:private true :const true :tag 'double} correct-luma-max-reversal
   "Largest lightness reversal against the overall direction that [[correct-luma]] smooths out, as a fraction of the total lightness change (RGB interpolation between palette stops dips by up to ~3.5 %)."

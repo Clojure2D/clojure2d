@@ -7,7 +7,8 @@
             [clojure.edn :as edn]
             [clojure.java.io :as io]
             [fastmath.core :as m]
-            [clojure2d.color :as c]))
+            [clojure2d.color :as c]
+            [clojure2d.test-predicates :refer [throws-data?]]))
 
 (def reference (delay (-> "color/gradients_reference.edn" io/resource slurp edn/read-string)))
 
@@ -69,6 +70,63 @@
     (doseq [[a [cm s1 s2]] (map vector angles (:tetrad schemes))
             :when (<= 5 a 175)]
       (is (= #{0 (m/round cm) (m/round s1) (m/round s2)} (palette-hues (c/paletton :tetrad 0 {:angle a}))) (str "tetrad " a)))))
+
+;; G2: contracts
+
+(deftest one-color-test
+  (let [g (c/gradient [[10 20 30 40]])]
+    (doseq [t [0.0 0.3 1.0 -1.0 2.0]]
+      (is (= [10.0 20.0 30.0 40.0] (vec (g t))) (str t))))
+  (is (= (repeat 4 (c/to-color :red)) (c/palette [:red] 4)))
+  (is (= (repeat 3 (c/to-color :red)) (c/resample [:red] 3)))
+  (let [p (c/palette :cartography/blue.pal-1)]
+    (is (= 1 (count p)) "a one-color palette from the files")
+    (is (= (repeat 5 (first p)) (c/palette p 5)))
+    (is (= (first p) ((c/gradient p) 0.7))))
+  (is (throws-data? {:colors 0} #(c/gradient [])))
+  (is (every? fn? (repeatedly 3000 c/random-gradient)) "random-gradient: no failures"))
+
+(deftest unknown-names-test
+  (is (throws-data? {:palette :nope} #(c/palette :nope)))
+  (is (throws-data? {:palette :nope/nope} #(c/palette :nope/nope)))
+  (is (throws-data? {:palette 999999999} #(c/palette 999999999)))
+  (is (throws-data? {:gradient :nope} #(c/gradient :nope)))
+  (is (throws-data? {:gradient :nope/nope} #(c/gradient :nope/nope))))
+
+(deftest validation-test
+  (testing "domain"
+    (is (throws-data? {:domain [0 0.5 0.5]} #(c/gradient [:red :blue :green] {:domain [0 0.5 0.5]})))
+    (is (throws-data? {:domain [0 0.8 0.2]} #(c/gradient [:red :blue :green] {:domain [0 0.8 0.2]})))
+    (is (throws-data? {:domain [0 1]} #(c/gradient [:red :blue :green] {:domain [0 1]})))
+    (is (= (c/to-color :blue) ((c/gradient [:red :blue :green] {:domain [0 0.2 1]}) 0.2))))
+  (testing "two colors for :iq and easings"
+    (is (throws-data? {:interpolation :iq :colors 3} #(c/gradient [:red :blue :green] {:interpolation :iq})))
+    (is (throws-data? {:interpolation :cubic-in :colors 3} #(c/gradient [:red :blue :green] {:interpolation :cubic-in})))
+    (is (fn? (c/gradient [:red :blue] {:interpolation :iq})))
+    (is (fn? (c/gradient [:red :blue] {:interpolation :cubic-in}))))
+  (testing "merge-gradients midpoint"
+    (let [g1 (c/gradient [:red :blue]) g2 (c/gradient [:green :white])]
+      (doseq [mp [0.0 1.0 -0.5 1.5]]
+        (is (throws-data? {:midpoint mp} #(c/merge-gradients g1 g2 mp))))
+      (is (= (c/to-color :white) ((c/merge-gradients g1 g2 0.7) 1.0)))))
+  (testing "number of colors"
+    (is (throws-data? {:number-of-colors 0} #(c/palette [:red :blue] 0)))
+    (is (throws-data? {:number-of-colors 0} #(c/palette (c/gradient [:red :blue]) 0)))
+    (is (throws-data? {:number-of-colors 0} #(c/resample [:red :blue] 0))))
+  (testing "paletton"
+    (is (throws-data? {:preset :nope} #(c/paletton :monochromatic 100 {:preset :nope})))
+    (is (throws-data? {:preset :nope} #(c/paletton :triad 100 {:preset :nope})))
+    (is (throws-data? {:preset :nope} #(c/paletton :tetrad 100 {:preset :nope})))
+    (is (throws-data? {:type :pentad} #(c/paletton :pentad 100)))
+    (is (= 5 (count (c/paletton :monochromatic 100 {:preset [[1 1] [0.5 1] [1 0.5] [0.2 0.2] [2 2]]})))))
+  (testing "options and colorspace"
+    (is (throws-data? {:options :x} #(c/gradient [:red :blue] :x)))
+    (is (throws-data? {:colorspace :Foo} #(c/gradient [:red :blue] {:colorspace :Foo})))))
+
+(deftest find-test
+  (is (= (c/find-gradient #"cubehelix") (c/find-gradient "cubehelix")))
+  (is (seq (c/find-gradient "cubehelix")))
+  (is (= (c/find-palette "pals" #"kovesi") (c/find-palette "pals" "kovesi"))))
 
 (deftest docstrings-test
   (doseq [s '[gradient palette merge-gradients iq-gradient gradient-cubehelix find-gradient find-palette random-color
