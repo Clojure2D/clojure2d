@@ -5960,9 +5960,9 @@
   ^Vec4 [^Vec4 c ^long channel ^double value]
   (update-channel c channel (fn ^double [^double _] value)))
 
-(defn- hue-lerp
-  "Linear interpolation of raw colors `a`, `b` of a hue space, the hue along the shorter arc (CSS `shorter`: a difference of exactly half a period is kept); a powerless hue takes the other hue, two powerless hues give the range start."
-  ^Vec4 [{:keys [^long hue ^double lo ^double period] :as hue-space} ^Vec4 a ^Vec4 b ^double t]
+(defn- shorter-arc-hue
+  "Hue between raw colors `a`, `b` of a hue space at `t`, along the shorter arc (CSS `shorter`: a difference of exactly half a period is kept); a powerless hue takes the other hue, two powerless hues give the range start."
+  ^double [{:keys [^long hue ^double lo ^double period] :as hue-space} ^Vec4 a ^Vec4 b ^double t]
   (let [pa (powerless-hue? hue-space a)
         pb (powerless-hue? hue-space b)
         ha (double (a hue))
@@ -5972,7 +5972,35 @@
         diff (- h2 h1)
         half (* 0.5 period)
         d (if (> diff half) (- diff period) (if (< diff (- half)) (+ diff period) diff))]
-    (with-channel (v/interpolate a b t) hue (m/wrap lo (+ lo period) (+ h1 (* t d))))))
+    (m/wrap lo (+ lo period) (+ h1 (* t d)))))
+
+(defn- premultiply
+  "Raw color `c` with every channel but alpha and the hue (index `hue`, -1 for none) multiplied by alpha / 255."
+  ^Vec4 [^Vec4 c ^long hue]
+  (let [a (/ (.w c) 255.0)
+        f (fn ^double [^long i ^double x] (if (== i hue) x (* a x)))]
+    (Vec4. (f 0 (.x c)) (f 1 (.y c)) (f 2 (.z c)) (.w c))))
+
+(defn- unpremultiply
+  "Inverse of [[premultiply]] with the alpha of `c`; for alpha 0 the channels are kept (zeros of a premultiplied mix)."
+  ^Vec4 [^Vec4 c ^long hue]
+  (let [a (/ (.w c) 255.0)]
+    (if (zero? a)
+      c
+      (let [f (fn ^double [^long i ^double x] (if (== i hue) x (/ x a)))]
+        (Vec4. (f 0 (.x c)) (f 1 (.y c)) (f 2 (.z c)) (.w c))))))
+
+(defn- interpolate-raw
+  "Linear interpolation of raw colors `a`, `b` at `t`, with premultiplied alpha when `premultiplied?`; in a hue space (`hue-space` not nil) the hue from [[shorter-arc-hue]] of the colors as given."
+  ^Vec4 [hue-space ^Vec4 a ^Vec4 b t premultiplied?]
+  (let [t (double t)
+        hue (long (get hue-space :hue -1))
+        mixed (if premultiplied?
+                (unpremultiply (v/interpolate (premultiply a hue) (premultiply b hue) t) hue)
+                (v/interpolate a b t))]
+    (if hue-space
+      (with-channel mixed hue (shorter-arc-hue hue-space a b t))
+      mixed)))
 
 (defn- make-achromatic
   "Raw color `c` of a hue space made achromatic: saturation or chroma 0 (whiteness `1 - B` when W + B < 1 for HWB-like spaces)."
@@ -5982,22 +6010,31 @@
     (< (+ (.y c) (.z c)) 1.0) (with-channel c 1 (- 1.0 (.z c)))
     :else c))
 
-(defn- hue-average
-  "Weighted average of raw colors `vs` of a hue space: channels averaged, the hue by the circular mean of the colors whose hue is not powerless (as coloraide); no such color or a resultant below 1e-6 of the total weight gives the range start and an achromatic color."
-  ^Vec4 [{:keys [^long hue ^double lo ^double period] :as hue-space} vs weights ^double weights-total]
-  (let [avg (v/div (reduce v/add (map v/mult vs weights)) weights-total)
-        to-rad (/ m/TWO_PI period)
-        [sn cs] (reduce (fn [[^double sn ^double cs] [^Vec4 c ^double w]]
-                                          (if (powerless-hue? hue-space c)
-                                            [sn cs]
-                                            (let [a (* to-rad (double (c hue)))]
-                                              [(+ sn (* w (m/sin a))) (+ cs (* w (m/cos a)))])))
-                                        [0.0 0.0] (map vector vs weights))
-        sn (/ (double sn) weights-total)
-        cs (/ (double cs) weights-total)]
-    (if (and (< (m/abs sn) 1.0e-6) (< (m/abs cs) 1.0e-6))
-      (make-achromatic hue-space (with-channel avg hue lo))
-      (with-channel avg hue (m/wrap lo (+ lo period) (/ (m/atan2 sn cs) to-rad))))))
+(defn- mean-raw
+  "Weighted mean of raw colors `vs` (`weights` summing to `weights-total`): alpha weighted by the weights, the other channels by the weights times alpha / 255 when `premultiplied?` (as coloraide); channels 0 when those weights sum to 0. In a hue space (`hue-space` not nil) the hue is the circular mean of the colors whose hue is not powerless; no such color or a resultant below 1e-6 of the total channel weight gives the range start and an achromatic color."
+  ^Vec4 [hue-space vs weights weights-total premultiplied?]
+  (let [weights-total (double weights-total)
+        alpha (/ (double (reduce m/+ 0.0 (map (fn [^Vec4 c ^double w] (* w (.w c))) vs weights))) weights-total)
+        cws (if premultiplied? (map (fn [^Vec4 c ^double w] (* w (/ (.w c) 255.0))) vs weights) weights)
+        cw-total (double (reduce m/+ 0.0 cws))
+        avg (if (zero? cw-total)
+              (Vec4. 0.0 0.0 0.0 alpha)
+              (with-channel (v/div (reduce v/add (map v/mult vs cws)) cw-total) 3 alpha))]
+    (if-not hue-space
+      avg
+      (let [{:keys [^long hue ^double lo ^double period]} hue-space
+            to-rad (/ m/TWO_PI period)
+            [sn cs] (reduce (fn [[^double sn ^double cs] [^Vec4 c ^double w]]
+                              (if (powerless-hue? hue-space c)
+                                [sn cs]
+                                (let [a (* to-rad (double (c hue)))]
+                                  [(+ sn (* w (m/sin a))) (+ cs (* w (m/cos a)))])))
+                            [0.0 0.0] (map vector vs cws))
+            sn (if (zero? cw-total) 0.0 (/ (double sn) cw-total))
+            cs (if (zero? cw-total) 0.0 (/ (double cs) cw-total))]
+        (if (and (< (m/abs sn) 1.0e-6) (< (m/abs cs) 1.0e-6))
+          (make-achromatic hue-space (with-channel avg hue lo))
+          (with-channel avg hue (m/wrap lo (+ lo period) (/ (m/atan2 sn cs) to-rad))))))))
 
 (defn- check-colors-count
   "Throws `ex-info` with `{:colors 0}` for an empty sequence of colors."
@@ -6023,15 +6060,19 @@
 
   - `cs` sequence of colors, any type accepted by [[to-color]]
   - `colorspace` (optional) a key of [[colorspaces]]: colors are converted with the raw `to-` function, averaged and converted back with `from-`
+  - `options` (optional, map; requires `colorspace`, `:RGB` for sRGB): `:premultiplied?` - when true the colors are weighted by alpha (premultiplied alpha, as CSS `color-mix()` and coloraide; the hue channel is not premultiplied); default false (straight alpha, as chroma.js)
 
-  Without `colorspace` the sRGB values are averaged as they are (chroma.js `average` in mode `rgb`; the chroma.js default is `lrgb`, square-root mixing). In colorspaces with a hue (HSx, HWB, GLHS, HCL, LCH-like, Okhsl, Okhsv, Okhwb, Cubehelix) the hue is the circular mean of the hues of the chromatic colors (as chroma.js and coloraide); when the hues cancel out, or all colors are achromatic, the result is achromatic (saturation or chroma 0, as coloraide). Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colors 0}` for no colors and `{:colorspace colorspace}` for an unknown colorspace. See also [[weighted-average]], [[mix]]."
+  Without `colorspace` the sRGB values are averaged as they are (chroma.js `average` in mode `rgb`; the chroma.js default is `lrgb`, square-root mixing). In colorspaces with a hue (HSx, HWB, GLHS, HCL, LCH-like, Okhsl, Okhsv, Okhwb, Cubehelix) the hue is the circular mean of the hues of the chromatic colors (as chroma.js and coloraide); when the hues cancel out, or all colors are achromatic, the result is achromatic (saturation or chroma 0, as coloraide). Returns a `Vec4`, not clamped. With premultiplied alpha fully transparent colors do not count, and colors that are all transparent give channels 0. Throws `ex-info` with `{:colors 0}` for no colors, `{:colorspace colorspace}` for an unknown colorspace and `{:options options}` for options that are not a map. See also [[weighted-average]], [[mix]]."
   {:metadoc/categories #{:interp}}
-  ([cs colorspace]
-   (let [[to from] (colorspace-converters colorspaces colorspace)]
+  ([cs colorspace] (average cs colorspace nil))
+  ([cs colorspace {:keys [premultiplied?] :as options}]
+   (check-options-map options)
+   (let [[to from] (colorspace-converters colorspaces colorspace)
+         hs (hue-spaces colorspace)]
      (check-colors-count cs)
-     (if-let [hs (hue-spaces colorspace)]
+     (if (or hs premultiplied?)
        (let [vs (map to cs)]
-         (from (hue-average hs vs (repeat 1.0) (count vs))))
+         (from (mean-raw hs vs (repeat (count vs) 1.0) (count vs) premultiplied?)))
        (from (v/average-vectors (map to cs))))))
   ([cs]
    (check-colors-count cs)
@@ -6043,14 +6084,18 @@
   - `cs` sequence of colors, any type accepted by [[to-color]]
   - `weights` sequence of numbers, one per color; the weighted sum is divided by the sum of the weights
   - `colorspace` (optional) a key of [[colorspaces]], as in [[average]] (circular mean of hues)
+  - `options` (optional, map; requires `colorspace`, `:RGB` for sRGB): `:premultiplied?` - when true the colors are weighted by alpha (premultiplied alpha, as CSS `color-mix()` and coloraide; the hue channel is not premultiplied); default false (straight alpha, as chroma.js)
 
-  Without `colorspace` the sRGB values are averaged as they are (chroma.js `average` in mode `rgb` with weights). Negative weights are allowed. Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colors 0}` for no colors, `{:colors n :weights m}` when the counts differ, `{:weights-sum s}` for a sum of weights that is 0 or not finite and `{:colorspace colorspace}` for an unknown colorspace. See also [[average]]."
+  Without `colorspace` the sRGB values are averaged as they are (chroma.js `average` in mode `rgb` with weights). Negative weights are allowed. Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colors 0}` for no colors, `{:colors n :weights m}` when the counts differ, `{:weights-sum s}` for a sum of weights that is 0 or not finite, `{:colorspace colorspace}` for an unknown colorspace and `{:options options}` for options that are not a map. See also [[average]]."
   {:metadoc/categories #{:interp}}
-  ([cs weights colorspace]
+  ([cs weights colorspace] (weighted-average cs weights colorspace nil))
+  ([cs weights colorspace {:keys [premultiplied?] :as options}]
+   (check-options-map options)
    (let [[to from] (colorspace-converters colorspaces colorspace)
-         s (weights-sum cs weights)]
-     (if-let [hs (hue-spaces colorspace)]
-       (from (hue-average hs (map to cs) weights s))
+         s (weights-sum cs weights)
+         hs (hue-spaces colorspace)]
+     (if (or hs premultiplied?)
+       (from (mean-raw hs (map to cs) weights s premultiplied?))
        (from (v/div (reduce v/add (map #(v/mult (to %1) %2) cs weights)) s)))))
   ([cs weights]
    (let [s (weights-sum cs weights)]
@@ -6062,14 +6107,15 @@
   - `c1`, `c2` colors, any type accepted by [[to-color]]
   - `colorspace` (optional) a key of [[colorspaces]]: colors are converted with the raw `to-` function, interpolated and converted back with `from-`
   - `t` weight of `c2`, default `0.5`: 0 gives `c1`, 1 gives `c2`; values outside [0, 1] extrapolate
+  - `options` (optional, map; requires `colorspace`, `:RGB` for sRGB): `:premultiplied?` - when true the colors are weighted by alpha (premultiplied alpha, as CSS `color-mix()` and coloraide; the hue channel is not premultiplied); default false (straight alpha, as chroma.js)
 
-  Without `colorspace` the sRGB values are interpolated (chroma.js `mix` in mode `rgb`). In colorspaces with a hue (HSx, HWB, GLHS, HCL, LCH-like, Okhsl, Okhsv, Okhwb, Cubehelix) the hue goes along the shorter arc (CSS `shorter`, chroma.js, coloraide); the hue of an achromatic color (powerless) is replaced by the hue of the other color. Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[lerp-]], [[lerp+]], [[mix]], [[gradient]]."
+  Without `colorspace` the sRGB values are interpolated (chroma.js `mix` in mode `rgb`). In colorspaces with a hue (HSx, HWB, GLHS, HCL, LCH-like, Okhsl, Okhsv, Okhwb, Cubehelix) the hue goes along the shorter arc (CSS `shorter`, chroma.js, coloraide); the hue of an achromatic color (powerless) is replaced by the hue of the other color. With premultiplied alpha a fully transparent color does not contribute its channels (transparent red and blue give blue at alpha 0.5), and two transparent colors give channels 0. Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace and `{:options options}` for options that are not a map. See also [[lerp-]], [[lerp+]], [[mix]], [[gradient]]."
   {:metadoc/categories #{:interp}}
-  ([c1 c2 colorspace ^double t]
+  ([c1 c2 colorspace ^double t] (lerp c1 c2 colorspace t nil))
+  ([c1 c2 colorspace t {:keys [premultiplied?] :as options}]
+   (check-options-map options)
    (let [[to from] (colorspace-converters colorspaces colorspace)]
-     (from (if-let [hs (hue-spaces colorspace)]
-             (hue-lerp hs (to c1) (to c2) t)
-             (lerp (to c1) (to c2) t)))))
+     (from (interpolate-raw (hue-spaces colorspace) (to c1) (to c2) (double t) premultiplied?))))
   ([c1 c2] (lerp c1 c2 0.5))
   ([c1 c2 ^double t]
    (v/interpolate (pr/to-color c1) (pr/to-color c2) t)))
@@ -6080,11 +6126,13 @@
   - `c1`, `c2` colors, any type accepted by [[to-color]]
   - `colorspace` (optional) where the colors are interpolated, as in [[lerp]]
   - `amount` weight of `c2`, default `0.5`
+  - `options` (optional) as in [[lerp]]
 
   The colors are interpolated with [[lerp]], then L* of the result is set to L* of `c1`. Returns a `Vec4`, not clamped (the result may leave the sRGB gamut). Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[lerp+]], [[adjust-temperature]]."
   {:metadoc/categories #{:interp}}
-  ([c1 c2 colorspace ^double amount]
-   (set-channel (lerp c1 c2 colorspace amount) :LAB 0 (ch0 (to-LAB c1))))
+  ([c1 c2 colorspace ^double amount] (lerp- c1 c2 colorspace amount nil))
+  ([c1 c2 colorspace amount options]
+   (set-channel (lerp c1 c2 colorspace amount options) :LAB 0 (ch0 (to-LAB c1))))
   ([c1 c2] (lerp- c1 c2 0.5))
   ([c1 c2 ^double amount]
    (let [res (lerp c1 c2 amount)]
@@ -6096,10 +6144,12 @@
   - `c1`, `c2` colors, any type accepted by [[to-color]]
   - `colorspace` (optional) where the colors are interpolated, as in [[lerp]]
   - `amount` weight of `c2`, default `0.5`
+  - `options` (optional) as in [[lerp]]
 
   The same as `(lerp- c2 c1 (- 1 amount))`. Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[lerp-]]."
-  ([c1 c2 colorspace ^double amount]
-   (lerp- c2 c1 colorspace (- 1.0 amount)))
+  ([c1 c2 colorspace ^double amount] (lerp+ c1 c2 colorspace amount nil))
+  ([c1 c2 colorspace amount options]
+   (lerp- c2 c1 colorspace (- 1.0 (double amount)) options))
   ([c1 c2] (lerp+ c1 c2 0.5))
   ([c1 c2 ^double amount]
    (lerp- c2 c1 (- 1.0 amount))))
@@ -6109,6 +6159,16 @@
   (m/sqrt (+ (* a a (- 1.0 t))
              (* b b t))))
 
+(defn- mix-premultiplied
+  "Square-root mixing of `c1`, `c2` with the squared channels weighted by alpha; both alphas 0 give channels 0."
+  ^Vec4 [^Vec4 c1 ^Vec4 c2 ^double t]
+  (let [w1 (* (- 1.0 t) (.w c1))
+        w2 (* t (.w c2))
+        w (+ w1 w2)
+        channel (fn ^double [^double a ^double b]
+                  (if (zero? w) 0.0 (m/sqrt (/ (+ (* w1 a a) (* w2 b b)) w))))]
+    (Vec4. (channel (.x c1) (.x c2)) (channel (.y c1) (.y c2)) (channel (.z c1) (.z c2)) (m/mlerp (.w c1) (.w c2) t))))
+
 (defn mix
   "Mixes two colors by squares: each channel becomes `sqrt((1 - t) a^2 + t b^2)`, alpha is interpolated linearly.
 
@@ -6117,13 +6177,17 @@
   - `c1`, `c2` colors, any type accepted by [[to-color]]
   - `colorspace` (optional) `:RGB` (the same as no colorspace) or another key of [[colorspaces]]: then the colors are interpolated linearly there, the same as [[lerp]] (chroma.js `mix` in that mode)
   - `t` weight of `c2`, default `0.5`
+  - `options` (optional) as in [[lerp]]: with `:premultiplied?` the squared channels are weighted by alpha, `sqrt(((1 - t) a1 c1^2 + t a2 c2^2) / ((1 - t) a1 + t a2))`, so a fully transparent color does not contribute
 
-  Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[lerp]], [[mixbox]], [[mixsub]]."
+  Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace and `{:options options}` for options that are not a map. See also [[lerp]], [[mixbox]], [[mixsub]]."
   {:metadoc/categories #{:interp}}
-  (^Vec4 [c1 c2 colorspace ^double t]
-   (if (= colorspace :RGB)
-     (mix c1 c2 t)
-     (lerp c1 c2 colorspace t)))
+  (^Vec4 [c1 c2 colorspace ^double t] (mix c1 c2 colorspace t nil))
+  (^Vec4 [c1 c2 colorspace t {:keys [premultiplied?] :as options}]
+   (check-options-map options)
+   (cond
+     (not= colorspace :RGB) (lerp c1 c2 colorspace t options)
+     premultiplied? (mix-premultiplied (pr/to-color c1) (pr/to-color c2) (double t))
+     :else (mix c1 c2 (double t))))
   (^Vec4 [c1 c2] (mix c1 c2 0.5))
   (^Vec4 [c1 c2 ^double t]
    (let [^Vec4 c1 (pr/to-color c1)

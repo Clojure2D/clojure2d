@@ -154,7 +154,7 @@
             :let [[to] (c/colorspaces cs)]
             [c1 c2] [[[255 0 30] [200 0 255]] [[20 200 30] [250 240 10]] [[0 0 255] [255 0 0]]]
             t [0.1 0.5 0.9 1.4 -0.3]
-            :let [h ((#'c/hue-lerp spec (to c1) (to c2) t) hue)]]
+            :let [h ((#'c/interpolate-raw spec (to c1) (to c2) t false) hue)]]
       (is (and (m/<= lo h) (m/< h (+ lo period))) (str cs " " c1 " " c2 " " t " " h))))
   (testing "lerp- and lerp+ use the same path"
     (is (m/< (max-diff (take 3 (c/lerp- :red :blue :HSL 0.5))
@@ -199,6 +199,59 @@
       (let [r (c/reduce-colors vir 3 {:fuzzy? true :rng (r/rng :mersenne 3)})]
         (is (= 3 (count r)))
         (is (apply <= (map c/luma r)))))))
+
+;; G4: premultiplied alpha
+
+(def ^:private alpha-tolerance {:RGB 1.0e-9 :HSL 1.0e-9 :LCH 0.2 :Oklch 1.0e-6}) ;; LCH: lch-d65 white point
+
+(defn- rgba-diff
+  "Largest difference of clipped R, G, B and of alpha."
+  ^double [e a]
+  (max (max-diff (clip e) (clip a)) (m/abs (m/- (double (e 3)) (double (a 3))))))
+
+(deftest premultiplied-lerp-test
+  (let [{:keys [alpha-pairs alpha-mix]} (:coloraide @reference)]
+    (doseq [[cs flags] alpha-mix
+            [flag rows] flags
+            :let [opts {:premultiplied? (= flag :premultiplied)}]
+            [[a b] per-t] (map vector alpha-pairs rows)
+            [t e] (map vector (:ts @reference) per-t)]
+      (is (m/<= (rgba-diff e (c/lerp a b cs t opts)) (alpha-tolerance cs)) (str cs " " flag " " a " " b " " t)))))
+
+(deftest premultiplied-average-test
+  (let [{:keys [alpha-sets alpha-average]} (:coloraide @reference)]
+    (doseq [[cs flags] alpha-average
+            [flag rows] flags
+            :let [opts {:premultiplied? (= flag :premultiplied)}]
+            [st e] (map vector alpha-sets rows)
+            ;; straight: coloraide leaves fully transparent colors out of the color channels, clojure2d (as chroma.js) not
+            :when (or (= flag :premultiplied) (every? #(pos? (double (% 3))) st))]
+      (is (m/<= (rgba-diff e (c/average st cs opts)) (alpha-tolerance cs)) (str cs " " flag " " st))
+      (is (m/<= (rgba-diff e (c/weighted-average st (repeat (count st) 2.0) cs opts)) (alpha-tolerance cs))
+          (str cs " " flag " " st)))))
+
+(deftest premultiplied-properties-test
+  (testing "transparent red and blue: blue at half alpha"
+    (is (= [0.0 0.0 255.0 127.5] (vec (c/lerp [255 0 0 0] :blue :RGB 0.5 {:premultiplied? true}))))
+    (is (= [0.0 0.0 255.0 127.5] (vec (c/mix [255 0 0 0] :blue :RGB 0.5 {:premultiplied? true}))))
+    (is (= [0.0 0.0 255.0 127.5] (vec (c/average [[255 0 0 0] :blue] :RGB {:premultiplied? true})))))
+  (testing "equal alphas: the straight result"
+    (doseq [cs [:RGB :LAB :HSL :Oklch] [a b] [[[200 50 80 100] [40 60 220 100]] [[255 0 0 30] [0 255 255 30]]]]
+      (is (m/< (max-diff (c/lerp a b cs 0.3) (c/lerp a b cs 0.3 {:premultiplied? true})) 1.0e-9) (str cs))
+      (is (m/< (max-diff (c/mix a b cs 0.3) (c/mix a b cs 0.3 {:premultiplied? true})) 1.0e-9) (str cs))
+      (is (m/< (max-diff (c/average [a b] cs) (c/average [a b] cs {:premultiplied? true})) 1.0e-9) (str cs))))
+  (testing "two transparent colors: channels 0"
+    (is (= [0.0 0.0 0.0 0.0] (vec (c/lerp [255 0 0 0] [0 0 255 0] :RGB 0.5 {:premultiplied? true}))))
+    (is (= [0.0 0.0 0.0 0.0] (vec (c/average [[255 0 0 0] [0 0 255 0]] :RGB {:premultiplied? true})))))
+  (testing "lerp- and lerp+ pass the options"
+    (is (= (c/lerp- [255 0 0 0] :blue :RGB 0.5 {:premultiplied? true})
+           (c/set-channel (c/lerp [255 0 0 0] :blue :RGB 0.5 {:premultiplied? true}) :LAB 0 ((c/to-LAB [255 0 0 0]) 0))))
+    (is (= (c/lerp+ :blue [255 0 0 0] :RGB 0.5 {:premultiplied? true}) (c/lerp- [255 0 0 0] :blue :RGB 0.5 {:premultiplied? true}))))
+  (testing "default straight, options map checked"
+    (is (= (c/lerp :red :blue :LAB 0.2) (c/lerp :red :blue :LAB 0.2 nil) (c/lerp :red :blue :LAB 0.2 {})))
+    (doseq [f [#(c/lerp :red :blue :RGB 0.5 :x) #(c/lerp- :red :blue :RGB 0.5 :x) #(c/lerp+ :red :blue :RGB 0.5 :x)
+               #(c/mix :red :blue :RGB 0.5 :x) #(c/average [:red] :RGB :x) #(c/weighted-average [:red] [1] :RGB :x)]]
+      (is (throws-data? {:options :x} f)))))
 
 (deftest docstrings-test
   (doseq [s '[nearest-color average weighted-average lerp lerp- lerp+ mix mixbox mixsub negate reduce-colors resample]]
