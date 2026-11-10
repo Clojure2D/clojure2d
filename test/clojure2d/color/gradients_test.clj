@@ -219,6 +219,41 @@
     (doseq [f [#(c/random-palette :x) #(c/random-gradient :x) #(c/random-color :warm 100.0 :x) #(c/apply-theme :red :warm :x)]]
       (is (throws-data? {:options :x} f)))))
 
+;; review fixes
+
+(deftest domain-hue-test
+  (testing "uneven stop positions, per-segment hues (coloraide stop())"
+    (let [{:keys [ts domain-stops coloraide-domain]} @reference]
+      (doseq [[cs modes] coloraide-domain
+              [mode rows] modes
+              [[st xs] per-t] (map vector domain-stops rows)]
+        (check-gradient (c/gradient st {:colorspace cs :hue mode :domain xs}) ts per-t ({:HSL 1.0e-9 :Oklch 1.0e-6} cs)
+                        (str cs " " mode " " xs)))))
+  (testing "other interpolators: a gray stop keeps the previous hue"
+    (let [hs (@#'c/hue-spaces :HSL)
+          stops (map c/to-HSL [:red :gray :blue])]
+      (is (= [0.0 0.0 -120.0] (#'c/unwrapped-hues hs :shorter stops)))
+      (is (= [0.0 0.0 240.0] (#'c/unwrapped-hues hs :longer stops)))
+      (is (= [240.0 240.0 240.0] (#'c/unwrapped-hues hs :shorter (map c/to-HSL [:gray :blue :gray])))))))
+
+(deftest gradient-ends-test
+  (testing "t limited to the domain: every interpolator keeps the end colors"
+    (is (m/< (max-diff (c/to-color :blue) ((c/gradient [:red :blue] {:domain [0.2 0.6]}) 0.9)) 1.0e-9))
+    (is (m/< (max-diff (c/to-color :lime) ((c/gradient [:red :blue :lime] {:domain [0.2 0.5 0.6] :interpolation :cubic}) 0.9)) 1.0e-9))
+    (is (m/< (max-diff (c/to-color :red) ((c/gradient [:red :blue :lime] {:domain [0.2 0.5 0.6] :interpolation :cubic :colorspace :HSL}) 0.1)) 1.0e-9)))
+  (testing "built-ins: :black-body limits t, :rainbow wraps t (d3)"
+    (let [bb (c/gradient :black-body) rb (c/gradient :rainbow)]
+      (is (= (bb 0.0) (bb -0.2)))
+      (is (= (bb 1.0) (bb 1.5)))
+      (is (m/< (max-diff (rb 0.75) (rb -0.25)) 1.0e-9))
+      (is (m/< (max-diff (rb 0.25) (rb 1.25)) 1.0e-9)))))
+
+(deftest review-contracts-test
+  (is (throws-data? {:color-theme :nope} #(c/random-color :nope 100 nil)))
+  (is (throws-data? {:domain [:a :b]} #(c/gradient [:red :blue] {:domain [:a :b]})))
+  (is (throws-data? {:hue nil} #(c/paletton :monochromatic nil)))
+  (is (throws-data? {:hue :x} #(c/paletton :triad :x))))
+
 (deftest docstrings-test
   (doseq [s '[gradient palette merge-gradients iq-gradient gradient-cubehelix find-gradient find-palette random-color
               random-palette random-gradient paletton hue-paletton paletton-presets-list]]

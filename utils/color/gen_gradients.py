@@ -16,7 +16,9 @@ orange-teal-purple-gold) and 8 random lists of 2-5 integer colors (numpy default
 * :coloraide {space {hue [[[r g b a] per t] per stop list]}} - coloraide 8.14.1 Color.interpolate(stops, space,
   hue=..., premultiplied=False), linear, spaces HSL, HWB, LCH (coloraide lch-d65), Oklch, hue modes shorter, longer,
   increasing, decreasing; achromatic stops have an undefined (powerless) hue, taken from the neighbour per segment;
-  not clipped. :alpha-stops [[r g b a] ...] lists and :coloraide-alpha {space {flag [[[r g b a] per t] per list]}}
+  not clipped. :domain-stops [[stops positions] ...] and :coloraide-domain {space {hue [[[r g b a] per t] per
+  list]}} - the same with uneven stop positions (coloraide stop()), spaces HSL, Oklch, hue shorter and longer.
+  :alpha-stops [[r g b a] ...] lists and :coloraide-alpha {space {flag [[[r g b a] per t] per list]}}
   (hue shorter, flags :premultiplied / :straight), spaces RGB (srgb), HSL, LCH, Oklch.
 * :d3 {:api {name [[r g b] per t]} :unrounded {name [[r g b] per t]}} - d3-scale-chromatic 3.1.0
   interpolateCubehelixDefault, interpolateWarm, interpolateCool, interpolateRainbow at 101 points (:d3-ts): the API
@@ -42,6 +44,7 @@ import tempfile
 
 import numpy as np
 from coloraide import Color
+from coloraide.interpolate import stop
 import coloraide
 
 OUT = "test/resources/color/gradients_reference.edn"
@@ -59,6 +62,11 @@ FIXED_STOPS = [[[255, 0, 0], [0, 0, 255]],
                [[255, 255, 0], [0, 0, 128], [255, 255, 255]],
                [[255, 0, 0], [128, 128, 128], [0, 0, 255]],
                [[255, 165, 0], [0, 128, 128], [128, 0, 128], [255, 215, 0]]]
+# stop lists with uneven positions (:domain of clojure2d gradients)
+DOMAIN_STOPS = [([[255, 0, 0], [128, 128, 128], [0, 0, 255]], [0.0, 0.2, 1.0]),
+                ([[255, 0, 0], [0, 0, 255], [0, 255, 0]], [0.0, 0.7, 1.0]),
+                ([[255, 165, 0], [0, 128, 128], [128, 0, 128], [255, 215, 0]], [0.0, 0.1, 0.5, 1.0])]
+DOMAIN_SPACES = {"HSL": "hsl", "Oklch": "oklch"}
 ALPHA_STOPS = [[[255, 0, 0, 0], [0, 0, 255, 255]],
                [[255, 0, 0, 51], [0, 0, 255, 204], [0, 255, 0, 127.5]],
                [[255, 255, 0, 255], [0, 0, 128, 25.5], [255, 255, 255, 178.5]]]
@@ -142,7 +150,13 @@ def coloraide_oracle(stops):
                      for g in (Color.interpolate([ca(c) for c in st], space=s, premultiplied=p) for st in ALPHA_STOPS)]
                  for f, p in flags.items()}
              for k, s in ALPHA_SPACES.items()}
-    return hue, alpha
+    domain = {k: {h: [[out_rgba(f(t)) for t in TS]
+                      for f in (Color.interpolate([stop(ca(c), x) for c, x in zip(st, xs)], space=s, hue=h,
+                                                  premultiplied=False)
+                                for st, xs in DOMAIN_STOPS)]
+                  for h in ["shorter", "longer"]}
+              for k, s in DOMAIN_SPACES.items()}
+    return hue, alpha, domain
 
 
 def cosine(a, b, c, d, t):
@@ -198,7 +212,7 @@ def main():
     ch = node("utils/color/chroma_oracle.mjs", {"scale": {"stops": stops, "modes": ["rgb", "lab", "hsl"], "ts": TS}})
     ch = ch["scale"]
     ch["hsl"] = [rs if i in chrom else None for i, rs in enumerate(ch["hsl"])]
-    hue, alpha = coloraide_oracle(stops)
+    hue, alpha, domain = coloraide_oracle(stops)
     d3 = node("utils/color/d3_oracle.mjs", {"ts": D3_TS})
     cos = {k: [cosine(*v, t) for t in TS] for k, v in {**THING, **IQ}.items()}
     pal = paletton()
@@ -209,6 +223,8 @@ def main():
            " :chromatic [" + " ".join(map(str, chrom)) + "]",
            " :chroma " + keyed(ch, nested, 10),
            " :coloraide " + keyed(hue, lambda d: keyed(d, nested, 21), 13),
+           " :domain-stops [" + " ".join("[" + rows(st) + " " + vec(xs) + "]" for st, xs in DOMAIN_STOPS) + "]",
+           " :coloraide-domain " + keyed(domain, lambda d: keyed(d, nested, 28), 20),
            " :alpha-stops [" + " ".join(rows(st) for st in ALPHA_STOPS) + "]",
            " :coloraide-alpha " + keyed(alpha, lambda d: keyed(d, nested, 27), 19),
            " :d3-ts " + vec(D3_TS),

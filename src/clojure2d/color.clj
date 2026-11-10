@@ -5394,9 +5394,12 @@
       - `:angle` - angle of the secondary hues in degrees, default `30`
       - `:adj` - `:triad` only, default `true`
 
-  Returns a vector of `Vec4`: five colors per hue in the order main hue, secondary hues, complement (for `:tetrad`: hue, complement, `hue + angle`, its complement). See also [[hue-paletton]], [[palette]]."
+  Returns a vector of `Vec4`: five colors per hue in the order main hue, secondary hues, complement (for `:tetrad`: hue, complement, `hue + angle`, its complement). Throws `ex-info` with `{:hue hue}` for a hue that is not a number, `{:preset preset}` for an unknown preset and `{:type type}` for an unknown scheme. See also [[hue-paletton]], [[palette]]."
   {:metadoc/categories #{:pal}}
-  (fn [m _ & _] m))
+  (fn [m hue & _]
+    (when-not (number? hue)
+      (throw (ex-info (str "Paletton hue should be a number, got: " hue) {:hue hue})))
+    m))
 
 (defn- paletton-preset
   "The `[ks kv]` pairs of a paletton `preset` (a name or the pairs); throws `ex-info` with `{:preset preset}` for an unknown name."
@@ -6558,7 +6561,7 @@
     (when (and easing? (not= n 2))
       (throw (ex-info (str "Easing interpolation needs 2 colors, got: " n) {:interpolation interpolation :colors n})))
     (when domain
-      (when-not (and (== (count domain) n) (apply < domain))
+      (when-not (and (== (count domain) n) (every? number? domain) (apply < domain))
         (throw (ex-info "Domain should be strictly increasing, one value per color" {:domain domain}))))
     (cond
       ;; one color: constant gradient
@@ -6580,28 +6583,28 @@
                             c)) clamp255))))
 
       :else
-      (let [r (or domain 
-                  (map (fn [^long v] (m/mnorm v 0.0 (dec (count cpalette)) 0.0 1.0)) (range (count cpalette))))
-            c0 (map pr/red stops)
-            c1 (map pr/green stops)
-            c2 (map pr/blue stops)
-            c3 (map pr/alpha stops)
+      (let [r (or domain
+                  (map (fn [^long v] (m/mnorm v 0.0 (dec n) 0.0 1.0)) (range n)))
+            ;; t limited to [0, 1] and to the domain, so every interpolator keeps the end colors
+            t-min (max 0.0 (double (first r)))
+            t-max (min 1.0 (double (last r)))
             ifn (if (keyword? interpolation) (partial i/interpolation interpolation) interpolation)
-            i0 (ifn r c0)
-            i1 (ifn r c1)
-            i2 (ifn r c2)
-            i3 (ifn r c3)
             hue-fn (when hue-space
                      (if (= interpolation :linear)
                        (segment-hue-fn hue-space hue-mode r cpalette)
                        (let [{:keys [^double lo ^double period]} hue-space
                              ih (ifn r (unwrapped-hues hue-space hue-mode cpalette))]
                          (fn ^double [^double t] (m/wrap lo (+ lo period) (double (ih t)))))))
-            hue-channel (long (get hue-space :hue -1))]
+            hue-channel (long (get hue-space :hue -1))
+            ;; the hue channel (not premultiplied) comes from hue-fn
+            [i0 i1 i2 i3] (mapv (fn [^long ch]
+                                  (if (and hue-fn (== ch hue-channel))
+                                    hue-fn
+                                    (ifn r (map (fn [^Vec4 c] (c ch)) stops))))
+                                [0 1 2 3])]
         (fn ^Vec4 [^double t]
-          (let [ct (m/constrain t 0.0 1.0)
-                c (unpremultiplied (v/vec4 (i0 ct) (i1 ct) (i2 ct) (i3 ct)))]
-            (v/fmap (from (if hue-fn (with-channel c hue-channel (hue-fn ct)) c)) clamp255)))))))
+          (let [ct (m/constrain (m/constrain t 0.0 1.0) t-min t-max)]
+            (v/fmap (from (unpremultiplied (v/vec4 (i0 ct) (i1 ct) (i2 ct) (i3 ct)))) clamp255)))))))
 
 (def ^{:metadoc/categories #{:gr}
      :doc "Creates a gradient in the Cubehelix colorspace from raw Cubehelix values (`[hue saturation lightness alpha]`, see [[to-Cubehelix]]), not sRGB colors: two or more stops, interpolated linearly, the hue as a number (`:hue :raw`, d3 `interpolateCubehelixLong`). Returns a gradient function as [[gradient]]."}
@@ -6660,13 +6663,15 @@
                  :cubehelix (gradient-cubehelix [(Vec4. 300.0 0.5 0.0 255.0) (Vec4. -240 0.5 1.0 255.0)])
                  :warm (gradient-cubehelix [(Vec4. -100.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0)])
                  :cool (gradient-cubehelix [(Vec4. 260.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0)])
-                 :rainbow (fn [^double t] (let [ts (m/abs (- t 0.5))]
+                 ;; d3 interpolateRainbow: t outside [0, 1] wraps
+                 :rainbow (fn [^double t] (let [t (if (or (< t 0.0) (> t 1.0)) (- t (m/floor t)) t)
+                                                ts (m/abs (- t 0.5))]
                                            (v/fmap (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
                                                                           (- 1.5 (* 1.5 ts))
                                                                           (- 0.8 (* 0.9 ts))
                                                                           255.0))
                                                    clamp255)))
-                 :black-body (fn [^double t] (temperature (m/mlerp 1000 15000 t)))})))
+                 :black-body (fn [^double t] (temperature (m/mlerp 1000.0 15000.0 (m/constrain t 0.0 1.0))))})))
 
 (defn- get-gradient-from-file-
   [k]
@@ -6706,7 +6711,7 @@
       - `:premultiplied?` - when true the colors are weighted by alpha (premultiplied alpha, as CSS gradients and coloraide; the hue channel is not premultiplied), default `false` (straight alpha)
       - `:hue` - hue interpolation in colorspaces with a hue (HSx, HWB, GLHS, HCL, LCH-like, Okhsl, Okhsv, Okhwb, Cubehelix), as CSS Color 4: `:shorter` (default), `:longer`, `:increasing`, `:decreasing` arc, or `:raw` (the hue as a number); an achromatic (powerless) stop takes the hue of its neighbour: with `:linear` interpolation per segment (as coloraide), with other methods the previous stop's hue
 
-  Channels are interpolated separately and clamped to [0, 255]; `t` is limited to [0, 1]. Without arguments a random gradient name is used.
+  Channels are interpolated separately and clamped to [0, 255]; `t` is limited to [0, 1] and to the domain (outside it the end colors). Of the built-in gradients, the cosine ones are periodic in `t`, `:rainbow` wraps `t` (as d3) and `:black-body` limits it to [0, 1]. Without arguments a random gradient name is used.
 
   Built-in gradients without a namespace: the thi.ng/color cosine presets (`:rainbow1` to `:rainbow4`, `:yellow-magenta-cyan`, `:orange-blue`, `:green-magenta`, `:green-red`, `:green-cyan`, `:yellow-red`, `:blue-cyan`, `:red-blue`, `:yellow-green-blue`, `:blue-white-red`, `:cyan-magenta`, `:yellow-purple-magenta`, `:green-blue-orange`, `:orange-magenta-blue`, `:blue-magenta-orange`, `:magenta-green`), I. Quilez's cosine palettes `:iq-1` to `:iq-7`, d3-scale-chromatic `:cubehelix`, `:warm`, `:cool`, `:rainbow`, and `:black-body` ([[temperature]] from 1000 to 15000 K). Namespaced names (e.g. `:pals/kovesi.cyclic_mrybm_35_75_c68`) come from resource files.
 
@@ -7012,7 +7017,7 @@
   - `color-theme`, `alpha` a thi.ng theme gives random lightness and chroma from its ranges and a random hue in LCH*; a [[paletton]] preset gives a random color of the monochromatic paletton palette of a random hue; `nil` theme: a random color as without arguments, with `alpha`
   - `options` (map): `:rng` - random number generator; none or `nil`: a fresh `(fastmath.random/rng :default)`
 
-  Returns a `Vec4` (clamped for a theme). Throws `ex-info` with `{:options options}` for options that are not a map. See also [[apply-theme]], [[random-palette]]."
+  Returns a `Vec4` (clamped for a theme). Throws `ex-info` with `{:color-theme color-theme}` for an unknown theme and `{:options options}` for options that are not a map. See also [[apply-theme]], [[random-palette]]."
   {:metadoc/categories #{:pal}}
   ([] (random-any-color (r/rng :default)))
   ([alpha-or-color-theme-or-options]
@@ -7029,6 +7034,7 @@
        (nil? color-theme) (set-alpha (random-any-color rng) alpha)
        (thing-presets-list color-theme) (let [[[l1 l2] [c1 c2]] (thing-presets color-theme)]
                                           (clamp (from-LCH* [(r/drandom rng l1 l2) (r/drandom rng c1 c2) (r/drandom rng 255.0) alpha])))
+       (not (contains? paletton-presets color-theme)) (throw (ex-info (str "Unknown color theme: " color-theme) {:color-theme color-theme}))
        :else (clamp (set-alpha (random-nth rng (paletton :monochromatic (r/drandom rng 360.0) {:preset color-theme})) alpha))))))
 
 (defn fe-color-matrix
