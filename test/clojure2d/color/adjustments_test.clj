@@ -6,7 +6,8 @@
             [clojure.edn :as edn]
             [clojure.java.io :as io]
             [fastmath.core :as m]
-            [clojure2d.color :as c]))
+            [clojure2d.color :as c]
+            [clojure2d.test-predicates :refer [throws-data?]]))
 
 (def reference (delay (-> "color/filters_reference.edn" io/resource slurp edn/read-string)))
 
@@ -64,6 +65,39 @@
   (doseq [cs [:LAB :LUV :Oklab] col [[200 50 50] [30 160 90] [40 60 220]]
           :let [[to from] (c/make-LCH cs)]]
     (is (m/<= (max-diff col (take 3 (from (to col)))) 1.0e-9) (str cs " " col))))
+
+;; G2: contracts
+
+(deftest negative-amount-test
+  (doseq [f [c/sepia c/grayscale c/saturation c/contrast c/exposure]]
+    (is (throws-data? {:amount -0.5} #(f -0.5)) (str f)))
+  (testing "brightness (offset) and hue-rotate accept negative values"
+    (is (fn? (c/brightness -0.2)))
+    (is (fn? (c/hue-rotate -20.0)))))
+
+(deftest adjust-modulate-errors-test
+  (doseq [f [c/adjust c/modulate]]
+    (is (throws-data? {:colorspace :Foo} #(f :red :Foo 0 1.0)) (str f))
+    (is (throws-data? {:channel 7} #(f :red :HSV 7 1.0)) (str f))
+    (is (throws-data? {:channel 7} #(f :red 7 1.0)) (str f))
+    (is (throws-data? {:channel -1} #(f :red -1 1.0)) (str f))))
+
+(defn- lightness-linear? [g]
+  (let [l0 ((c/to-LAB (g 0.0)) 0)
+        l1 ((c/to-LAB (g 1.0)) 0)]
+    (every? (fn [^double t] (m/< (m/abs (m/- (m/lerp l0 l1 t) ((c/to-LAB (g t)) 0))) 0.1))
+            (range 0.0 1.0 0.01))))
+
+(deftest correct-luma-test
+  (testing "increasing and decreasing lightness"
+    (doseq [stops [[:navy :yellow] [:yellow :navy] [:white :black] [:lightyellow :orangered :deeppink :darkred]]]
+      (is (lightness-linear? (c/correct-luma (c/gradient stops))) (str stops))))
+  (testing "palettes sorted by lightness, both orders, keep their size"
+    (let [pal (sort-by c/luma (c/palette :guell))]
+      (is (= (count pal) (count (c/correct-luma pal))))
+      (is (= (count pal) (count (c/correct-luma (reverse pal)))))))
+  (testing "non-monotonic lightness"
+    (is (throws-data? {:lightness :non-monotonic} #(c/correct-luma (c/gradient [:black :white :black]))))))
 
 (deftest docstrings-test
   (doseq [s '[whiten blacken brighten darken saturate desaturate adjust modulate tinter correct-luma apply-theme

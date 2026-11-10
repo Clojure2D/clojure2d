@@ -6154,17 +6154,17 @@
   - `channel` 0, 1, 2 or 3 (alpha)
   - `value` added to the channel, in the raw range of the colorspace
 
-  Returns a `Vec4`, not clamped. A channel outside 0-3 leaves the color unchanged; an unknown colorspace throws a `NullPointerException`. See also [[modulate]], [[set-channel]]."
+  Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace and `{:channel channel}` for a channel outside 0-3. See also [[modulate]], [[set-channel]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col colorspace ^long channel ^double value]
-   (let [[to from] (colorspaces colorspace)
+   (let [[to from] (colorspace-converters colorspaces colorspace)
          ^Vec4 c (to col)]
      (from (case channel
              0 (Vec4. (+ value (.x c)) (.y c) (.z c) (.w c))
              1 (Vec4. (.x c) (+ value (.y c)) (.z c) (.w c))
              2 (Vec4. (.x c) (.y c) (+ value (.z c)) (.w c))
              3 (Vec4. (.x c) (.y c) (.z c) (+ value (.w c)))
-             c))))
+             (channel-error channel)))))
   (^Vec4 [col ^long channel ^double value]
    (let [^Vec4 c (pr/to-color col)]
      (case channel
@@ -6172,7 +6172,7 @@
        1 (Vec4. (.x c) (+ value (.y c)) (.z c) (.w c))
        2 (Vec4. (.x c) (.y c) (+ value (.z c)) (.w c))
        3 (Vec4. (.x c) (.y c) (.z c) (+ value (.w c)))
-       c))))
+       (channel-error channel)))))
 
 (defn modulate
   "Multiplies one channel of a color by `amount`, optionally in another colorspace.
@@ -6182,17 +6182,17 @@
   - `channel` 0, 1, 2 or 3 (alpha)
   - `amount` factor
 
-  Returns a `Vec4`, not clamped. A channel outside 0-3 leaves the color unchanged; an unknown colorspace throws a `NullPointerException`. See also [[adjust]]."
+  Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace and `{:channel channel}` for a channel outside 0-3. See also [[adjust]]."
   {:metadoc/categories meta-ops}
   (^Vec4 [col colorspace ^long channel ^double amount]
-   (let [[to from] (colorspaces colorspace)
+   (let [[to from] (colorspace-converters colorspaces colorspace)
          ^Vec4 c (to col)]
      (from (case channel
              0 (Vec4. (* amount (.x c)) (.y c) (.z c) (.w c))
              1 (Vec4. (.x c) (* amount (.y c)) (.z c) (.w c))
              2 (Vec4. (.x c) (.y c) (* amount (.z c)) (.w c))
              3 (Vec4. (.x c) (.y c) (.z c) (* amount (.w c)))
-             c))))
+             (channel-error channel)))))
   (^Vec4 [col ^long channel ^double amount]
    (let [^Vec4 c (pr/to-color col)]
      (case channel
@@ -6200,7 +6200,7 @@
        1 (Vec4. (.x c) (* amount (.y c)) (.z c) (.w c))
        2 (Vec4. (.x c) (.y c) (* amount (.z c)) (.w c))
        3 (Vec4. (.x c) (.y c) (.z c) (* amount (.w c)))
-       c))))
+       (channel-error channel)))))
 
 (defn adjust-temperature
   "Shifts a color toward the color of a blackbody temperature, keeping its lightness.
@@ -6445,6 +6445,33 @@
   ([pal number-of-colors] (resample pal number-of-colors {}))
   ([pal number-of-colors gradient-params] (palette pal number-of-colors gradient-params)))
 
+(def ^{:private true :const true :tag 'double} correct-luma-max-reversal
+  "Largest lightness reversal against the overall direction that [[correct-luma]] smooths out, as a fraction of the total lightness change (RGB interpolation between palette stops dips by up to ~3.5 %)."
+  0.05)
+
+(defn- lightness-inverse
+  "Inverse of the lightness profile `ls` sampled at `xs`, oriented by the overall direction (end minus start): `u = d L` is made monotonic by its running maximum (reversals up to [[correct-luma-max-reversal]] of the total change), plateaus are dropped. Returns `[u-start u-end inverse d]`, `inverse` mapping `u` to the position; throws `ex-info` with `{:lightness :non-monotonic}` for a larger reversal or no direction."
+  [ls xs]
+  (let [^double l0 (first ls)
+        ^double l1 (peek ls)
+        d (m/signum (- l1 l0))
+        tolerance (* correct-luma-max-reversal (m/abs (- l1 l0)))
+        non-monotonic #(throw (ex-info "Lightness of the gradient is not monotonic" {:lightness :non-monotonic}))]
+    (when (zero? d) (non-monotonic))
+    (let [[us ps] (loop [[^double l & lr] ls
+                         [x & xr] xs
+                         mx ##-Inf
+                         us []
+                         ps []]
+                    (if-not l
+                      [us ps]
+                      (let [u (* d l)]
+                        (when (> (- mx u) tolerance) (non-monotonic))
+                        (if (> u mx)
+                          (recur lr xr u (conj us u) (conj ps x))
+                          (recur lr xr mx us ps)))))]
+      [(first us) (peek us) (li/linear us ps) d])))
+
 (defn correct-luma
   "Makes the CIELAB lightness of a gradient or palette change linearly.
 
@@ -6453,17 +6480,15 @@
   - `palette-or-gradient` a gradient (function of t in [0, 1]) or a palette (sequence of colors)
   - `gradient-params` (optional) options of [[gradient]] used to turn a palette into a gradient
 
-  Returns a gradient for a gradient, a palette of the same size for a palette. Only gradients whose lightness increases work: decreasing or non-monotonic lightness throws (fastmath interpolation requires increasing samples)."
+  Returns a gradient for a gradient, a palette of the same size for a palette. The lightness must increase or decrease overall (a palette sorted by lightness, in either order); reversals against that direction up to 5 % of the total lightness change are smoothed out (a running maximum), larger ones, or equal lightness at both ends, throw `ex-info` with `{:lightness :non-monotonic}`."
   {:metadoc/categories #{:pal :gr}}
   ([palette-or-gradient] (correct-luma palette-or-gradient {}))
   ([palette-or-gradient gradient-params]
    (if (fn? palette-or-gradient) ;; gradient
-     (let [l0 (ch0 (to-LAB (palette-or-gradient 0.0)))
-           l1 (ch0 (to-LAB (palette-or-gradient 1.0)))
-           xs (m/slice-range 0.0 1.0 200)
-           ls (map (fn [^double v] (ch0 (to-LAB (palette-or-gradient v)))) xs)
-           i (li/linear ls xs)]
-       (fn ^Vec4 [^double t] (palette-or-gradient (i (m/lerp l0 l1 t)))))
+     (let [xs (m/slice-range 0.0 1.0 200)
+           ls (mapv (fn [^double v] (ch0 (to-LAB (palette-or-gradient v)))) xs)
+           [^double u0 ^double u1 inverse] (lightness-inverse ls xs)]
+       (fn ^Vec4 [^double t] (palette-or-gradient (inverse (m/lerp u0 u1 t)))))
      (let [n (count palette-or-gradient)
            g (correct-luma (gradient palette-or-gradient gradient-params))]
        (palette g n)))))
@@ -6616,13 +6641,20 @@
                     (+ (* b1 (.x c)) (* b2 (.y c)) (* b3 (.z c)) (* b4 (.w c)) b5)
                     (+ (* a1 (.x c)) (* a2 (.y c)) (* a3 (.z c)) (* a4 (.w c)) a5))))))
 
+(defn- check-amount
+  "Throws `ex-info` with `{:amount amount}` for a negative filter amount (not allowed by W3C Filter Effects)."
+  [^double amount]
+  (when (neg? amount)
+    (throw (ex-info (str "Filter amount should not be negative, got: " amount) {:amount amount}))))
+
 (defn sepia
   "Creates the CSS `sepia()` filter (W3C Filter Effects Level 1).
 
   - `amount` 0 (unchanged) to 1 (full sepia); values above 1 extrapolate (the specification clamps them to 1)
 
-  Returns a filter function (see [[fe-color-matrix]])."
+  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount."
   ([^double amount]
+   (check-amount amount)
    (let [amount (- 1.0 amount)
          a (+ 0.393 (* 0.607 amount)) b (- 0.769 (* 0.769 amount)) c (- 0.189 (* 0.189 amount))
          d (- 0.349 (* 0.349 amount)) e (+ 0.686 (* 0.314 amount)) f (- 0.168 (* 0.168 amount))
@@ -6637,8 +6669,9 @@
 
   - `amount` 1 keeps the color, 0 gives gray 127.5, above 1 increases contrast; negative values invert (not allowed by the specification)
 
-  Returns a filter function (see [[fe-color-matrix]])."
+  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount."
   ([^double amount]
+   (check-amount amount)
    (let [intercept (* 127.5 (- 1.0 amount))]
      (fe-color-matrix [amount 0.0 0.0 0.0 intercept
                        0.0 amount 0.0 0.0 intercept
@@ -6650,8 +6683,9 @@
 
   - `amount` 1 keeps the color, 0 gives black, above 1 brightens
 
-  Returns a filter function (see [[fe-color-matrix]]). Note: [[brightness]] of clojure2d adds an offset instead."
+  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount. Note: [[brightness]] of clojure2d adds an offset instead."
   ([^double amount]
+   (check-amount amount)
    (fe-color-matrix [amount 0.0 0.0 0.0 0.0
                      0.0 amount 0.0 0.0 0.0
                      0.0 0.0 amount 0.0 0.0
@@ -6673,12 +6707,8 @@
                        0.0 0.0 0.0 1.0 0.0]))))
 
 
-(defn saturation
-  "Creates the CSS `saturate()` filter (W3C Filter Effects Level 1, `feColorMatrix` type saturate).
-
-  - `amount` 1 keeps the color, 0 gives gray, above 1 oversaturates
-
-  The weights are 0.2126, 0.7152, 0.0722 (the specification uses 0.213, 0.715, 0.072 for saturate). Returns a filter function (see [[fe-color-matrix]])."
+(defn- saturation-matrix
+  "Filter of the `feColorMatrix` saturate matrix for `amount` (any value)."
   ([^double amount]
    (let [r+ (+ 0.2126 (* 0.7874 amount))
          r- (- 0.2126 (* 0.2126 amount))
@@ -6690,6 +6720,16 @@
                        r- g+ b- 0.0 0.0
                        r- g- b+ 0.0 0.0
                        0.0 0.0 0.0 1.0 0.0]))))
+
+(defn saturation
+  "Creates the CSS `saturate()` filter (W3C Filter Effects Level 1, `feColorMatrix` type saturate).
+
+  - `amount` 1 keeps the color, 0 gives gray, above 1 oversaturates
+
+  The weights are 0.2126, 0.7152, 0.0722 (the specification uses 0.213, 0.715, 0.072 for saturate). Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount."
+  ([^double amount]
+   (check-amount amount)
+   (saturation-matrix amount)))
 
 (defn hue-rotate
   "Creates the CSS `hue-rotate()` filter (W3C Filter Effects Level 1, `feColorMatrix` type hueRotate).
@@ -6717,8 +6757,10 @@
 
   - `amount` 0 (unchanged) to 1 (gray); values above 1 extrapolate (the specification clamps them to 1)
 
-  Returns a filter function (see [[fe-color-matrix]])."
-  ([^double amount] (saturation (- 1.0 amount))))
+  Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount."
+  ([^double amount]
+   (check-amount amount)
+   (saturation-matrix (- 1.0 amount))))
 
 ;; Color Vision Deficiency
 ;; https://github.com/chromelens/chromelens/blob/master/lenses/filters/
