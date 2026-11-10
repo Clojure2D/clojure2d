@@ -104,6 +104,10 @@
     (is (throws-data? {:interpolation :iq :colors 3} #(c/gradient [:red :blue :green] {:interpolation :iq})))
     (is (throws-data? {:interpolation :cubic-in :colors 3} #(c/gradient [:red :blue :green] {:interpolation :cubic-in})))
     (is (fn? (c/gradient [:red :blue] {:interpolation :iq})))
+    (let [coeffs [[0.5 0.5 0.5] [0.5 0.5 0.5] [1 0.5 -1] [0.2 0.3 0.4]]
+          g (c/gradient coeffs {:interpolation :iq})
+          iq (apply c/iq-gradient coeffs)]
+      (is (= (map g [0.0 0.3 1.0]) (map iq [0.0 0.3 1.0])) ":iq with four coefficient vectors"))
     (is (fn? (c/gradient [:red :blue] {:interpolation :cubic-in}))))
   (testing "merge-gradients midpoint"
     (let [g1 (c/gradient [:red :blue]) g2 (c/gradient [:green :white])]

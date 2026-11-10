@@ -591,15 +591,12 @@ c/color-themes
 
 ;; Set of palettes defined in thi.ng umbrella, in `color-palettes` package.
 
-(🎨 (c/palette :thi.ng/ORLwKeosxtEeZxq))
+(🎨 (c/palette (first (c/find-palette "thi.ng" #"."))))
 
 ^{::clerk/visibility :hide}
 (clerk/table
- [[:thi.ng/OkEXVdMQmQ1oQTp (🎨 (c/palette :thi.ng/OkEXVdMQmQ1oQTp))]
-  [:thi.ng/QLj3F8heV6QT4YG (🎨 (c/palette :thi.ng/QLj3F8heV6QT4YG))]
-  [:thi.ng/qAPJgQvoDkRkQTN (🎨 (c/palette :thi.ng/qAPJgQvoDkRkQTN))]
-  [:thi.ng/bYcivY8Jqx8nsiR (🎨 (c/palette :thi.ng/bYcivY8Jqx8nsiR))]
-  [:thi.ng/sz5Uxo4ByGDH6tQ (🎨 (c/palette :thi.ng/sz5Uxo4ByGDH6tQ))]])
+ (for [k (take 5 (rest (c/find-palette "thi.ng" #".")))]
+   [k (🎨 (c/palette k))]))
 
 ;; ### [DOCC](https://github.com/mattdesl/dictionary-of-colour-combinations)
 
@@ -638,7 +635,7 @@ c/color-themes
   [:cl/fs2010              (🎨 (c/palette :cl/fs2010))]
   [:os/os250k-metres       (🎨 (c/palette :os/os250k-metres))]
   [:jjg_neo10_liht/frozen-in-time (🎨 (c/palette :jjg_neo10_liht/frozen-in-time))]
-  [:heine/Exxon88  (🎨 (c/palette :heine/Exxon88))]])
+  [:heine/exxon88  (🎨 (c/palette :heine/exxon88))]])
 
 ;; ## [Paletton](https://paletton.com/)
 
@@ -764,18 +761,18 @@ c/color-themes
 
 (🎨 (c/gradient [:white :red :yellow (c/color :blue 160) :lime :black]
                 {:domain [0.0 0.2 0.4 0.6 0.8 1.0]
-                 :interpolation :linear-smile
+                 :interpolation :linear
                  :colorspace :RGB}))
 
 ;; Let's create custom `loess` interpolator
-(defn loess [xs ys] (fastmath.interpolation/loess 0.7 2 xs ys))
+(defn loess [xs ys] (fastmath.interpolation/loess xs ys {:bandwidth 0.7 :iters 2}))
 
 ^{::clerk/visibility :hide}
 (clerk/table
  {:head [:options :result]
   :rows (map (juxt identity #(🎨 (c/gradient [:white :red :yellow (c/color :blue 160) :lime :black] %)))
              [{} {:interpolation :monotone}
-              {:interpolation :cubic-spline}
+              {:interpolation :cubic}
               {:interpolation :shepard}
               {:interpolation loess}
               {:colorspace :LAB}
@@ -1164,9 +1161,9 @@ c/temperature-names
 ;; `temperature` function returns a color connected to a given temperature.
 (🎨 (c/temperature 10000))
 
-;; Let's see how temperature gradient looks like (from 0K to 30000K):
+;; Let's see how temperature gradient looks like (from 500K to 30000K):
 
-(🎨 (comp c/temperature (partial * 30000.0)))
+(🎨 (comp c/temperature #(m/mlerp 500.0 30000.0 %)))
 
 ;; and finally let's adjust color,
 

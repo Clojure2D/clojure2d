@@ -6700,7 +6700,7 @@
   - `palette-or-gradient-name` a name of a gradient (see [[find-gradient]], [predefined gradients](../static/gradients.html)) or a palette (sequence of colors)
   - `options` (map, optional) for a palette:
       - `:colorspace` - a key of [[colorspaces]] where the colors are interpolated, default `:RGB`
-      - `:interpolation` - a `fastmath.interpolation` method name (e.g. `:linear`, `:cubic`, `:monotone`, `:b-spline`; some need more points), a `fastmath.easings` easing name (only the first two colors are used), `:iq` (cosine gradient of two colors, [[iq-gradient]]) or a function of `xs` and `ys` returning an interpolator; default `:linear`
+      - `:interpolation` - a `fastmath.interpolation` method name (e.g. `:linear`, `:cubic`, `:monotone`, `:b-spline`; some need more points), a `fastmath.easings` easing name (exactly two colors), `:iq` (cosine gradient of two colors, or of four coefficient vectors `[a b c d]`, see [[iq-gradient]]) or a function of `xs` and `ys` returning an interpolator; default `:linear`
       - `:domain` - positions of the colors, increasing; default evenly spaced 0-1
       - `:to?`, `:from?` - convert the colors to / from `colorspace`, default `true` (`false` when the colors are already in it)
       - `:premultiplied?` - when true the colors are weighted by alpha (premultiplied alpha, as CSS gradients and coloraide; the hue channel is not premultiplied), default `false` (straight alpha)
@@ -6710,16 +6710,17 @@
 
   Built-in gradients without a namespace: the thi.ng/color cosine presets (`:rainbow1` to `:rainbow4`, `:yellow-magenta-cyan`, `:orange-blue`, `:green-magenta`, `:green-red`, `:green-cyan`, `:yellow-red`, `:blue-cyan`, `:red-blue`, `:yellow-green-blue`, `:blue-white-red`, `:cyan-magenta`, `:yellow-purple-magenta`, `:green-blue-orange`, `:orange-magenta-blue`, `:blue-magenta-orange`, `:magenta-green`), I. Quilez's cosine palettes `:iq-1` to `:iq-7`, d3-scale-chromatic `:cubehelix`, `:warm`, `:cool`, `:rainbow`, and `:black-body` ([[temperature]] from 1000 to 15000 K). Namespaced names (e.g. `:pals/kovesi.cyclic_mrybm_35_75_c68`) come from resource files.
 
-  Returns a function of one double returning a `Vec4`. Throws `ex-info` with `{:gradient k}` for an unknown name, `{:colors 0}` for no colors, `{:domain d}` for a domain that is not strictly increasing or not one value per color, `{:interpolation k :colors n}` for `:iq` or an easing with other than 2 colors, `{:hue h}` for an unknown hue interpolation, `{:colorspace cs}` and `{:options o}`. See also [[palette]], [[merge-gradients]], [[gradient-cubehelix]]."
+  Returns a function of one double returning a `Vec4`. Throws `ex-info` with `{:gradient k}` for an unknown name, `{:colors 0}` for no colors, `{:domain d}` for a domain that is not strictly increasing or not one value per color, `{:interpolation k :colors n}` for an easing with other than 2 colors or `:iq` with other than 2 colors or 4 coefficient vectors, `{:hue h}` for an unknown hue interpolation, `{:colorspace cs}` and `{:options o}`. See also [[palette]], [[merge-gradients]], [[gradient-cubehelix]]."
   {:metadoc/categories #{:gr}}
   ([] (gradient (random-nth (r/rng :default) (:seq @gradients-list-))))
   ([palette-or-gradient-name] (gradient palette-or-gradient-name {}))
   ([palette-or-gradient-name options]
    (check-options-map options)
    (cond (keyword? palette-or-gradient-name) (get-gradient palette-or-gradient-name)
+         ;; :iq - two colors, or the four cosine coefficients a, b, c, d
          (= (:interpolation options) :iq) (let [n (count palette-or-gradient-name)]
-                                            (when-not (== n 2)
-                                              (throw (ex-info (str "Interpolation :iq needs 2 colors, got: " n)
+                                            (when-not (or (== n 2) (== n 4))
+                                              (throw (ex-info (str "Interpolation :iq needs 2 colors or 4 coefficient vectors, got: " n)
                                                               {:interpolation :iq :colors n})))
                                             (apply iq-gradient palette-or-gradient-name))
          :else (interpolated-gradient palette-or-gradient-name options))))
