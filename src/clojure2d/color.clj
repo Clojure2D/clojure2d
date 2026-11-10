@@ -106,7 +106,7 @@
   
   ## Distances
 
-  Several functions to calculate difference between colors, `delta-E*-xxx` etc.
+  Color differences: [[delta-E*]] (CIE 1976), [[delta-E*-94]], [[delta-E*-2000]], [[delta-E*-CMC]], [[delta-E-HyAB]], [[delta-E-z]] (Jzazbz), [[delta-E*-euclidean]] (any colorspace, Oklab by default), [[delta-C*]] and [[delta-H*]] (chroma and hue parts), [[delta-C-RGB]] (redmean), [[delta-D-HCL]]. Contrast: [[contrast-ratio]] (WCAG). Visibility: [[noticable-different?]].
 
   ## References
 
@@ -5397,7 +5397,15 @@
 ;; https://www.imatest.com/docs/colorcheck_ref/
 
 (defn delta-E*
-  "ΔE*_ab difference, CIE 1976"
+  "Returns the CIE 1976 color difference ΔE*ab: the Euclidean distance in CIELAB.
+
+  `sqrt(ΔL² + Δa² + Δb²)` of the colors converted with [[to-LAB]] (CIE 1931 2° D65).
+
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `options` (map, optional):
+      - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
+
+  Returns a non-negative double, symmetric in `c1`, `c2`; up to about 259 for sRGB colors (blue to green; black to white 100). Alpha is ignored. See also [[delta-E*-euclidean]], [[delta-E*-94]], [[delta-E*-2000]]."
   (^double [c1 c2] (delta-E* c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
                    :or {colorspace :LAB}}]
@@ -5414,7 +5422,15 @@
      (m/hypot-sqrt (.y c2) (.z c2))))
 
 (defn delta-C*
-  "ΔC*_ab difference, chroma difference in LAB color space, CIE 1976"
+  "Returns the CIE 1976 chroma difference ΔC*ab = C*1 - C*2.
+
+  Chroma `C* = sqrt(a² + b²)` of the colors converted with [[to-LAB]]. The result is signed: positive when `c1` has the higher chroma, so swapping the colors changes the sign.
+
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `options` (map, optional):
+      - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
+
+  Returns a double. Alpha is ignored. See also [[delta-H*]], [[delta-E*]]."
   {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-C* c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
@@ -5425,7 +5441,15 @@
 (def ^{:deprecated "Use delta-C*"} delta-c delta-C*)
 
 (defn delta-H*
-  "ΔH* difference, hue difference in LAB, CIE 1976"
+  "Returns the CIE 1976 hue difference ΔH*ab = sqrt(Δa² + Δb² - ΔC*²).
+
+  The part of [[delta-E*]] not explained by lightness and chroma, from the colors converted with [[to-LAB]]; unsigned (rounding noise below 0 gives 0).
+
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `options` (map, optional):
+      - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
+
+  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. See also [[delta-C*]]."
   {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-H* c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
@@ -5440,7 +5464,15 @@
 (def ^{:deprecated "Use delta-H*"} delta-h delta-H*)
 
 (defn delta-E-HyAB
-  "ΔE_HyAB difference"
+  "Returns the HyAB color difference: `|ΔL| + sqrt(Δa² + Δb²)` in CIELAB.
+
+  S. Abasi, M. Amani Tehran, M. D. Fairchild, Distance metrics for very large color differences (2020): a city-block lightness term with a Euclidean chromatic term, meant for large differences.
+
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `options` (map, optional):
+      - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
+
+  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. See also [[delta-E*]]."
   (^double [c1 c2] (delta-E-HyAB c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
                    :or {colorspace :LAB}}]
@@ -5452,7 +5484,16 @@
         (m/abs (- (.x c2) (.x c1)))))))
 
 (defn delta-E*-94
-  "ΔE* difference, CIE 1994"
+  "Returns the CIE 1994 color difference ΔE*94.
+
+  `sqrt((ΔL / kL)² + (ΔC / SC)² + (ΔH / SH)²)` in CIELAB with `SC = 1 + K1 C1`, `SH = 1 + K2 C1`; graphic arts: kL 1, K1 0.045, K2 0.015; textiles: kL 2, K1 0.048, K2 0.014. `c1` is the reference: the weights use its chroma, so the result is not symmetric.
+
+  - `c1` reference color, `c2` sample color, any type accepted by [[to-color]]
+  - `options` (map, optional):
+      - `:textiles?` - textile constants instead of graphic arts, default `false`
+      - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
+
+  Returns a non-negative double. Alpha is ignored. See also [[delta-E*-2000]], [[delta-E*-CMC]]."
   {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-E*-94 c1 c2 nil))
   (^double [c1 c2 {:keys [textiles? colorspace]
@@ -5479,8 +5520,16 @@
   delta-e-cie delta-E*)
 
 (defn delta-E*-euclidean
-  ^{:metadoc/categories #{:dist}
-    :doc "Euclidean distance in given colorspace (default Oklab)."}
+  "Returns the Euclidean distance of two colors in a colorspace, by default Oklab.
+
+  `sqrt(Δ0² + Δ1² + Δ2²)` over the first three channels after conversion. With the default it is ΔEOK (CSS Color 4, coloraide); with `:LAB` it equals [[delta-E*]], with `:DIN99` the DIN99 color difference (ASTM D2244-07). The result is in the units of the colorspace (Oklab: 0 to 1 for sRGB colors).
+
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `options` (map, optional):
+      - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:Oklab`. Use `:pass` to measure the channels as given.
+
+  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. Hue channels are treated as linear (no wrap-around)."
+  {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-E*-euclidean c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
                    :or {colorspace :Oklab}}]
@@ -5492,7 +5541,13 @@
                    (- (.z c2) (.z c1))))))
 
 (defn delta-C-RGB
-  "ΔC in RGB color space"
+  "Returns the redmean color difference of two sRGB colors.
+
+  A low-cost approximation of perceptual distance by T. Riemersma (compuphase, Colour metric): `sqrt((2 + r/256) ΔR² + 4 ΔG² + (2 + (255 - r)/256) ΔB²)` with `r` the mean red, on channels 0-255.
+
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+
+  Returns a non-negative double, symmetric in `c1`, `c2`; black to white about 765. Alpha is ignored. See also [[delta-E*]]."
   ^double [c1 c2]
   (let [^Vec4 c1 (pr/to-color c1)
         ^Vec4 c2 (pr/to-color c2)
@@ -5513,7 +5568,15 @@
 
 ;; http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.125.3833&rep=rep1&type=pdf
 (defn delta-D-HCL
-  "Color difference in HCL (Sarifuddin and Missaou) color space"
+  "Returns the HCL color difference DHCL of Sarifuddin and Missaoui (2005).
+
+  `sqrt((AL ΔL)² + ACH (C1² + C2² - 2 C1 C2 cos ΔH))` in [[to-HCL]] with `AL = 1.4456`, `ACH = ΔH + 0.16`, ΔH the angular hue difference in degrees (0 to 180). The primary paper is no longer available online; the degree reading of ΔH follows an implementation by other authors. Values are much larger than ΔE (red to orange about 762).
+
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `options` (map, optional):
+      - `:colorspace` - conversion applied to both colors, default `:HCL`; it must return the [[to-HCL]] layout (H in degrees, C, L).
+
+  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. See also [[delta-E*]]."
   (^double [c1 c2] (delta-D-HCL c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
                    :or {colorspace :HCL}}]
@@ -5529,9 +5592,17 @@
                       (* -2.0 (.y c1) (.y c2) (m/cos (m/radians dH))))))))))
 
 (defn delta-E*-CMC
-  "ΔE* CMC difference
+  "Returns the CMC l:c (1984) color difference.
 
-  Parameters `l` and `c` defaults to 1.0. Other common settings is `l=2.0` and `c=1.0`."
+  `sqrt((ΔL / (l SL))² + (ΔC / (c SC))² + (ΔH / SH)²)` in CIELAB, the weights computed from the lightness, chroma and hue of `c1`, the reference; the result is not symmetric. `l = 1`, `c = 1` measures perceptibility (default here); `l = 2`, `c = 1` acceptability (the default of colour-science and coloraide).
+
+  - `c1` reference color, `c2` sample color, any type accepted by [[to-color]]
+  - `options` (map, optional):
+      - `:l` - lightness factor, default `1.0`
+      - `:c` - chroma factor, default `1.0`
+      - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
+
+  Returns a non-negative double. Alpha is ignored. See also [[delta-E*-94]], [[delta-E*-2000]]."
   {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-E*-CMC c1 c2 nil))
   (^double [c1 c2 {:keys [^double l ^double c colorspace]
@@ -5572,7 +5643,15 @@
 (def ^{:deprecated "Use delta-E*-CMC"} delta-e-cmc delta-E*-CMC)
 
 (defn delta-E-z
-  "ΔE* calculated in JAB color space."
+  "Returns the Jzazbz color difference ΔEz (Safdar et al. 2017).
+
+  `sqrt(ΔJz² + ΔCz² + ΔHz²)` with `ΔHz = 2 sqrt(Cz1 Cz2) sin(Δhz / 2)`, from [[to-JAB]] (absolute white at 100 cd/m2).
+
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `options` (map, optional):
+      - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:JAB`. Use `:pass` for colors already in Jzazbz.
+
+  Returns a non-negative double, symmetric in `c1`, `c2`; small numbers (black to white about 0.17). Alpha is ignored. See also [[delta-E*-2000]]."
   {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-E-z c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
@@ -5609,9 +5688,16 @@
     (m/sqrt (/ v7 (+ v7 p25_7)))))
 
 (defn delta-E*-2000
-  "ΔE* color difference, CIE 2000
+  "Returns the CIEDE2000 color difference ΔE00 (CIE 142-2001).
 
-  http://www2.ece.rochester.edu/~gsharma/ciede2000/ciede2000noteCRNA.pdf"
+  Implemented after G. Sharma, W. Wu, E. N. Dalal, The CIEDE2000 color-difference formula: implementation notes, supplementary test data, and mathematical observations (2005), and verified against their test data. Weighted lightness, chroma and hue differences of CIELAB with the hue rotation term.
+
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `options` (map, optional):
+      - `:l`, `:c`, `:h` - parametric factors kL, kC, kH, default `1.0` each (textiles: `:l 2.0`)
+      - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
+
+  Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. See also [[delta-E*-94]], [[delta-E*-CMC]], [[delta-E*]]."
   (^double [c1 c2] (delta-E*-2000 c1 c2 nil))
   (^double [c1 c2 {:keys [^double l ^double c ^double h colorspace]
                    :or {l 1.0 c 1.0 h 1.0 colorspace :LAB}}]
@@ -5670,9 +5756,13 @@
                 (* Rt c' h'))))))
 
 (defn contrast-ratio
-  "WCAG contrast ratio.
+  "Returns the WCAG 2 contrast ratio of two colors: `(L1 + 0.05) / (L2 + 0.05)`, L1 the lighter.
 
-  Based on YUV luma."
+  The relative luminance is [[relative-luma]] divided by 255. Common thresholds: 3 (large text), 4.5 (text, AA), 7 (text, AAA).
+
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+
+  Returns a double from 1 (equal luminance) to 21 (black and white), symmetric in `c1`, `c2`. Alpha is ignored: colors are not composited on a background."
   {:metadoc/categories #{:dist}}
   ^double [c1 c2]
   (let [l1 (/ (relative-luma c1) 255.0)
@@ -5689,11 +5779,17 @@
                  (+ 10.70 (/ 5.74 s))) p))
 
 (defn noticable-different?
-  "Returns noticable difference (true/false) between colors.
+  "Tests whether two colors are noticeably different for a given mark size.
 
-  Defined in: https://research.tableau.com/sites/default/files/2014CIC_48_Stone_v3.pdf
-  
-  Implementation from: https://github.com/connorgr/d3-jnd/blob/master/src/jnd.js"
+  M. Stone, D. A. Szafir, V. Setlur, An Engineering Model for Color Difference as a Function of Size (2014), as d3-jnd: the colors differ when any of `|ΔL|`, `|Δa|`, `|Δb|` in CIELAB reaches `p (A + B / s)`, with `A = (10.16, 10.68, 10.70)`, `B = (1.50, 3.08, 5.74)`. The model was fitted for sizes from 1/3 to 6 degrees; the default size is an extrapolation. CIELAB here uses the D65 white (d3-jnd computes it with d3-color).
+
+  - `c1`, `c2` colors, any type accepted by [[to-color]]
+  - `options` (map, optional):
+      - `:s` - size in degrees of visual angle, default `0.1`
+      - `:p` - share of observers who should see the difference, 0 to 1, default `0.5`
+      - `:colorspace` - conversion applied to both colors, default `:LAB`. Use `:pass` for colors already in CIELAB.
+
+  Returns a boolean, symmetric in `c1`, `c2`. Alpha is ignored."
   {:metadoc/categories #{:dist}}
   ([c1 c2] (noticable-different? c1 c2 nil))
   ([c1 c2 {:keys [^double s ^double p colorspace]

@@ -290,8 +290,8 @@
 ;; * `delta-C*` - ${\Delta}C^*_{ab}$, chroma (color) difference in LAB color space, CIE76
 ;; * `delta-H*` - ${\Delta}H^*_{ab}$, hue difference in LAB color space, CIE76
 ;; * `delta-E*-94` - ${\Delta}E^*_{94}$, CIE94 difference
-;; * `delta-E*-2000` - ${\Delta}E^*_{00}$, CIEDE2000 difference, three optional weights can be provided, `l` for luma, `c` for color intensity and `h` for hue. By default they are set to `1.0`.
-;; * `delta-E*-CMC` - ${\Delta}E^*_{CMC}$, CMC l:c 1984 difference, two optional weights can be provided, `l` for luma and `c` for color intensity. By default they are set to `1.0`.
+;; * `delta-E*-2000` - ${\Delta}E^*_{00}$, CIEDE2000 difference, three optional weights can be provided in the options map, `:l` for lightness, `:c` for chroma and `:h` for hue. By default they are set to `1.0`.
+;; * `delta-E*-CMC` - ${\Delta}E^*_{CMC}$, CMC l:c 1984 difference, two optional weights can be provided in the options map, `:l` for lightness and `:c` for chroma. By default they are set to `1.0`.
 ;; * `delta-E-z` - ${\Delta}E_{z}$, difference in JzAzBz color space
 ;; * `delta-E-HyAB` - ${\Delta}E_{HyAB}$, hybrid difference in LAB color space
 ;; * `delta-E*-euclidean` - general, euclidean, distance in selected color space (`Oklab` by default)
@@ -308,13 +308,13 @@
          ['(c/delta-H* :yellow :blue)                      (c/delta-H* :yellow :blue)]
          ['(c/delta-E*-94 :yellow :blue)                   (c/delta-E*-94 :yellow :blue)]
          ['(c/delta-E*-2000 :yellow :blue)                 (c/delta-E*-2000 :yellow :blue)]
-         ['(c/delta-E*-2000 :yellow :blue 2.0 1.0 1.0)     (c/delta-E*-2000 :yellow :blue 2.0 1.0 1.0)]
+         ['(c/delta-E*-2000 :yellow :blue {:l 2.0})       (c/delta-E*-2000 :yellow :blue {:l 2.0})]
          ['(c/delta-E*-CMC :yellow :blue)                  (c/delta-E*-CMC :yellow :blue)]
-         ['(c/delta-E*-CMC :yellow :blue 2.0 1.0)          (c/delta-E*-CMC :yellow :blue 2.0 1.0)]
+         ['(c/delta-E*-CMC :yellow :blue {:l 2.0})         (c/delta-E*-CMC :yellow :blue {:l 2.0})]
          ['(c/delta-E-z :yellow :blue)                     (c/delta-E-z :yellow :blue)]
          ['(c/delta-E-HyAB :yellow :blue)                  (c/delta-E-HyAB :yellow :blue)]
          ['(c/delta-E*-euclidean :yellow :blue)            (c/delta-E*-euclidean :yellow :blue)]
-         ['(c/delta-E*-euclidean :yellow :blue :YUV)       (c/delta-E*-euclidean :yellow :blue :YUV)]
+         ['(c/delta-E*-euclidean :yellow :blue {:colorspace :YUV}) (c/delta-E*-euclidean :yellow :blue {:colorspace :YUV})]
          ['(c/delta-C-RGB :yellow :blue)                   (c/delta-C-RGB :yellow :blue)]
          ['(c/delta-D-HCL :yellow :blue)                   (c/delta-D-HCL :yellow :blue)]]})
 

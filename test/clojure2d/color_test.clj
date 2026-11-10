@@ -173,20 +173,7 @@
   (is (= "#4cbb22" (c/format-hex (b/blend-colors b/darken 0x4cbbfc 0xeeee22))))
   (is (= "#eeeefc" (c/format-hex (b/blend-colors b/lighten 0x4cbbfc 0xeeee22)))))
 
-(deftest chroma-contrast
-  (is (= 1.72 (m/approx (c/contrast-ratio :pink :hotpink))))
-  (is (= 6.12 (m/approx (c/contrast-ratio :pink :purple)))))
-
-(deftest chroma-distance
-  (is (= 96.95 (m/approx (c/delta-E* "fff" "ff0"))))
-  (is (= 122.16 (m/approx (c/delta-E* "fff" "f0f"))))
-  (is (= 255.0 (m/approx (c/delta-E*-euclidean "fff" "ff0" {:colorspace :RGB}))))
-  (is (= 255.0 (m/approx (c/delta-E*-euclidean "fff" "f0f" {:colorspace :RGB}))))
-  (is (= 1.64 (m/approx (c/delta-E*-CMC 0xededee 0xedeeed))))
-  (is (= 3.16 (m/approx (c/delta-E*-CMC 0xececee 0xeceeec))))
-  (is (= 7.36 (m/approx (c/delta-E*-CMC 0xe9e9ee 0xe9eee9))))
-  (is (= 14.84 (m/approx (c/delta-E*-CMC 0xe4e4ee 0xe4eee4))))
-  (is (= 21.32 (m/approx (c/delta-E*-CMC 0xe0e0ee 0xe0eee0)))))
+;; delta and contrast tests: clojure2d.color.deltas-test
 
 (deftest chroma-color
   (is (= "#ff000080" (c/format-hex (c/set-alpha :red 128))))

@@ -24,6 +24,7 @@ All notable changes to this project will be documented in this file. This change
 * `clojure2d.color`: docstrings for the representation layer (named colors, accessors, setters, AWT colors, clamping, scaling, `hue`, `hue-polar`, `format-hex`, `pack`, `black?`) and the `ColorProto` protocol; namespace docstring corrected for packed integers and hex strings
 * `clojure2d.color/to-color` (and every color function) accepts color names as strings, case-insensitive, for names without a namespace (`"red"`, `"Dark-Blue"`), and `float` arrays
 * `clojure2d.color`: docstrings for the colorspace conversions (model, source, conventions, ranges; `to-`, `from-`, normalized `*` variants) and a convention table in `colorspaces`, `colorspaces*`, `colorspaces-list`; `to-OSA`/`from-OSA` docstrings no longer swapped; docstrings for the XYZ helpers (`XYZ-to-LAB`, `LAB-to-XYZ`, `XYZ-to-LUV`, `LUV-to-XYZ`, `XYZ-to-HunterLAB`, `HunterLAB-to-XYZ`, `XYZ-to-LCH`, `LCH-to-XYZ`, `XYZ-to-LCHuv`, `LCHuv-to-XYZ`, `XYZ-to-Yxy`, `Yxy-to-XYZ`, `XYZ-to-UVW`, `UVW-to-XYZ`, `XYZ-to-UCS`, `UCS-to-XYZ`), `to-luma-color-hue`, `from-luma-color-hue`
+* `clojure2d.color`: docstrings for the color differences and contrast (`delta-E*`, `delta-C*`, `delta-H*`, `delta-E-HyAB`, `delta-E*-94`, `delta-E*-euclidean`, `delta-C-RGB`, `delta-D-HCL`, `delta-E*-CMC`, `delta-E-z`, `delta-E*-2000`, `contrast-ratio`, `noticable-different?`): formula, source, options and defaults, reference argument; `delta-E*-euclidean` had none
 
 ### Changed
 
