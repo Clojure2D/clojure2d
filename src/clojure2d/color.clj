@@ -113,12 +113,6 @@
   * https://vis4.net/chromajs/
   * https://github.com/thi-ng/color
   * https://github.com/nschloe/colorio"
-  {:metadoc/categories {:ops "Color/channel operations"
-                        :conv "Color conversions"
-                        :gr "Gradients"
-                        :pal "Colors, palettes"
-                        :interp "Interpolation"
-                        :dist "Distance"}}
   (:require [fastmath.core :as m]
             [fastmath.random :as r]
             [fastmath.vector :as v]
@@ -133,7 +127,7 @@
             [clojure2d.color.munsell :as munsell]
             [clojure.java.io :refer [input-stream resource]]
             [clojure.edn :as edn]
-            [clojure.string]
+            [clojure.string :as str]
             [fastmath.matrix :as mat])
   (:import [fastmath.vector Vec2 Vec3 Vec4]
            [java.awt Color]
@@ -142,10 +136,7 @@
            [fastmath.java Array]))
 
 (set! *unchecked-math* :warn-on-boxed)
-(m/use-primitive-operators)
-
-(defonce ^:private meta-conv #{:conv})
-(defonce ^:private meta-ops #{:ops})
+(set! *warn-on-reflection* true)
 
 ;; load the stuff to delay
 
@@ -157,18 +148,8 @@
 
 ;; color names
 
-(defonce ^:private color-presets-delay
-  (delay (into {} (map (fn [[k v]]
-                         [k (pr/to-color v)]) (read-edn "color_presets.edn")))))
-
-(defn named-colors-list
-  "Returns the names of all predefined colors.
-
-  The names are keywords: the 148 CSS Color 4 names (e.g. `:red`, `:rebeccapurple`), hyphenated variants of the multi-word CSS names (e.g. `:dark-blue`), `:amber` (a clojure2d-specific color, `#b28c00`) and `:docc/...` colors from A Dictionary of Colour Combinations by Sanzo Wada (via mattdesl/dictionary-of-colour-combinations). Every name can be used wherever a color is expected.
-
-  Returns an unordered sequence of keywords. See also [[to-color]], [[palette]]."
-  {:metadoc/categories #{:pal}}
-  [] (keys @color-presets-delay))
+(def ^:private color-presets-delay
+  (delay (into {} (map (fn [[k v]] [k (pr/to-color v)]) (read-edn "color_presets.edn")))))
 
 ;; palettes / gradients
 
@@ -176,7 +157,7 @@
   [prefix n]
   (read-edn (str prefix "c2d_" n ".edn")))
 
-(defonce ^:private load-edn-file (memoize load-edn-file-))
+(def ^:private load-edn-file (memoize load-edn-file-))
 
 (defn- get-palette-or-gradient
   [prefix k]
@@ -198,7 +179,6 @@
   Accepts and returns `double`.
 
   See also [[lclamp255]], [[clamp]] and [[lclamp]]."
-  {:metadoc/categories meta-ops}
   ^double [^double a]
   (m/constrain a 0.0 255.0))
 
@@ -208,7 +188,6 @@
   Use to ensure that value is in RGB range.
 
   See also [[clamp255]], [[clamp]] and [[lclamp]]."
-  {:metadoc/categories meta-ops}
   ^long [^double a]
   (m/constrain (m/round a) 0 255))
 
@@ -219,7 +198,7 @@
 (defn- color-array?
   "Is `c` an array of a type [[to-color]] accepts?"
   [c]
-  (contains? color-array-classes (class c)))
+  (color-array-classes (class c)))
 
 (defn possible-color?
   "Checks by type whether `c` looks like a single color.
@@ -227,16 +206,16 @@
   - `c` any value
 
   Returns true for strings, keywords, packed integers (`Long`, `Integer`), `Vec2`, `Vec3`, `Vec4` and `java.awt.Color`, and for a sequential collection (vector, list, sequence) or a `double`, `float`, `int`, `long` array of 1 to 4 numbers, each within `[-255,255]`. Other collections (sets, maps, Java collections) are not colors. The value is not converted, so an unknown name or an invalid hex string also passes. A short sequence of small numbers is ambiguous: `[16 32]` is a gray with alpha, not a palette of two packed colors. See also [[valid-color?]], [[possible-palette?]]."
-  {:metadoc/categories #{:pal}}
   [c]
-  (cond
-    (or (string? c) (keyword? c) (instance? Long c) (instance? Integer c)
-        (instance? Vec2 c) (instance? Vec3 c) (instance? Vec4 c) (instance? Color c)) true
-    (or (sequential? c) (color-array? c)) (let [s (take 5 c)
-                       n (count s)]
-                   (and (<= 1 n 4)
-                        (every? #(and (number? %) (<= (m/abs (double %)) 255.0)) s)))
-    :else false))
+  (or (string? c) (keyword? c) (instance? Long c) (instance? Integer c)
+      (instance? Vec2 c) (instance? Vec3 c) (instance? Vec4 c) (instance? Color c)
+      (and (or (sequential? c) (color-array? c)) (let [s (take 5 c)
+                                                       n (count s)]
+                                                   (and (m/<= 1 n 4)
+                                                        (every? (fn [v]
+                                                                  (and (number? v)
+                                                                       (m/<= 0.0 (double v) 255.0))) s))))))
+
 
 (defn possible-palette?
   "Checks by type whether `c` looks like a palette, a sequence of colors.
@@ -244,10 +223,9 @@
   - `c` any value
 
   Returns true for a non-empty sequential collection (vector, list, sequence) which is not itself a color according to [[possible-color?]] and whose every element is a possible color. nil, maps, sets, strings and functions (gradients) are not palettes. The elements are not converted. See also [[possible-color?]], [[valid-color?]], [[palette]]."
-  {:metadoc/categories #{:pal}}
   [c]
   (and (sequential? c)
-       (boolean (seq c))
+       (seq c)
        (not (possible-color? c))
        (every? possible-color? c)))
 
@@ -257,7 +235,6 @@
   - `c` any value
 
   Returns the `Vec4` from [[to-color]] when the conversion succeeds, false otherwise (nil, an unknown name, an invalid hex string, an unsupported type). See also [[possible-color?]]."
-  {:metadoc/categories #{:pal}}
   [c]
   (try
     (pr/to-color c)
@@ -271,7 +248,6 @@
   - `c` one of: `Vec4` (returned as is), `Vec3` (alpha 255), `Vec2` (gray, alpha), keyword (a name of [[named-colors-list]]), packed ARGB integer (top byte 0 means opaque), hex string (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `#` optional, case-insensitive, 1 or 2 digits for a gray), color name string (case-insensitive, names without a namespace, e.g. `Red`, `dark-blue`), `java.awt.Color`, sequence or `double`/`float`/`int`/`long` array (0 elements black, 1 gray, 2 gray and alpha, 3 RGB, 4 or more RGBA)
 
   Returns a `Vec4`; values are taken as given, so a `Vec4` from another colorspace passes through. Throws `ex-info` with `{:color c}` for nil, an unknown color name, a string which is neither hex nor a color name or a number other than an integer, and `{:color type}` (its class) for a value of another type. See also [[color]] (clamped), [[valid-color?]], [[to-awt-color]], [[format-hex]]."
-  {:metadoc/categories meta-ops}
   ^Vec4 [c] (pr/to-color c))
 
 (defn to-awt-color
@@ -280,7 +256,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Channels and alpha are rounded and clamped to integers in `[0,255]`. See also [[awt-color]], [[to-color]]."
-  {:metadoc/categories meta-ops}
   ^java.awt.Color [c] (pr/to-awt-color c))
 
 (defn luma
@@ -291,7 +266,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a double, `[0,255]` for RGB colors (white 255). See also [[relative-luma]] (linear), [[to-Gray]]."
-  {:metadoc/categories meta-ops}
   ^double [c] (pr/luma c))
 
 (def ^:private srgb-to-xyz-matrix
@@ -324,9 +298,9 @@
 (defn- luma-fn
   "Weighted sum of channels with the Y row of the sRGB to XYZ matrix of [[to-XYZ]] (from `(rgb/rgbs :sRGB)`)."
   ^double [^double r ^double g ^double b]
-  (+ (* srgb->xyz-10 r)
-     (* srgb->xyz-11 g)
-     (* srgb->xyz-12 b)))
+  (m/+ (m/* srgb->xyz-10 r)
+       (m/* srgb->xyz-11 g)
+       (m/* srgb->xyz-12 b)))
 
 (declare from-sRGB)
 
@@ -338,7 +312,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a double, `[0,255]` (white 255). See also [[luma]], [[contrast-ratio]]."
-  {:metadoc/categories meta-ops}
   ^double [c]
   (let [^Vec4 c (from-sRGB c)]
     (luma-fn (.x c) (.y c) (.z c))))
@@ -349,7 +322,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a double, not clamped. For a `Vec4` holding another colorspace (e.g. from `to-LAB`) it is that colorspace's first channel. Same as [[ch0]]; see also [[set-red]]."
-  {:metadoc/categories meta-ops}
   ^double [c] (pr/red c))
 
 (defn green
@@ -358,7 +330,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a double, not clamped. For a `Vec4` holding another colorspace (e.g. from `to-LAB`) it is that colorspace's second channel. Same as [[ch1]]; see also [[set-green]]."
-  {:metadoc/categories meta-ops}
   ^double [c] (pr/green c))
 
 (defn blue
@@ -367,7 +338,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a double, not clamped. For a `Vec4` holding another colorspace (e.g. from `to-LAB`) it is that colorspace's third channel. Same as [[ch2]]; see also [[set-blue]]."
-  {:metadoc/categories meta-ops}
   ^double [c] (pr/blue c))
 
 (defn alpha
@@ -376,7 +346,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a double, not clamped; 255 for colors without alpha (`Vec3`, 3-element sequences, packed integers whose top byte is 0). See also [[set-alpha]]."
-  {:metadoc/categories meta-ops}
   ^double [c] (pr/alpha c))
 
 (defn ch0
@@ -385,7 +354,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a double, not clamped. For a `Vec4` holding another colorspace (e.g. from `to-LAB`) it is that colorspace's first channel. Same as [[red]]; see also [[set-ch0]], [[get-channel]]."
-  {:metadoc/categories meta-ops}
   ^double [c] (pr/red c))
 
 (defn ch1
@@ -394,7 +362,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a double, not clamped. For a `Vec4` holding another colorspace (e.g. from `to-LAB`) it is that colorspace's second channel. Same as [[green]]; see also [[set-ch1]], [[get-channel]]."
-  {:metadoc/categories meta-ops}
   ^double [c] (pr/green c))
 
 (defn ch2
@@ -403,7 +370,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a double, not clamped. For a `Vec4` holding another colorspace (e.g. from `to-LAB`) it is that colorspace's third channel. Same as [[blue]]; see also [[set-ch2]], [[get-channel]]."
-  {:metadoc/categories meta-ops}
   ^double [c] (pr/blue c))
 
 (defn hue-polar
@@ -414,13 +380,12 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a double; grays (equal channels) give 0. See also [[hue]]."
-  {:metadoc/categories meta-ops}
   ^double [c]
   (let [^Vec4 c (pr/to-color c)
-        a (* 0.5 (- (+ (.x c) (.x c)) (.y c) (.z c)))
-        b (* 0.8660254037844386 (- (.y c) (.z c)))
+        a (m/* 0.5 (m/- (m/+ (.x c) (.x c)) (.y c) (.z c)))
+        b (m/* 0.8660254037844386 (m/- (.y c) (.z c)))
         h (m/degrees (m/atan2 b a))]
-    (if (neg? h) (+ 360.0 h) h)))
+    (if (m/neg? h) (m/+ 360.0 h) h)))
 
 (declare to-HC)
 
@@ -432,7 +397,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a double from 0 to 360 (a tiny negative hexagon position rounds to 360); grays (equal channels) give 0. See also [[hue-polar]], [[to-HSV]]."
-  {:metadoc/categories meta-ops}
   ^double [c]
   (let [^Vec4 ret (to-HC (pr/to-color c))] (.x ret)))
 
@@ -443,7 +407,6 @@
   - `a` new alpha, not clamped
 
   Returns a `Vec4`. See also [[alpha]], [[color]] (clamping), [[set-awt-alpha]]."
-  {:metadoc/categories meta-ops}
   ^Vec4 [c a]
   (let [^Vec4 v (pr/to-color c)]
     (Vec4. (.x v) (.y v) (.z v) a)))
@@ -455,7 +418,6 @@
   - `val` new channel value, not clamped
 
   Returns a `Vec4`. See also [[red]], [[set-ch0]], [[set-channel]]."
-  {:metadoc/categories meta-ops}
   ^Vec4 [c val]
   (let [^Vec4 v (pr/to-color c)]
     (Vec4. val (.y v) (.z v) (.w v))))
@@ -467,7 +429,6 @@
   - `val` new channel value, not clamped
 
   Returns a `Vec4`. See also [[green]], [[set-ch1]], [[set-channel]]."
-  {:metadoc/categories meta-ops}
   ^Vec4 [c val]
   (let [^Vec4 v (pr/to-color c)]
     (Vec4. (.x v) val (.z v) (.w v))))
@@ -479,7 +440,6 @@
   - `val` new channel value, not clamped
 
   Returns a `Vec4`. See also [[blue]], [[set-ch2]], [[set-channel]]."
-  {:metadoc/categories meta-ops}
   ^Vec4 [c val]
   (let [^Vec4 v (pr/to-color c)]
     (Vec4. (.x v) (.y v) val (.w v))))
@@ -491,7 +451,6 @@
   - `val` new channel value, not clamped
 
   Returns a `Vec4`. See also [[ch0]], [[set-red]], [[set-channel]]."
-  {:metadoc/categories meta-ops}
   ^Vec4 [c val]
   (let [^Vec4 v (pr/to-color c)]
     (Vec4. val (.y v) (.z v) (.w v))))
@@ -503,7 +462,6 @@
   - `val` new channel value, not clamped
 
   Returns a `Vec4`. See also [[ch1]], [[set-green]], [[set-channel]]."
-  {:metadoc/categories meta-ops}
   ^Vec4 [c val]
   (let [^Vec4 v (pr/to-color c)]
     (Vec4. (.x v) val (.z v) (.w v))))
@@ -515,7 +473,6 @@
   - `val` new channel value, not clamped
 
   Returns a `Vec4`. See also [[ch2]], [[set-blue]], [[set-channel]]."
-  {:metadoc/categories meta-ops}
   ^Vec4 [c val]
   (let [^Vec4 v (pr/to-color c)]
     (Vec4. (.x v) (.y v) val (.w v))))
@@ -527,7 +484,6 @@
   - `a` new alpha, rounded and clamped to `[0,255]`
 
   See also [[set-alpha]], [[awt-color]]."
-  {:metadoc/categories meta-ops}
   ^Color [c a]
   (let [^Color cc (pr/to-awt-color c)]
     (Color. (.getRed cc)
@@ -546,11 +502,9 @@
   - `[r g b a]` from channel values and alpha
 
   Channel values and alpha are rounded and clamped to integers in `[0,255]`. See also [[awt-gray]], [[color]]."
-  {:metadoc/categories meta-ops}
   (^Color [c]
    (pr/to-awt-color c))
-  (^Color [c a]
-   (set-awt-alpha c a))
+  (^Color [c a] (set-awt-alpha c a))
   (^Color [^double r ^double g ^double b]
    (Color. (lclamp255 r)
            (lclamp255 g)
@@ -572,7 +526,6 @@
   - `[r g b a]` from channel values and alpha
 
   Unlike [[to-color]], which converts without clamping, `color` always returns a valid RGBA color. See also [[gray]], [[awt-color]]."
-  {:metadoc/categories meta-ops}
   (^Vec4 [c]
    (let [^Vec4 v (pr/to-color c)]
      (Vec4. (clamp255 (.x v)) (clamp255 (.y v)) (clamp255 (.z v)) (clamp255 (.w v)))))
@@ -596,7 +549,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. See also [[lclamp]]."
-  {:metadoc/categories meta-ops}
   ^Vec4 [c]
   (v/fmap (pr/to-color c) clamp255))
 
@@ -606,7 +558,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with integer-valued doubles. See also [[clamp]]."
-  {:metadoc/categories meta-ops}
   ^Vec4 [c]
   (v/fmap (pr/to-color c) lclamp255))
 
@@ -618,14 +569,13 @@
   - `alpha?` (optional, default false) when truthy alpha is multiplied too
 
   Returns a `Vec4`, not clamped. See also [[scale-down]], [[scale-up]]."
-  {:metadoc/categories meta-ops}
   (^Vec4 [c ^double v] (scale c v false))
   (^Vec4 [c ^double v alpha?]
    (let [^Vec4 c (pr/to-color c)]
-     (Vec4. (* v (.x c))
-            (* v (.y c))
-            (* v (.z c))
-            (if alpha? (* v (.w c)) (.w c))))))
+     (Vec4. (m/* v (.x c))
+            (m/* v (.y c))
+            (m/* v (.z c))
+            (if alpha? (m/* v (.w c)) (.w c))))))
 
 (defn scale-down
   "Divides the channels by 255: an RGB color goes to the `[0,1]` scale.
@@ -634,9 +584,8 @@
   - `alpha?` (optional, default false) when truthy alpha is divided too
 
   Returns a `Vec4`. See also [[scale-up]], [[scale]]."
-  {:metadoc/categories meta-ops}
   (^Vec4 [c] (scale-down c false))
-  (^Vec4 [c alpha?] (scale c (/ 255.0) alpha?)))
+  (^Vec4 [c alpha?] (scale c (m// 255.0) alpha?)))
 
 (defn scale-up
   "Multiplies the channels by 255: a color on the `[0,1]` scale goes to `[0,255]`.
@@ -645,7 +594,6 @@
   - `alpha?` (optional, default false) when truthy alpha is multiplied too
 
   Returns a `Vec4`. See also [[scale-down]], [[scale]]."
-  {:metadoc/categories meta-ops}
   (^Vec4 [c] (scale-up c false))
   (^Vec4 [c alpha?] (scale c 255.0 alpha?)))
 
@@ -656,7 +604,6 @@
   - `a` alpha (optional, default 255)
 
   Values are clamped to `[0,255]`. See also [[color]], [[awt-gray]]."
-  {:metadoc/categories meta-ops}
   (^Vec4 [^double v] (color v v v))
   (^Vec4 [^double v ^double a] (color v v v a)))
 
@@ -667,25 +614,26 @@
   - `a` alpha (optional, default 255)
 
   Values are rounded and clamped to `[0,255]`. See also [[gray]], [[awt-color]]."
-  {:metadoc/categories meta-ops}
   (^Color [^double v] (awt-color v v v))
   (^Color [^double v ^double a] (awt-color v v v a)))
 
 (defn- hex-string->color
   "Parses hex notation (`#` optional) to `Vec4`: 1 digit `v` is `vvvvvv`, 2 digits `vv` are `vvvvvv`, `rgb`, `rgba` (digits doubled), `rrggbb`, `rrggbbaa`. Returns nil for other text."
   [^String input]
-  (let [^String s (if (= (first input) \#) (subs input 1) input)]
+  (let [^String s (if (str/starts-with? input "#") (subs input 1) input)]
     (when (and (#{1 2 3 4 6 8} (count s)) (re-matches #"[0-9a-fA-F]+" s))
       (let [^String s (case (count s)
-                        1 (str s s s s s s)
-                        2 (str s s s)
-                        3 (let [[r g b] s] (str r r g g b b))
+                        1 (str s s s s s s "ff")
+                        2 (str s s s "ff")
+                        3 (let [[r g b] s] (str r r g g b b "ff"))
                         4 (let [[r g b a] s] (str r r g g b b a a))
+                        6 (str s "ff")
                         s)
-            rgb (Long/parseLong (subs s 0 (min 6 (count s))) 16)]
-        (if (= 8 (count s))
-          (Vec4. (bit-and 0xff (m/>> rgb 16)) (bit-and 0xff (m/>> rgb 8)) (bit-and 0xff rgb) (Long/parseLong (subs s 6) 16))
-          (pr/to-color (Long/parseLong s 16)))))))
+            rgb (Long/parseLong s 16)]
+        (Vec4. (m/bit-and 0xff (m/>> rgb 24))
+               (m/bit-and 0xff (m/>> rgb 16))
+               (m/bit-and 0xff (m/>> rgb 8))
+               (m/bit-and 0xff rgb))))))
 
 (defn- gray-vec4
   "Unclamped gray `Vec4`."
@@ -709,11 +657,10 @@
   (throw (ex-info (str "Not a color: " c " (" (type c) ")") {:color (if (number? c) c (type c))})))
 
 (defn- color-name-string->color
-  "The `Vec4` of a predefined color name given as a string, case-insensitive, names without a namespace only; nil otherwise."
+  "The `Vec4` of a predefined color name given as a string, case-insensitive; nil otherwise."
   [^String input]
   (let [k (keyword (.toLowerCase input))]
-    (when (nil? (namespace k))
-      (@color-presets-delay k))))
+    (@color-presets-delay k)))
 
 (defn- string->color
   "Parses hex notation or a color name; throws `ex-info` with `{:color input}` otherwise."
@@ -725,28 +672,21 @@
 (defn- packed-alpha
   "Alpha of a packed ARGB integer: the top byte, or 255 when the top byte is 0."
   ^double [^long c]
-  (let [a (bit-and 0xff (m/>> c 24))]
+  (let [a (m/bit-and 0xff (m/>> c 24))]
     (if (zero? a) 255.0 a)))
 
 (extend-protocol pr/ColorProto
   Vec2
-  (to-color ^Vec4 [^Vec2 c]
-    (Vec4. (.x c) (.x c) (.x c) (.y c)))
-  (to-awt-color ^Color [^Vec2 c]
-    (let [v (lclamp255 (.x c))]      
-      (Color. v v v (lclamp255 (.y c)))))
+  (to-color ^Vec4 [^Vec2 c] (Vec4. (.x c) (.x c) (.x c) (.y c)))
+  (to-awt-color ^Color [^Vec2 c] (let [v (lclamp255 (.x c))] (Color. v v v (lclamp255 (.y c)))))
   (luma ^double [^Vec2 c] (.x c))
   (red ^double [^Vec2 c] (.x c))
   (green ^double [^Vec2 c] (.x c))
   (blue ^double [^Vec2 c] (.x c))
   (alpha ^double [^Vec2 c] (.y c))
   Vec3
-  (to-color ^Vec4 [^Vec3 c]
-    (Vec4. (.x c) (.y c) (.z c) 255))
-  (to-awt-color ^Color [^Vec3 c]
-    (Color. (lclamp255 (.x c))
-            (lclamp255 (.y c))
-            (lclamp255 (.z c))))
+  (to-color ^Vec4 [^Vec3 c] (Vec4. (.x c) (.y c) (.z c) 255.0))
+  (to-awt-color ^Color [^Vec3 c] (Color. (lclamp255 (.x c)) (lclamp255 (.y c)) (lclamp255 (.z c))))
   (luma ^double [^Vec3 c] (luma-fn (.x c) (.y c) (.z c)))
   (red ^double [^Vec3 c] (.x c))
   (green ^double [^Vec3 c] (.y c))
@@ -754,11 +694,10 @@
   (alpha ^double [_] 255.0)
   Vec4
   (to-color ^Vec4 [c] c)
-  (to-awt-color ^Color [^Vec4 c]
-    (Color.  (lclamp255 (.x c))
-             (lclamp255 (.y c))
-             (lclamp255 (.z c))
-             (lclamp255 (.w c))))
+  (to-awt-color ^Color [^Vec4 c] (Color.  (lclamp255 (.x c))
+                                          (lclamp255 (.y c))
+                                          (lclamp255 (.z c))
+                                          (lclamp255 (.w c))))
   (luma ^double [^Vec4 c] (luma-fn (.x c) (.y c) (.z c)))
   (red ^double [^Vec4 c] (.x c))
   (green ^double [^Vec4 c] (.y c))
@@ -773,11 +712,10 @@
   (blue ^double [n] (pr/blue (named-color n)))
   (alpha ^double [n] (pr/alpha (named-color n)))
   Color
-  (to-color ^Vec4 [^Color c]
-    (Vec4. (.getRed c)
-           (.getGreen c)
-           (.getBlue c)
-           (.getAlpha c)))
+  (to-color ^Vec4 [^Color c] (Vec4. (.getRed c)
+                                    (.getGreen c)
+                                    (.getBlue c)
+                                    (.getAlpha c)))
   (to-awt-color ^Color [c] c)
   (luma ^double [^Color c] (luma-fn (.getRed c) (.getGreen c) (.getBlue c)))
   (red ^double [^Color c] (.getRed c))
@@ -794,24 +732,25 @@
   (blue [_] (nil-color-error))
   Long
   (alpha ^double [^long c] (packed-alpha c))
-  (red ^double [^long c] (bit-and 0xff (m/>> c 16)))
-  (green ^double [^long c] (bit-and 0xff (m/>> c 8)))
-  (blue ^double [^long c] (bit-and 0xff c))
-  (to-color ^Vec4 [^long c] (Vec4. (bit-and 0xff (m/>> c 16))
-                                   (bit-and 0xff (m/>> c 8))
-                                   (bit-and 0xff c)
+  (red ^double [^long c] (m/bit-and 0xff (m/>> c 16)))
+  (green ^double [^long c] (m/bit-and 0xff (m/>> c 8)))
+  (blue ^double [^long c] (m/bit-and 0xff c))
+  (to-color ^Vec4 [^long c] (Vec4. (m/bit-and 0xff (m/>> c 16))
+                                   (m/bit-and 0xff (m/>> c 8))
+                                   (m/bit-and 0xff c)
                                    (packed-alpha c)))
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
   (luma ^double [c] (pr/luma (pr/to-color c)))
   Integer
   (alpha ^double [c] (packed-alpha (long c)))
-  (red ^double [c] (bit-and 0xff (m/>> ^int c 16)))
-  (green ^double [c] (bit-and 0xff (m/>> ^int c 8)))
-  (blue ^double [c] (bit-and 0xff ^int c))
-  (to-color ^Vec4 [c] (Vec4. (bit-and 0xff (m/>> ^int c 16))
-                             (bit-and 0xff (m/>> ^int c 8))
-                             (bit-and 0xff ^int c)
-                             (packed-alpha (long c))))
+  (red ^double [c] (m/bit-and 0xff (m/>> (long c) 16)))
+  (green ^double [c] (m/bit-and 0xff (m/>> (long c) 8)))
+  (blue ^double [c] (m/bit-and 0xff ^int c))
+  (to-color ^Vec4 [c] (let [c (long c)]
+                        (Vec4. (m/bit-and 0xff (m/>> c 16))
+                               (m/bit-and 0xff (m/>> c 8))
+                               (m/bit-and 0xff  c)
+                               (packed-alpha c))))
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
   (luma ^double [c] (pr/luma (pr/to-color c)))
   String
@@ -836,12 +775,13 @@
   (to-awt-color ^Color [c] (pr/to-awt-color (pr/to-color c)))
   (luma ^double [c] (pr/luma (pr/to-color c)))
   ISeq
-  (to-color ^Vec4 [c] (case (count (take 4 c))
-                        0 (Vec4. 0.0 0.0 0.0 255.0)
-                        1 (gray-vec4 (first c))
-                        2 (gray-vec4 (first c) (second c))
-                        3 (Vec4. (first c) (second c) (nth c 2) 255.0)
-                        (Vec4. (first c) (second c) (nth c 2) (nth c 3 255.0))))
+  (to-color ^Vec4 [c] (let [c (vec (take 4 c))]
+                        (case (count c)
+                          0 (Vec4. 0.0 0.0 0.0 255.0)
+                          1 (gray-vec4 (c 0))
+                          2 (gray-vec4 (c 0) (c 1))
+                          3 (Vec4. (c 0) (c 1) (c 2) 255.0)
+                          (Vec4. (c 0) (c 1) (c 2) (c 3)))))
   (alpha ^double [c] (pr/alpha (pr/to-color c)))
   (red ^double [c] (pr/red (pr/to-color c)))
   (green ^double [c] (pr/green (pr/to-color c)))
@@ -869,10 +809,10 @@
   pr/ColorProto
   (to-color ^Vec4 [c] (case (alength ^doubles c)
                         0 (Vec4. 0.0 0.0 0.0 255.0)
-                        1 (gray-vec4 (aget ^doubles c 0))
-                        2 (gray-vec4 (aget ^doubles c 0) (aget ^doubles c 1))
-                        3 (Vec4. (aget ^doubles c 0) (aget ^doubles c 1) (aget ^doubles c 2) 255.0)
-                        (Vec4. (aget ^doubles c 0) (aget ^doubles c 1) (aget ^doubles c 2) (aget ^doubles c 3))))
+                        1 (gray-vec4 (Array/aget ^doubles c 0))
+                        2 (gray-vec4 (Array/aget ^doubles c 0) (Array/aget ^doubles c 1))
+                        3 (Vec4. (Array/aget ^doubles c 0) (Array/aget ^doubles c 1) (Array/aget ^doubles c 2) 255.0)
+                        (Vec4. (Array/aget ^doubles c 0) (Array/aget ^doubles c 1) (Array/aget ^doubles c 2) (Array/aget ^doubles c 3))))
   (alpha ^double [c] (pr/alpha (pr/to-color c)))
   (red ^double [c] (pr/red (pr/to-color c)))
   (green ^double [c] (pr/green (pr/to-color c)))
@@ -884,10 +824,10 @@
   pr/ColorProto
   (to-color ^Vec4 [c] (case (alength ^ints c)
                         0 (Vec4. 0.0 0.0 0.0 255.0)
-                        1 (gray-vec4 (aget ^ints c 0))
-                        2 (gray-vec4 (aget ^ints c 0) (aget ^ints c 1))
-                        3 (Vec4. (aget ^ints c 0) (aget ^ints c 1) (aget ^ints c 2) 255.0)
-                        (Vec4. (aget ^ints c 0) (aget ^ints c 1) (aget ^ints c 2) (aget ^ints c 3))))
+                        1 (gray-vec4 (Array/aget ^ints c 0))
+                        2 (gray-vec4 (Array/aget ^ints c 0) (Array/aget ^ints c 1))
+                        3 (Vec4. (Array/aget ^ints c 0) (Array/aget ^ints c 1) (Array/aget ^ints c 2) 255.0)
+                        (Vec4. (Array/aget ^ints c 0) (Array/aget  ^ints c 1) (Array/aget ^ints c 2) (Array/aget ^ints c 3))))
   (alpha ^double [c] (pr/alpha (pr/to-color c)))
   (red ^double [c] (pr/red (pr/to-color c)))
   (green ^double [c] (pr/green (pr/to-color c)))
@@ -914,10 +854,10 @@
   pr/ColorProto
   (to-color ^Vec4 [c] (case (alength ^longs c)
                         0 (Vec4. 0.0 0.0 0.0 255.0)
-                        1 (gray-vec4 (aget ^longs c 0))
-                        2 (gray-vec4 (aget ^longs c 0) (aget ^longs c 1))
-                        3 (Vec4. (aget ^longs c 0) (aget ^longs c 1) (aget ^longs c 2) 255.0)
-                        (Vec4. (aget ^longs c 0) (aget ^longs c 1) (aget ^longs c 2) (aget ^longs c 3))))
+                        1 (gray-vec4 (Array/aget ^longs c 0))
+                        2 (gray-vec4 (Array/aget ^longs c 0) (Array/aget ^longs c 1))
+                        3 (Vec4. (Array/aget ^longs c 0) (Array/aget ^longs c 1) (Array/aget ^longs c 2) 255.0)
+                        (Vec4. (Array/aget ^longs c 0) (Array/aget ^longs c 1) (Array/aget ^longs c 2) (Array/aget ^longs c 3))))
   (alpha ^double [c] (pr/alpha (pr/to-color c)))
   (red ^double [c] (pr/red (pr/to-color c)))
   (green ^double [c] (pr/green (pr/to-color c)))
@@ -933,14 +873,13 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns lowercase `#rrggbb`, or `#rrggbbaa` when the rounded alpha is below 255. Channels and alpha are rounded and clamped to `[0,255]`. [[to-color]] reads the result back. See also [[pack]]."
-  {:metadoc/categories meta-ops}
   ^String [c]
   (let [^Vec4 c (pr/to-color c)
         s (str "#" (format "%02x" (lclamp255 (.x c)))
                (format "%02x" (lclamp255 (.y c)))
                (format "%02x" (lclamp255 (.z c))))
         a (lclamp255 (.w c))]
-    (if (< a 255) (str s (format "%02x" a)) s)))
+    (if (m/< a 255) (str s (format "%02x" a)) s)))
 
 (defn pack
   "Packs a color into a 32-bit ARGB integer, `0xAARRGGBB`.
@@ -948,15 +887,13 @@
   - `c` color, any type accepted by [[to-color]]
 
   Channels and alpha are rounded and clamped to `[0,255]`; the result is an `int`, negative when alpha is 128 or more. [[to-color]] reads an integer whose top byte is 0 as an opaque color, so a fully transparent color does not round-trip. See also [[format-hex]], [[quil]]."
-  {:metadoc/categories meta-ops}
   [c]
-  (unchecked-int (bit-or (m/<< (lclamp255 (pr/alpha c)) 24)
-                         (m/<< (lclamp255 (pr/red c)) 16)
-                         (m/<< (lclamp255 (pr/green c)) 8)
-                         (lclamp255 (pr/blue c)))))
+  (unchecked-int (m/bit-or (m/<< (lclamp255 (pr/alpha c)) 24)
+                           (m/<< (lclamp255 (pr/red c)) 16)
+                           (m/<< (lclamp255 (pr/green c)) 8)
+                           (lclamp255 (pr/blue c)))))
 
-(def ^{:doc "Packs a color into a 32-bit ARGB integer, the color type of Quil and Processing. Alias of [[pack]]."
-       :metadoc/categories meta-ops} quil pack)
+(def ^{:doc "Packs a color into a 32-bit ARGB integer, the color type of Quil and Processing. Alias of [[pack]]."} quil pack)
 
 (defn black?
   "Checks whether a color is black: red, green and blue, clamped to `[0,255]`, are all 0.
@@ -966,9 +903,9 @@
   Alpha is ignored; negative channels count as 0. See also [[not-black?]]."
   [c]
   (let [^Vec4 v (clamp c)]
-    (and (zero? (.x v))
-         (zero? (.y v))
-         (zero? (.z v)))))
+    (and (m/zero? (.x v))
+         (m/zero? (.y v))
+         (m/zero? (.z v)))))
 
 (defn not-black?
   "Checks whether a color is not black: any of red, green and blue, clamped to `[0,255]`, is above 0.
@@ -978,9 +915,9 @@
   Alpha is ignored. See also [[black?]]."
   [c]
   (let [^Vec4 v (clamp c)]
-    (or (pos? (.x v))
-        (pos? (.y v))
-        (pos? (.z v)))))
+    (or (m/pos? (.x v))
+        (m/pos? (.y v))
+        (m/pos? (.z v)))))
 
 ;; ## Colorspace functions
 ;;
@@ -998,17 +935,16 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: C, M, Y in `[0,255]`. See also [[from-CMY]], [[to-CMY*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
-    (Vec4. (- 255.0 (.x c))
-           (- 255.0 (.y c))
-           (- 255.0 (.z c))
+    (Vec4. (m/- 255.0 (.x c))
+           (m/- 255.0 (.y c))
+           (m/- 255.0 (.z c))
            (.w c))))
 
-(def ^{:doc "CMY to sRGB, the same function as [[to-CMY]] (the conversion is its own inverse)." :metadoc/categories meta-conv} from-CMY to-CMY)
-(def ^{:doc "The same as [[to-CMY]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} to-CMY* to-CMY)
-(def ^{:doc "The same as [[from-CMY]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} from-CMY* to-CMY)
+(def ^{:doc "CMY to sRGB, the same function as [[to-CMY]] (the conversion is its own inverse)."} from-CMY to-CMY)
+(def ^{:doc "The same as [[to-CMY]]: its channels are already in `[0,255]`."} to-CMY* to-CMY)
+(def ^{:doc "The same as [[from-CMY]]: its channels are already in `[0,255]`."} from-CMY* to-CMY)
 
 ;; ### OHTA
 
@@ -1020,15 +956,14 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: I1 0 to 255, I2 -127.5 to 127.5, I3 -127.5 to 127.5. See also [[from-OHTA]], [[to-OHTA*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb] 
   (let [^Vec4 c (pr/to-color srgb)
-        i1 (/ (+ (.x c) (.y c) (.z c)) 3.0)
-        i2 (* 0.5 (- (.x c) (.z c)))
-        i3 (* 0.25 (- (* 2.0 (.y c)) (.x c) (.z c)))]
+        i1 (m// (m/+ (.x c) (.y c) (.z c)) 3.0)
+        i2 (m/* 0.5 (m/- (.x c) (.z c)))
+        i3 (m/* 0.25 (m/- (m/* 2.0 (.y c)) (.x c) (.z c)))]
     (Vec4. i1 i2 i3 (.w c))))
 
-(def ^:private ^:const ohta-s (Vec4. 0.0 127.5 127.5 0.0))
+(def ^:private ohta-s (Vec4. 0.0 127.5 127.5 0.0))
 
 (defn to-OHTA*
   "Converts an sRGB color to OHTA with channels mapped to `[0,255]`.
@@ -1038,12 +973,11 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-OHTA*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (v/add (to-OHTA srgb) ohta-s))
 
-(def ^{:private true :const true :tag 'double} c23- (/ -2.0 3.0))
-(def ^{:private true :const true :tag 'double} c43 (/ 4.0 3.0))
+(def ^{:private true :const true :tag 'double} c23- (m// -2.0 3.0))
+(def ^{:private true :const true :tag 'double} c43 (m// 4.0 3.0))
 
 (defn from-OHTA
   "Converts OHTA to sRGB, the inverse of [[to-OHTA]].
@@ -1051,15 +985,14 @@
   - `c` OHTA color, any type accepted by [[to-color]], with channels in the ranges of [[to-OHTA]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-OHTA*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [ohta]
   (let [^Vec4 c (pr/to-color ohta)
         i1 (.x c)
         i2 (.y c)
         i3 (.z c)
-        r (+ i1 i2 (* c23- i3))
-        g (+ i1 (* c43 i3))
-        b (+ i1 (- i2) (* c23- i3))]
+        r (m/+ i1 i2 (m/* c23- i3))
+        g (m/+ i1 (m/* c43 i3))
+        b (m/+ i1 (m/- i2) (m/* c23- i3))]
     (Vec4. r g b (.w c))))
 
 (defn from-OHTA*
@@ -1068,7 +1001,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-OHTA]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [ohta*]
   (from-OHTA (v/sub (pr/to-color ohta*) ohta-s)))
 
@@ -1080,7 +1012,6 @@
   The input is taken as linear RGB (0-255). This is also the `:sRGB` entry of [[colorspaces]]: unlike the other `to-...` conversions, which take sRGB input, `:sRGB` treats its input as linear and encodes it, so it is the inverse of `:linearRGB`, not an identity.
 
   See also [[from-sRGB]], `clojure2d.color.rgb/linear-to-srgb`, [[->linear-RGB-to-RGB]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [linear-rgb]
   (let [^Vec4 c (pr/to-color linear-rgb)]
     (v/vec4 (-> (Vec3. (.x c) (.y c) (.z c))
@@ -1095,7 +1026,6 @@
   Also available as [[to-linearRGB]] (the `:linearRGB` entry of [[colorspaces]]).
 
   See also [[to-sRGB]], `clojure2d.color.rgb/srgb-to-linear`, [[->RGB-to-linear-RGB]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [^Vec4 c (pr/to-color srgb)]
     (v/vec4 (-> (Vec3. (.x c) (.y c) (.z c))
@@ -1112,9 +1042,9 @@
   See also [[RGB1-to-RGB]]."
   ^Vec4 [rgb]
   (let [^Vec4 c (pr/to-color rgb)]
-    (Vec4. (/ (.x c) 255.0)
-           (/ (.y c) 255.0)
-           (/ (.z c) 255.0)
+    (Vec4. (m// (.x c) 255.0)
+           (m// (.y c) 255.0)
+           (m// (.z c) 255.0)
            (.w c))))
 
 (defn RGB1-to-RGB
@@ -1125,25 +1055,37 @@
   See also [[RGB-to-RGB1]]."
   ^Vec4 [rgb1]
   (let [^Vec4 c (pr/to-color rgb1)]
-    (Vec4. (* (.x c) 255.0)
-           (* (.y c) 255.0)
-           (* (.z c) 255.0)
+    (Vec4. (m/* (.x c) 255.0)
+           (m/* (.y c) 255.0)
+           (m/* (.z c) 255.0)
            (.w c))))
 
-(def ^{:doc "The same as [[to-sRGB]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} to-sRGB* to-sRGB)
-(def ^{:doc "The same as [[from-sRGB]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} from-sRGB* from-sRGB)
+(def ^{:doc "The same as [[to-sRGB]]: its channels are already in `[0,255]`."} to-sRGB* to-sRGB)
+(def ^{:doc "The same as [[from-sRGB]]: its channels are already in `[0,255]`."} from-sRGB* from-sRGB)
 
 ;; ### Oklab
 
 (defn- linear->Oklab
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        l (m/cbrt (+ (* 0.4122214694707629 (.x c)) (* 0.5363325372617349 (.y c)) (* 0.051445993267502196 (.z c))))
-        m (m/cbrt (+ (* 0.2119034958178251 (.x c)) (* 0.6806995506452345 (.y c)) (* 0.10739695353694051 (.z c))))
-        s (m/cbrt (+ (* 0.08830245919005637 (.x c)) (* 0.2817188391361215 (.y c)) (* 0.6299787016738223 (.z c))))]
-    (Vec4. (+ (* 0.21045426830931396 l) (* 0.7936177747023053 m) (* -0.0040720430116192585 s))
-           (+ (* 1.9779985324311686 l) (* -2.42859224204858 m) (* 0.450593709617411 s))
-           (+ (* 0.025904042465547734 l) (* 0.7827717124575297 m) (* -0.8086757549230774 s))
+        l (m/cbrt (m/+ (m/* 0.4122214694707629 (.x c))
+                       (m/* 0.5363325372617349 (.y c))
+                       (m/* 0.051445993267502196 (.z c))))
+        m (m/cbrt (m/+ (m/* 0.2119034958178251 (.x c))
+                       (m/* 0.6806995506452345 (.y c))
+                       (m/* 0.10739695353694051 (.z c))))
+        s (m/cbrt (m/+ (m/* 0.08830245919005637 (.x c))
+                       (m/* 0.2817188391361215 (.y c))
+                       (m/* 0.6299787016738223 (.z c))))]
+    (Vec4. (m/+ (m/* 0.21045426830931396 l)
+                (m/* 0.7936177747023053 m)
+                (m/* -0.0040720430116192585 s))
+           (m/+ (m/* 1.9779985324311686 l)
+                (m/* -2.42859224204858 m)
+                (m/* 0.450593709617411 s))
+           (m/+ (m/* 0.025904042465547734 l)
+                (m/* 0.7827717124575297 m)
+                (m/* -0.8086757549230774 s))
            (.w c))))
 
 (defn to-Oklab
@@ -1155,7 +1097,10 @@
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 1, a -0.234 to 0.276, b -0.312 to 0.199. See also [[from-Oklab]], [[to-Oklab*]]."
   ^Vec4 [srgb]
-  (linear->Oklab (scale (from-sRGB srgb) 0.00392156862745098)))
+  (-> srgb
+      (from-sRGB)
+      (scale-down)
+      (linear->Oklab)))
 
 (defn to-Oklab*
   "Converts an sRGB color to Oklab with channels mapped to `[0,255]`.
@@ -1175,12 +1120,12 @@
 (defn- Oklab->linear
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        l (m/cb (+ (.x c) (* 0.3963377773761749 (.y c)) (* 0.21580375730991364 (.z c))))
-        m (m/cb (+ (.x c) (* -0.10556134581565857 (.y c)) (* -0.0638541728258133 (.z c))))
-        s (m/cb (+ (.x c) (* -0.08948417752981186 (.y c)) (* -1.2914855480194092 (.z c))))]
-    (Vec4. (+ (* 4.076741636075959  l) (* -3.307711539258062 m) (* 0.2309699031821041 s))
-           (+ (* -1.2684379732850313 l) (* 2.6097573492876878 m) (* -0.3413193760026569 s))
-           (+ (* -0.004196076138675526 l) (* -0.703418617935936 m) (* 1.7076146940746113 s))
+        l (m/cb (m/+ (.x c) (m/* 0.3963377773761749 (.y c)) (m/* 0.21580375730991364 (.z c))))
+        m (m/cb (m/+ (.x c) (m/* -0.10556134581565857 (.y c)) (m/* -0.0638541728258133 (.z c))))
+        s (m/cb (m/+ (.x c) (m/* -0.08948417752981186 (.y c)) (m/* -1.2914855480194092 (.z c))))]
+    (Vec4. (m/+ (m/* 4.076741636075959  l) (m/* -3.307711539258062 m) (m/* 0.2309699031821041 s))
+           (m/+ (m/* -1.2684379732850313 l) (m/* 2.6097573492876878 m) (m/* -0.3413193760026569 s))
+           (m/+ (m/* -0.004196076138675526 l) (m/* -0.703418617935936 m) (m/* 1.7076146940746113 s))
            (.w c))))
 
 (defn from-Oklab
@@ -1190,7 +1135,10 @@
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-Oklab*]]."
   ^Vec4 [oklab]
-  (to-sRGB (scale (Oklab->linear oklab) 255.0)))
+  (-> oklab
+      (Oklab->linear)
+      (scale-up)
+      (to-sRGB)))
 
 (defn from-Oklab*
   "Converts Oklab with channels in `[0,255]`, as produced by [[to-Oklab*]], to sRGB.
@@ -1220,7 +1168,7 @@
   (^Vec4 [c]
    (let [^Vec4 cc (pr/to-color c)
          H (m/atan2 (.z cc) (.y cc))
-         Hd (m/degrees (if (neg? H) (+ H m/TWO_PI) H))
+         Hd (m/degrees (if (m/neg? H) (m/+ H m/TWO_PI) H))
          C (m/hypot-sqrt (.y cc) (.z cc))]
      (Vec4. (.x cc) C Hd (.w cc)))))
 
@@ -1237,7 +1185,7 @@
   (^Vec4 [c]
    (let [^Vec4 c (pr/to-color c)
          h (m/radians (.z c))]
-     (Vec4. (.x c) (* (.y c) (m/cos h)) (* (.y c) (m/sin h)) (.w c)))))
+     (Vec4. (.x c) (m/* (.y c) (m/cos h)) (m/* (.y c) (m/sin h)) (.w c)))))
 
 ;;
 
@@ -1294,13 +1242,13 @@
 
 (defn- toe
   ^double [^double x]
-  (let [v (- (* 1.170873786407767 x) 0.206)]
-    (* 0.5 (+ v (m/sqrt (+ (m/sq v) (* 0.14050485436893204 x)))))))
+  (let [v (m/- (m/* 1.170873786407767 x) 0.206)]
+    (m/* 0.5 (m/+ v (m/sqrt (m/+ (m/sq v) (m/* 0.14050485436893204 x)))))))
 
 (defn- inv-toe
   ^double [^double x]
-  (/ (+ (* x x) (* 0.206 x))
-     (* 1.170873786407767 (+ x 0.03))))
+  (m// (m/+ (m/* x x) (m/* 0.206 x))
+     (m/* 1.170873786407767 (m/+ x 0.03))))
 
 (def ^{:private true :const true :tag 'double} oklab-achromatic-chroma
   "Oklab chroma below which a color counts as gray in Okhsl and Okhsv (rounding noise of the matrices)."
@@ -1309,28 +1257,28 @@
 (defn- oklab-achromatic?
   "Is the Oklab color black, white (L at 0 or 1) or gray (chroma below [[oklab-achromatic-chroma]])? Okhsl and Okhsv give saturation 0 for such colors, as coloraide."
   [^Vec4 lab]
-  (or (<= (.x lab) 0.0) (>= (.x lab) 1.0)
-      (< (m/hypot-sqrt (.y lab) (.z lab)) oklab-achromatic-chroma)))
+  (or (m/<= (.x lab) 0.0) (m/>= (.x lab) 1.0)
+      (m/< (m/hypot-sqrt (.y lab) (.z lab)) oklab-achromatic-chroma)))
 
 (defn- ->ST
   ^Vec2 [^Vec2 cusp]
-  (Vec2. (/ (.y cusp) (.x cusp))
-         (/ (.y cusp) (- 1.0 (.x cusp)))))
+  (Vec2. (m// (.y cusp) (.x cusp))
+         (m// (.y cusp) (m/- 1.0 (.x cusp)))))
 
 (defmacro ^:private oklab-poly
   [k0 k1 k2 k3 k4 wl wm ws]
-  `(Vec4. (+ ~k0 (* ~k1 ~'a) (* ~k2 ~'b) (* ~k3 ~'a ~'a) (* ~k4 ~'a ~'b)) ~wl ~wm ~ws))
+  `(Vec4. (m/+ ~k0 (m/* ~k1 ~'a) (m/* ~k2 ~'b) (m/* ~k3 ~'a ~'a) (m/* ~k4 ~'a ~'b)) ~wl ~wm ~ws))
 
 (defn- compute-max-saturation
   ^double [^double a ^double b]
   (let [^Vec4 v (cond
-                  (> (- (* -1.8817031 a)
-                        (* 0.80936501 b)) 1.0)
+                  (m/> (m/- (m/* -1.8817031 a)
+                            (m/* 0.80936501 b)) 1.0)
                   (oklab-poly 1.19086277 1.76576728 0.59662641 0.75515197 0.56771245
                               4.076741636075959 -3.307711539258062 0.2309699031821041)
 
-                  (> (- (* 1.8144408 a)
-                        (* 1.19445267 b)) 1.0)
+                  (m/> (m/- (m/* 1.8144408 a)
+                            (m/* 1.19445267 b)) 1.0)
                   (oklab-poly 0.73956515 -0.45954404 0.08285427 0.12541073 -0.14503204
                               -1.2684379732850313 2.6097573492876878 -0.3413193760026569)
 
@@ -1340,33 +1288,34 @@
         wl (.y v)
         wm (.z v)
         ws (.w v)
-        kl (+ (* 0.3963377773761749 a) (* 0.21580375730991364 b))
-        km (+ (* -0.10556134581565857 a) (* -0.0638541728258133 b))
-        ks (+ (* -0.08948417752981186 a) (* -1.2914855480194092 b))
-        l- (inc (* S kl))
-        m- (inc (* S km))
-        s- (inc (* S ks))
-        l (* l- l- l-)
-        m (* m- m- m-)
-        s (* s- s- s-)
-        lds (* 3.0 kl l- l-)
-        mds (* 3.0 km m- m-)
-        sds (* 3.0 ks s- s-)
-        lds2 (* 6.0 kl kl l-)
-        mds2 (* 6.0 km km m-)
-        sds2 (* 6.0 ks ks s-)
-        f (+ (* wl l) (* wm m) (* ws s))
-        f1 (+ (* wl lds) (* wm mds) (* ws sds))
-        f2 (+ (* wl lds2) (* wm mds2) (* ws sds2))]
-    (- S (/ (* f f1)
-            (- (* f1 f1) (* 0.5 f f2))))))
+        kl (m/+ (m/* 0.3963377773761749 a) (m/* 0.21580375730991364 b))
+        km (m/+ (m/* -0.10556134581565857 a) (m/* -0.0638541728258133 b))
+        ks (m/+ (m/* -0.08948417752981186 a) (m/* -1.2914855480194092 b))
+        l- (m/inc (m/* S kl))
+        m- (m/inc (m/* S km))
+        s- (m/inc (m/* S ks))
+        l (m/* l- l- l-)
+        m (m/* m- m- m-)
+        s (m/* s- s- s-)
+        lds (m/* 3.0 kl l- l-)
+        mds (m/* 3.0 km m- m-)
+        sds (m/* 3.0 ks s- s-)
+        lds2 (m/* 6.0 kl kl l-)
+        mds2 (m/* 6.0 km km m-)
+        sds2 (m/* 6.0 ks ks s-)
+        f (m/+ (m/* wl l) (m/* wm m) (m/* ws s))
+        f1 (m/+ (m/* wl lds) (m/* wm mds) (m/* ws sds))
+        f2 (m/+ (m/* wl lds2) (m/* wm mds2) (m/* ws sds2))]
+    (m/- S (m// (m/* f f1)
+                (m/- (m/* f1 f1)
+                     (m/* 0.5 f f2))))))
 
 (defn- find-cusp
   ^Vec2 [^double a ^double b]
   (let [S-cusp (compute-max-saturation a b)
-        ^Vec4 rgb-at-max (Oklab->linear (Vec4. 1.0 (* S-cusp a) (* S-cusp b) 1.0))
-        L-cusp (m/cbrt (/ (max (.x rgb-at-max) (.y rgb-at-max) (.z rgb-at-max))))]
-    (Vec2. L-cusp (* L-cusp S-cusp))))
+        ^Vec4 rgb-at-max (Oklab->linear (Vec4. 1.0 (m/* S-cusp a) (m/* S-cusp b) 1.0))
+        L-cusp (m/cbrt (m// (m/max (.x rgb-at-max) (.y rgb-at-max) (.z rgb-at-max))))]
+    (Vec2. L-cusp (m/* L-cusp S-cusp))))
 
 (defn to-Okhsv
   "Converts an sRGB color to Okhsv, an HSV-like space built on Oklab.
@@ -1376,36 +1325,33 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: H 0 to 1, S 0 to 1.012, V 0 to 1. See also [[from-Okhsv]], [[to-Okhsv*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [^Vec4 lab (to-Oklab srgb)]
     (if (oklab-achromatic? lab)
       (Vec4. 0.0 0.0 (toe (.x lab)) (.w lab))
       (let [L (.x lab)
             C (m/hypot-sqrt (.y lab) (.z lab))
-            a- (/ (.y lab) C)
-            b- (/ (.z lab) C)
-            h (+ 0.5 (/ (* 0.5 (m/atan2 (- (.z lab)) (- (.y lab)))) m/PI))
+            a- (m// (.y lab) C)
+            b- (m// (.z lab) C)
+            h (m/+ 0.5 (m// (m/* 0.5 (m/atan2 (m/- (.z lab)) (m/- (.y lab)))) m/PI))
             ^Vec2 ST-max (->ST (find-cusp a- b-))
             S-max (.x ST-max)
             T-max (.y ST-max)
-            k (- 1.0 (/ 0.5 S-max))
-            t (/ T-max (+ C (* L T-max)))
-            Lv (* t L)
-            Cv (* t C)
+            k (m/- 1.0 (m// 0.5 S-max))
+            t (m// T-max (m/+ C (m/* L T-max)))
+            Lv (m/* t L)
+            Cv (m/* t C)
             Lvt (inv-toe Lv)
-            Cvt (/ (* Cv Lvt) Lv)
-            ^Vec4 rgb-scale (Oklab->linear (Vec4. Lvt (* a- Cvt) (* b- Cvt) 1.0))
-            scale-L (m/cbrt (/ (max (.x rgb-scale) (.y rgb-scale) (.z rgb-scale) 0.0)))
-            L (/ L scale-L)
-            #_#_ C (/ C scale-L) ;; it's in original source code
-            tL (toe L)
-            #_#_ C (/ (* C tL) L) 
-            L tL
-            v (/ L Lv)
-            s (* (+ 0.5 T-max)
-                 (/ Cv (+ (* 0.5 T-max)
-                          (* T-max k Cv))))]
+            Cvt (m// (m/* Cv Lvt) Lv)
+            ^Vec4 rgb-scale (Oklab->linear (Vec4. Lvt (m/* a- Cvt) (m/* b- Cvt) 1.0))
+            scale-L (m/cbrt (m// (m/max (.x rgb-scale) (.y rgb-scale) (.z rgb-scale) 0.0)))
+            #_#_ C (m// C scale-L) ;; it's in original source code
+            L (toe (m// L scale-L))
+            #_#_ C (m// (m/* C tL) L)
+            v (m// L Lv)
+            s (m/* (m/+ 0.5 T-max)
+                   (m// Cv (m/+ (m/* 0.5 T-max)
+                                (m/* T-max k Cv))))]
         (Vec4. h s v (.w lab))))))
 
 (defn to-Okhsv*
@@ -1431,30 +1377,30 @@
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-Okhsv*]]."
   ^Vec4 [okhsv]
   (let [^Vec4 hsv (pr/to-color okhsv)]
-    (if (zero? (.z hsv))
+    (if (m/zero? (.z hsv))
       (Vec4. 0.0 0.0 0.0 (.w hsv))
-      (let [h (* m/TWO_PI (.x hsv))
+      (let [h (m/* m/TWO_PI (.x hsv))
             a- (m/cos h)
             b- (m/sin h)
             ^Vec2 ST-max (->ST (find-cusp a- b-))
             S-max (.x ST-max)
             T-max (.y ST-max)
-            k (- 1.0 (/ 0.5 S-max))
-            r (/ (+ 0.5 (- T-max (* T-max k (.y hsv)))))
-            Lv (- 1.0 (* 0.5 (.y hsv) r))
-            Cv (* 0.5 (.y hsv) T-max r)
-            L (* (.z hsv) Lv)
-            C (* (.z hsv) Cv)
+            k (m/- 1.0 (m// 0.5 S-max))
+            r (m// (m/+ 0.5 (m/- T-max (m/* T-max k (.y hsv)))))
+            Lv (m/- 1.0 (m/* 0.5 (.y hsv) r))
+            Cv (m/* 0.5 (.y hsv) T-max r)
+            L (m/* (.z hsv) Lv)
+            C (m/* (.z hsv) Cv)
             Lvt (inv-toe Lv)
-            Cvt (/ (* Cv Lvt) Lv)
+            Cvt (m// (m/* Cv Lvt) Lv)
             Lnew (inv-toe L)
-            C (/ (* C Lnew) L)
+            C (m// (m/* C Lnew) L)
             L Lnew
-            ^Vec4 rgb-scale (Oklab->linear (Vec4. Lvt (* a- Cvt) (* b- Cvt) 1.0))
-            scaleL (m/cbrt (/ (max (.x rgb-scale) (.y rgb-scale) (.z rgb-scale))))
-            L (* L scaleL)
-            C (* C scaleL)]
-        (from-Oklab (Vec4. L (* C a-) (* C b-) (.w hsv)))))))
+            ^Vec4 rgb-scale (Oklab->linear (Vec4. Lvt (m/* a- Cvt) (m/* b- Cvt) 1.0))
+            scaleL (m/cbrt (m// (m/max (.x rgb-scale) (.y rgb-scale) (.z rgb-scale))))
+            L (m/* L scaleL)
+            C (m/* C scaleL)]
+        (from-Oklab (Vec4. L (m/* C a-) (m/* C b-) (.w hsv)))))))
 
 (defn from-Okhsv*
   "Converts Okhsv with channels in `[0,255]`, as produced by [[to-Okhsv*]], to sRGB.
@@ -1481,7 +1427,7 @@
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: H 0 to 1, W -0.0112 to 1, B 0 to 1. See also [[from-Okhwb]], [[to-Okhwb*]]."
   ^Vec4 [srgb]
   (let [^Vec4 c (to-Okhsv srgb)]
-    (Vec4. (.x c) (* (- 1.0 (.y c)) (.z c)) (- 1.0 (.z c)) (.w c))))
+    (Vec4. (.x c) (m/* (m/- 1.0 (.y c)) (.z c)) (m/- 1.0 (.z c)) (.w c))))
 
 (defn to-Okhwb*
   "Converts an sRGB color to Okhwb with channels mapped to `[0,255]`.
@@ -1506,10 +1452,10 @@
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-Okhwb*]]."
   ^Vec4 [okhwb]
   (let [^Vec4 c (pr/to-color okhwb)
-        v (- 1.0 (.z c))]
-    (if (zero? v)
+        v (m/- 1.0 (.z c))]
+    (if (m/zero? v)
       (Vec4. 0.0 0.0 0.0 (.w c))
-      (from-Okhsv (Vec4. (.x c) (- 1.0 (/ (.y c) v)) v (.w c))))))
+      (from-Okhsv (Vec4. (.x c) (m/- 1.0 (m// (.y c) v)) v (.w c))))))
 
 (defn from-Okhwb*
   "Converts Okhwb with channels in `[0,255]`, as produced by [[to-Okhwb*]], to sRGB.
@@ -1528,78 +1474,78 @@
 
 (defn- get-ST-mid
   ^Vec2 [^double a ^double b]
-  (Vec2. (+ 0.11516993 (/ (+ 7.44778970 (* 4.15901240 b)
-                             (* a (+ -2.19557347 (* 1.75198401 b)
-                                     (* a (+ -2.13704948 (* -10.02301043 b)
-                                             (* a (+ -4.24894561 (* 5.38770819 b)
-                                                     (* 4.69891013 a))))))))))
-         (+ 0.11239642 (/ (+ 1.61320320 (* -0.68124379 b)
-                             (* a (+ 0.40370612 (* 0.90148123 b)
-                                     (* a (+ -0.27087943 (* 0.61223990 b)
-                                             (* a (+ 0.00299215 (* -0.45399568 b)
-                                                     (* -0.14661872 a))))))))))))
+  (Vec2. (m/+ 0.11516993 (m// (m/+ 7.44778970 (m/* 4.15901240 b)
+                             (m/* a (m/+ -2.19557347 (m/* 1.75198401 b)
+                                     (m/* a (m/+ -2.13704948 (m/* -10.02301043 b)
+                                             (m/* a (m/+ -4.24894561 (m/* 5.38770819 b)
+                                                     (m/* 4.69891013 a))))))))))
+         (m/+ 0.11239642 (m// (m/+ 1.61320320 (m/* -0.68124379 b)
+                             (m/* a (m/+ 0.40370612 (m/* 0.90148123 b)
+                                     (m/* a (m/+ -0.27087943 (m/* 0.61223990 b)
+                                             (m/* a (m/+ 0.00299215 (m/* -0.45399568 b)
+                                                     (m/* -0.14661872 a))))))))))))
 
 (defn- find-gamut-intersection
   ^double [^double a ^double b ^double L ^Vec2 cusp]
   ;; L0 = L1 = L, C1 = 1
-  (if (<= L (.x cusp))
-    (/ (* (.y cusp) L) (.x cusp))
-    (let [t (/ (* (.y cusp) (dec L)) (dec (.x cusp)))
+  (if (m/<= L (.x cusp))
+    (m// (m/* (.y cusp) L) (.x cusp))
+    (let [t (m// (m/* (.y cusp) (m/dec L)) (m/dec (.x cusp)))
           #_#_ dL 0.0
           #_#_ dC 1.0
-          kl (+ (* 0.3963377773761749 a) (* 0.21580375730991364 b))
-          km (+ (* -0.10556134581565857 a) (* -0.0638541728258133 b))
-          ks (+ (* -0.08948417752981186 a) (* -1.2914855480194092 b))
-          L (+ (* L (- 1.0 t)) (* L t))
+          kl (m/+ (m/* 0.3963377773761749 a) (m/* 0.21580375730991364 b))
+          km (m/+ (m/* -0.10556134581565857 a) (m/* -0.0638541728258133 b))
+          ks (m/+ (m/* -0.08948417752981186 a) (m/* -1.2914855480194092 b))
+          L (m/+ (m/* L (m/- 1.0 t)) (m/* L t))
           C t
-          l- (+ L (* C kl))
-          m- (+ L (* C km))
-          s- (+ L (* C ks))
-          l (* l- l- l-)
-          m (* m- m- m-)
-          s (* s- s- s-)
-          ldt (* 3.0 kl l- l-)
-          mdt (* 3.0 km m- m-)
-          sdt (* 3.0 ks s- s-)
-          ldt2 (* 6.0 kl kl l-)
-          mdt2 (* 6.0 km km m-)
-          sdt2 (* 6.0 ks ks s-)
-          r (dec (+ (* 4.076741636075959 l) (* -3.307711539258062 m) (* 0.2309699031821041 s)))
-          r1 (+ (* 4.076741636075959 ldt) (* -3.307711539258062 mdt) (* 0.2309699031821041 sdt))
-          r2 (+ (* 4.076741636075959 ldt2) (* -3.307711539258062 mdt2) (* 0.2309699031821041 sdt2))
-          ur (/ r1 (- (* r1 r1) (* 0.5 r r2)))
-          tr (* -1.0 r ur)
-          g (dec (+ (* -1.2684379732850313 l) (* 2.6097573492876878 m) (* -0.3413193760026569 s)))
-          g1 (+ (* -1.2684379732850313 ldt) (* 2.6097573492876878 mdt) (* -0.3413193760026569 sdt))
-          g2 (+ (* -1.2684379732850313 ldt2) (* 2.6097573492876878 mdt2) (* -0.3413193760026569 sdt2))
-          ug (/ g1 (- (* g1 g1) (* 0.5 g g2)))
-          tg (* -1.0 g ug)
-          b(dec (+ (* -0.004196076138675526 l) (* -0.703418617935936 m) (* 1.7076146940746113 s)))
-          b1 (+ (* -0.004196076138675526 ldt) (* -0.703418617935936 mdt) (* 1.7076146940746113 sdt))
-          b2 (+ (* -0.004196076138675526 ldt2) (* -0.703418617935936 mdt2) (* 1.7076146940746113 sdt2))
-          ub (/ b1 (- (* b1 b1) (* 0.5 b b2)))
-          tb (* -1.0 b ub)
-          tr (if (>= ur 0.0) tr Double/MAX_VALUE)
-          tg (if (>= ug 0.0) tg Double/MAX_VALUE)
-          tb (if (>= ub 0.0) tb Double/MAX_VALUE)]
-      (+ t (min tr tg tb)))))
+          l- (m/+ L (m/* C kl))
+          m- (m/+ L (m/* C km))
+          s- (m/+ L (m/* C ks))
+          l (m/* l- l- l-)
+          m (m/* m- m- m-)
+          s (m/* s- s- s-)
+          ldt (m/* 3.0 kl l- l-)
+          mdt (m/* 3.0 km m- m-)
+          sdt (m/* 3.0 ks s- s-)
+          ldt2 (m/* 6.0 kl kl l-)
+          mdt2 (m/* 6.0 km km m-)
+          sdt2 (m/* 6.0 ks ks s-)
+          r (m/dec (m/+ (m/* 4.076741636075959 l) (m/* -3.307711539258062 m) (m/* 0.2309699031821041 s)))
+          r1 (m/+ (m/* 4.076741636075959 ldt) (m/* -3.307711539258062 mdt) (m/* 0.2309699031821041 sdt))
+          r2 (m/+ (m/* 4.076741636075959 ldt2) (m/* -3.307711539258062 mdt2) (m/* 0.2309699031821041 sdt2))
+          ur (m// r1 (m/- (m/* r1 r1) (m/* 0.5 r r2)))
+          tr (m/* -1.0 r ur)
+          g (m/dec (m/+ (m/* -1.2684379732850313 l) (m/* 2.6097573492876878 m) (m/* -0.3413193760026569 s)))
+          g1 (m/+ (m/* -1.2684379732850313 ldt) (m/* 2.6097573492876878 mdt) (m/* -0.3413193760026569 sdt))
+          g2 (m/+ (m/* -1.2684379732850313 ldt2) (m/* 2.6097573492876878 mdt2) (m/* -0.3413193760026569 sdt2))
+          ug (m// g1 (m/- (m/* g1 g1) (m/* 0.5 g g2)))
+          tg (m/* -1.0 g ug)
+          b(m/dec (m/+ (m/* -0.004196076138675526 l) (m/* -0.703418617935936 m) (m/* 1.7076146940746113 s)))
+          b1 (m/+ (m/* -0.004196076138675526 ldt) (m/* -0.703418617935936 mdt) (m/* 1.7076146940746113 sdt))
+          b2 (m/+ (m/* -0.004196076138675526 ldt2) (m/* -0.703418617935936 mdt2) (m/* 1.7076146940746113 sdt2))
+          ub (m// b1 (m/- (m/* b1 b1) (m/* 0.5 b b2)))
+          tb (m/* -1.0 b ub)
+          tr (if (m/>= ur 0.0) tr Double/MAX_VALUE)
+          tg (if (m/>= ug 0.0) tg Double/MAX_VALUE)
+          tb (if (m/>= ub 0.0) tb Double/MAX_VALUE)]
+      (m/+ t (m/min tr tg tb)))))
 
 (defn- get-Cs
   ^Vec3 [^double L ^double a ^double b]
   (let [^Vec2 cusp (find-cusp a b)
         C-max (find-gamut-intersection a b L cusp)
         ^Vec2 ST-max (->ST cusp)
-        L- (- 1.0 L)
-        k (/ C-max (min (* L (.x ST-max)) (* L- (.y ST-max))))
+        L- (m/- 1.0 L)
+        k (m// C-max (m/min (m/* L (.x ST-max)) (m/* L- (.y ST-max))))
         ^Vec2 ST-mid (get-ST-mid a b)
-        Ca (* L (.x ST-mid))
-        Cb (* L- (.y ST-mid))
-        C-mid (* 0.9 k (m/sqrt (m/sqrt (/ (+ (/ (m/sq (* Ca Ca)))
-                                             (/ (m/sq (* Cb Cb))))))))
-        Ca (* L 0.4)
-        Cb (* L- 0.8)
-        C-0 (m/sqrt (/ (+ (/ (* Ca Ca))
-                          (/ (* Cb Cb)))))]
+        Ca (m/* L (.x ST-mid))
+        Cb (m/* L- (.y ST-mid))
+        C-mid (m/* 0.9 k (m/sqrt (m/sqrt (m// (m/+ (m// (m/sq (m/* Ca Ca)))
+                                             (m// (m/sq (m/* Cb Cb))))))))
+        Ca (m/* L 0.4)
+        Cb (m/* L- 0.8)
+        C-0 (m/sqrt (m// (m/+ (m// (m/* Ca Ca))
+                          (m// (m/* Cb Cb)))))]
     (Vec3. C-0 C-mid C-max)))
 
 (defn to-Okhsl
@@ -1615,22 +1561,22 @@
     (if (oklab-achromatic? lab)
       (Vec4. 0.0 0.0 (toe (.x lab)) (.w lab))
       (let [C (m/hypot-sqrt (.y lab) (.z lab))
-            a- (/ (.y lab) C)
-            b- (/ (.z lab) C)
+            a- (m// (.y lab) C)
+            b- (m// (.z lab) C)
             L (.x lab)
-            h (+ 0.5 (* 0.5 (/ (m/atan2 (- (.z lab)) (- (.y lab))) m/PI)))
+            h (m/+ 0.5 (m/* 0.5 (m// (m/atan2 (m/- (.z lab)) (m/- (.y lab))) m/PI)))
             ^Vec3 cs (get-Cs L a- b-)
             C-0 (.x cs)
             C-mid (.y cs)
             C-max (.z cs)
-            s (if (< C C-mid)
-                (let [k1 (* 0.8 C-0)
-                      k2 (- 1.0 (/ k1 C-mid))]
-                  (* 0.8 (/ C (+ k1 (* k2 C)))))
-                (let [k1 (/ (* 0.3125 C-mid C-mid) C-0)
-                      k2 (- 1.0 (/ k1 (- C-max C-mid)))]
-                  (+ 0.8 (* 0.2 (/ (- C C-mid)
-                                   (+ k1 (* k2 (- C C-mid))))))))]
+            s (if (m/< C C-mid)
+                (let [k1 (m/* 0.8 C-0)
+                      k2 (m/- 1.0 (m// k1 C-mid))]
+                  (m/* 0.8 (m// C (m/+ k1 (m/* k2 C)))))
+                (let [k1 (m// (m/* 0.3125 C-mid C-mid) C-0)
+                      k2 (m/- 1.0 (m// k1 (m/- C-max C-mid)))]
+                  (m/+ 0.8 (m/* 0.2 (m// (m/- C C-mid)
+                                   (m/+ k1 (m/* k2 (m/- C C-mid))))))))]
         (Vec4. h s (toe L) (.w lab))))))
 
 (defn to-Okhsl*
@@ -1657,11 +1603,11 @@
   ^Vec4 [okhsl]
   (let [^Vec4 hsl (pr/to-color okhsl)]
     (cond
-      (zero? (.z hsl)) (Vec4. 0.0 0.0 0.0 (.w hsl))
+      (m/zero? (.z hsl)) (Vec4. 0.0 0.0 0.0 (.w hsl))
       ;; lightness 1 is white for any saturation (1 - L = 0 in get-Cs)
-      (== 1.0 (.z hsl)) (Vec4. 255.0 255.0 255.0 (.w hsl))
+      (m/== 1.0 (.z hsl)) (Vec4. 255.0 255.0 255.0 (.w hsl))
       :else
-      (let [h (* m/TWO_PI (.x hsl))
+      (let [h (m/* m/TWO_PI (.x hsl))
             a- (m/cos h)
             b- (m/sin h)
             L (inv-toe (.z hsl))
@@ -1669,16 +1615,16 @@
             C-0 (.x cs)
             C-mid (.y cs)
             C-max (.z cs)
-            C (if (< (.y hsl) 0.8)
-                (let [t (* 1.25 (.y hsl))
-                      k1 (* 0.8 C-0)
-                      k2 (- 1.0 (/ k1 C-mid))]
-                  (/ (* t k1) (- 1.0 (* t k2))))
-                (let [t (/ (- (.y hsl) 0.8) 0.2)
-                      k1 (/ (* 0.3125 C-mid C-mid) C-0)
-                      k2 (- 1.0 (/ k1 (- C-max C-mid)))]
-                  (+ C-mid (/ (* t k1) (- 1.0 (* t k2))))))]
-        (from-Oklab (Vec4. L (* C a-) (* C b-) (.w hsl)))))))
+            C (if (m/< (.y hsl) 0.8)
+                (let [t (m/* 1.25 (.y hsl))
+                      k1 (m/* 0.8 C-0)
+                      k2 (m/- 1.0 (m// k1 C-mid))]
+                  (m// (m/* t k1) (m/- 1.0 (m/* t k2))))
+                (let [t (m// (m/- (.y hsl) 0.8) 0.2)
+                      k1 (m// (m/* 0.3125 C-mid C-mid) C-0)
+                      k2 (m/- 1.0 (m// k1 (m/- C-max C-mid)))]
+                  (m/+ C-mid (m// (m/* t k1) (m/- 1.0 (m/* t k2))))))]
+        (from-Oklab (Vec4. L (m/* C a-) (m/* C b-) (.w hsl)))))))
 
 (defn from-Okhsl*
   "Converts Okhsl with channels in `[0,255]`, as produced by [[to-Okhsl*]], to sRGB.
@@ -1724,9 +1670,9 @@
   See also [[XYZ1-to-XYZ]]."
   ^Vec4 [xyz]
   (let [^Vec4 c (pr/to-color xyz)]
-    (Vec4. (* 0.01 (.x c))
-           (* 0.01 (.y c))
-           (* 0.01 (.z c))
+    (Vec4. (m/* 0.01 (.x c))
+           (m/* 0.01 (.y c))
+           (m/* 0.01 (.z c))
            (.w c))))
 
 (defn XYZ1-to-XYZ
@@ -1737,17 +1683,17 @@
   See also [[XYZ-to-XYZ1]]."
   ^Vec4 [xyz1]
   (let [^Vec4 c (pr/to-color xyz1)]
-    (Vec4. (* 100.0 (.x c))
-           (* 100.0 (.y c))
-           (* 100.0 (.z c))
+    (Vec4. (m/* 100.0 (.x c))
+           (m/* 100.0 (.y c))
+           (m/* 100.0 (.z c))
            (.w c))))
 
 (defn- to-XYZ-
   "Pure RGB->XYZ conversion without corrections."
   ^Vec3 [^Vec3 c]
-  (Vec3. (+ (* (.x c) srgb->xyz-00) (* (.y c) srgb->xyz-01) (* (.z c) srgb->xyz-02))
-         (+ (* (.x c) srgb->xyz-10) (* (.y c) srgb->xyz-11) (* (.z c) srgb->xyz-12))
-         (+ (* (.x c) srgb->xyz-20) (* (.y c) srgb->xyz-21) (* (.z c) srgb->xyz-22))))
+  (Vec3. (m/+ (m/* (.x c) srgb->xyz-00) (m/* (.y c) srgb->xyz-01) (m/* (.z c) srgb->xyz-02))
+         (m/+ (m/* (.x c) srgb->xyz-10) (m/* (.y c) srgb->xyz-11) (m/* (.z c) srgb->xyz-12))
+         (m/+ (m/* (.x c) srgb->xyz-20) (m/* (.y c) srgb->xyz-21) (m/* (.z c) srgb->xyz-22))))
 
 (defn to-XYZ1
   "Converts an sRGB color to CIE XYZ on the 0-1 scale (Y of white 1).
@@ -1757,7 +1703,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`; ranges for colors in the sRGB gamut: X 0 to 0.9505, Y 0 to 1, Z 0 to 1.0888. See also [[to-XYZ]], [[from-XYZ1]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [^Vec4 c (pr/to-color srgb)
         xyz-raw (to-XYZ- (-> (Vec3. (.x c) (.y c) (.z c))
@@ -1773,7 +1718,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`; ranges for colors in the sRGB gamut: X 0 to 95.047, Y 0 to 100, Z 0 to 108.883. See also [[from-XYZ]], [[to-XYZ*]], [[->RGB-to-XYZ]] (other RGB spaces)."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (XYZ1-to-XYZ (to-XYZ1 srgb)))
 
@@ -1785,22 +1729,21 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-XYZ*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-XYZ srgb)]
-    (Vec4. (m/mnorm (.x cc) 0.0 95.04715475817799 0.0 255.0)
-           (m/mnorm (.y cc) 0.0 100.0 0.0 255.0)
-           (m/mnorm (.z cc) 0.0 108.8829656285427 0.0 255.0)
+    (Vec4. (m/mnorm (.x cc) 0.0 95.047154758178 0.0 255.0)
+           (m/mnorm (.y cc) 0.0 100.00000000000004 0.0 255.0)
+           (m/mnorm (.z cc) 0.0 108.88296562854272 0.0 255.0)
            (.w cc))))
 
-(def ^{:doc "Alias of [[to-XYZ*]]: XYZ with channels mapped to `[0,255]`." :metadoc/categories meta-conv} to-XYZ1* to-XYZ*)
+(def ^{:doc "Alias of [[to-XYZ*]]: XYZ with channels mapped to `[0,255]`."} to-XYZ1* to-XYZ*)
 
 (defn- from-XYZ-
   "Pure XYZ->RGB conversion."
   ^Vec3 [^Vec3 v]
-  (Vec3. (+ (* (.x v) xyz->srgb-00) (* (.y v) xyz->srgb-01) (* (.z v) xyz->srgb-02))
-         (+ (* (.x v) xyz->srgb-10) (* (.y v) xyz->srgb-11) (* (.z v) xyz->srgb-12))
-         (+ (* (.x v) xyz->srgb-20) (* (.y v) xyz->srgb-21) (* (.z v) xyz->srgb-22))))
+  (Vec3. (m/+ (m/* (.x v) xyz->srgb-00) (m/* (.y v) xyz->srgb-01) (m/* (.z v) xyz->srgb-02))
+         (m/+ (m/* (.x v) xyz->srgb-10) (m/* (.y v) xyz->srgb-11) (m/* (.z v) xyz->srgb-12))
+         (m/+ (m/* (.x v) xyz->srgb-20) (m/* (.y v) xyz->srgb-21) (m/* (.z v) xyz->srgb-22))))
 
 (defn from-XYZ1
   "Converts CIE XYZ on the 0-1 scale to sRGB, the inverse of [[to-XYZ1]].
@@ -1819,7 +1762,6 @@
   - `c` XYZ color, any type accepted by [[to-color]], Y of white 100
 
   Returns an RGB `Vec4`, not clamped: colors outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-XYZ*]], [[->XYZ-to-RGB]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [xyz1] 
   (from-XYZ1 (XYZ-to-XYZ1 xyz1)))
 
@@ -1829,15 +1771,14 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-XYZ]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [xyz*]
   (let [^Vec4 c (pr/to-color xyz*)
-        x (m/mnorm (.x c) 0.0 255.0 0.0 95.04715475817799)
-        y (m/mnorm (.y c) 0.0 255.0 0.0 100.0)
-        z (m/mnorm (.z c) 0.0 255.0 0.0 108.8829656285427)]
+        x (m/mnorm (.x c) 0.0 255.0 0.0 95.047154758178)
+        y (m/mnorm (.y c) 0.0 255.0 0.0 100.00000000000004)
+        z (m/mnorm (.z c) 0.0 255.0 0.0 108.88296562854272)]
     (from-XYZ (Vec4. x y z (.w c)))))
 
-(def ^{:doc "Alias of [[from-XYZ*]]." :metadoc/categories meta-conv} from-XYZ1* from-XYZ*)
+(def ^{:doc "Alias of [[from-XYZ*]]."} from-XYZ1* from-XYZ*)
 
 ;; https://en.wikipedia.org/wiki/CIE_1960_color_space#Relation_to_CIE_XYZ
 
@@ -1851,9 +1792,9 @@
   Returns a `Vec4` `[U V W alpha]`. See also [[UCS-to-XYZ]], [[to-UCS]]."
   ^Vec4 [xyz]
   (let [^Vec4 c (XYZ-to-XYZ1 xyz)]
-    (Vec4. (* m/TWO_THIRD (.x c))
+    (Vec4. (m/* m/TWO_THIRD (.x c))
            (.y c)
-           (* -0.5 (- (.x c) (* 3.0 (.y c)) (.z c)))
+           (m/* -0.5 (m/- (.x c) (m/* 3.0 (.y c)) (.z c)))
            (.w c))))
 
 (defn to-UCS
@@ -1864,7 +1805,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: U 0 to 0.634, V 0 to 1, W 0 to 1.569. See also [[from-UCS]], [[to-UCS*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (-> srgb to-XYZ XYZ-to-UCS))
 
@@ -1876,11 +1816,10 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-UCS*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [^Vec4 cc (to-UCS srgb)]
     (Vec4. (m/mnorm (.x cc) 0.0 0.6336476983878533 0.0 255.0)
-           (* (.y cc) 255.0)
+           (m/* (.y cc) 255.0)
            (m/mnorm (.z cc) -0.0 1.5691790543518245 0.0 255.0)
            (.w cc))))
 
@@ -1892,11 +1831,11 @@
   Returns a `Vec4` `[X Y Z alpha]`. See also [[from-UCS]]."
   ^Vec4 [ucs]
   (let [^Vec4 c (pr/to-color ucs)]
-    (XYZ1-to-XYZ (Vec4. (* 1.5 (.x c))
+    (XYZ1-to-XYZ (Vec4. (m/* 1.5 (.x c))
                         (.y c)
-                        (+ (* 1.5 (.x c))
-                           (* -3.0 (.y c))
-                           (* 2.0 (.z c)))
+                        (m/+ (m/* 1.5 (.x c))
+                             (m/* -3.0 (.y c))
+                             (m/* 2.0 (.z c)))
                         (.w c)))))
 
 (defn from-UCS
@@ -1905,7 +1844,6 @@
   - `c` UCS color, any type accepted by [[to-color]], with channels in the ranges of [[to-UCS]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-UCS*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [ucs]
   (-> ucs UCS-to-XYZ from-XYZ))
 
@@ -1915,11 +1853,10 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-UCS]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [ucs*]
   (let [^Vec4 cc (pr/to-color ucs*)]
     (from-UCS (Vec4. (m/mnorm (.x cc) 0.0 255.0 0.0 0.6336476983878533)
-                     (/ (.y cc) 255.0)
+                     (m// (.y cc) 255.0)
                      (m/mnorm (.z cc) 0.0 255.0 -0.0 1.5691790543518245)
                      (.w cc)))))
 
@@ -1931,7 +1868,7 @@
 
 (defn- convert-mix
   ^double [^double m]
-  (-> m (max 0.0) m/cbrt (+ -0.15595420054924863)))
+  (-> m (m/max 0.0) m/cbrt (m/+ -0.15595420054924863)))
 
 (defn to-XYB
   "Converts an sRGB color to XYB, the JPEG XL color space.
@@ -1952,7 +1889,7 @@
         b (convert-mix (m/muladd 9.545987813548164E-4 (.x c)
                                  (m/muladd 8.030095852743851E-4 (.y c)
                                            (m/muladd 0.002163960260821779 (.z c) xyb-bias))))]
-    (Vec4. (* 0.5 (- r g)) (* 0.5 (+ r g)) b (.w c))))
+    (Vec4. (m/* 0.5 (m/- r g)) (m/* 0.5 (m/+ r g)) b (.w c))))
 
 (defn to-XYB*
   "Converts an sRGB color to XYB with channels mapped to `[0,255]`.
@@ -1977,16 +1914,22 @@
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-XYB*]]."
   ^Vec4 [xyb]
   (let [^Vec4 c (pr/to-color xyb)
-        gamma-r (- (+ (.y c) (.x c)) -0.15595420054924863)
-        gamma-g (- (.y c) (.x c) -0.15595420054924863)
-        gamma-b (- (.z c) -0.15595420054924863)
-        mixed-r (- (* gamma-r gamma-r gamma-r) xyb-bias)
-        mixed-g (- (* gamma-g gamma-g gamma-g) xyb-bias)
-        mixed-b (- (* gamma-b gamma-b gamma-b) xyb-bias)]
+        gamma-r (m/- (m/+ (.y c) (.x c)) -0.15595420054924863)
+        gamma-g (m/- (.y c) (.x c) -0.15595420054924863)
+        gamma-b (m/- (.z c) -0.15595420054924863)
+        mixed-r (m/- (m/* gamma-r gamma-r gamma-r) xyb-bias)
+        mixed-g (m/- (m/* gamma-g gamma-g gamma-g) xyb-bias)
+        mixed-b (m/- (m/* gamma-b gamma-b gamma-b) xyb-bias)]
     ;; exact inverse of the opsin matrix of to-XYB
-    (to-sRGB (Vec4. (+ (* 2813.0495606831655 mixed-r) (* -2516.070696573549 mixed-g) (* -41.978864109616275 mixed-b))
-                    (+ (* -829.8075821739781 mixed-r) (* 1126.7864462835944 mixed-g) (* -41.978864109616275 mixed-b))
-                    (+ (* -933.0070781119886 mixed-r) (* 691.7953767137035 mixed-g) (* 496.211701398285 mixed-b))
+    (to-sRGB (Vec4. (m/+ (m/* 2813.0495606831655 mixed-r)
+                         (m/* -2516.070696573549 mixed-g)
+                         (m/* -41.978864109616275 mixed-b))
+                    (m/+ (m/* -829.8075821739781 mixed-r)
+                         (m/* 1126.7864462835944 mixed-g)
+                         (m/* -41.978864109616275 mixed-b))
+                    (m/+ (m/* -933.0070781119886 mixed-r)
+                         (m/* 691.7953767137035 mixed-g)
+                         (m/* 496.211701398285 mixed-b))
                     (.w c)))))
 
 (defn from-XYB*
@@ -2015,28 +1958,28 @@
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: R, Y, B in `[0,255]`. See also [[from-RYB]], [[to-RYB*]]."
   ^Vec4 [srgb]
   (let [^Vec4 c (pr/to-color srgb)
-        w (min (.x c) (.y c) (.z c))
-        r (- (.x c) w)
-        g (- (.y c) w)
-        b (- (.z c) w)
-        mg (max r g b)
-        y (min r g)
-        r (- r y)
-        g (- g y)
-        nz? (and (not (zero? b))
-                 (not (zero? g)))
-        g (if nz? (/ g 2.0) g)
-        b (if nz? (/ b 2.0) b)
-        y (+ y g)
-        b (+ b g)
-        my (max r y b)
-        n (if-not (zero? my) (/ mg my) 1.0)]
+        w (m/min (.x c) (.y c) (.z c))
+        r (m/- (.x c) w)
+        g (m/- (.y c) w)
+        b (m/- (.z c) w)
+        mg (m/max r g b)
+        y (m/min r g)
+        r (m/- r y)
+        g (m/- g y)
+        nz? (and (m/not-zero? b)
+                 (m/not-zero? g))
+        g (if nz? (m// g 2.0) g)
+        b (if nz? (m// b 2.0) b)
+        y (m/+ y g)
+        b (m/+ b g)
+        my (m/max r y b)
+        n (if (m/not-zero? my) (m// mg my) 1.0)]
     (Vec4. (m/muladd r n w)
            (m/muladd y n w)
            (m/muladd b n w)
            (.w c))))
 
-(def ^{:doc "The same as [[to-RYB]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} to-RYB* to-RYB)
+(def ^{:doc "The same as [[to-RYB]]: its channels are already in `[0,255]`."} to-RYB* to-RYB)
 
 (defn from-RYB
   "Converts RYB to sRGB, the inverse of [[to-RYB]].
@@ -2046,40 +1989,40 @@
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-RYB*]]."
   ^Vec4 [ryb]
   (let [^Vec4 c (pr/to-color ryb)
-        w (min (.x c) (.y c) (.z c))
-        r (- (.x c) w)
-        y (- (.y c) w)
-        b (- (.z c) w)
-        my (max r y b)
-        g (min y b)
-        y (- y g)
-        b (- b g)
-        nz? (and (not (zero? b))
-                 (not (zero? g)))
-        b (if nz? (* 2.0 b) b)
-        g (if nz? (* 2.0 g) g)
-        r (+ r y)
-        g (+ g y)
-        mg (max r g b)
-        n (if-not (zero? mg) (/ my mg) 1.0)]
+        w (m/min (.x c) (.y c) (.z c))
+        r (m/- (.x c) w)
+        y (m/- (.y c) w)
+        b (m/- (.z c) w)
+        my (m/max r y b)
+        g (m/min y b)
+        y (m/- y g)
+        b (m/- b g)
+        nz? (and (m/not-zero? b)
+                 (m/not-zero? g))
+        b (if nz? (m/* 2.0 b) b)
+        g (if nz? (m/* 2.0 g) g)
+        r (m/+ r y)
+        g (m/+ g y)
+        mg (m/max r g b)
+        n (if(m/not-zero? mg) (m// my mg) 1.0)]
     (Vec4. (m/muladd r n w)
            (m/muladd g n w)
            (m/muladd b n w)
            (.w c))))
 
-(def ^{:doc "The same as [[from-RYB]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} from-RYB* from-RYB)
+(def ^{:doc "The same as [[from-RYB]]: its channels are already in `[0,255]`."} from-RYB* from-RYB)
 
 ;; ### LAB
 
-(def ^{:private true :const true :tag 'double} CIEEpsilon (/ 216.0 24389.0))
-(def ^{:private true :const true :tag 'double} CIEK (/ 24389.0 27.0))
+(def ^{:private true :const true :tag 'double} CIEEpsilon (m// 216.0 24389.0))
+(def ^{:private true :const true :tag 'double} CIEK (m// 24389.0 27.0))
 
 (defn- to-lab-correct
   "LAB correction"
   ^double [^double v]
-  (if (> v CIEEpsilon)
+  (if (m/> v CIEEpsilon)
     (m/cbrt v)
-    (/ (+ 16.0 (* v CIEK)) 116.0)))
+    (m// (m/+ 16.0 (m/* v CIEK)) 116.0)))
 
 (defn XYZ-to-LAB
   "Converts XYZ (0-100, as [[to-XYZ]]) to CIE 1976 L*a*b* relative to a white point.
@@ -2091,12 +2034,12 @@
   (^Vec4 [xyz] (XYZ-to-LAB xyz wp/CIE-2-D65))
   (^Vec4 [xyz ^Vec4 whitepoint]
    (let [xyz (XYZ-to-XYZ1 xyz)
-         x (to-lab-correct (/ (.x xyz) (.x whitepoint)))
+         x (to-lab-correct (m// (.x xyz) (.x whitepoint)))
          y (to-lab-correct (.y xyz))
-         z (to-lab-correct (/ (.z xyz) (.y whitepoint)))
-         L (- (* y 116.0) 16.0)
-         a (* 500.0 (- x y))
-         b (* 200.0 (- y z))]
+         z (to-lab-correct (m// (.z xyz) (.y whitepoint)))
+         L (m/- (m/* y 116.0) 16.0)
+         a (m/* 500.0 (m/- x y))
+         b (m/* 200.0 (m/- y z))]
      (Vec4. L a b (.w xyz)))))
 
 (defn to-LAB
@@ -2107,7 +2050,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -86.18 to 98.23, b -107.86 to 94.48. See also [[from-LAB]], [[to-LAB*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (-> srgb to-XYZ XYZ-to-LAB))
 
@@ -2119,7 +2061,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-LAB*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-LAB srgb)]
     (Vec4. (m/mnorm (.x cc) 0.0 100.00000000000003 0.0 255.0)
@@ -2130,10 +2071,10 @@
 (defn- from-lab-correct
   "LAB correction"
   ^double [^double v]
-  (let [v3 (* v v v)]
-    (if (> v3 CIEEpsilon)
+  (let [v3 (m/* v v v)]
+    (if (m/> v3 CIEEpsilon)
       v3
-      (/ (- (* 116.0 v) 16.0) CIEK))))
+      (m// (m/- (m/* 116.0 v) 16.0) CIEK))))
 
 (defn LAB-to-XYZ
   "Converts CIE 1976 L*a*b* to XYZ (0-100) relative to a white point, the inverse of [[XYZ-to-LAB]].
@@ -2145,9 +2086,9 @@
   (^Vec4 [lab] (LAB-to-XYZ lab wp/CIE-2-D65))
   (^Vec4 [lab ^Vec4 whitepoint]
    (let [^Vec4 c (pr/to-color lab)
-         y (/ (+ (.x c) 16.0) 116.0)
-         x (* (.x whitepoint) (from-lab-correct (+ y (/ (.y c) 500.0))))
-         z (* (.y whitepoint) (from-lab-correct (- y (/ (.z c) 200.0))))]
+         y (m// (m/+ (.x c) 16.0) 116.0)
+         x (m/* (.x whitepoint) (from-lab-correct (m/+ y (m// (.y c) 500.0))))
+         z (m/* (.y whitepoint) (from-lab-correct (m/- y (m// (.z c) 200.0))))]
      (XYZ1-to-XYZ (Vec4. x (from-lab-correct y) z (.w c))))))
 
 (defn from-LAB
@@ -2156,7 +2097,6 @@
   - `c` LAB color, any type accepted by [[to-color]], with channels in the ranges of [[to-LAB]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-LAB*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [lab]
   (-> lab LAB-to-XYZ from-XYZ))
 
@@ -2166,7 +2106,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-LAB]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [lab*]
   (let [^Vec4 c (pr/to-color lab*)]
     (from-LAB (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.00000000000003)
@@ -2186,20 +2125,20 @@
   (^Vec4 [xyz] (XYZ-to-LUV xyz wp/CIE-2-D65))
   (^Vec4 [xyz ^Vec4 whitepoint]
    (let [^Vec4 cc (pr/to-color xyz)
-         uv-factor (+ (.x cc) (* 15.0 (.y cc)) (* 3.0 (.z cc)))]
-     (if (zero? uv-factor)
+         uv-factor (m/+ (.x cc) (m/* 15.0 (.y cc)) (m/* 3.0 (.z cc)))]
+     (if (m/zero? uv-factor)
        (Vec4. 0.0 0.0 0.0 (.w cc))
-       (let [uv-factor* (/ uv-factor)
-             var-u (* 4.0 (.x cc) uv-factor*)
-             var-v (* 9.0 (.y cc) uv-factor*)
-             var-y (to-lab-correct (/ (.y cc) 100.0))
-             ref-uv-factor (/ (+ (.x whitepoint) 15.0 (* 3.0 (.y whitepoint))))
-             ref-u (* 4.0 (.x whitepoint) ref-uv-factor)
-             ref-v (* 9.0 ref-uv-factor)
-             L (- (* 116.0 var-y) 16.0)] 
+       (let [uv-factor* (m// uv-factor)
+             var-u (m/* 4.0 (.x cc) uv-factor*)
+             var-v (m/* 9.0 (.y cc) uv-factor*)
+             var-y (to-lab-correct (m// (.y cc) 100.0))
+             ref-uv-factor (m// (m/+ (.x whitepoint) 15.0 (m/* 3.0 (.y whitepoint))))
+             ref-u (m/* 4.0 (.x whitepoint) ref-uv-factor)
+             ref-v (m/* 9.0 ref-uv-factor)
+             L (m/- (m/* 116.0 var-y) 16.0)] 
          (Vec4. L
-                (* 13.0 L (- var-u ref-u))
-                (* 13.0 L (- var-v ref-v))
+                (m/* 13.0 L (m/- var-u ref-u))
+                (m/* 13.0 L (m/- var-v ref-v))
                 (.w cc)))))))
 
 (defn to-LUV
@@ -2210,7 +2149,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, u -83.08 to 175.02, v -134.10 to 107.40. See also [[from-LUV]], [[to-LUV*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (-> srgb to-XYZ XYZ-to-LUV))
 
@@ -2222,7 +2160,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-LUV*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-LUV srgb)]
     (Vec4. (m/mnorm (.x cc) 0.0 100.00000000000003 0.0 255.0)
@@ -2240,19 +2177,19 @@
   (^Vec4 [luv] (LUV-to-XYZ luv wp/CIE-2-D65))
   (^Vec4 [luv ^Vec4 whitepoint]
    (let [^Vec4 c (pr/to-color luv)]
-     (if (zero? (.x c))
+     (if (m/zero? (.x c))
        (Vec4. 0.0 0.0 0.0 (.w c))
-       (let [ref-uv-factor (/ (+ (.x whitepoint) 15.0 (* 3.0 (.y whitepoint))))
-             ref-u (* 4.0 (.x whitepoint) ref-uv-factor)
-             ref-v (* 9.0 ref-uv-factor)
-             var-y (from-lab-correct (/ (+ (.x c) 16.0) 116.0))
-             var-u (+ ref-u (/ (.y c) (* 13.0 (.x c))))
-             var-v (+ ref-v (/ (.z c) (* 13.0 (.x c))))
-             Y (* 100.0 var-y)
-             X (/ (* -9.0 Y var-u) (- (* (- var-u 4.0) var-v) (* var-u var-v)))]
+       (let [ref-uv-factor (m// (m/+ (.x whitepoint) 15.0 (m/* 3.0 (.y whitepoint))))
+             ref-u (m/* 4.0 (.x whitepoint) ref-uv-factor)
+             ref-v (m/* 9.0 ref-uv-factor)
+             var-y (from-lab-correct (m// (m/+ (.x c) 16.0) 116.0))
+             var-u (m/+ ref-u (m// (.y c) (m/* 13.0 (.x c))))
+             var-v (m/+ ref-v (m// (.z c) (m/* 13.0 (.x c))))
+             Y (m/* 100.0 var-y)
+             X (m// (m/* -9.0 Y var-u) (m/- (m/* (m/- var-u 4.0) var-v) (m/* var-u var-v)))]
          (Vec4. X
                 Y
-                (/ (- (* 9.0 Y) (* 15.0 var-v Y) (* var-v X)) (* 3.0 var-v))
+                (m// (m/- (m/* 9.0 Y) (m/* 15.0 var-v Y) (m/* var-v X)) (m/* 3.0 var-v))
                 (.w c)))))))
 
 (defn from-LUV
@@ -2261,7 +2198,6 @@
   - `c` LUV color, any type accepted by [[to-color]], with channels in the ranges of [[to-LUV]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-LUV*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [luv]
   (-> luv LUV-to-XYZ from-XYZ))
 
@@ -2271,7 +2207,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-LUV]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [luv*]
   (let [^Vec4 c (pr/to-color luv*)]
     (from-LUV (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.00000000000003)
@@ -2281,8 +2216,8 @@
 
 ;; HunterLab
 
-(def ^{:private true :const true :tag 'double} Ka (/ 17500.0 198.04))
-(def ^{:private true :const true :tag 'double} Kb (/ 7000.0 218.11))
+(def ^{:private true :const true :tag 'double} Ka (m// 17500.0 198.04))
+(def ^{:private true :const true :tag 'double} Kb (m// 7000.0 218.11))
 
 (defn XYZ-to-HunterLAB
   "Converts XYZ (0-100, as [[to-XYZ]]) to Hunter Lab relative to a white point.
@@ -2296,16 +2231,16 @@
   (^Vec4 [xyz] (XYZ-to-HunterLAB xyz wp/CIE-2-D65))
   (^Vec4 [xyz ^Vec4 whitepoint]
    (let [cc (XYZ-to-XYZ1 xyz)]
-     (if (zero? (.y cc))
+     (if (m/zero? (.y cc))
        (Vec4. 0.0 0.0 0.0 (.w cc))
-       (let [X (/ (.x cc) (.x whitepoint))
+       (let [X (m// (.x cc) (.x whitepoint))
              sqrtY (m/sqrt (.y cc))
-             Z (/ (.z cc) (.y whitepoint))
-             ka (* Ka (m/inc (.x whitepoint)))
-             kb (* Kb (m/inc (.y whitepoint)))]
-         (Vec4. (* 100.0 sqrtY)
-                (* ka (/ (- X (.y cc)) sqrtY))
-                (* kb (/ (- (.y cc) Z) sqrtY))
+             Z (m// (.z cc) (.y whitepoint))
+             ka (m/* Ka (m/inc (.x whitepoint)))
+             kb (m/* Kb (m/inc (.y whitepoint)))]
+         (Vec4. (m/* 100.0 sqrtY)
+                (m/* ka (m// (m/- X (.y cc)) sqrtY))
+                (m/* kb (m// (m/- (.y cc) Z) sqrtY))
                 (.w cc)))))))
 
 (defn to-HunterLAB
@@ -2316,7 +2251,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -69.08 to 109.46, b -199.78 to 55.72. See also [[from-HunterLAB]], [[to-HunterLAB*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (-> srgb to-XYZ XYZ-to-HunterLAB))
 
@@ -2328,7 +2262,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-HunterLAB*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-HunterLAB srgb)]
     (Vec4. (m/mnorm (.x cc) 0.0 100.00000000000003 0.0 255.0)
@@ -2346,14 +2279,14 @@
   (^Vec4 [hunterlab] (HunterLAB-to-XYZ hunterlab wp/CIE-2-D65))
   (^Vec4 [hunterlab ^Vec4 whitepoint]
    (let [^Vec4 c (pr/to-color hunterlab)]
-     (if (zero? (.x c))
+     (if (m/zero? (.x c))
        (Vec4. 0.0 0.0 0.0 (.w c))
-       (let [Y (m/sq (/ (.x c) 100.0))
+       (let [Y (m/sq (m// (.x c) 100.0))
              sqrtY (m/sqrt Y)
-             ka (* Ka (m/inc (.x whitepoint)))
-             kb (* Kb (m/inc (.y whitepoint)))
-             X (* (.x whitepoint) (+ (* (/ (.y c) ka) sqrtY) Y))
-             Z (- (* (.y whitepoint) (- (* (/ (.z c) kb) sqrtY) Y)))]
+             ka (m/* Ka (m/inc (.x whitepoint)))
+             kb (m/* Kb (m/inc (.y whitepoint)))
+             X (m/* (.x whitepoint) (m/+ (m/* (m// (.y c) ka) sqrtY) Y))
+             Z (m/- (m/* (.y whitepoint) (m/- (m/* (m// (.z c) kb) sqrtY) Y)))]
          (XYZ1-to-XYZ (Vec4. X Y Z (.w c))))))))
 
 (defn from-HunterLAB
@@ -2362,7 +2295,6 @@
   - `c` HunterLAB color, any type accepted by [[to-color]], with channels in the ranges of [[to-HunterLAB]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-HunterLAB*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [hunterlab]
   (-> hunterlab HunterLAB-to-XYZ from-XYZ))
 
@@ -2372,7 +2304,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-HunterLAB]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [hunterlab*]
   (let [^Vec4 c (pr/to-color hunterlab*)]
     (from-HunterLAB (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.00000000000003)
@@ -2401,7 +2332,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, C 0 to 133.81, H 0 to 360. See also [[from-LCH]], [[to-LCH*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (to-luma-color-hue to-LAB srgb))
 
@@ -2413,7 +2343,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-LCH*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-LCH srgb)]
     (Vec4. (m/mnorm (.x cc) 0.0 100.00000000000003 0.0 255.0)
@@ -2438,7 +2367,6 @@
   - `c` LCH color, any type accepted by [[to-color]], with channels in the ranges of [[to-LCH]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-LCH*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [lch]
   (from-luma-color-hue from-LAB lch))
 
@@ -2448,7 +2376,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-LCH]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [lch*]
   (let [^Vec4 c (pr/to-color lch*)]
     (from-LCH (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.00000000000003)
@@ -2477,7 +2404,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, C 0 to 179.04, H 0 to 360. See also [[from-LCHuv]], [[to-LCHuv*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (to-luma-color-hue to-LUV srgb))
 
@@ -2489,7 +2415,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-LCHuv*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-LCHuv srgb)]
     (Vec4. (m/mnorm (.x cc) 0.0 100.00000000000003 0.0 255.0)
@@ -2514,7 +2439,6 @@
   - `c` LCHuv color, any type accepted by [[to-color]], with channels in the ranges of [[to-LCHuv]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-LCHuv*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [lchuv]
   (from-luma-color-hue from-LUV lchuv))
 
@@ -2524,7 +2448,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-LCHuv]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [lchuv*]
   (let [^Vec4 c (pr/to-color lchuv*)]
     (from-LCHuv (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.00000000000003)
@@ -2546,12 +2469,12 @@
   (^Vec4 [xyz] (XYZ-to-Yxy xyz wp/CIE-2-D65))
   (^Vec4 [xyz ^Vec4 whitepoint]
    (let [^Vec4 xyz (pr/to-color xyz)
-         d (+ (.x xyz) (.y xyz) (.z xyz))]
-     (if (zero? d)
+         d (m/+ (.x xyz) (.y xyz) (.z xyz))]
+     (if (m/zero? d)
        (Vec4. 0.0 (.z whitepoint) (.w whitepoint) (.w xyz))
        (Vec4. (.y xyz)
-              (/ (.x xyz) d)
-              (/ (.y xyz) d)
+              (m// (.x xyz) d)
+              (m// (.y xyz) d)
               (.w xyz))))))
 
 (defn to-Yxy
@@ -2562,7 +2485,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: Y 0 to 100, x 0.15 to 0.64, y 0.06 to 0.60. See also [[from-Yxy]], [[to-Yxy*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (XYZ-to-Yxy (to-XYZ srgb)))
 
@@ -2574,7 +2496,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-Yxy*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-Yxy srgb)]
     (Vec4. (m/mnorm (.x cc) 0.0 100.00000000000004 0.0 255.0)
@@ -2590,11 +2511,11 @@
   Returns a `Vec4` `[X Y Z alpha]`; `Y = 0` gives black. Infinite for `y = 0` with `Y > 0`. See also [[from-Yxy]]."
   ^Vec4 [yxy]
   (let [^Vec4 c (pr/to-color yxy)]
-    (if (zero? (.x c))
+    (if (m/zero? (.x c))
       (Vec4. 0.0 0.0 0.0 (.w c))
-      (let [Yy (/ (.x c) (.z c))
-            X (* (.y c) Yy) 
-            Z (* (- 1.0 (.y c) (.z c)) Yy)]
+      (let [Yy (m// (.x c) (.z c))
+            X (m/* (.y c) Yy) 
+            Z (m/* (m/- 1.0 (.y c) (.z c)) Yy)]
         (Vec4. X (.x c) Z (.w c))))))
 
 (defn from-Yxy
@@ -2603,7 +2524,6 @@
   - `c` Yxy color, any type accepted by [[to-color]], with channels in the ranges of [[to-Yxy]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-Yxy*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [yxy]
   (from-XYZ (Yxy-to-XYZ yxy)))
 
@@ -2613,7 +2533,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-Yxy]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [yxy*]
   (let [^Vec4 c (pr/to-color yxy*)]
     (from-Yxy (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.00000000000004)
@@ -2639,7 +2558,6 @@
   Throws `ex-info` for an invalid notation or specification.
 
   See also [[munsell-to-sRGB]], `clojure2d.color.munsell/munsell-to-Yxy` (Illuminant C by default)."
-  {:metadoc/categories meta-conv}
   (^Vec4 [munsell] (munsell-to-Yxy munsell nil))
   (^Vec4 [munsell options]
    (munsell/munsell-to-Yxy munsell (merge {:whitepoint wp/CIE-2-D65} options))))
@@ -2659,7 +2577,6 @@
   Throws `ex-info` for an invalid notation or specification.
 
   See also [[munsell-to-Yxy]]."
-  {:metadoc/categories meta-conv}
   (^Vec4 [munsell] (munsell-to-sRGB munsell nil))
   (^Vec4 [munsell options]
    (from-Yxy (munsell-to-Yxy munsell (assoc options :whitepoint wp/CIE-2-D65)))))
@@ -2669,20 +2586,20 @@
 (defn- xy->uv
   (^Vec2 [^Vec2 xy] (xy->uv (.x xy) (.y xy)))
   (^Vec2 [^double x ^double y]
-   (let [d (/ (+ (* 12.0 y)
-                 (* -2.0 x)
+   (let [d (m// (m/+ (m/* 12.0 y)
+                 (m/* -2.0 x)
                  3.0))]
-     (Vec2. (* 4.0 x d)
-            (* 6.0 y d)))))
+     (Vec2. (m/* 4.0 x d)
+            (m/* 6.0 y d)))))
 
 (defn- uv->xy
   (^Vec2 [^Vec2 uv] (uv->xy (.x uv) (.y uv)))
   (^Vec2 [^double u ^double v]
-   (let [d (/ (+ (* 2.0 u)
-                 (* -8.0 v)
+   (let [d (m// (m/+ (m/* 2.0 u)
+                 (m/* -8.0 v)
                  4.0))]
-     (Vec2. (* 3.0 u d)
-            (* 2.0 v d)))))
+     (Vec2. (m/* 3.0 u d)
+            (m/* 2.0 v d)))))
 
 (defn XYZ-to-UVW
   "Converts XYZ (0-100, as [[to-XYZ]]) to CIE 1964 U*V*W* relative to a white point.
@@ -2698,9 +2615,9 @@
    (let [^Vec4 c (XYZ-to-Yxy xyz whitepoint)
          ^Vec2 uv0 (xy->uv (Vec2. (.z whitepoint) (.w whitepoint)))
          ^Vec2 uv (v/sub (xy->uv (Vec2. (.y c) (.z c))) uv0)
-         W (- (* 25.0 (m/cbrt (.x c))) 17.0)
-         W13 (* 13.0 W)]
-     (Vec4. (* W13 (.x uv)) (* W13 (.y uv)) W (.w c)))))
+         W (m/- (m/* 25.0 (m/cbrt (.x c))) 17.0)
+         W13 (m/* 13.0 W)]
+     (Vec4. (m/* W13 (.x uv)) (m/* W13 (.y uv)) W (.w c)))))
 
 (defn to-UVW
   "Converts an sRGB color to CIE 1964 U*V*W*.
@@ -2721,7 +2638,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-UVW*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [srgb]
   (let [cc (to-UVW srgb)]
     (Vec4. (m/mnorm (.x cc) -82.16458690584015 171.8059820026561 0.0 255.0)
@@ -2742,12 +2658,12 @@
   (^Vec4 [uvw ^Vec4 whitepoint]
    (let [^Vec4 c (pr/to-color uvw)
          ^Vec2 uv0 (xy->uv (Vec2. (.z whitepoint) (.w whitepoint)))
-         Y (m/cb (/ (+ 17.0 (.z c)) 25.0))
-         ^Vec2 xy (if (zero? (.z c))
+         Y (m/cb (m// (m/+ 17.0 (.z c)) 25.0))
+         ^Vec2 xy (if (m/zero? (.z c))
                     (uv->xy uv0)
-                    (let [W13 (/ (* 13.0 (.z c)))]
-                      (uv->xy (Vec2. (+ (* (.x c) W13) (.x uv0))
-                                     (+ (* (.y c) W13) (.y uv0))))))]
+                    (let [W13 (m// (m/* 13.0 (.z c)))]
+                      (uv->xy (Vec2. (m/+ (m/* (.x c) W13) (.x uv0))
+                                     (m/+ (m/* (.y c) W13) (.y uv0))))))]
      (Yxy-to-XYZ (Vec4. Y (.x xy) (.y xy) (.w c))))))
 
 (defn from-UVW
@@ -2765,7 +2681,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-UVW]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [uvw*]
   (let [^Vec4 cc (pr/to-color uvw*)]
     (from-UVW (Vec4. (m/mnorm (.x cc) 0.0 255.0 -82.16458690584015 171.8059820026561)
@@ -2801,12 +2716,11 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100.003, M 0 to 99.999, S 0 to 99.979. See also [[from-LMS]], [[to-LMS*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [c (to-XYZ c)]
-    (Vec4. (+ (* 0.40024 (.x c)) (* 0.7076 (.y c)) (* -0.08081 (.z c)))
-           (+ (* -0.2263 (.x c)) (* 1.16532 (.y c)) (* 0.0457 (.z c)))
-           (* 0.91822 (.z c))
+    (Vec4. (m/+ (m/* 0.40024 (.x c)) (m/* 0.7076 (.y c)) (m/* -0.08081 (.z c)))
+           (m/+ (m/* -0.2263 (.x c)) (m/* 1.16532 (.y c)) (m/* 0.0457 (.z c)))
+           (m/* 0.91822 (.z c))
            (.w c))))
 
 (defn to-LMS*
@@ -2817,7 +2731,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-LMS*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-LMS c)]
     (Vec4. (m/mnorm (.x cc) 0.0 100.00284076797065 0.0 255.0)
@@ -2849,16 +2762,15 @@
   - `c` LMS color, any type accepted by [[to-color]], with channels in the ranges of [[to-LMS]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-LMS*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
-    (from-XYZ (Vec4. (+ (* 1.8599363874558397 (.x c))
-                        (* -1.1293816185800916 (.y c))
-                        (* 0.2198974095961933 (.z c)))
-                     (+ (* 0.3611914362417676 (.x c))
-                        (* 0.6388124632850422 (.y c))
-                        (* -0.0000063705968386499 (.z c)))
-                     (* 1.0890636230968613 (.z c))
+    (from-XYZ (Vec4. (m/+ (m/* 1.8599363874558397 (.x c))
+                          (m/* -1.1293816185800916 (.y c))
+                          (m/* 0.2198974095961933 (.z c)))
+                     (m/+ (m/* 0.3611914362417676 (.x c))
+                          (m/* 0.6388124632850422 (.y c))
+                          (m/* -0.0000063705968386499 (.z c)))
+                     (m/* 1.0890636230968613 (.z c))
                      (.w c)))))
 
 (defn from-LMS*
@@ -2867,7 +2779,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-LMS]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-LMS (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 100.00284076797065)
@@ -2879,20 +2790,13 @@
 ;;
 ;; https://www.researchgate.net/publication/221677980_Development_and_Testing_of_a_Color_Space_IPT_with_Improved_Hue_Uniformity
 
-(defmacro ^:private spow 
-  "Symmetric pow"
-  [v e]
-  `(if (neg? ~v)
-     (- (m/pow (- ~v) ~e))
-     (m/pow ~v ~e)))
-
 (defn- spow-043
   ^double [^double v]
-  (spow v 0.43))
+  (m/spow v 0.43))
 
 (defn- spow-r043
   ^double [^double v]
-  (spow v 2.3255813953488373))
+  (m/spow v 2.3255813953488373))
 
 
 (defn to-IPT
@@ -2903,16 +2807,15 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: I 0 to 1, P -0.45 to 0.66, T -0.75 to 0.65. See also [[from-IPT]], [[to-IPT*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [c (to-XYZ1 c)
-        ^Vec3 LMS (-> (Vec3. (+ (* 0.4002 (.x c)) (* 0.7075 (.y c)) (* -0.0807 (.z c)))
-                             (+ (* -0.228 (.x c)) (* 1.15 (.y c)) (* 0.0612 (.z c)))
-                             (* 0.9184 (.z c)))
+        ^Vec3 LMS (-> (Vec3. (m/+ (m/* 0.4002 (.x c)) (m/* 0.7075 (.y c)) (m/* -0.0807 (.z c)))
+                             (m/+ (m/* -0.228 (.x c)) (m/* 1.15 (.y c)) (m/* 0.0612 (.z c)))
+                             (m/* 0.9184 (.z c)))
                       (v/fmap spow-043))]
-    (Vec4. (+ (* 0.4 (.x LMS)) (* 0.4 (.y LMS)) (* 0.2 (.z LMS)))
-           (+ (* 4.455 (.x LMS)) (* -4.851 (.y LMS)) (* 0.396 (.z LMS)))
-           (+ (* 0.8056 (.x LMS)) (* 0.3572 (.y LMS)) (* -1.1628 (.z LMS)))
+    (Vec4. (m/+ (m/* 0.4 (.x LMS)) (m/* 0.4 (.y LMS)) (m/* 0.2 (.z LMS)))
+           (m/+ (m/* 4.455 (.x LMS)) (m/* -4.851 (.y LMS)) (m/* 0.396 (.z LMS)))
+           (m/+ (m/* 0.8056 (.x LMS)) (m/* 0.3572 (.y LMS)) (m/* -1.1628 (.z LMS)))
            (.w c))))
 
 (defn to-IPT*
@@ -2923,7 +2826,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-IPT*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-IPT c)]
     (Vec4. (m/mnorm (.x cc) 0.0 0.9999878910004701 0.0 255.0)
@@ -2937,20 +2839,19 @@
   - `c` IPT color, any type accepted by [[to-color]], with channels in the ranges of [[to-IPT]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-IPT*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        ^Vec3 LMS' (-> (Vec3. (+ (.x c) (* 0.0975689305146139 (.y c)) (* 0.2052264331645916 (.z c)))
-                              (+ (.x c) (* -0.1138764854731471 (.y c)) (* 0.13321715836999806 (.z c)))
-                              (+ (.x c) (* 0.0326151099170664 (.y c)) (* -0.6768871830691793 (.z c))))
+        ^Vec3 LMS' (-> (Vec3. (m/+ (.x c) (m/* 0.0975689305146139 (.y c)) (m/* 0.2052264331645916 (.z c)))
+                              (m/+ (.x c) (m/* -0.1138764854731471 (.y c)) (m/* 0.13321715836999806 (.z c)))
+                              (m/+ (.x c) (m/* 0.0326151099170664 (.y c)) (m/* -0.6768871830691793 (.z c))))
                        (v/fmap spow-r043))]
-    (from-XYZ1 (Vec4. (+ (* 1.8502429449432056 (.x LMS'))
-                         (* -1.1383016378672328 (.y LMS'))
-                         (* 0.23843495850870136 (.z LMS')))
-                      (+ (* 0.3668307751713486 (.x LMS'))
-                         (* 0.6438845448402355 (.y LMS'))
-                         (* -0.010673443584379992 (.z LMS')))
-                      (* 1.088850174216028 (.z LMS'))
+    (from-XYZ1 (Vec4. (m/+ (m/* 1.8502429449432056 (.x LMS'))
+                           (m/* -1.1383016378672328 (.y LMS'))
+                           (m/* 0.23843495850870136 (.z LMS')))
+                      (m/+ (m/* 0.3668307751713486 (.x LMS'))
+                           (m/* 0.6438845448402355 (.y LMS'))
+                           (m/* -0.010673443584379992 (.z LMS')))
+                      (m/* 1.088850174216028 (.z LMS'))
                       (.w c)))))
 
 (defn from-IPT*
@@ -2959,7 +2860,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-IPT]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-IPT (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 0.9999878910004701)
@@ -2972,11 +2872,11 @@
 
 (defn- spow-0427
   ^double [^double v]
-  (spow v 0.427))
+  (m/spow v 0.427))
 
 (defn- spow-r0427
   ^double [^double v]
-  (spow v 2.34192037470726))
+  (m/spow v 2.34192037470726))
 
 (defn to-IgPgTg
   "Converts an sRGB color to IgPgTg (Hellwig and Fairchild 2020).
@@ -2986,16 +2886,15 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: Ig 0 to 0.97, Pg -0.35 to 0.39, Tg -0.41 to 0.44. See also [[from-IgPgTg]], [[to-IgPgTg*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [c (to-XYZ1 c)
-        ^Vec3 LMS (-> (Vec3. (/ (+ (* 2.968 (.x c)) (* 2.741 (.y c)) (* -0.649 (.z c))) 18.36)
-                             (/ (+ (* 1.237 (.x c)) (* 5.969 (.y c)) (* -0.173 (.z c))) 21.46)
-                             (/ (+ (* -0.318 (.x c)) (* 0.387 (.y c)) (* 2.311 (.z c))) 19435.0))
+        ^Vec3 LMS (-> (Vec3. (m// (m/+ (m/* 2.968 (.x c)) (m/* 2.741 (.y c)) (m/* -0.649 (.z c))) 18.36)
+                             (m// (m/+ (m/* 1.237 (.x c)) (m/* 5.969 (.y c)) (m/* -0.173 (.z c))) 21.46)
+                             (m// (m/+ (m/* -0.318 (.x c)) (m/* 0.387 (.y c)) (m/* 2.311 (.z c))) 19435.0))
                       (v/fmap spow-0427))]
-    (Vec4. (+ (* 0.117 (.x LMS)) (* 1.464 (.y LMS)) (* 0.13 (.z LMS)))
-           (+ (* 8.285 (.x LMS)) (* -8.361 (.y LMS)) (* 21.4 (.z LMS)))
-           (+ (* -1.208 (.x LMS)) (* 2.412 (.y LMS)) (* -36.53 (.z LMS)))
+    (Vec4. (m/+ (m/* 0.117 (.x LMS)) (m/* 1.464 (.y LMS)) (m/* 0.13 (.z LMS)))
+           (m/+ (m/* 8.285 (.x LMS)) (m/* -8.361 (.y LMS)) (m/* 21.4 (.z LMS)))
+           (m/+ (m/* -1.208 (.x LMS)) (m/* 2.412 (.y LMS)) (m/* -36.53 (.z LMS)))
            (.w c))))
 
 (defn to-IgPgTg*
@@ -3006,7 +2905,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-IgPgTg*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-IgPgTg c)]
     (Vec4. (m/mnorm (.x cc) 0.0 0.9741526429696793 0.0 255.0)
@@ -3022,29 +2920,28 @@
   - `c` IgPgTg color, any type accepted by [[to-color]], with channels in the ranges of [[to-IgPgTg]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-IgPgTg*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        ^Vec3 LMS' (-> (Vec3. (+ (* 0.5818464618992453 (.x c))
-                                 (* 0.12331854793907805 (.y c))
-                                 (* 0.07431308420320755 (.z c)))
-                              (+ (* 0.6345481937914152 (.x c))
-                                 (* -0.009437923746683726 (.y c))
-                                 (* -0.0032707446752298776 (.z c)))
-                              (+ (* 0.022656986516578295 (.x c))
-                                 (* -0.004701151874826374 (.y c))
-                                 (* -0.030048158824914566 (.z c))))
+        ^Vec3 LMS' (-> (Vec3. (m/+ (m/* 0.5818464618992453 (.x c))
+                                   (m/* 0.12331854793907805 (.y c))
+                                   (m/* 0.07431308420320755 (.z c)))
+                              (m/+ (m/* 0.6345481937914152 (.x c))
+                                   (m/* -0.009437923746683726 (.y c))
+                                   (m/* -0.0032707446752298776 (.z c)))
+                              (m/+ (m/* 0.022656986516578295 (.x c))
+                                   (m/* -0.004701151874826374 (.y c))
+                                   (m/* -0.030048158824914566 (.z c))))
                        (v/fmap spow-r0427)
                        (v/emult igpgtg-vec3))]
-    (from-XYZ1 (Vec4. (+ (* 0.4343486855574634 (.x LMS'))
-                         (* -0.2063623701142843 (.y LMS'))
-                         (* 0.1065303361735277 (.z LMS')))
-                      (+ (* -0.08785463778363382 (.x LMS'))
-                         (* 0.2084634664799235 (.y LMS'))
-                         (* -0.009066845616854849 (.z LMS')))
-                      (+ (* 0.07447971736457794 (.x LMS'))
-                         (* -0.06330532030466153 (.y LMS'))
-                         (* 0.4488903142176134 (.z LMS')))
+    (from-XYZ1 (Vec4. (m/+ (m/* 0.4343486855574634 (.x LMS'))
+                           (m/* -0.2063623701142843 (.y LMS'))
+                           (m/* 0.1065303361735277 (.z LMS')))
+                      (m/+ (m/* -0.08785463778363382 (.x LMS'))
+                           (m/* 0.2084634664799235 (.y LMS'))
+                           (m/* -0.009066845616854849 (.z LMS')))
+                      (m/+ (m/* 0.07447971736457794 (.x LMS'))
+                           (m/* -0.06330532030466153 (.y LMS'))
+                           (m/* 0.4488903142176134 (.z LMS')))
                       (.w c)))))
 
 (defn from-IgPgTg*
@@ -3053,7 +2950,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-IgPgTg]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-IgPgTg (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 0.9741526429696793)
@@ -3065,26 +2961,26 @@
 
 (def ^{:private true :const true :tag 'double} jab-b 1.15)
 (def ^{:private true :const true :tag 'double} jab-g 0.66)
-(def ^{:private true :const true :tag 'double} jab-rb (/ jab-b))
-(def ^{:private true :const true :tag 'double} jab-rg (/ jab-g))
-(def ^{:private true :const true :tag 'double} jab-b- (dec jab-b))
-(def ^{:private true :const true :tag 'double} jab-g- (dec jab-g))
-(def ^{:private true :const true :tag 'double} jab-c1 (/ 3424.0 (m/fpow 2.0 12)))
-(def ^{:private true :const true :tag 'double} jab-c2 (/ 2413.0 (m/fpow 2.0 7)))
-(def ^{:private true :const true :tag 'double} jab-c3 (/ 2392.0 (m/fpow 2.0 7)))
-(def ^{:private true :const true :tag 'double} jab-n (/ 2610.0 (m/fpow 2.0 14)))
-(def ^{:private true :const true :tag 'double} jab-p (* 1.7 (/ 2523.0 (m/fpow 2.0 5))))
-(def ^{:private true :const true :tag 'double} jab-rn (/ jab-n))
-(def ^{:private true :const true :tag 'double} jab-rp (/ jab-p))
+(def ^{:private true :const true :tag 'double} jab-rb (m// jab-b))
+(def ^{:private true :const true :tag 'double} jab-rg (m// jab-g))
+(def ^{:private true :const true :tag 'double} jab-b- (m/dec jab-b))
+(def ^{:private true :const true :tag 'double} jab-g- (m/dec jab-g))
+(def ^{:private true :const true :tag 'double} jab-c1 (m// 3424.0 (m/fpow 2.0 12)))
+(def ^{:private true :const true :tag 'double} jab-c2 (m// 2413.0 (m/fpow 2.0 7)))
+(def ^{:private true :const true :tag 'double} jab-c3 (m// 2392.0 (m/fpow 2.0 7)))
+(def ^{:private true :const true :tag 'double} jab-n (m// 2610.0 (m/fpow 2.0 14)))
+(def ^{:private true :const true :tag 'double} jab-p (m/* 1.7 (m// 2523.0 (m/fpow 2.0 5))))
+(def ^{:private true :const true :tag 'double} jab-rn (m// jab-n))
+(def ^{:private true :const true :tag 'double} jab-rp (m// jab-p))
 (def ^{:private true :const true :tag 'double} jab-d -0.56)
-(def ^{:private true :const true :tag 'double} jab-d+ (inc jab-d))
+(def ^{:private true :const true :tag 'double} jab-d+ (m/inc jab-d))
 (def ^{:private true :const true :tag 'double} jab-d0 1.6295499532821566e-11)
 
 (defn- jab-lms->lms' 
   ^double [^double v]
-  (let [v (m/pow (/ v 10000.0) jab-n)]
-    (m/pow (/ (+ jab-c1 (* jab-c2 v))
-              (inc (* jab-c3 v))) jab-p)))
+  (let [v (m/pow (m// v 10000.0) jab-n)]
+    (m/pow (m// (m/+ jab-c1 (m/* jab-c2 v))
+              (m/inc (m/* jab-c3 v))) jab-p)))
 
 (defn to-JAB
   "Converts an sRGB color to Jzazbz (Safdar et al. 2017).
@@ -3094,20 +2990,19 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: J 0 to 0.167, a -0.093 to 0.109, b -0.156 to 0.115. See also [[from-JAB]], [[to-JAB*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [c (to-XYZ c)
-        X' (- (* jab-b (.x c)) (* jab-b- (.z c)))
-        Y' (- (* jab-g (.y c)) (* jab-g- (.x c)))
-        ^Vec3 LMS' (-> (Vec3. (+ (* 0.41478972 X') (* 0.579999 Y') (* 0.0146480 (.z c)))
-                              (+ (* -0.2015100 X') (* 1.120649 Y') (* 0.0531008 (.z c)))
-                              (+ (* -0.0166008 X') (* 0.264800 Y') (* 0.6684799 (.z c))))
+        X' (m/- (m/* jab-b (.x c)) (m/* jab-b- (.z c)))
+        Y' (m/- (m/* jab-g (.y c)) (m/* jab-g- (.x c)))
+        ^Vec3 LMS' (-> (Vec3. (m/+ (m/* 0.41478972 X') (m/* 0.579999 Y') (m/* 0.0146480 (.z c)))
+                              (m/+ (m/* -0.2015100 X') (m/* 1.120649 Y') (m/* 0.0531008 (.z c)))
+                              (m/+ (m/* -0.0166008 X') (m/* 0.264800 Y') (m/* 0.6684799 (.z c))))
                        (v/fmap jab-lms->lms'))
-        ^Vec3 Iab (Vec3. (+ (* 0.5 (.x LMS')) (* 0.5 (.y LMS')))
-                         (+ (* 3.524000 (.x LMS')) (* -4.066708 (.y LMS')) (* 0.542708 (.z LMS')))
-                         (+ (* 0.199076 (.x LMS')) (* 1.096799 (.y LMS')) (* -1.295875 (.z LMS'))))]
-    (Vec4. (- (/ (* jab-d+ (.x Iab))
-                 (inc (* jab-d (.x Iab)))) jab-d0) (.y Iab) (.z Iab) (.w c))))
+        ^Vec3 Iab (Vec3. (m/+ (m/* 0.5 (.x LMS')) (m/* 0.5 (.y LMS')))
+                         (m/+ (m/* 3.524000 (.x LMS')) (m/* -4.066708 (.y LMS')) (m/* 0.542708 (.z LMS')))
+                         (m/+ (m/* 0.199076 (.x LMS')) (m/* 1.096799 (.y LMS')) (m/* -1.295875 (.z LMS'))))]
+    (Vec4. (m/- (m// (m/* jab-d+ (.x Iab))
+                     (m/inc (m/* jab-d (.x Iab)))) jab-d0) (.y Iab) (.z Iab) (.w c))))
 
 (defn to-JAB*
   "Converts an sRGB color to JAB with channels mapped to `[0,255]`.
@@ -3117,7 +3012,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-JAB*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-JAB c)]
     (Vec4. (m/mnorm (.x cc) 0.0 0.16717359341064056 0.0 255.0)
@@ -3128,9 +3022,9 @@
 (defn- jab-lms'->lms
   "Inverse PQ of one Jzazbz LMS' channel; rounding noise around black (a slightly negative channel or base) gives 0 instead of NaN."
   ^double [^double v]
-  (let [v (m/pow (max 0.0 v) jab-rp)]
-    (* 10000.0 (m/pow (max 0.0 (/ (- jab-c1 v)
-                                  (- (* jab-c3 v) jab-c2))) jab-rn))))
+  (let [v (m/pow (m/max 0.0 v) jab-rp)]
+    (m/* 10000.0 (m/pow (m/max 0.0 (m// (m/- jab-c1 v)
+                                  (m/- (m/* jab-c3 v) jab-c2))) jab-rn))))
 
 (defn from-JAB
   "Converts JAB to sRGB, the inverse of [[to-JAB]].
@@ -3138,21 +3032,20 @@
   - `c` JAB color, any type accepted by [[to-color]], with channels in the ranges of [[to-JAB]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-JAB*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        J+ (+ jab-d0 (.x c))
-        I (/ J+ (- jab-d+ (* jab-d J+)))
-        ^Vec3 LMS (-> (Vec3. (+ I (* 0.1386050432715393 (.y c)) (* 0.05804731615611886 (.z c)))
-                             (+ I (* -0.1386050432715393 (.y c)) (* -0.05804731615611886 (.z c)))
-                             (+ I (* -0.09601924202631895 (.y c)) (* -0.8118918960560388 (.z c))))
+        J+ (m/+ jab-d0 (.x c))
+        I (m// J+ (m/- jab-d+ (m/* jab-d J+)))
+        ^Vec3 LMS (-> (Vec3. (m/+ I (m/* 0.1386050432715393 (.y c)) (m/* 0.05804731615611886 (.z c)))
+                             (m/+ I (m/* -0.1386050432715393 (.y c)) (m/* -0.05804731615611886 (.z c)))
+                             (m/+ I (m/* -0.09601924202631895 (.y c)) (m/* -0.8118918960560388 (.z c))))
                       (v/fmap jab-lms'->lms))
-        ^Vec3 XYZ' (Vec3. (+ (* 1.9242264357876069 (.x LMS)) (* -1.0047923125953657 (.y LMS)) (* 0.037651404030617994 (.z LMS)))
-                          (+ (* 0.350316762094999 (.x LMS)) (* 0.7264811939316552 (.y LMS)) (* -0.06538442294808501 (.z LMS)))
-                          (+ (* -0.09098281098284752 (.x LMS)) (* -0.3127282905230739 (.y LMS)) (* 1.5227665613052603 (.z LMS))))
-        X (* jab-rb (+ (.x XYZ') (* jab-b- (.z XYZ'))))]
+        ^Vec3 XYZ' (Vec3. (m/+ (m/* 1.9242264357876069 (.x LMS)) (m/* -1.0047923125953657 (.y LMS)) (m/* 0.037651404030617994 (.z LMS)))
+                          (m/+ (m/* 0.350316762094999 (.x LMS)) (m/* 0.7264811939316552 (.y LMS)) (m/* -0.06538442294808501 (.z LMS)))
+                          (m/+ (m/* -0.09098281098284752 (.x LMS)) (m/* -0.3127282905230739 (.y LMS)) (m/* 1.5227665613052603 (.z LMS))))
+        X (m/* jab-rb (m/+ (.x XYZ') (m/* jab-b- (.z XYZ'))))]
     (from-XYZ (Vec4. X
-                     (* jab-rg (+ (.y XYZ') (* jab-g- X)))
+                     (m/* jab-rg (m/+ (.y XYZ') (m/* jab-g- X)))
                      (.z XYZ') (.w c)))))
 
 (defn from-JAB*
@@ -3161,7 +3054,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-JAB]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-JAB (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 0.16717359341064056)
@@ -3179,7 +3071,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: J 0 to 0.167, C 0 to 0.159, H 0 to 360. See also [[from-JCH]], [[to-JCH*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (to-luma-color-hue to-JAB c))
 
@@ -3191,7 +3082,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-JCH*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-JCH c)]
     (Vec4. (m/mnorm (.x cc) 0.0 0.16717359341064056 0.0 255.0)
@@ -3205,7 +3095,6 @@
   - `c` JCH color, any type accepted by [[to-color]], with channels in the ranges of [[to-JCH]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-JCH*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (from-luma-color-hue from-JAB c))
 
@@ -3215,7 +3104,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-JCH]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-JCH (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 0.16717359341064056)
@@ -3229,46 +3117,46 @@
 (defn- to-HC
   "Calculate hue and chroma"
   ^Vec4 [^Vec4 c]
-  (let [M (max (.x c) (.y c) (.z c))
-        m (min (.x c) (.y c) (.z c))
-        C (- M m)
-        ^double h (if (zero? C)
+  (let [M (m/max (.x c) (.y c) (.z c))
+        m (m/min (.x c) (.y c) (.z c))
+        C (m/- M m)
+        h (double (if (m/zero? C)
                     0.0
-                    (let [rC (/ C)]
+                    (let [rC (m// C)]
                       (cond
-                        (== M (.x c)) (mod (* rC (- (.y c) (.z c))) 6.0)
-                        (== M (.y c)) (+ 2.0 (* rC (- (.z c) (.x c))))
-                        :else (+ 4.0 (* rC (- (.x c) (.y c)))))))]
-    (Vec4. (* 60.0 h) C M m)))
+                        (m/== M (.x c)) (m/mod (m/* rC (m/- (.y c) (.z c))) 6.0)
+                        (m/== M (.y c)) (m/+ 2.0 (m/* rC (m/- (.z c) (.x c))))
+                        :else (m/+ 4.0 (m/* rC (m/- (.x c) (.y c))))))))]
+    (Vec4. (m/* 60.0 h) C M m)))
 
 (defn- from-HCX
   "Convert HCX to RGB"
   ^Vec3 [^double h ^double c ^double x]
   (cond
-    (<= 0.0 h 1.0) (Vec3. c x 0.0)
-    (<= 1.0 h 2.0) (Vec3. x c 0.0)
-    (<= 2.0 h 3.0) (Vec3. 0.0 c x)
-    (<= 3.0 h 4.0) (Vec3. 0.0 x c)
-    (<= 4.0 h 5.0) (Vec3. x 0.0 c)
+    (m/<= 0.0 h 1.0) (Vec3. c x 0.0)
+    (m/<= h 2.0) (Vec3. x c 0.0)
+    (m/<= h 3.0) (Vec3. 0.0 c x)
+    (m/<= h 4.0) (Vec3. 0.0 x c)
+    (m/<= h 5.0) (Vec3. x 0.0 c)
     :else (Vec3. c 0.0 x)))
 
-(def ^{:private true :const true :tag 'double} n360->255 (/ 255.0 360.0))
-(def ^{:private true :const true :tag 'double} n255->360 (/ 360.0 255.0))
+(def ^{:private true :const true :tag 'double} n360->255 (m// 255.0 360.0))
+(def ^{:private true :const true :tag 'double} n255->360 (m// 360.0 255.0))
 
 (defn- normalize-HSx
   "Make output range 0-255"
   ^Vec4 [^Vec4 c]
-  (Vec4. (* n360->255 (.x c))
-         (* 255.0 (.y c))
-         (* 255.0 (.z c))
+  (Vec4. (m/* n360->255 (.x c))
+         (m/* 255.0 (.y c))
+         (m/* 255.0 (.z c))
          (.w c)))
 
 (defn- denormalize-HSx 
   "Make output range native to HSx colorspaces"
   ^Vec4 [^Vec4 c]
-  (Vec4. (* n255->360 (.x c))
-         (/ (.y c) 255.0)
-         (/ (.z c) 255.0)
+  (Vec4. (m/* n255->360 (.x c))
+         (m// (.y c) 255.0)
+         (m// (.z c) 255.0)
          (.w c)))
 
 (defn- wrap-hue 
@@ -3286,14 +3174,13 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: H 0 to 360, S 0 to 1, I 0 to 1. See also [[from-HSI]], [[to-HSI*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
         hc (to-HC c)
-        I (/ (+ (.x c) (.y c) (.z c)) 3.0)
-        S (if (zero? I) 0.0
-              (- 1.0 (/ (.w hc) I)))]
-    (Vec4. (.x hc) S (/ I 255.0) (.w c))))
+        I (m// (m/+ (.x c) (.y c) (.z c)) 3.0)
+        S (if (m/zero? I) 0.0
+              (m/- 1.0 (m// (.w hc) I)))]
+    (Vec4. (.x hc) S (m// I 255.0) (.w c))))
 
 (defn from-HSI
   "Converts HSI to sRGB, the inverse of [[to-HSI]].
@@ -3301,14 +3188,13 @@
   - `c` HSI color, any type accepted by [[to-color]], with channels in the ranges of [[to-HSI]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-HSI*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        h' (/ (wrap-hue (.x c)) 60.0)
-        z (- 1.0 (m/abs (dec (mod h' 2.0))))
-        C (/ (* 3.0 (.z c) (.y c)) (inc z))
-        X (* C z)
-        m (* (.z c) (- 1.0 (.y c)))
+        h' (m// (wrap-hue (.x c)) 60.0)
+        z (m/- 1.0 (m/abs (m/dec (m/mod h' 2.0))))
+        C (m// (m/* 3.0 (.z c) (.y c)) (m/inc z))
+        X (m/* C z)
+        m (m/* (.z c) (m/- 1.0 (.y c)))
         rgb' (v/add (from-HCX h' C X) (Vec3. m m m))]
     (v/vec4 (v/mult rgb' 255.0) (.w c))))
 
@@ -3318,31 +3204,30 @@
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4`. Inverse: [[from-HSI*]]." :metadoc/categories meta-conv} to-HSI* (comp normalize-HSx to-HSI))
+  Returns a `Vec4`. Inverse: [[from-HSI*]]."} to-HSI* (comp normalize-HSx to-HSI))
 (def ^{:doc "Converts HSI with channels in `[0,255]`, as produced by [[to-HSI*]], to sRGB.
 
   - `c` color with channels in `[0,255]`
 
-  Returns an RGB `Vec4`, not clamped. See also [[from-HSI]]." :metadoc/categories meta-conv} from-HSI* (comp from-HSI denormalize-HSx pr/to-color))
+  Returns an RGB `Vec4`, not clamped. See also [[from-HSI]]."} from-HSI* (comp from-HSI denormalize-HSx pr/to-color))
 
 ;; HSV
 
 (defn to-HSV
   "Converts an sRGB color to HSV (HSB), hue, saturation and value.
 
-  Hexagonal hue in degrees (0 for grays), value `max`, saturation `(max - min) / max`.
+  Hexagonal hue in degrees (0 for grays), value `max`, saturation `(m/max - min) / max`.
 
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: H 0 to 360, S 0 to 1, V 0 to 1. See also [[from-HSV]], [[to-HSV*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
         hc (to-HC c)
         V (.z hc)
-        S (if (zero? V) 0.0
-              (/ (.y hc) V))]
-    (Vec4. (.x hc) S (/ V 255.0) (.w c))))
+        S (if (m/zero? V) 0.0
+              (m// (.y hc) V))]
+    (Vec4. (.x hc) S (m// V 255.0) (.w c))))
 
 (defn from-HSV
   "Converts HSV to sRGB, the inverse of [[to-HSV]].
@@ -3350,13 +3235,12 @@
   - `c` HSV color, any type accepted by [[to-color]], with channels in the ranges of [[to-HSV]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-HSV*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        C (* (.y c) (.z c))
-        h' (/ (wrap-hue (.x c)) 60.0)
-        X (* C (- 1.0 (m/abs (dec (mod h' 2.0)))))
-        m (- (.z c) C)
+        C (m/* (.y c) (.z c))
+        h' (m// (wrap-hue (.x c)) 60.0)
+        X (m/* C (m/- 1.0 (m/abs (m/dec (m/mod h' 2.0)))))
+        m (m/- (.z c) C)
         ^Vec3 rgb' (v/add (from-HCX h' C X) (Vec3. m m m))]
     (v/vec4 (v/mult rgb' 255.0) (.w c))))
 
@@ -3366,19 +3250,19 @@
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4`. Inverse: [[from-HSV*]]." :metadoc/categories meta-conv} to-HSV* (comp normalize-HSx to-HSV))
+  Returns a `Vec4`. Inverse: [[from-HSV*]]."} to-HSV* (comp normalize-HSx to-HSV))
 (def ^{:doc "Converts HSV with channels in `[0,255]`, as produced by [[to-HSV*]], to sRGB.
 
   - `c` color with channels in `[0,255]`
 
-  Returns an RGB `Vec4`, not clamped. See also [[from-HSV]]." :metadoc/categories meta-conv} from-HSV* (comp from-HSV denormalize-HSx pr/to-color))
+  Returns an RGB `Vec4`, not clamped. See also [[from-HSV]]."} from-HSV* (comp from-HSV denormalize-HSx pr/to-color))
 
 ;; HSB = HSV
 
-(def ^{:doc "Alias of [[to-HSV]]: HSB is another name of HSV." :metadoc/categories meta-conv} to-HSB to-HSV)
-(def ^{:doc "Alias of [[from-HSV]]." :metadoc/categories meta-conv} from-HSB from-HSV)
-(def ^{:doc "Alias of [[to-HSV*]]." :metadoc/categories meta-conv} to-HSB* to-HSV*)
-(def ^{:doc "Alias of [[from-HSV*]]." :metadoc/categories meta-conv} from-HSB* from-HSV*)
+(def ^{:doc "Alias of [[to-HSV]]: HSB is another name of HSV."} to-HSB to-HSV)
+(def ^{:doc "Alias of [[from-HSV]]."} from-HSB from-HSV)
+(def ^{:doc "Alias of [[to-HSV*]]."} to-HSB* to-HSV*)
+(def ^{:doc "Alias of [[from-HSV*]]."} from-HSB* from-HSV*)
 
 ;; paletton HSV
 
@@ -3407,9 +3291,9 @@
   Returns a `Vec4`. Inverse: [[from-PalettonHSV*]]."
   ^Vec4 [c]
   (let [^Vec4 c (to-PalettonHSV c)]
-    (Vec4. (* n360->255 (.x c))
-           (* 127.5 (.y c))
-           (* 127.5 (.z c))
+    (Vec4. (m/* n360->255 (.x c))
+           (m/* 127.5 (.y c))
+           (m/* 127.5 (.z c))
            (.w c))))
 
 (defn from-PalettonHSV
@@ -3430,32 +3314,30 @@
   Returns an RGB `Vec4`, not clamped. See also [[from-PalettonHSV]]."
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
-    (from-PalettonHSV (Vec4. (* n255->360 (.x c))
-                             (/ (.y c) 127.5)
-                             (/ (.z c) 127.5)
+    (from-PalettonHSV (Vec4. (m/* n255->360 (.x c))
+                             (m// (.y c) 127.5)
+                             (m// (.z c) 127.5)
                              (.w c)))))
 
 ;; HSL
 
-
 (defn to-HSL
   "Converts an sRGB color to HSL, hue, saturation and lightness.
 
-  Hexagonal hue in degrees (0 for grays), lightness `(max + min) / 2`.
+  Hexagonal hue in degrees (0 for grays), lightness `(m/max + min) / 2`.
 
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: H 0 to 360, S 0 to 1, L 0 to 1. See also [[from-HSL]], [[to-HSL*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
         hc (to-HC c)
-        L (/ (* 0.5 (+ (.z hc) (.w hc))) 255.0)
+        L (m// (m/* 0.5 (m/+ (.z hc) (.w hc))) 255.0)
         ;; S on the 0-255 scale here, at most 255; near white the ratio of two tiny differences rounds above it
-        S (if (or (== 1.0 L)
-                  (zero? (.y hc))) 0.0
-              (min 255.0 (/ (.y hc) (- 1.0 (m/abs (dec (+ L L)))))))]
-    (Vec4. (.x hc) (/ S 255.0) L (.w c))))
+        S (if (or (m/== 1.0 L)
+                  (m/zero? (.y hc))) 0.0
+              (m/min 255.0 (m// (.y hc) (m/- 1.0 (m/abs (m/dec (m/+ L L)))))))]
+    (Vec4. (.x hc) (m// S 255.0) L (.w c))))
 
 (defn from-HSL
   "Converts HSL to sRGB, the inverse of [[to-HSL]].
@@ -3463,13 +3345,12 @@
   - `c` HSL color, any type accepted by [[to-color]], with channels in the ranges of [[to-HSL]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-HSL*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        C (* (.y c) (- 1.0 (m/abs (dec (+ (.z c) (.z c))))))
-        h' (/ (wrap-hue (.x c)) 60.0)
-        X (* C (- 1.0 (m/abs (dec (mod h' 2.0)))))
-        m (- (.z c) (* 0.5 C))
+        C (m/* (.y c) (m/- 1.0 (m/abs (m/dec (m/+ (.z c) (.z c))))))
+        h' (m// (wrap-hue (.x c)) 60.0)
+        X (m/* C (m/- 1.0 (m/abs (m/dec (m/mod h' 2.0)))))
+        m (m/- (.z c) (m/* 0.5 C))
         ^Vec3 rgb' (v/add (from-HCX h' C X) (Vec3. m m m))]
     (v/vec4 (v/mult rgb' 255.0) (.w c))))
 
@@ -3479,12 +3360,12 @@
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4`. Inverse: [[from-HSL*]]." :metadoc/categories meta-conv} to-HSL* (comp normalize-HSx to-HSL))
+  Returns a `Vec4`. Inverse: [[from-HSL*]]."} to-HSL* (comp normalize-HSx to-HSL))
 (def ^{:doc "Converts HSL with channels in `[0,255]`, as produced by [[to-HSL*]], to sRGB.
 
   - `c` color with channels in `[0,255]`
 
-  Returns an RGB `Vec4`, not clamped. See also [[from-HSL]]." :metadoc/categories meta-conv} from-HSL* (comp from-HSL denormalize-HSx pr/to-color))
+  Returns an RGB `Vec4`, not clamped. See also [[from-HSL]]."} from-HSL* (comp from-HSL denormalize-HSx pr/to-color))
 
 ;; HCL
 ;; http://w3.uqo.ca/missaoui/Publications/TRColorSpace.zip
@@ -3497,55 +3378,54 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: H -180 to 180, C 0 to 170, L 0 to 135.27. See also [[from-HCL]], [[to-HCL*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
         r (.x c)
         g (.y c)
         b (.z c)
-        mn (min r g b)
-        mx (max r g b)
-        Q (m/exp (if (zero? mx) 0.0 (* 0.03 (/ mn mx))))
-        L (* 0.5 (+ (* Q mx) (* (dec Q) mn)))
-        gb- (- g b)
-        rg- (- r g)
-        C (* (/ Q 3.0) (+ (m/abs rg-)
-                          (m/abs gb-)
-                          (m/abs (- b r))))
-        H (m/degrees (if (zero? gb-) 0.0 (m/atan (/ gb- rg-))))
+        mn (m/min r g b)
+        mx (m/max r g b)
+        Q (m/exp (if (m/zero? mx) 0.0 (m/* 0.03 (m// mn mx))))
+        L (m/* 0.5 (m/+ (m/* Q mx) (m/* (m/dec Q) mn)))
+        gb- (m/- g b)
+        rg- (m/- r g)
+        C (m/* (m// Q 3.0) (m/+ (m/abs rg-)
+                                (m/abs gb-)
+                                (m/abs (m/- b r))))
+        H (m/degrees (if (m/zero? gb-) 0.0 (m/atan (m// gb- rg-))))
         H (cond
-            (and (>= rg- 0.0) (>= gb- 0.0)) (* H m/TWO_THIRD)
-            (and (>= rg- 0.0) (neg? gb-)) (* 2.0 m/TWO_THIRD H)
-            (and (neg? rg-) (>= gb- 0.0)) (+ (* 2.0 m/TWO_THIRD H) 180.0)
-            (and (neg? rg-) (neg? gb-)) (- (* m/TWO_THIRD H) 180.0) 
+            (and (m/>= rg- 0.0) (m/>= gb- 0.0)) (m/* H m/TWO_THIRD)
+            (and (m/>= rg- 0.0) (m/neg? gb-)) (m/* 2.0 m/TWO_THIRD H)
+            (and (m/neg? rg-) (m/>= gb- 0.0)) (m/+ (m/* 2.0 m/TWO_THIRD H) 180.0)
+            (and (m/neg? rg-) (m/neg? gb-)) (m/- (m/* m/TWO_THIRD H) 180.0) 
             :else H)]
     (Vec4. H C L (.w c))))
 
 (defn- hcl-q-step
   "One fixed-point step for Q of the HCL inverse: from Q to max, min (given C, L), then `exp(0.03 min / max)`."
   ^double [^double C ^double L ^double Q]
-  (let [d (/ (* 1.5 C) Q)
-        mx (/ (+ (* 2.0 L) (* (dec Q) d)) (dec (* 2.0 Q)))]
-    (m/exp (* 0.03 (/ (- mx d) mx)))))
+  (let [d (m// (m/* 1.5 C) Q)
+        mx (m// (m/+ (m/* 2.0 L) (m/* (m/dec Q) d)) (m/dec (m/* 2.0 Q)))]
+    (m/exp (m/* 0.03 (m// (m/- mx d) mx)))))
 
 (defn- hcl->max-min
   "Largest and smallest RGB channel of an HCL color, solved exactly: the forward conversion gives `max - min = 3 C / (2 Q)` and `L = (Q max + (Q - 1) min) / 2` with `Q = exp(0.03 min / max)`; Q is the fixed point of [[hcl-q-step]], found with Steffensen (Aitken) acceleration, 2-3 steps to 1e-15. The published inverse (Sarifuddin and Missaoui, colour-science) estimates Q from C / L instead and round-trips only within about 0.06. Black (L = 0) gives zeros."
   ^Vec2 [^double C ^double L]
-  (if (<= L 0.0)
+  (if (m/<= L 0.0)
     (Vec2. 0.0 0.0)
     (let [Q (double
              (loop [iter (long 0)
                     Q0 (m/exp 0.015)]
                (let [Q1 (hcl-q-step C L Q0)
                      Q2 (hcl-q-step C L Q1)
-                     den (+ (- Q2 Q1 Q1) Q0)
-                     Q (if (zero? den) Q2 (- Q0 (/ (m/sq (- Q1 Q0)) den)))]
-                 (if (or (>= iter 20) (<= (m/abs (- Q Q0)) (* 1.0e-15 Q)))
+                     den (m/+ (m/- Q2 Q1 Q1) Q0)
+                     Q (if (m/zero? den) Q2 (m/- Q0 (m// (m/sq (m/- Q1 Q0)) den)))]
+                 (if (or (m/>= iter 20) (m/<= (m/abs (m/- Q Q0)) (m/* 1.0e-15 Q)))
                    Q
-                   (recur (inc iter) Q)))))
-          d (/ (* 1.5 C) Q)
-          mx (/ (+ (* 2.0 L) (* (dec Q) d)) (dec (* 2.0 Q)))]
-      (Vec2. mx (- mx d)))))
+                   (recur (m/inc iter) Q)))))
+          d (m// (m/* 1.5 C) Q)
+          mx (m// (m/+ (m/* 2.0 L) (m/* (m/dec Q) d)) (m/dec (m/* 2.0 Q)))]
+      (Vec2. mx (m/- mx d)))))
 
 (defn from-HCL
   "Converts HCL to sRGB, the inverse of [[to-HCL]].
@@ -3555,7 +3435,6 @@
   - `c` HCL color, any type accepted by [[to-color]], with channels in the ranges of [[to-HCL]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-HCL*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
         H       (m/wrap -180.0 180.0 (.x c))
@@ -3563,19 +3442,19 @@
         mx      (.x mx-mn)
         mn      (.y mx-mn)]
     (cond
-      (<= mx 0.0)          (Vec4. 0.0 0.0 0.0 (.w c))
-      (<= 0.0 H 60.0)      (let [t (m/tan (m/radians (* 1.5 H)))]
-                             (Vec4. mx (/ (+ (* mx t) mn) (inc t)) mn (.w c)))
-      (<= 60.0 H 120.0)    (let [t (m/tan (m/radians (* 0.75 (- H 180.0))))]
-                             (Vec4. (/ (- (* mx (inc t)) mn) t) mx mn (.w c)))
-      (<= 120.0 H 180.0)   (let [t (m/tan (m/radians (* 0.75 (- H 180.0))))]
-                             (Vec4. mn mx (- (* mx (inc t)) (* mn t)) (.w c)))
-      (<= -60.0 H 0.0)     (let [t (m/tan (m/radians (* 0.75 H)))]
-                             (Vec4. mx mn (- (* mn (inc t)) (* mx t)) (.w c)))
-      (<= -120.0 H -60.0)  (let [t (m/tan (m/radians (* 0.75 H)))]
-                             (Vec4. (/ (- (* mn (inc t)) mx) t) mn mx (.w c)))
-      :else (let [t (m/tan (m/radians (* 1.5 (+ H 180.0))))]
-              (Vec4. mn (/ (+ (* mn t) mx) (inc t)) mx (.w c))))))
+      (m/<= mx 0.0)          (Vec4. 0.0 0.0 0.0 (.w c))
+      (m/<= 0.0 H 60.0)      (let [t (m/tan (m/radians (m/* 1.5 H)))]
+                               (Vec4. mx (m// (m/+ (m/* mx t) mn) (m/inc t)) mn (.w c)))
+      (m/<= 60.0 H 120.0)    (let [t (m/tan (m/radians (m/* 0.75 (m/- H 180.0))))]
+                               (Vec4. (m// (m/- (m/* mx (m/inc t)) mn) t) mx mn (.w c)))
+      (m/<= 120.0 H 180.0)   (let [t (m/tan (m/radians (m/* 0.75 (m/- H 180.0))))]
+                               (Vec4. mn mx (m/- (m/* mx (m/inc t)) (m/* mn t)) (.w c)))
+      (m/<= -60.0 H 0.0)     (let [t (m/tan (m/radians (m/* 0.75 H)))]
+                               (Vec4. mx mn (m/- (m/* mn (m/inc t)) (m/* mx t)) (.w c)))
+      (m/<= -120.0 H -60.0)  (let [t (m/tan (m/radians (m/* 0.75 H)))]
+                               (Vec4. (m// (m/- (m/* mn (m/inc t)) mx) t) mn mx (.w c)))
+      :else (let [t (m/tan (m/radians (m/* 1.5 (m/+ H 180.0))))]
+              (Vec4. mn (m// (m/+ (m/* mn t) mx) (m/inc t)) mx (.w c))))))
 
 (defn to-HCL*
   "Converts an sRGB color to HCL with channels mapped to `[0,255]`.
@@ -3585,12 +3464,11 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-HCL*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c] 
   (let [cc (to-HCL c)]
     (Vec4. (m/mnorm (.x cc) -180.0 180.0 0.0 255.0)
-           (* 255.0 (/ (.y cc) 170.0))
-           (* 255.0 (/ (.z cc) 135.26590615814683))
+           (m/* 255.0 (m// (.y cc) 170.0))
+           (m/* 255.0 (m// (.z cc) 135.26590615814683))
            (.w cc))))
 
 (defn from-HCL*
@@ -3599,12 +3477,11 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-HCL]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-HCL (Vec4. (m/mnorm (.x c) 0.0 255.0 -180.0 180.0)
-                     (* 170.0 (/ (.y c) 255.0))
-                     (* 135.26590615814683 (/ (.z c) 255.0))
+                     (m/* 170.0 (m// (.y c) 255.0))
+                     (m/* 135.26590615814683 (m// (.z c) 255.0))
                      (.w c)))))
 
 ;; ### HWB
@@ -3620,10 +3497,9 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: H 0 to 360, W 0 to 1, B 0 to 1. See also [[from-HWB]], [[to-HWB*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (to-HSV c)]
-    (Vec4. (.x c) (* (- 1.0 (.y c)) (.z c)) (- 1.0 (.z c)) (.w c))))
+    (Vec4. (.x c) (m/* (m/- 1.0 (.y c)) (.z c)) (m/- 1.0 (.z c)) (.w c))))
 
 (defn from-HWB
   "Converts HWB to sRGB, the inverse of [[to-HWB]].
@@ -3631,15 +3507,14 @@
   - `c` HWB color, any type accepted by [[to-color]], with channels in the ranges of [[to-HWB]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-HWB*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
         w (.y c)
         b (.z c)
-        w+b (+ w b)
-        w (if (> w+b 1.0) (/ w w+b) w)
-        b- (if (> w+b 1.0) (- 1.0 (/ b w+b)) (- 1.0 b))]
-    (from-HSV (Vec4. (.x c) (if (zero? w) 1.0 (- 1.0 (/ w b-))) b- (.w c)))))
+        w+b (m/+ w b)
+        w (if (m/> w+b 1.0) (m// w w+b) w)
+        b- (if (m/> w+b 1.0) (m/- 1.0 (m// b w+b)) (m/- 1.0 b))]
+    (from-HSV (Vec4. (.x c) (if (m/zero? w) 1.0 (m/- 1.0 (m// w b-))) b- (.w c)))))
 
 (def ^{:doc "Converts an sRGB color to HWB with channels mapped to `[0,255]`.
 
@@ -3647,12 +3522,12 @@
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4`. Inverse: [[from-HWB*]]." :metadoc/categories meta-conv} to-HWB* (comp normalize-HSx to-HWB))
+  Returns a `Vec4`. Inverse: [[from-HWB*]]."} to-HWB* (comp normalize-HSx to-HWB))
 (def ^{:doc "Converts HWB with channels in `[0,255]`, as produced by [[to-HWB*]], to sRGB.
 
   - `c` color with channels in `[0,255]`
 
-  Returns an RGB `Vec4`, not clamped. See also [[from-HWB]]." :metadoc/categories meta-conv} from-HWB* (comp from-HWB denormalize-HSx pr/to-color))
+  Returns an RGB `Vec4`, not clamped. See also [[from-HWB]]."} from-HWB* (comp from-HWB denormalize-HSx pr/to-color))
 
 
 ;; ### GLHS
@@ -3672,33 +3547,32 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 1, H 0 to 360, S 0 to 1. See also [[from-GLHS]], [[to-GLHS*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        mx (max (.x c) (.y c) (.z c))
+        mx (m/max (.x c) (.y c) (.z c))
         md (stat/median-3 (.x c) (.y c) (.z c))
-        mn (min (.x c) (.y c) (.z c))]
-    (if (== mx mn)
-      (Vec4. (/ mx 255.0) 0 0 (.w c))
-      (let [l (+ (* weight-max mx) (* weight-mid md) (* weight-min mn))
-            r (/ (- mx mn))
-            e (* (- md mn) r)
-            ^long k (cond
-                      (and (> (.x c) (.y c)) (>= (.y c) (.z c))) 0
-                      (and (>= (.y c) (.x c)) (> (.x c) (.z c))) 1
-                      (and (> (.y c) (.z c)) (>= (.z c) (.x c))) 2
-                      (and (>= (.z c) (.y c)) (> (.y c) (.x c))) 3
-                      (and (> (.z c) (.x c)) (>= (.x c) (.y c))) 4
-                      :else 5)
-            f (if (even? k)
+        mn (m/min (.x c) (.y c) (.z c))]
+    (if (m/== mx mn)
+      (Vec4. (m// mx 255.0) 0 0 (.w c))
+      (let [l (m/+ (m/* weight-max mx) (m/* weight-mid md) (m/* weight-min mn))
+            r (m// (m/- mx mn))
+            e (m/* (m/- md mn) r)
+            k (long (cond
+                      (and (m/> (.x c) (.y c)) (m/>= (.y c) (.z c))) 0
+                      (and (m/>= (.y c) (.x c)) (m/> (.x c) (.z c))) 1
+                      (and (m/> (.y c) (.z c)) (m/>= (.z c) (.x c))) 2
+                      (and (m/>= (.z c) (.y c)) (m/> (.y c) (.x c))) 3
+                      (and (m/> (.z c) (.x c)) (m/>= (.x c) (.y c))) 4
+                      :else 5))
+            f (if (m/even? k)
                 e
-                (* (- mx md) r))
-            h (* 60.0 (+ k f))
-            lq (* 255.0 (+ (* weight-mid e) weight-max))
-            s (if (<= l lq)
-                (/ (- l mn) l)
-                (/ (- mx l) (- 255.0 l)))]
-        (Vec4. (/ l 255.0) h s (.w c))))))
+                (m/* (m/- mx md) r))
+            h (m/* 60.0 (m/+ k f))
+            lq (m/* 255.0 (m/+ (m/* weight-mid e) weight-max))
+            s (if (m/<= l lq)
+                (m// (m/- l mn) l)
+                (m// (m/- mx l) (m/- 255.0 l)))]
+        (Vec4. (m// l 255.0) h s (.w c))))))
 
 (defn to-GLHS*
   "Converts an sRGB color to GLHS with channels mapped to `[0,255]`.
@@ -3708,12 +3582,11 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-GLHS*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c] 
   (let [cc (to-GLHS c)]
-    (Vec4. (* 255.0 (.x cc))
+    (Vec4. (m/* 255.0 (.x cc))
            (m/mnorm (.y cc) 0.0 360.0 0.0 255.0)
-           (* 255.0 (.z cc))
+           (m/* 255.0 (.z cc))
            (.w cc))))
 
 (defn from-GLHS
@@ -3722,28 +3595,27 @@
   - `c` GLHS color, any type accepted by [[to-color]], with channels in the ranges of [[to-GLHS]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-GLHS*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        l (* 255.0 (.x c))]
-    (if (zero? (.z c))
+        l (m/* 255.0 (.x c))]
+    (if (m/zero? (.z c))
       (Vec4. l l l (.w c))
-      (let [h (/ (wrap-hue (.y c)) 60.0)
+      (let [h (m// (wrap-hue (.y c)) 60.0)
             k (long (m/floor h))
-            f (- h k)
-            fp (if (even? k) f (- 1.0 f))
-            wfw (+ (* weight-mid fp) weight-max)
-            lq (* 255.0 wfw)
+            f (m/- h k)
+            fp (if (m/even? k) f (m/- 1.0 f))
+            wfw (m/+ (m/* weight-mid fp) weight-max)
+            lq (m/* 255.0 wfw)
             s (.z c)
-            ^Vec3 rgb (if (<= l lq)
-                        (let [mn (* (- 1.0 s) l)
-                              md (/ (+ (* fp l) (* mn (- (* (- 1.0 fp) weight-max) (* fp weight-min)))) wfw)
-                              mx (/ (- (- l (* md weight-mid)) (* mn weight-min)) weight-max)]
+            ^Vec3 rgb (if (m/<= l lq)
+                        (let [mn (m/* (m/- 1.0 s) l)
+                              md (m// (m/+ (m/* fp l) (m/* mn (m/- (m/* (m/- 1.0 fp) weight-max) (m/* fp weight-min)))) wfw)
+                              mx (m// (m/- (m/- l (m/* md weight-mid)) (m/* mn weight-min)) weight-max)]
                           (Vec3. mn md mx))
-                        (let [mx (+ (* s 255.0) (* (- 1.0 s) l))
-                              md (/ (- (* (- 1.0 fp) l) (* mx (- (* (- 1.0 fp) weight-max) (* fp weight-min))))
-                                    (+ (* (- 1.0 fp) weight-mid) weight-min))
-                              mn (/ (- (- l (* mx weight-max)) (* md weight-mid)) weight-min)]
+                        (let [mx (m/+ (m/* s 255.0) (m/* (m/- 1.0 s) l))
+                              md (m// (m/- (m/* (m/- 1.0 fp) l) (m/* mx (m/- (m/* (m/- 1.0 fp) weight-max) (m/* fp weight-min))))
+                                      (m/+ (m/* (m/- 1.0 fp) weight-mid) weight-min))
+                              mn (m// (m/- (m/- l (m/* mx weight-max)) (m/* md weight-mid)) weight-min)]
                           (Vec3. mn md mx)))]
         (case k
           0 (Vec4. (.z rgb) (.y rgb) (.x rgb) (.w c))
@@ -3760,12 +3632,11 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-GLHS]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
-    (from-GLHS (Vec4. (/ (.x c) 255.0)
+    (from-GLHS (Vec4. (m// (.x c) 255.0)
                       (m/mnorm (.y c) 0.0 255.0 0.0 360.0)
-                      (/ (.z c) 255.0)
+                      (m// (.z c) 255.0)
                       (.w c)))))
 
 ;; ### YPbPr
@@ -3778,14 +3649,13 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: Y 0 to 255, Pb -127.5 to 127.5, Pr -127.5 to 127.5. See also [[from-YPbPr]], [[to-YPbPr*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        y (+ (* 0.2126 (.x c))
-             (* 0.7152 (.y c))
-             (* 0.0722 (.z c)))
-        pb (/ (- (.z c) y) 1.8556)
-        pr (/ (- (.x c) y) 1.5748)]
+        y (m/+ (m/* 0.2126 (.x c))
+               (m/* 0.7152 (.y c))
+               (m/* 0.0722 (.z c)))
+        pb (m// (m/- (.z c) y) 1.8556)
+        pr (m// (m/- (.x c) y) 1.5748)]
     (Vec4. y pb pr (.w c))))
 
 (defn to-YPbPr*
@@ -3796,7 +3666,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-YPbPr*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-YPbPr c)]
     (Vec4. (.x cc)
@@ -3810,12 +3679,11 @@
   - `c` YPbPr color, any type accepted by [[to-color]], with channels in the ranges of [[to-YPbPr]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-YPbPr*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        b (+ (.x c) (* 1.8556 (.y c)))
-        r (+ (.x c) (* 1.5748 (.z c)))
-        g (/ (- (.x c) (* 0.2126 r) (* 0.0722 b)) 0.7152)]
+        b (m/+ (.x c) (m/* 1.8556 (.y c)))
+        r (m/+ (.x c) (m/* 1.5748 (.z c)))
+        g (m// (m/- (.x c) (m/* 0.2126 r) (m/* 0.0722 b)) 0.7152)]
     (Vec4. r g b (.w c))))
 
 (defn from-YPbPr*
@@ -3824,7 +3692,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-YPbPr]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-YPbPr (Vec4. (.x c)
@@ -3842,12 +3709,11 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: Y 0 to 255, Db -339.92 to 339.92, Dr -339.92 to 339.92. See also [[from-YDbDr]], [[to-YDbDr*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c] 
   (let [^Vec4 c (pr/to-color c)
-        Y (+ (* 0.299 (.x c)) (* 0.587 (.y c)) (* 0.114 (.z c)))
-        Db (+ (* -0.45 (.x c)) (* -0.883 (.y c)) (* 1.333 (.z c)))
-        Dr (+ (* -1.333 (.x c)) (* 1.116 (.y c)) (* 0.217 (.z c)))]
+        Y (m/+ (m/* 0.299 (.x c)) (m/* 0.587 (.y c)) (m/* 0.114 (.z c)))
+        Db (m/+ (m/* -0.45 (.x c)) (m/* -0.883 (.y c)) (m/* 1.333 (.z c)))
+        Dr (m/+ (m/* -1.333 (.x c)) (m/* 1.116 (.y c)) (m/* 0.217 (.z c)))]
     (Vec4. Y Db Dr (.w c))))
 
 (defn to-YDbDr*
@@ -3858,7 +3724,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-YDbDr*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-YDbDr c)]
     (Vec4. (.x cc)
@@ -3872,15 +3737,14 @@
   - `c` YDbDr color, any type accepted by [[to-color]], with channels in the ranges of [[to-YDbDr]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-YDbDr*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
         Y (.x c)
         Db (.y c)
         Dr (.z c)
-        r (+ Y (* 9.2303716147657e-05 Db) (* -0.52591263066186533 Dr))
-        g (+ Y (* -0.12913289889050927 Db) (* 0.26789932820759876 Dr))
-        b (+ Y (* 0.66467905997895482 Db) (* -7.9202543533108e-05 Dr))]
+        r (m/+ Y (m/* 9.2303716147657e-05 Db) (m/* -0.52591263066186533 Dr))
+        g (m/+ Y (m/* -0.12913289889050927 Db) (m/* 0.26789932820759876 Dr))
+        b (m/+ Y (m/* 0.66467905997895482 Db) (m/* -7.9202543533108e-05 Dr))]
     (Vec4. r g b (.w c))))
 
 (defn from-YDbDr*
@@ -3889,7 +3753,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-YDbDr]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-YDbDr (Vec4. (.x c)
@@ -3912,12 +3775,11 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: Y 0 to 255, Cb -127.5 to 127.5, Cr -127.5 to 127.5. See also [[from-YCbCr]], [[to-YCbCr*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
-    (Vec4. (+ (* 0.299 (.x c)) (* 0.587 (.y c)) (* 0.114 (.z c)))
-           (+ (* -0.16873589164785552 (.x c)) (* -0.3312641083521444 (.y c)) (* 0.5 (.z c)))
-           (+ (* 0.5 (.x c)) (* -0.4186875891583452 (.y c)) (* -0.08131241084165479 (.z c)))
+    (Vec4. (m/+ (m/* 0.299 (.x c)) (m/* 0.587 (.y c)) (m/* 0.114 (.z c)))
+           (m/+ (m/* -0.16873589164785552 (.x c)) (m/* -0.3312641083521444 (.y c)) (m/* 0.5 (.z c)))
+           (m/+ (m/* 0.5 (.x c)) (m/* -0.4186875891583452 (.y c)) (m/* -0.08131241084165479 (.z c)))
            (.w c))))
 
 (defn to-YCbCr*
@@ -3928,7 +3790,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-YCbCr*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (v/add (to-YCbCr c) y-norm))
 
@@ -3938,12 +3799,11 @@
   - `c` YCbCr color, any type accepted by [[to-color]], with channels in the ranges of [[to-YCbCr]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-YCbCr*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
-    (Vec4. (+ (.x c) (* 1.402 (.z c)))
-           (+ (.x c) (* -0.3441362862010221 (.y c)) (* -0.7141362862010221 (.z c)))
-           (+ (.x c) (* 1.772 (.y c)))
+    (Vec4. (m/+ (.x c) (m/* 1.402 (.z c)))
+           (m/+ (.x c) (m/* -0.3441362862010221 (.y c)) (m/* -0.7141362862010221 (.z c)))
+           (m/+ (.x c) (m/* 1.772 (.y c)))
            (.w c))))
 
 (defn from-YCbCr*
@@ -3952,7 +3812,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-YCbCr]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (from-YCbCr (v/sub (pr/to-color c) y-norm)))
 
@@ -3966,12 +3825,11 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: Y 0 to 255, U -111.18 to 111.18, V -156.83 to 156.83. See also [[from-YUV]], [[to-YUV*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
-    (Vec4. (+ (* 0.299 (.x c)) (* 0.587 (.y c)) (* 0.114 (.z c)))
-           (+ (* -0.147 (.x c)) (* -0.289 (.y c)) (* 0.436 (.z c)))
-           (+ (* 0.615 (.x c)) (* -0.515 (.y c)) (* -0.1 (.z c)))
+    (Vec4. (m/+ (m/* 0.299 (.x c)) (m/* 0.587 (.y c)) (m/* 0.114 (.z c)))
+           (m/+ (m/* -0.147 (.x c)) (m/* -0.289 (.y c)) (m/* 0.436 (.z c)))
+           (m/+ (m/* 0.615 (.x c)) (m/* -0.515 (.y c)) (m/* -0.1 (.z c)))
            (.w c))))
 
 (defn to-YUV*
@@ -3982,7 +3840,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-YUV*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-YUV c)]
     (Vec4. (.x cc)
@@ -3996,12 +3853,11 @@
   - `c` YUV color, any type accepted by [[to-color]], with channels in the ranges of [[to-YUV]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-YUV*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
-    (Vec4. (+ (.x c) (* -3.945707070708279E-5 (.y c)) (* 1.139827967171717 (.z c)))
-           (+ (.x c) (* -0.39461016414141414 (.y c)) (* -0.5805003156565657 (.z c)))
-           (+ (.x c) (* 2.0319996843434343 (.y c)) (* -4.8137626262625125E-4 (.z c)))
+    (Vec4. (m/+ (.x c) (m/* -3.945707070708279E-5 (.y c)) (m/* 1.139827967171717 (.z c)))
+           (m/+ (.x c) (m/* -0.39461016414141414 (.y c)) (m/* -0.5805003156565657 (.z c)))
+           (m/+ (.x c) (m/* 2.0319996843434343 (.y c)) (m/* -4.8137626262625125E-4 (.z c)))
            (.w c))))
 
 (defn from-YUV*
@@ -4010,7 +3866,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-YUV]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-YUV (Vec4. (.x c)
@@ -4028,12 +3883,11 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: Y 0 to 255, I -151.91 to 151.91, Q -133.26 to 133.26. See also [[from-YIQ]], [[to-YIQ*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
-    (Vec4. (+ (* 0.299 (.x c)) (* 0.587 (.y c)) (* 0.114 (.z c)))
-           (+ (* 0.595716 (.x c)) (* -0.274453 (.y c)) (* -0.321263 (.z c)))
-           (+ (* 0.211456 (.x c)) (* -0.522591 (.y c)) (* 0.311135 (.z c)))
+    (Vec4. (m/+ (m/* 0.299 (.x c)) (m/* 0.587 (.y c)) (m/* 0.114 (.z c)))
+           (m/+ (m/* 0.595716 (.x c)) (m/* -0.274453 (.y c)) (m/* -0.321263 (.z c)))
+           (m/+ (m/* 0.211456 (.x c)) (m/* -0.522591 (.y c)) (m/* 0.311135 (.z c)))
            (.w c))))
 
 (defn to-YIQ*
@@ -4044,7 +3898,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-YIQ*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-YIQ c)]
     (Vec4. (.x cc)
@@ -4058,12 +3911,11 @@
   - `c` YIQ color, any type accepted by [[to-color]], with channels in the ranges of [[to-YIQ]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-YIQ*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
-    (Vec4. (+ (.x c) (* 0.9562957197589482 (.y c)) (* 0.6210244164652611 (.z c)))
-           (+ (.x c) (* -0.27212209931851045 (.y c)) (* -0.647380596825695 (.z c)))
-           (+ (.x c) (* -1.1069890167364902 (.y c)) (* 1.7046149983646481 (.z c)))
+    (Vec4. (m/+ (.x c) (m/* 0.9562957197589482 (.y c)) (m/* 0.6210244164652611 (.z c)))
+           (m/+ (.x c) (m/* -0.27212209931851045 (.y c)) (m/* -0.647380596825695 (.z c)))
+           (m/+ (.x c) (m/* -1.1069890167364902 (.y c)) (m/* 1.7046149983646481 (.z c)))
            (.w c))))
 
 (defn from-YIQ*
@@ -4072,7 +3924,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-YIQ]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
         I (m/mnorm (.y c) 0.0 255.0 -151.90758 151.90758)
@@ -4089,12 +3940,11 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: Y 0 to 255, Cg -127.5 to 127.5, Co -127.5 to 127.5. See also [[from-YCgCo]], [[to-YCgCo*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        Y (+ (* 0.25 (.x c)) (* 0.5 (.y c)) (* 0.25 (.z c)))
-        Cg (+ (* -0.25 (.x c)) (* 0.5 (.y c)) (* -0.25 (.z c)))
-        Co (+ (* 0.5 (.x c)) (* -0.5 (.z c)))]
+        Y (m/+ (m/* 0.25 (.x c)) (m/* 0.5 (.y c)) (m/* 0.25 (.z c)))
+        Cg (m/+ (m/* -0.25 (.x c)) (m/* 0.5 (.y c)) (m/* -0.25 (.z c)))
+        Co (m/+ (m/* 0.5 (.x c)) (m/* -0.5 (.z c)))]
     (Vec4. Y Cg Co (.w c))))
 
 (defn to-YCgCo*
@@ -4105,7 +3955,6 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-YCgCo*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (v/add (to-YCgCo c) y-norm))
 
@@ -4115,13 +3964,12 @@
   - `c` YCgCo color, any type accepted by [[to-color]], with channels in the ranges of [[to-YCgCo]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-YCgCo*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
         Cg (.y c)
         Co (.z c)
-        tmp (- (.x c) Cg)]
-    (Vec4. (+ Co tmp) (+ (.x c) Cg) (- tmp Co) (.w c))))
+        tmp (m/- (.x c) Cg)]
+    (Vec4. (m/+ Co tmp) (m/+ (.x c) Cg) (m/- tmp Co) (.w c))))
 
 (defn from-YCgCo*
   "Converts YCgCo with channels in `[0,255]`, as produced by [[to-YCgCo*]], to sRGB.
@@ -4129,7 +3977,6 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-YCgCo]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (from-YCgCo (v/sub (pr/to-color c) y-norm)))
 
@@ -4140,10 +3987,10 @@
 (def ^{:private true :const true :tag 'double} ch-c -0.29227)
 (def ^{:private true :const true :tag 'double} ch-d -0.90649)
 (def ^{:private true :const true :tag 'double} ch-e 1.97294)
-(def ^{:private true :const true :tag 'double} ch-ed (* ch-e ch-d))
-(def ^{:private true :const true :tag 'double} ch-eb (* ch-e ch-b))
-(def ^{:private true :const true :tag 'double} ch-bc-da (- (* ch-b ch-c) (* ch-d ch-a)))
-(def ^{:private true :const true :tag 'double} ch-bc-da+ed-eb-r (/ (+ ch-bc-da ch-ed (- ch-eb))))
+(def ^{:private true :const true :tag 'double} ch-ed (m/* ch-e ch-d))
+(def ^{:private true :const true :tag 'double} ch-eb (m/* ch-e ch-b))
+(def ^{:private true :const true :tag 'double} ch-bc-da (m/- (m/* ch-b ch-c) (m/* ch-d ch-a)))
+(def ^{:private true :const true :tag 'double} ch-bc-da+ed-eb-r (m// (m/+ ch-bc-da ch-ed (m/- ch-eb))))
 
 (defn to-Cubehelix
   "Converts an sRGB color to Cubehelix, a hue-saturation-lightness space built on Green's cubehelix scheme.
@@ -4153,21 +4000,20 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: H 0 to 360, S 0 to 4.614, L 0 to 1. See also [[from-Cubehelix]], [[to-Cubehelix*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        r (/ (.x c) 255.0)
-        g (/ (.y c) 255.0)
-        b (/ (.z c) 255.0)
-        l (* ch-bc-da+ed-eb-r (+ (* ch-bc-da b) (* ch-ed r) (- (* ch-eb g))))
-        bl (- b l)
-        k (/ (- (* ch-e (- g l)) (* ch-c bl)) ch-d)
-        s (/ (m/sqrt (+ (* k k) (* bl bl)))
-             (* ch-e l (- 1.0 l)))]
+        r (m// (.x c) 255.0)
+        g (m// (.y c) 255.0)
+        b (m// (.z c) 255.0)
+        l (m/* ch-bc-da+ed-eb-r (m/+ (m/* ch-bc-da b) (m/* ch-ed r) (m/- (m/* ch-eb g))))
+        bl (m/- b l)
+        k (m// (m/- (m/* ch-e (m/- g l)) (m/* ch-c bl)) ch-d)
+        s (m// (m/sqrt (m/+ (m/* k k) (m/* bl bl)))
+               (m/* ch-e l (m/- 1.0 l)))]
     (if (m/nan? s)
       (Vec4. 0.0 0.0 l (.w c))
-      (let [h (- (* (m/atan2 k bl) m/rad-in-deg) 120.0)]
-        (Vec4. (if (neg? h) (+ h 360.0) h) s l (.w c))))))
+      (let [h (m/- (m/* (m/atan2 k bl) m/rad-in-deg) 120.0)]
+        (Vec4. (if (m/neg? h) (m/+ h 360.0) h) s l (.w c))))))
 
 (defn to-Cubehelix*
   "Converts an sRGB color to Cubehelix with channels mapped to `[0,255]`.
@@ -4177,12 +4023,11 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-Cubehelix*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [cc (to-Cubehelix c)]
     (Vec4. (m/mnorm (.x cc) 0.0 360.0 0.0 255.0)
            (m/mnorm (.y cc) 0.0 4.61438686803972 0.0 255.0)
-           (* 255.0 (.z cc))
+           (m/* 255.0 (.z cc))
            (.w cc))))
 
 (defn from-Cubehelix
@@ -4191,17 +4036,16 @@
   - `c` Cubehelix color, any type accepted by [[to-color]], with channels in the ranges of [[to-Cubehelix]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-Cubehelix*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
-        h (* (+ (.x c) 120.0) m/deg-in-rad)
+        h (m/* (m/+ (.x c) 120.0) m/deg-in-rad)
         l (.z c)
-        a (* (.y c) l (- 1.0 l))
+        a (m/* (.y c) l (m/- 1.0 l))
         cosh (m/cos h)
         sinh (m/sin h)]
-    (Vec4. (* 255.0 (+ l (* a (+ (* ch-a cosh) (* ch-b sinh)))))
-           (* 255.0 (+ l (* a (+ (* ch-c cosh) (* ch-d sinh)))))
-           (* 255.0 (+ l (* a ch-e cosh)))
+    (Vec4. (m/* 255.0 (m/+ l (m/* a (m/+ (m/* ch-a cosh) (m/* ch-b sinh)))))
+           (m/* 255.0 (m/+ l (m/* a (m/+ (m/* ch-c cosh) (m/* ch-d sinh)))))
+           (m/* 255.0 (m/+ l (m/* a ch-e cosh)))
            (.w c))))
 
 (defn from-Cubehelix*
@@ -4210,12 +4054,11 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-Cubehelix]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c] 
   (let [^Vec4 c (pr/to-color c)
         cc (Vec4. (m/mnorm (.x c) 0.0 255.0 0.0 360.0)
                   (m/mnorm (.y c) 0.0 255.0 0.0 4.61438686803972)
-                  (/ (.z c) 255.0)
+                  (m// (.z c) 255.0)
                   (.w c))]
     (from-Cubehelix cc)))
 
@@ -4230,37 +4073,36 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L -13.51 to 7.14, j and g roughly -20 to 20 except near black. See also [[from-OSA]], [[to-OSA*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [xyz (to-XYZ c)
         X (.x xyz)
         Y (.y xyz)
         Z (.z xyz)
-        sum-xyz (+ X Y Z)
-        x (if (zero? X) 0.0 (/ X sum-xyz))
-        y (if (zero? Y) 0.0 (/ Y sum-xyz))
-        K (+ (* 4.4934 x x)
-             (* 4.3034 y y)
-             (* -4.276 x y)
-             (* -1.3744 x)
-             (* -2.5643 y)
-             1.8103)
-        Y0 (* Y K)
-        Y03 (- (m/cbrt Y0) m/TWO_THIRD)
-        L' (* 5.9 (+ Y03 (* 0.042 (m/cbrt (- Y0 30.0)))))
-        C (/ L' (* 5.9 Y03))
-        R3 (m/cbrt (+ (* 0.7990 X) (* 0.4194 Y) (* -0.1648 Z)))
-        G3 (m/cbrt (+ (* -0.4493 X) (* 1.3265 Y) (* 0.0927 Z)))
-        B3 (m/cbrt (+ (* -0.1149 X) (* 0.3394 Y) (* 0.7170 Z)))
-        a (+ (* -13.7 R3) (* 17.7 G3) (* -4.0 B3))
-        b (+ (* 1.7 R3) (* 8.0 G3) (* -9.7 B3))
-        L (/ (- L' 14.3993) m/SQRT2)]
-    (Vec4. L (* C b) (* C a) (.w xyz))))
+        sum-xyz (m/+ X Y Z)
+        x (if (m/zero? X) 0.0 (m// X sum-xyz))
+        y (if (m/zero? Y) 0.0 (m// Y sum-xyz))
+        K (m/+ (m/* 4.4934 x x)
+               (m/* 4.3034 y y)
+               (m/* -4.276 x y)
+               (m/* -1.3744 x)
+               (m/* -2.5643 y)
+               1.8103)
+        Y0 (m/* Y K)
+        Y03 (m/- (m/cbrt Y0) m/TWO_THIRD)
+        L' (m/* 5.9 (m/+ Y03 (m/* 0.042 (m/cbrt (m/- Y0 30.0)))))
+        C (m// L' (m/* 5.9 Y03))
+        R3 (m/cbrt (m/+ (m/* 0.7990 X) (m/* 0.4194 Y) (m/* -0.1648 Z)))
+        G3 (m/cbrt (m/+ (m/* -0.4493 X) (m/* 1.3265 Y) (m/* 0.0927 Z)))
+        B3 (m/cbrt (m/+ (m/* -0.1149 X) (m/* 0.3394 Y) (m/* 0.7170 Z)))
+        a (m/+ (m/* -13.7 R3) (m/* 17.7 G3) (m/* -4.0 B3))
+        b (m/+ (m/* 1.7 R3) (m/* 8.0 G3) (m/* -9.7 B3))
+        L (m// (m/- L' 14.3993) m/SQRT2)]
+    (Vec4. L (m/* C b) (m/* C a) (.w xyz))))
 
-(def ^{:private true :const true :tag 'double} OSA-v (* 0.042 0.042 0.042))
-(def ^{:private true :const true :tag 'double} OSA-30v (* 30.0 OSA-v))
-(def ^{:private true :const true :tag 'double} OSA-a (- (inc OSA-v)))
-(def ^{:private true :const true :tag 'double} OSA-detr (/ -139.68999999999997))
+(def ^{:private true :const true :tag 'double} OSA-v (m/* 0.042 0.042 0.042))
+(def ^{:private true :const true :tag 'double} OSA-30v (m/* 30.0 OSA-v))
+(def ^{:private true :const true :tag 'double} OSA-a (m/- (m/inc OSA-v)))
+(def ^{:private true :const true :tag 'double} OSA-detr (m// -139.68999999999997))
 (def ^{:private true :const true :tag 'double} OSA-omega 4.957506551095124)
 
 (deftype OSAFDF [^double fomega ^double dfomega ^double X ^double Y ^double Z])
@@ -4271,82 +4113,81 @@
   - `c` OSA color, any type accepted by [[to-color]], with channels in the ranges of [[to-OSA]]
 
   Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-OSA*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 col (pr/to-color c)
         L (.x col)
         j(.y col)
         g (.z col)
-        L' (+ (* m/SQRT2 L) 14.3993)
-        u (+ (/ L' 5.9) m/TWO_THIRD)
-        b (* 3.0 u)
-        c (* -3.0 u u)
-        d (+ (* u u u) OSA-30v)
-        p (/ (- (* 3.0 OSA-a c)
-                (* b b))
-             (* 3.0 OSA-a OSA-a))
-        aa27 (* 27.0 OSA-a OSA-a)
-        q (/ (+ (* 2.0 b b b)
-                (* -9.0 OSA-a b c)
-                (* aa27 d))
-             (* aa27 OSA-a))
-        q2 (* 0.5 q)
-        s (m/sqrt (+ (m/sq q2)
-                     (m/pow3 (* p m/THIRD))))
-        t (- (+ (m/cbrt (- s q2))
-                (m/cbrt (- (- q2) s)))
-             (/ b (* 3.0 OSA-a)))
-        Y0 (* t t t)
-        C (/ L' (* 5.9 (- t m/TWO_THIRD)))
-        a (/ g C)
-        b (/ j C)
-        ap (* OSA-detr (+ (* -9.7 a) (* 4.0 b)))
-        bp (* OSA-detr (+ (* -8.0 a) (* 17.7 b)))
+        L' (m/+ (m/* m/SQRT2 L) 14.3993)
+        u (m/+ (m// L' 5.9) m/TWO_THIRD)
+        b (m/* 3.0 u)
+        c (m/* -3.0 u u)
+        d (m/+ (m/* u u u) OSA-30v)
+        p (m// (m/- (m/* 3.0 OSA-a c)
+                    (m/* b b))
+               (m/* 3.0 OSA-a OSA-a))
+        aa27 (m/* 27.0 OSA-a OSA-a)
+        q (m// (m/+ (m/* 2.0 b b b)
+                    (m/* -9.0 OSA-a b c)
+                    (m/* aa27 d))
+               (m/* aa27 OSA-a))
+        q2 (m/* 0.5 q)
+        s (m/sqrt (m/+ (m/sq q2)
+                       (m/pow3 (m/* p m/THIRD))))
+        t (m/- (m/+ (m/cbrt (m/- s q2))
+                    (m/cbrt (m/- (m/- q2) s)))
+               (m// b (m/* 3.0 OSA-a)))
+        Y0 (m/* t t t)
+        C (m// L' (m/* 5.9 (m/- t m/TWO_THIRD)))
+        a (m// g C)
+        b (m// j C)
+        ap (m/* OSA-detr (m/+ (m/* -9.7 a) (m/* 4.0 b)))
+        bp (m/* OSA-detr (m/+ (m/* -8.0 a) (m/* 17.7 b)))
         f-df (fn [^double omega]
                (let [cbrt-R omega
-                     cbrt-G (+ omega ap)
-                     cbrt-B (+ omega bp)
+                     cbrt-G (m/+ omega ap)
+                     cbrt-B (m/+ omega bp)
                      R (m/pow3 cbrt-R)
                      G (m/pow3 cbrt-G)
                      B (m/pow3 cbrt-B)
                      ;; exact inverse of the OSA RGB matrix of to-OSA
-                     X (+ (* 1.062618265125947 R) (* -0.4120917485671994 G) (* 0.297517984916228 B))
-                     Y (+ (* 0.359926645484816 R) (* 0.6400721081119282 G) (* -2.6183048923376638E-5 B))
-                     Z (+ (* -8.963014585108617E-5 R) (* -0.36902345244568985 G) (* 1.4423901018042944 B))
-                     sum-xyz (+ X Y Z)
-                     x (if (zero? X) 0.0 (/ X sum-xyz))
-                     y (if (zero? Y) 0.0 (/ Y sum-xyz))
-                     K (+ (* 4.4934 x x)
-                          (* 4.3034 y y)
-                          (* -4.276 x y)
-                          (* -1.3744 x)
-                          (* -2.5643 y)
-                          1.8103)
-                     f (- (* Y K) Y0)
-                     dR (* 3.0 (m/sq cbrt-R))
-                     dG (* 3.0 (m/sq cbrt-G))
-                     dB (* 3.0 (m/sq cbrt-B))
-                     dX (+ (* 1.062618265125947 dR) (* -0.4120917485671994 dG) (* 0.297517984916228 dB))
-                     dY (+ (* 0.359926645484816 dR) (* 0.6400721081119282 dG) (* -2.6183048923376638E-5 dB))
-                     dZ (+ (* -8.963014585108617E-5 dR) (* -0.36902345244568985 dG) (* 1.4423901018042944 dB))
-                     dsum-xyz (+ dX dY dZ)
-                     dx (if (zero? X) 0.0 (/ (- (* dX sum-xyz) (* X dsum-xyz)) (* sum-xyz sum-xyz)))
-                     dy (if (zero? Y) 0.0 (/ (- (* dY sum-xyz) (* Y dsum-xyz)) (* sum-xyz sum-xyz)))
-                     dK (+ (* 4.4934 2.0 x dx)
-                           (* 4.3034 2.0 y dy)
-                           (* -4.276 (+ (* dx y) (* x dy)))
-                           (* -1.3744 dx)
-                           (* -2.5643 dy))
-                     df (+ (* dY K) (* Y dK))]
+                     X (m/+ (m/* 1.062618265125947 R) (m/* -0.4120917485671994 G) (m/* 0.297517984916228 B))
+                     Y (m/+ (m/* 0.359926645484816 R) (m/* 0.6400721081119282 G) (m/* -2.6183048923376638E-5 B))
+                     Z (m/+ (m/* -8.963014585108617E-5 R) (m/* -0.36902345244568985 G) (m/* 1.4423901018042944 B))
+                     sum-xyz (m/+ X Y Z)
+                     x (if (m/zero? X) 0.0 (m// X sum-xyz))
+                     y (if (m/zero? Y) 0.0 (m// Y sum-xyz))
+                     K (m/+ (m/* 4.4934 x x)
+                            (m/* 4.3034 y y)
+                            (m/* -4.276 x y)
+                            (m/* -1.3744 x)
+                            (m/* -2.5643 y)
+                            1.8103)
+                     f (m/- (m/* Y K) Y0)
+                     dR (m/* 3.0 (m/sq cbrt-R))
+                     dG (m/* 3.0 (m/sq cbrt-G))
+                     dB (m/* 3.0 (m/sq cbrt-B))
+                     dX (m/+ (m/* 1.062618265125947 dR) (m/* -0.4120917485671994 dG) (m/* 0.297517984916228 dB))
+                     dY (m/+ (m/* 0.359926645484816 dR) (m/* 0.6400721081119282 dG) (m/* -2.6183048923376638E-5 dB))
+                     dZ (m/+ (m/* -8.963014585108617E-5 dR) (m/* -0.36902345244568985 dG) (m/* 1.4423901018042944 dB))
+                     dsum-xyz (m/+ dX dY dZ)
+                     dx (if (m/zero? X) 0.0 (m// (m/- (m/* dX sum-xyz) (m/* X dsum-xyz)) (m/* sum-xyz sum-xyz)))
+                     dy (if (m/zero? Y) 0.0 (m// (m/- (m/* dY sum-xyz) (m/* Y dsum-xyz)) (m/* sum-xyz sum-xyz)))
+                     dK (m/+ (m/* 4.4934 2.0 x dx)
+                             (m/* 4.3034 2.0 y dy)
+                             (m/* -4.276 (m/+ (m/* dx y) (m/* x dy)))
+                             (m/* -1.3744 dx)
+                             (m/* -2.5643 dy))
+                     df (m/+ (m/* dY K) (m/* Y dK))]
                  (OSAFDF. f df X Y Z)))]
     (loop [iter (long 0)
            omega OSA-omega]
       (let [^OSAFDF res (f-df omega)]
-        (if (and (< iter 50)
-                 (> (m/abs (.fomega res)) 1.0e-12))
-          (recur (inc iter)
-                 (- omega (/ (.fomega res)
-                             (.dfomega res))))
+        (if (and (m/< iter 50)
+                 (m/> (m/abs (.fomega res)) 1.0e-12))
+          (recur (m/inc iter)
+                 (m/- omega (m// (.fomega res)
+                                 (.dfomega res))))
           (from-XYZ (Vec4. (.X res) (.Y res) (.Z res) (.w col))))))))
 
 (def ^{:private true :const true :tag 'double} osa-jg-scale
@@ -4361,12 +4202,11 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4`. Inverse: [[from-OSA*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [c (to-OSA c)]
     (Vec4. (m/mnorm (.x c) -13.507581921540849 7.137750782376464 0.0 255.0)
-           (m/mnorm (m/atan (/ (.y c) osa-jg-scale)) (- m/HALF_PI) m/HALF_PI 0.0 255.0)
-           (m/mnorm (m/atan (/ (.z c) osa-jg-scale)) (- m/HALF_PI) m/HALF_PI 0.0 255.0)
+           (m/mnorm (m/atan (m// (.y c) osa-jg-scale)) m/-HALF_PI m/HALF_PI 0.0 255.0)
+           (m/mnorm (m/atan (m// (.z c) osa-jg-scale)) m/-HALF_PI m/HALF_PI 0.0 255.0)
            (.w c))))
 
 (defn from-OSA*
@@ -4375,12 +4215,11 @@
   - `c` color with channels in `[0,255]`
 
   Returns an RGB `Vec4`, not clamped. See also [[from-OSA]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)]
     (from-OSA (Vec4. (m/mnorm (.x c) 0.0 255.0 -13.507581921540849 7.137750782376464)
-                     (* osa-jg-scale (m/tan (m/mnorm (.y c) 0.0 255.0 (- m/HALF_PI) m/HALF_PI)))
-                     (* osa-jg-scale (m/tan (m/mnorm (.z c) 0.0 255.0 (- m/HALF_PI) m/HALF_PI)))
+                     (m/* osa-jg-scale (m/tan (m/mnorm (.y c) 0.0 255.0 m/-HALF_PI m/HALF_PI)))
+                     (m/* osa-jg-scale (m/tan (m/mnorm (.z c) 0.0 255.0 m/-HALF_PI m/HALF_PI)))
                      (.w c)))))
 
 ;; ### DIN99 family
@@ -4388,7 +4227,7 @@
 (def ^:private din99-config
   {:din99 {:l99mult 105.509 :lmult 0.0158
            :cosc (m/cos (m/radians 16.0)) :sinc (m/sin (m/radians 16.0))
-           :fmult 0.7 :c99mult 1.0 :gmult (/ 9.0 200.0) :hshift 0.0 :gdiv (/ 9.0 200.0)
+           :fmult 0.7 :c99mult 1.0 :gmult (m// 9.0 200.0) :hshift 0.0 :gdiv (m// 9.0 200.0)
            :r [0.0 100.00031169207742], :g [-27.45042201345889 36.17532020126586], :b [-33.3955437863943 31.155071432985277]}
    :din99b {:l99mult 303.67 :lmult 0.0039
             :cosc (m/cos (m/radians 26.0)) :sinc (m/sin (m/radians 26.0))
@@ -4412,25 +4251,25 @@
   "CIE-2-D65 with Kuehni's correction of X (`c0 Xn - (c0 - 1) Zn`), the white of DIN99c and DIN99d."
   ^Vec4 [^double c0]
   (let [^Vec4 w wp/CIE-2-D65]
-    (wp/XZ->coordinates (- (* c0 (.x w)) (* (dec c0) (.y w))) (.y w))))
+    (wp/XZ->coordinates (m/- (m/* c0 (.x w)) (m/* (m/dec c0) (.y w))) (.y w))))
 
 (defn- make-to-kuehni-LAB
   "sRGB to CIELAB with Kuehni's correction `X' = c0 X - (c0 - 1) Z` applied to the color and the white (Cui et al. 2002, DIN99c and DIN99d)."
   [^double c0]
   (let [white (kuehni-whitepoint c0)
-        c0- (dec c0)]
+        c0- (m/dec c0)]
     (fn ^Vec4 [c]
       (let [^Vec4 xyz (to-XYZ c)]
-        (XYZ-to-LAB (Vec4. (- (* c0 (.x xyz)) (* c0- (.z xyz))) (.y xyz) (.z xyz) (.w xyz)) white)))))
+        (XYZ-to-LAB (Vec4. (m/- (m/* c0 (.x xyz)) (m/* c0- (.z xyz))) (.y xyz) (.z xyz) (.w xyz)) white)))))
 
 (defn- make-from-kuehni-LAB
   "Inverse of [[make-to-kuehni-LAB]]: CIELAB relative to the corrected white, then `X = (X' + (c0 - 1) Z) / c0`."
   [^double c0]
   (let [white (kuehni-whitepoint c0)
-        c0- (dec c0)]
+        c0- (m/dec c0)]
     (fn ^Vec4 [lab]
       (let [^Vec4 xyz (LAB-to-XYZ lab white)]
-        (from-XYZ (Vec4. (/ (+ (.x xyz) (* c0- (.z xyz))) c0) (.y xyz) (.z xyz) (.w xyz)))))))
+        (from-XYZ (Vec4. (m// (m/+ (.x xyz) (m/* c0- (.z xyz))) c0) (.y xyz) (.z xyz) (.w xyz)))))))
 
 (defn- make-to-DIN99
   [n]
@@ -4439,14 +4278,14 @@
         ->lab (if kuehni (make-to-kuehni-LAB kuehni) to-LAB)]
     (fn ^Vec4 [c]
       (let [^Vec4 c (->lab c)
-            e (+ (* cosc (.y c)) (* sinc (.z c)))
-            f (* fmult (- (* cosc (.z c)) (* sinc (.y c))))
+            e (m/+ (m/* cosc (.y c)) (m/* sinc (.z c)))
+            f (m/* fmult (m/- (m/* cosc (.z c)) (m/* sinc (.y c))))
             G (m/hypot-sqrt e f)
-            h-ef (+ (m/atan2 f e) hshift)
-            C99 (* c99mult (/ (m/log1p (* gmult G)) gdiv))
-            a99 (* C99 (m/cos h-ef))
-            b99 (* C99 (m/sin h-ef))
-            L99 (* l99mult (m/log1p (* lmult (.x c))))]
+            h-ef (m/+ (m/atan2 f e) hshift)
+            C99 (m/* c99mult (m// (m/log1p (m/* gmult G)) gdiv))
+            a99 (m/* C99 (m/cos h-ef))
+            b99 (m/* C99 (m/sin h-ef))
+            L99 (m/* l99mult (m/log1p (m/* lmult (.x c))))]
         (Vec4. L99 a99 b99 (.w c))))))
 
 (defn- make-to-DIN99*
@@ -4465,18 +4304,18 @@
   [n]
   (let [{:keys [^double cosc ^double sinc ^double fmult ^double hshift ^double c99mult
                 ^double gmult ^double gdiv ^double l99mult ^double lmult kuehni]} (din99-config n)
-        C99mult (/ gdiv c99mult)
+        C99mult (m// gdiv c99mult)
         lab-> (if kuehni (make-from-kuehni-LAB kuehni) from-LAB)]
     (fn ^Vec4 [c]
       (let [^Vec4 c (pr/to-color c)
-            h99 (- (m/atan2 (.z c) (.y c)) hshift)
+            h99 (m/- (m/atan2 (.z c) (.y c)) hshift)
             C99 (m/hypot-sqrt (.y c) (.z c))
-            G (/ (m/expm1 (* C99mult C99)) gmult)
-            e (* G (m/cos h99))
-            f (/ (* G (m/sin h99)) fmult)
-            a (- (* e cosc) (* f sinc))
-            b (+ (* e sinc) (* f cosc))
-            L (/ (m/expm1 (/ (.x c) l99mult)) lmult)]
+            G (m// (m/expm1 (m/* C99mult C99)) gmult)
+            e (m/* G (m/cos h99))
+            f (m// (m/* G (m/sin h99)) fmult)
+            a (m/- (m/* e cosc) (m/* f sinc))
+            b (m/+ (m/* e sinc) (m/* f cosc))
+            L (m// (m/expm1 (m// (.x c) l99mult)) lmult)]
         (lab-> (Vec4. L a b (.w c)))))))
 
 (defn- make-from-DIN99*
@@ -4497,121 +4336,139 @@
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -27.45 to 36.18, b -33.40 to 31.15. See also [[from-DIN99]], [[to-DIN99*]]." :metadoc/categories meta-conv} to-DIN99 (make-to-DIN99 :din99))
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -27.45 to 36.18, b -33.40 to 31.15. See also [[from-DIN99]], [[to-DIN99*]]."} to-DIN99 (make-to-DIN99 :din99))
+
 (def ^{:doc "Converts an sRGB color to DIN99b, a CIELAB-based uniform space (Cui et al. 2002).
 
   Computed from [[to-LAB]] (CIE 1931 2° D65), with the DIN99b constants and a 26° hue rotation.
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -40.11 to 45.52, b -40.49 to 44.37. See also [[from-DIN99b]], [[to-DIN99b*]]." :metadoc/categories meta-conv} to-DIN99b (make-to-DIN99 :din99b))
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -40.11 to 45.52, b -40.49 to 44.37. See also [[from-DIN99b]], [[to-DIN99b*]]."} to-DIN99b (make-to-DIN99 :din99b))
+
 (def ^{:doc "Converts an sRGB color to DIN99o, a CIELAB-based uniform space (DIN 6176, Cui et al. 2002).
 
   Computed from [[to-LAB]] (CIE 1931 2° D65): logarithmic lightness, chroma rotated by 26°, compressed by 0.83 and rotated back (as culori and coloraide).
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -40.09 to 45.50, b -40.47 to 44.34. See also [[from-DIN99o]], [[to-DIN99o*]]." :metadoc/categories meta-conv} to-DIN99o (make-to-DIN99 :din99o))
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -40.09 to 45.50, b -40.47 to 44.34. See also [[from-DIN99o]], [[to-DIN99o*]]."} to-DIN99o (make-to-DIN99 :din99o))
+
 (def ^{:doc "Converts an sRGB color to DIN99c, a CIELAB-based uniform space (Cui et al. 2002).
 
   Computed from [[to-XYZ]] with Kuehni's correction `X' = 1.1 X - 0.1 Z` applied to the color and to the CIE 1931 2° D65 white, then CIELAB and the DIN99c constants (as colour-science).
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -38.50 to 45.17, b -45.68 to 44.22. See also [[from-DIN99c]], [[to-DIN99c*]]." :metadoc/categories meta-conv} to-DIN99c (make-to-DIN99 :din99c))
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -38.50 to 45.17, b -45.68 to 44.22. See also [[from-DIN99c]], [[to-DIN99c*]]."} to-DIN99c (make-to-DIN99 :din99c))
+
 (def ^{:doc "Converts an sRGB color to DIN99d, a CIELAB-based uniform space (Cui et al. 2002).
 
   Computed from [[to-XYZ]] with Kuehni's correction `X' = 1.12 X - 0.12 Z` applied to the color and to the CIE 1931 2° D65 white, then CIELAB and the DIN99d constants, 50° hue rotation (as colour-science).
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -37.53 to 44.17, b -45.79 to 43.68. See also [[from-DIN99d]], [[to-DIN99d*]]." :metadoc/categories meta-conv} to-DIN99d (make-to-DIN99 :din99d))
+  Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: L 0 to 100, a -37.53 to 44.17, b -45.79 to 43.68. See also [[from-DIN99d]], [[to-DIN99d*]]."} to-DIN99d (make-to-DIN99 :din99d))
+
 (def ^{:doc "Converts an sRGB color to DIN99 with channels mapped to `[0,255]`.
 
   Each channel of [[to-DIN99]] is mapped linearly from its range (L 0 to 100, a -27.45 to 36.18, b -33.40 to 31.15) to `[0,255]`. Alpha is kept.
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4`. Inverse: [[from-DIN99*]]." :metadoc/categories meta-conv} to-DIN99* (make-to-DIN99* to-DIN99 :din99))
+  Returns a `Vec4`. Inverse: [[from-DIN99*]]."} to-DIN99* (make-to-DIN99* to-DIN99 :din99))
+
 (def ^{:doc "Converts an sRGB color to DIN99b with channels mapped to `[0,255]`.
 
   Each channel of [[to-DIN99b]] is mapped linearly from its range (L 0 to 100, a -40.11 to 45.52, b -40.49 to 44.37) to `[0,255]`. Alpha is kept.
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4`. Inverse: [[from-DIN99b*]]." :metadoc/categories meta-conv} to-DIN99b* (make-to-DIN99* to-DIN99b :din99b))
+  Returns a `Vec4`. Inverse: [[from-DIN99b*]]."} to-DIN99b* (make-to-DIN99* to-DIN99b :din99b))
+
 (def ^{:doc "Converts an sRGB color to DIN99o with channels mapped to `[0,255]`.
 
   Each channel of [[to-DIN99o]] is mapped linearly from its range (L 0 to 100, a -40.09 to 45.50, b -40.47 to 44.34) to `[0,255]`. Alpha is kept.
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4`. Inverse: [[from-DIN99o*]]." :metadoc/categories meta-conv} to-DIN99o* (make-to-DIN99* to-DIN99o :din99o))
+  Returns a `Vec4`. Inverse: [[from-DIN99o*]]."} to-DIN99o* (make-to-DIN99* to-DIN99o :din99o))
+
 (def ^{:doc "Converts an sRGB color to DIN99c with channels mapped to `[0,255]`.
 
   Each channel of [[to-DIN99c]] is mapped linearly from its range (L 0 to 100, a -38.50 to 45.17, b -45.68 to 44.22) to `[0,255]`. Alpha is kept.
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4`. Inverse: [[from-DIN99c*]]." :metadoc/categories meta-conv} to-DIN99c* (make-to-DIN99* to-DIN99c :din99c))
+  Returns a `Vec4`. Inverse: [[from-DIN99c*]]."} to-DIN99c* (make-to-DIN99* to-DIN99c :din99c))
+
 (def ^{:doc "Converts an sRGB color to DIN99d with channels mapped to `[0,255]`.
 
   Each channel of [[to-DIN99d]] is mapped linearly from its range (L 0 to 100, a -37.53 to 44.17, b -45.79 to 43.68) to `[0,255]`. Alpha is kept.
 
   - `c` color, any type accepted by [[to-color]]
 
-  Returns a `Vec4`. Inverse: [[from-DIN99d*]]." :metadoc/categories meta-conv} to-DIN99d* (make-to-DIN99* to-DIN99d :din99d))
+  Returns a `Vec4`. Inverse: [[from-DIN99d*]]."} to-DIN99d* (make-to-DIN99* to-DIN99d :din99d))
 
 (def ^{:doc "Converts DIN99 to sRGB, the inverse of [[to-DIN99]].
 
   - `c` DIN99 color, any type accepted by [[to-color]], with channels in the ranges of [[to-DIN99]]
 
-  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-DIN99*]]." :metadoc/categories meta-conv} from-DIN99 (make-from-DIN99 :din99))
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-DIN99*]]."} from-DIN99 (make-from-DIN99 :din99))
+
 (def ^{:doc "Converts DIN99b to sRGB, the inverse of [[to-DIN99b]].
 
   - `c` DIN99b color, any type accepted by [[to-color]], with channels in the ranges of [[to-DIN99b]]
 
-  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-DIN99b*]]." :metadoc/categories meta-conv} from-DIN99b (make-from-DIN99 :din99b))
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-DIN99b*]]."} from-DIN99b (make-from-DIN99 :din99b))
+
 (def ^{:doc "Converts DIN99o to sRGB, the inverse of [[to-DIN99o]].
 
   - `c` DIN99o color, any type accepted by [[to-color]], with channels in the ranges of [[to-DIN99o]]
 
-  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-DIN99o*]]." :metadoc/categories meta-conv} from-DIN99o (make-from-DIN99 :din99o))
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-DIN99o*]]."} from-DIN99o (make-from-DIN99 :din99o))
+
 (def ^{:doc "Converts DIN99c to sRGB, the inverse of [[to-DIN99c]].
 
   - `c` DIN99c color, any type accepted by [[to-color]], with channels in the ranges of [[to-DIN99c]]
 
-  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-DIN99c*]]." :metadoc/categories meta-conv} from-DIN99c (make-from-DIN99 :din99c))
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-DIN99c*]]."} from-DIN99c (make-from-DIN99 :din99c))
+
 (def ^{:doc "Converts DIN99d to sRGB, the inverse of [[to-DIN99d]].
 
   - `c` DIN99d color, any type accepted by [[to-color]], with channels in the ranges of [[to-DIN99d]]
 
-  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-DIN99d*]]." :metadoc/categories meta-conv} from-DIN99d (make-from-DIN99 :din99d))
+  Returns an RGB `Vec4`, not clamped: values outside the sRGB gamut give channels outside `[0,255]`. Alpha is kept. See also [[from-DIN99d*]]."} from-DIN99d (make-from-DIN99 :din99d))
+
 (def ^{:doc "Converts DIN99 with channels in `[0,255]`, as produced by [[to-DIN99*]], to sRGB.
 
   - `c` color with channels in `[0,255]`
 
-  Returns an RGB `Vec4`, not clamped. See also [[from-DIN99]]." :metadoc/categories meta-conv} from-DIN99* (make-from-DIN99* from-DIN99 :din99))
+  Returns an RGB `Vec4`, not clamped. See also [[from-DIN99]]."} from-DIN99* (make-from-DIN99* from-DIN99 :din99))
+
 (def ^{:doc "Converts DIN99b with channels in `[0,255]`, as produced by [[to-DIN99b*]], to sRGB.
 
   - `c` color with channels in `[0,255]`
 
-  Returns an RGB `Vec4`, not clamped. See also [[from-DIN99b]]." :metadoc/categories meta-conv} from-DIN99b* (make-from-DIN99* from-DIN99b :din99b))
+  Returns an RGB `Vec4`, not clamped. See also [[from-DIN99b]]."} from-DIN99b* (make-from-DIN99* from-DIN99b :din99b))
+
 (def ^{:doc "Converts DIN99o with channels in `[0,255]`, as produced by [[to-DIN99o*]], to sRGB.
 
   - `c` color with channels in `[0,255]`
 
-  Returns an RGB `Vec4`, not clamped. See also [[from-DIN99o]]." :metadoc/categories meta-conv} from-DIN99o* (make-from-DIN99* from-DIN99o :din99o))
+  Returns an RGB `Vec4`, not clamped. See also [[from-DIN99o]]."} from-DIN99o* (make-from-DIN99* from-DIN99o :din99o))
+
 (def ^{:doc "Converts DIN99c with channels in `[0,255]`, as produced by [[to-DIN99c*]], to sRGB.
 
   - `c` color with channels in `[0,255]`
 
-  Returns an RGB `Vec4`, not clamped. See also [[from-DIN99c]]." :metadoc/categories meta-conv} from-DIN99c* (make-from-DIN99* from-DIN99c :din99c))
+  Returns an RGB `Vec4`, not clamped. See also [[from-DIN99c]]."} from-DIN99c* (make-from-DIN99* from-DIN99c :din99c))
+
 (def ^{:doc "Converts DIN99d with channels in `[0,255]`, as produced by [[to-DIN99d*]], to sRGB.
 
   - `c` color with channels in `[0,255]`
 
-  Returns an RGB `Vec4`, not clamped. See also [[from-DIN99d]]." :metadoc/categories meta-conv} from-DIN99d* (make-from-DIN99* from-DIN99d :din99d))
+  Returns an RGB `Vec4`, not clamped. See also [[from-DIN99d]]."} from-DIN99d* (make-from-DIN99* from-DIN99d :din99d))
 
 ;; Other RGB
 
@@ -4736,28 +4593,27 @@
   - `c` color, any type accepted by [[to-color]]
 
   Returns a `Vec4` with the three channels and alpha. Ranges for colors in the sRGB gamut: all channels in `[0,255]`. See also [[from-Gray]], [[to-Gray*]]."
-  {:metadoc/categories meta-conv}
   ^Vec4 [c]
   (let [^Vec4 c (pr/to-color c)
         l (luma c)]
     (Vec4. l l l (.w c))))
 
-(def ^{:doc "The same as [[to-Gray]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} to-Gray* to-Gray)
+(def ^{:doc "The same as [[to-Gray]]: its channels are already in `[0,255]`."} to-Gray* to-Gray)
 
 ;; do nothing in reverse
-(def ^{:doc "The same function as [[to-Gray]]: the gray conversion cannot be inverted." :metadoc/categories meta-conv} from-Gray to-Gray)
-(def ^{:doc "The same function as [[to-Gray]]: the gray conversion cannot be inverted." :metadoc/categories meta-conv} from-Gray* to-Gray)
+(def ^{:doc "The same function as [[to-Gray]]: the gray conversion cannot be inverted."} from-Gray to-Gray)
+(def ^{:doc "The same function as [[to-Gray]]: the gray conversion cannot be inverted."} from-Gray* to-Gray)
 
 ;; Just for a case "do nothing"
-(def ^{:doc "Alias for [[to-color]]" :metadoc/categories meta-conv} to-RGB pr/to-color)
-(def ^{:doc "Alias for [[to-color]]" :metadoc/categories meta-conv} from-RGB pr/to-color)
-(def ^{:doc "Alias for [[to-color]]" :metadoc/categories meta-conv} to-RGB* pr/to-color)
-(def ^{:doc "Alias for [[to-color]]" :metadoc/categories meta-conv} from-RGB* pr/to-color)
+(def ^{:doc "Alias for [[to-color]]"} to-RGB pr/to-color)
+(def ^{:doc "Alias for [[to-color]]"} from-RGB pr/to-color)
+(def ^{:doc "Alias for [[to-color]]"} to-RGB* pr/to-color)
+(def ^{:doc "Alias for [[to-color]]"} from-RGB* pr/to-color)
 
-(def ^{:doc "Decodes sRGB to linear RGB, the same function as [[from-sRGB]] (the `:linearRGB` entry of [[colorspaces]])." :metadoc/categories meta-conv} to-linearRGB from-sRGB)
-(def ^{:doc "Encodes linear RGB to sRGB, the same function as [[to-sRGB]]." :metadoc/categories meta-conv} from-linearRGB to-sRGB)
-(def ^{:doc "The same as [[to-linearRGB]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} to-linearRGB* from-sRGB)
-(def ^{:doc "The same as [[from-linearRGB]]: its channels are already in `[0,255]`." :metadoc/categories meta-conv} from-linearRGB* to-sRGB)
+(def ^{:doc "Decodes sRGB to linear RGB, the same function as [[from-sRGB]] (the `:linearRGB` entry of [[colorspaces]])."} to-linearRGB from-sRGB)
+(def ^{:doc "Encodes linear RGB to sRGB, the same function as [[to-sRGB]]."} from-linearRGB to-sRGB)
+(def ^{:doc "The same as [[to-linearRGB]]: its channels are already in `[0,255]`."} to-linearRGB* from-sRGB)
+(def ^{:doc "The same as [[from-linearRGB]]: its channels are already in `[0,255]`."} from-linearRGB* to-sRGB)
 
 ;; List of all color spaces with functions
 (def ^{:doc "Colorspace conversions by name: keyword to `[to-XXX from-XXX]`, the raw converters.
@@ -4772,8 +4628,7 @@
   - from linear RGB: `:linearRGB`, `:XYB`, the Oklab family (`:Oklab`, `:Oklch`, `:Okhsl`, `:Okhsv`, `:Okhwb`)
   - other: `:RGB` and `:pass` (identity), `:Gray` (lossy, luma), `:RYB` (Leonard's heuristic), `:sRGB` (encodes linear RGB)
 
-  Ranges and sources are in the docstrings of the `to-` functions."
-     :metadoc/categories meta-conv}
+  Ranges and sources are in the docstrings of the `to-` functions."}
   colorspaces {:CMY         [to-CMY from-CMY]
                :OHTA        [to-OHTA from-OHTA]
                :XYZ         [to-XYZ from-XYZ]
@@ -4827,8 +4682,7 @@
 
 (def ^{:doc "Colorspace conversions by name with channels mapped to `[0,255]`: keyword to `[to-XXX* from-XXX*]`.
 
-  Each `to-XXX*` maps the channels of the raw `to-XXX` (see [[colorspaces]]) to `[0,255]`, mostly linearly from the extrema over the sRGB gamut (hue channels from their whole period), so sRGB colors give channels in `[0,255]` (OSA j and g, unbounded near some dark colors, through an arctangent, see [[to-OSA*]]). `from-XXX*` reverses it. Useful for treating any colorspace like RGB, e.g. in pixel filters. Alpha is kept, values are not clamped."
-     :metadoc/categories meta-conv}
+  Each `to-XXX*` maps the channels of the raw `to-XXX` (see [[colorspaces]]) to `[0,255]`, mostly linearly from the extrema over the sRGB gamut (hue channels from their whole period), so sRGB colors give channels in `[0,255]` (OSA j and g, unbounded near some dark colors, through an arctangent, see [[to-OSA*]]). `from-XXX*` reverses it. Useful for treating any colorspace like RGB, e.g. in pixel filters. Alpha is kept, values are not clamped."}
   colorspaces* {:CMY         [to-CMY* from-CMY*]
                 :OHTA        [to-OHTA* from-OHTA*]
                 :XYZ         [to-XYZ* from-XYZ*]
@@ -4881,7 +4735,7 @@
                 :pass        [to-color to-color]})
 
 ;; List of color spaces names
-(def ^{:doc "Sorted list of the colorspace names, the keys of [[colorspaces]] and [[colorspaces*]]." :metadoc/categories meta-conv} colorspaces-list (sort (keys colorspaces)))
+(def ^{:doc "Sorted list of the colorspace names, the keys of [[colorspaces]] and [[colorspaces*]]."} colorspaces-list (sort (keys colorspaces)))
 
 (defn- colorspace-converters
   "The `[to from]` pair of `colorspace` in `table` ([[colorspaces]] or [[colorspaces*]]); throws `ex-info` with `{:colorspace colorspace}` for an unknown name."
@@ -4939,12 +4793,12 @@
 
 (defn- update-channel
   "`c` with `channel` (0-3) replaced by `(f value)`; throws `ex-info` with `{:channel channel}` for another channel."
-  ^Vec4 [^Vec4 c ^long channel ^clojure.lang.IFn$DD f]
+  ^Vec4 [^Vec4 c ^long channel f]
   (case channel
-    0 (Vec4. (.invokePrim f (.x c)) (.y c) (.z c) (.w c))
-    1 (Vec4. (.x c) (.invokePrim f (.y c)) (.z c) (.w c))
-    2 (Vec4. (.x c) (.y c) (.invokePrim f (.z c)) (.w c))
-    3 (Vec4. (.x c) (.y c) (.z c) (.invokePrim f (.w c)))
+    0 (Vec4. (f (.x c)) (.y c) (.z c) (.w c))
+    1 (Vec4. (.x c) (f (.y c)) (.z c) (.w c))
+    2 (Vec4. (.x c) (.y c) (f (.z c)) (.w c))
+    3 (Vec4. (.x c) (.y c) (.z c) (f (.w c)))
     (channel-error channel)))
 
 (def ^:private complementary-hue-channel
@@ -4963,7 +4817,7 @@
                 (throw (ex-info (str "Complementary color is not supported in colorspace: " colorspace)
                                 {:colorspace colorspace})))
          [to from] (colorspaces colorspace)]
-     (from (update-channel (to c) ch (fn ^double [^double h] (+ 180.0 h)))))))
+     (from (update-channel (to c) ch (fn ^double [^double h] (m/+ 180.0 h)))))))
 
 (defn set-channel
   "Returns the color with one channel set to `val`, optionally in another colorspace.
@@ -4974,7 +4828,6 @@
   - `val` new value, in the colorspace's raw range, not clamped
 
   Returns a `Vec4`. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace and `{:channel channel}` for a channel outside 0-3. See also [[get-channel]], [[set-alpha]]."
-  {:metadoc/categories meta-ops}
   (^Vec4 [col colorspace ^long channel ^double val]
    (let [[to from] (colorspace-converters colorspaces colorspace)
          ^Vec4 c (to col)]
@@ -5001,7 +4854,6 @@
   - `channel` 0, 1, 2 or 3 (alpha)
 
   Returns a double. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace and `{:channel channel}` for a channel outside 0-3. See also [[set-channel]], [[ch0]]."
-  {:metadoc/categories meta-ops}
   (^double [col colorspace ^long channel]
    (let [to (first (colorspace-converters colorspaces colorspace))]
      (get-channel (to col) channel)))
@@ -5020,15 +4872,14 @@
   - `ch1-scale` .. `ch4-scale` maxima of the input channels; with one value it is used for all four channels, with three values alpha keeps the `[0,255]` range
 
   The returned function rescales each channel of its argument to `[0,255]` (`255 * v / max`), clamps, and applies the normalized `from-` function of `cs` (`from-XXX*`). With `cs` alone it returns that `from-XXX*` function. Throws `ex-info` with `{:colorspace cs}` for an unknown colorspace. See also [[colorspaces*]]."
-  {:metadoc/categories meta-conv}
   ([cs ch1-scale ch2-scale ch3-scale ch4-scale]
    (let [colorspace-fn (second (colorspace-converters colorspaces* cs))]
      (fn [v] 
        (let [^Vec4 v (pr/to-color v)
-             ch1 (* 255.0 (/ (.x v) ^double ch1-scale))
-             ch2 (* 255.0 (/ (.y v) ^double ch2-scale))
-             ch3 (* 255.0 (/ (.z v) ^double ch3-scale))
-             ch4 (* 255.0 (/ (.w v) ^double ch4-scale))]
+             ch1 (m/* 255.0 (m// (.x v) (double ch1-scale)))
+             ch2 (m/* 255.0 (m// (.y v) (double ch2-scale)))
+             ch3 (m/* 255.0 (m// (.z v) (double ch3-scale)))
+             ch4 (m/* 255.0 (m// (.w v) (double ch4-scale)))]
          (colorspace-fn (v/fmap (Vec4. ch1 ch2 ch3 ch4) clamp255))))))
   ([cs ch1-scale ch2-scale ch3-scale] (color-converter cs ch1-scale ch2-scale ch3-scale 255.0))
   ([cs ch-scale] (color-converter cs ch-scale ch-scale ch-scale ch-scale))
@@ -5036,11 +4887,11 @@
 
 ;; black body
 
-(defonce ^:private blackbody-table
+(def ^:private blackbody-table
   ;; normalized linear sRGB of a blackbody on a grid uniform in mired (utils/color/gen_temperature.py):
   ;; [mired-min mired-step r g b], channels as double arrays
-  (delay (let [{:keys [mired-min mired-step rgb]} (read-edn "color/blackbody_srgb.edn")]
-           [(double mired-min) (double mired-step)
+  (delay (let [{:keys [^double mired-min ^double mired-step rgb]} (read-edn "color/blackbody_srgb.edn")]
+           [mired-min mired-step
             (double-array (map first rgb)) (double-array (map second rgb)) (double-array (map last rgb))])))
 
 (def ^:private temperature-name-to-K
@@ -5059,11 +4910,11 @@
    :cool 7250.0})
 
 (def ^{:doc (str "Sorted names accepted by [[temperature]] instead of a temperature in K.\n\n  The author's approximate choices for common light sources: "
-                (->> temperature-name-to-K
-                     (sort-by (juxt val key))
-                     (map (fn [[k t]] (str "`" k "` " (long t))))
-                     (clojure.string/join ", "))
-                " K.")}
+                 (->> temperature-name-to-K
+                      (sort-by (juxt val key))
+                      (map (fn [[k t]] (str "`" k "` " (long t))))
+                      (str/join ", "))
+                 " K.")}
   temperature-names (sort (keys temperature-name-to-K)))
 
 (defn- temperature-kelvin
@@ -5078,7 +4929,7 @@
 (defn- blackbody-channel
   "sRGB channel 0-255 at position `i + f` (node `i`, fraction `f`) of a column of the blackbody table: linear interpolation of the linear value, then sRGB encoding."
   ^double [^doubles a ^long i ^double f]
-  (* 255.0 (rgb/linear-to-srgb (m/lerp (Array/aget a i) (Array/aget a (inc i)) f))))
+  (m/* 255.0 (rgb/linear-to-srgb (m/lerp (Array/aget a i) (Array/aget a (m/inc i)) f))))
 
 (defn temperature
   "Returns the color of a blackbody radiator at temperature `t`: its hue at full brightness, as sRGB.
@@ -5090,13 +4941,12 @@
   - `t` temperature in K (positive number, `##Inf` allowed) or a name of [[temperature-names]], e.g. `:candle`, `:warm`, `:blue-sky`
 
   Returns a `Vec4`, channels 0-255, alpha 255. Throws `ex-info` with `{:temperature t}` for an unknown name, a value that is neither a number nor a keyword, a temperature not above 0 K and NaN. See also [[adjust-temperature]], [[wavelength]], `clojure2d.color.whitepoints/blackbody-spectrum`."
-  {:metadoc/categories #{:pal}}
   ^Vec4 [t]
   (let [[^double mired-min ^double mired-step ^doubles r ^doubles g ^doubles b] @blackbody-table
-        last-node (dec (alength r))
-        pos (m/constrain (/ (- (/ 1.0e6 (temperature-kelvin t)) mired-min) mired-step) 0.0 last-node)
-        i (min (long pos) (dec last-node))
-        f (- pos i)]
+        last-node (m/long-dec (alength r))
+        pos (m/constrain (m// (m/- (m// 1.0e6 (temperature-kelvin t)) mired-min) mired-step) 0.0 last-node)
+        i (m/min (long pos) (m/long-dec last-node))
+        f (m/- pos i)]
     (Vec4. (blackbody-channel r i f) (blackbody-channel g i f) (blackbody-channel b i f) 255.0)))
 
 (defn wavelength-to-XYZ
@@ -5120,14 +4970,14 @@
 (defn- full-brightness-srgb
   "sRGB `Vec4` (0-255, alpha 255) of a light with linear sRGB `rgb` (any scale): negative channels clipped to 0, the largest channel scaled to 1, then encoded; no light gives black."
   ^Vec4 [^Vec3 rgb]
-  (let [r (max 0.0 (.x rgb))
-        g (max 0.0 (.y rgb))
-        b (max 0.0 (.z rgb))
-        mx (max r g b)]
-    (if (pos? mx)
-      (Vec4. (* 255.0 (rgb/linear-to-srgb (/ r mx)))
-             (* 255.0 (rgb/linear-to-srgb (/ g mx)))
-             (* 255.0 (rgb/linear-to-srgb (/ b mx)))
+  (let [r (m/max 0.0 (.x rgb))
+        g (m/max 0.0 (.y rgb))
+        b (m/max 0.0 (.z rgb))
+        mx (m/max r g b)]
+    (if (m/pos? mx)
+      (Vec4. (m/* 255.0 (rgb/linear-to-srgb (m// r mx)))
+             (m/* 255.0 (rgb/linear-to-srgb (m// g mx)))
+             (m/* 255.0 (rgb/linear-to-srgb (m// b mx)))
              255.0)
       (Vec4. 0.0 0.0 0.0 255.0))))
 
@@ -5176,7 +5026,6 @@
   - `a`, `b`, `c`, `d` offset, amplitude, frequency and phase, three numbers each (`Vec3` or vectors)
 
   Returns a function of `t` (any value, periodic) returning a `Vec4` with alpha 255. See also [[gradient]]."
-  {:metadoc/categories #{:gr}}
   ([c1 c2]
    (apply iq-gradient (cosine-coefficients c1 c2)))
   ([a b c d]
@@ -5193,73 +5042,73 @@
 
 ;; --------------
 
-(defonce ^:private paletton-base-data
-  (let [s (fn ^double [^double e ^double t ^double n] (if (== n -1.0) e
-                                                          (+ e (/ (- t e) (inc n)))))
-        i (fn ^double [^double e ^double t ^double n] (if (== n -1.0) t
-                                                          (+ t (/ (- e t) (inc n)))))
+(def ^:private paletton-base-data
+  (let [s (fn ^double [^double e ^double t ^double n] (if (m/== n -1.0) e
+                                                         (m/+ e (m// (m/- t e) (m/inc n)))))
+        i (fn ^double [^double e ^double t ^double n] (if (m/== n -1.0) t
+                                                         (m/+ t (m// (m/- e t) (m/inc n)))))
         d120 {:a [1.0 1.0]
               :b [1.0 1.0]
               :f (fn ^double [^double e]
-                   (if (zero? e) -1.0
-                       (* 0.5 (m/tan (* m/HALF_PI (/ (- 120.0 e) 120.0))))))
+                   (if (m/zero? e) -1.0
+                       (m/* 0.5 (m/tan (m/* m/HALF_PI (m// (m/- 120.0 e) 120.0))))))
               :fi (fn ^double [^double e]
-                    (if (== e -1.0) 0.0
-                        (- 120.0 (* 2.0 (/ (* (m/atan (/ e 0.5)) 120.0) m/PI)))))
+                    (if (m/== e -1.0) 0.0
+                        (m/- 120.0 (m/* 2.0 (m// (m/* (m/atan (m// e 0.5)) 120.0) m/PI)))))
               :g s
               :rgb (fn [e n r a] (Vec4. e n r a))}
         d180 {:a [1.0 1.0]
               :b [1.0 0.8]
               :f (fn ^double [^double e]
-                   (if (== e 180.0) -1.0
-                       (* 0.5 (m/tan (* m/HALF_PI (/ (- e 120.0) 60.0))))))
+                   (if (m/== e 180.0) -1.0
+                       (m/* 0.5 (m/tan (m/* m/HALF_PI (m// (m/- e 120.0) 60.0))))))
               :fi (fn ^double [^double e]
-                    (if (== e -1.0) 180.0
-                        (+ 120.0 (* 2.0 (/ (* (m/atan (/ e 0.5)) 60.0) m/PI)))))
+                    (if (m/== e -1.0) 180.0
+                        (m/+ 120.0 (m/* 2.0 (m// (m/* (m/atan (m// e 0.5)) 60.0) m/PI)))))
               :g i
               :rgb (fn [e n r a] (Vec4. n e r a))}
         d210 {:a [1.0 0.8]
               :b [1.0 0.6]
               :f (fn ^double [^double e]
-                   (if (== e 180.0) -1.0
-                       (* 0.75 (m/tan (* m/HALF_PI (/ (- 210.0 e) 30.0))))))
+                   (if (m/== e 180.0) -1.0
+                       (m/* 0.75 (m/tan (m/* m/HALF_PI (m// (m/- 210.0 e) 30.0))))))
               :fi (fn ^double [^double e]
-                    (if (== e -1.0) 180.0
-                        (- 210.0 (* 2.0 (/ (* (m/atan (/ e 0.75)) 30.0) m/PI)))))
+                    (if (m/== e -1.0) 180.0
+                        (m/- 210.0 (m/* 2.0 (m// (m/* (m/atan (m// e 0.75)) 30.0) m/PI)))))
               :g s
               :rgb (fn [e n r a] (Vec4. r e n a))}
         d255 {:a [1.0 0.6]
               :b [0.85 0.7]
               :f (fn ^double [^double e]
-                   (if (== e 255.0) -1.0
-                       (* 1.33 (m/tan (* m/HALF_PI (/ (- e 210.0) 45.0))))))
+                   (if (m/== e 255.0) -1.0
+                       (m/* 1.33 (m/tan (m/* m/HALF_PI (m// (m/- e 210.0) 45.0))))))
               :fi (fn ^double [^double e]
-                    (if (== e -1.0) 255.0
-                        (+ 210.0 (* 2.0 (/ (* (m/atan (/ e 1.33)) 45.0) m/PI)))))
+                    (if (m/== e -1.0) 255.0
+                        (m/+ 210.0 (m/* 2.0 (m// (m/* (m/atan (m// e 1.33)) 45.0) m/PI)))))
               :g i
               :rgb (fn [e n r a] (Vec4. r n e a))}
         d315 {:a [0.85 0.7]
               :b [1.0 0.65]
               :f (fn ^double [^double e]
-                   (if (== e 255.0) -1.0
-                       (* 1.33 (m/tan (* m/HALF_PI (/ (- 315.0 e) 60.0))))))
+                   (if (m/== e 255.0) -1.0
+                       (m/* 1.33 (m/tan (m/* m/HALF_PI (m// (m/- 315.0 e) 60.0))))))
               :fi (fn ^double [^double e]
-                    (if (== e -1.0) 255.0
-                        (- 315.0 (* 2.0 (/ (* (m/atan (/ e 1.33)) 60.0) m/PI)))))
+                    (if (m/== e -1.0) 255.0
+                        (m/- 315.0 (m/* 2.0 (m// (m/* (m/atan (m// e 1.33)) 60.0) m/PI)))))
               :g s
               :rgb (fn [e n r a] (Vec4. n r e a))}
         d360 {:a [1.0 0.65]
               :b [1.0 1.0]
               :f (fn ^double [^double e]
-                   (if (zero? e) -1.0
-                       (* 1.33 (m/tan (* m/HALF_PI (/ (- e 315.0) 45.0))))))
+                   (if (m/zero? e) -1.0
+                       (m/* 1.33 (m/tan (m/* m/HALF_PI (m// (m/- e 315.0) 45.0))))))
               :fi (fn ^double [^double e]
-                    (if (== e -1.0) 0.0
-                        (+ 315.0 (* 2.0 (/ (* (m/atan (/ e 1.33)) 45.0) m/PI)))))
+                    (if (m/== e -1.0) 0.0
+                        (m/+ 315.0 (m/* 2.0 (m// (m/* (m/atan (m// e 1.33)) 45.0) m/PI)))))
               :g i
               :rgb (fn [e n r a] (Vec4. e r n a))}]
     (fn [^double h]
-      (condp clojure.core/> h
+      (condp m/> h
         120.0 d120
         180.0 d180
         210.0 d210
@@ -5269,9 +5118,9 @@
         d360))))
 
 (defn- adjust-s-v-rev
-  ^double [^double e ^double t] (if (<= t 1.0)
-                                  (* e t)
-                                  (+ e (* (- 1.0 e) (dec t)))))
+  ^double [^double e ^double t] (if (m/<= t 1.0)
+                                  (m/* e t)
+                                  (m/+ e (m/* (m/- 1.0 e) (m/dec t)))))
 
 (defn- paletton-hsv-to-rgb
   "Paletton version of HSV to RGB converter"
@@ -5287,10 +5136,10 @@
          ^double n (f h)
          v (adjust-s-v-rev (g av bv n) kv)
          s (adjust-s-v-rev (g as bs n) ks)
-         r (* 255.0 v)
-         b (* r (- 1.0 s))
-         g (if (== n -1.0) b
-               (/ (+ r (* n b)) (inc n)))]
+         r (m/* 255.0 v)
+         b (m/* r (m/- 1.0 s))
+         g (if (m/== n -1.0) b
+               (m// (m/+ r (m/* n b)) (m/inc n)))]
      (rgb r g b alpha)))
   (^Vec4 [^double hue ^double ks ^double kv]
    (paletton-hsv-to-rgb hue ks kv 255.0)))
@@ -5303,25 +5152,24 @@
   - `r`, `g`, `b` channels 0-255, or `c` a color, any type accepted by [[to-color]]
 
   Returns a double; 0 for grays. See also [[paletton]]."
-  {:metadoc/categories meta-ops}
   (^double [^double r ^double g ^double b]
-   (if (== r g b)
+   (if (m/== r g b)
      0.0
-     (let [f (max r g b)
-           p (min r g b)
-           [^double l i] (if (== f r)
-                           (if (== p b)
+     (let [f (m/max r g b)
+           p (m/min r g b)
+           [^double l i] (if (m/== f r)
+                           (if (m/== p b)
                              [g (:fi (paletton-base-data 119.0))]
                              [b (:fi (paletton-base-data 359.0))])
-                           (if (== f g)
-                             (if (== p r)
+                           (if (m/== f g)
+                             (if (m/== p r)
                                [b (:fi (paletton-base-data 209.0))]
                                [r (:fi (paletton-base-data 179.0))])
-                             (if (== p r)
+                             (if (m/== p r)
                                [g (:fi (paletton-base-data 254.0))]
                                [r (:fi (paletton-base-data 314.0))])))
-           s (i (if (== l p) -1.0
-                    (/ (- f l) (- l p))))]
+           s (i (if (m/== l p) -1.0
+                    (m// (m/- f l) (m/- l p))))]
        s)))
   ([c] (let [cc (to-color c)]
          (hue-paletton (.x cc) (.y cc) (.z cc)))))
@@ -5340,28 +5188,28 @@
 
 (defn- adjust-s-v
   ^double [^double e ^double t]
-  (if (zero? e)
+  (if (m/zero? e)
     0.0
-    (if (<= t e)
-      (/ t e)
-      (inc (/ (- t e) (- 1.0 e))))))
+    (if (m/<= t e)
+      (m// t e)
+      (m/inc (m// (m/- t e) (m/- 1.0 e))))))
 
 (defn- paletton-rgb-to-hsv
   (^Vec4 [^double r ^double g ^double b ^double alpha]
-   (if (== r g b)
-     (Vec4. 0.0 0.0 (/ (+ (* 0.299 r) (* 0.587 g) (* 0.114 b)) 255.0) alpha)
-     (let [f (max r g b)
-           p (min r g b)
+   (if (m/== r g b)
+     (Vec4. 0.0 0.0 (m// (m/+ (m/* 0.299 r) (m/* 0.587 g) (m/* 0.114 b)) 255.0) alpha)
+     (let [f (m/max r g b)
+           p (m/min r g b)
            h (hue-paletton r g b)
            [s v] (get-s-v h)
-           n (adjust-s-v s (/ (- f p) f))
-           r (adjust-s-v v (/ f 255.0))]
+           n (adjust-s-v s (m// (m/- f p) f))
+           r (adjust-s-v v (m// f 255.0))]
        (Vec4. h n r alpha))))
   (^Vec4 [^double r ^double g ^double b]
    (paletton-rgb-to-hsv r g b 255.0)))
 
 ;; List of paletton presets
-(defonce ^:private paletton-presets
+(def ^:private paletton-presets
   {:pale-light          [[0.24649 1.78676] [0.09956 1.95603] [0.17209 1.88583] [0.32122 1.65929] [0.39549 1.50186]]
    :pastels-bright      [[0.65667 1.86024] [0.04738 1.99142] [0.39536 1.89478] [0.90297 1.85419] [1.86422 1.8314]]
    :shiny               [[1.00926 2]       [0.3587 2]        [0.5609 2]        [2 0.8502] [2 0.65438]]
@@ -5388,8 +5236,7 @@
    :almost-gray-light   [[0.03501 1.59439] [0.23204 1.10483] [0.14935 1.33784] [0.07371 1.04897] [0.09635 0.91368]]})
 
 ;; List of preset names
-(def ^{:doc "Names of the [[paletton]] presets (lightness and saturation variants of paletton.com, the same values and names), sorted."
-       :metadoc/categories #{:pal}}
+(def ^{:doc "Names of the [[paletton]] presets (lightness and saturation variants of paletton.com, the same values and names), sorted."}
   paletton-presets-list (vec (sort (keys paletton-presets))))
 
 (defn- paletton-monochromatic-palette
@@ -5414,7 +5261,6 @@
       - `:adj` - `:triad` only, default `true`
 
   Returns a vector of `Vec4`: five colors per hue in the order main hue, secondary hues, complement (for `:tetrad`: hue, complement, `hue + angle`, its complement). Throws `ex-info` with `{:hue hue}` for a hue that is not a finite number, `{:preset preset}` for an unknown preset and `{:type type}` for an unknown scheme. See also [[hue-paletton]], [[palette]]."
-  {:metadoc/categories #{:pal}}
   (fn [m hue & _]
     (when-not (and (number? hue) (m/valid-double? (double hue)))
       (throw (ex-info (str "Paletton hue should be a finite number, got: " hue) {:hue hue})))
@@ -5438,10 +5284,11 @@
               preset :full}} (first conf)
         ppreset (paletton-preset preset)
         p (paletton-monochromatic-palette hue ppreset)]
-    (if compl (vec (concat p (paletton-monochromatic-palette (+ ^double hue 180.0) ppreset))) p)))
+    (if compl (vec (concat p (paletton-monochromatic-palette (m/+ (double hue) 180.0) ppreset))) p)))
 
 (defmethod paletton :triad [_ hue & conf]
-  (let [{compl :compl
+  (let [hue (double hue)
+        {compl :compl
          preset :preset
          ^double angle :angle
          adj :adj
@@ -5449,9 +5296,9 @@
               preset :full
               angle 30.0
               adj true}} (first conf)
-        chue (+ 180.0 ^double hue)
-        hue1 (if adj (+ ^double hue angle) (+ chue angle))
-        hue2 (if adj (- ^double hue angle) (- chue angle))
+        chue (m/+ 180.0 hue)
+        hue1 (if adj (m/+ hue angle) (m/+ chue angle))
+        hue2 (if adj (m/- hue angle) (m/- chue angle))
         ppreset (paletton-preset preset)
         p1 (paletton-monochromatic-palette hue ppreset)
         p2 (paletton-monochromatic-palette hue1 ppreset)
@@ -5465,7 +5312,7 @@
          :or {preset :full
               angle 30.0}} (first conf)
         p1 (paletton :monochromatic hue {:preset preset :compl true})
-        p2 (paletton :monochromatic (+ angle ^double hue) {:preset preset :compl true})]
+        p2 (paletton :monochromatic (m/+ angle (double hue)) {:preset preset :compl true})]
     (vec (concat p1 p2))))
 
 ;; ## Additional functions
@@ -5500,14 +5347,14 @@
    (let [to (difference-converter options colorspace)
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)]
-     (m/hypot-sqrt (- (.x c2) (.x c1))
-                   (- (.y c2) (.y c1))
-                   (- (.z c2) (.z c1))))))
+     (m/hypot-sqrt (m/- (.x c2) (.x c1))
+                   (m/- (.y c2) (.y c1))
+                   (m/- (.z c2) (.z c1))))))
 
 (defn- delta-ab
   ^double [^Vec4 c1 ^Vec4 c2]
-  (- (m/hypot-sqrt (.y c1) (.z c1))
-     (m/hypot-sqrt (.y c2) (.z c2))))
+  (m/- (m/hypot-sqrt (.y c1) (.z c1))
+       (m/hypot-sqrt (.y c2) (.z c2))))
 
 (defn delta-C*
   "Returns the CIE 1976 chroma difference ΔC*ab = C*1 - C*2.
@@ -5519,7 +5366,6 @@
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
 
   Returns a double. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-H*]], [[delta-E*]]."
-  {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-C* c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
                    :or {colorspace :LAB}
@@ -5537,7 +5383,6 @@
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
 
   Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-C*]]."
-  {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-H* c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
                    :or {colorspace :LAB}
@@ -5545,9 +5390,9 @@
    (let [to (difference-converter options colorspace)
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)]
-     (m/safe-sqrt (- (+ (m/sq (- (.y c2) (.y c1)))
-                        (m/sq (- (.z c2) (.z c1))))
-                     (m/sq (delta-ab c1 c2)))))))
+     (m/safe-sqrt (m/- (m/+ (m/sq (m/- (.y c2) (.y c1)))
+                            (m/sq (m/- (.z c2) (.z c1))))
+                       (m/sq (delta-ab c1 c2)))))))
 
 (defn delta-E-HyAB
   "Returns the HyAB color difference: `|ΔL| + sqrt(Δa² + Δb²)` in CIELAB.
@@ -5566,9 +5411,9 @@
    (let [to (difference-converter options colorspace)
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)]
-     (+ (m/hypot-sqrt (- (.y c2) (.y c1))
-                      (- (.z c2) (.z c1)))
-        (m/abs (- (.x c2) (.x c1)))))))
+     (m/+ (m/hypot-sqrt (m/- (.y c2) (.y c1))
+                      (m/- (.z c2) (.z c1)))
+        (m/abs (m/- (.x c2) (.x c1)))))))
 
 (defn delta-E*-94
   "Returns the CIE 1994 color difference ΔE*94.
@@ -5581,7 +5426,6 @@
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
 
   Returns a non-negative double. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-E*-2000]], [[delta-E*-CMC]]."
-  {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-E*-94 c1 c2 nil))
   (^double [c1 c2 {:keys [textiles? colorspace]
                    :or {textiles? false colorspace :LAB}
@@ -5593,15 +5437,15 @@
          ^Vec4 c2 (to c2)
          C1* (m/hypot-sqrt (.y c1) (.z c1))
          C2* (m/hypot-sqrt (.y c2) (.z c2))
-         Sc (inc (* k1 C1*))
-         Sh (inc (* k2 C1*))
+         Sc (m/inc (m/* k1 C1*))
+         Sh (m/inc (m/* k2 C1*))
          SL (if textiles? 2.0 1.0)
-         dab (- C1* C2*)]
-     (m/sqrt (+ (m/sq (/ (- (.x c2) (.x c1)) SL))
-                (m/sq (/ dab Sc))
-                (m/sq (/ (m/safe-sqrt (- (+ (m/sq (- (.y c2) (.y c1)))
-                                            (m/sq (- (.z c2) (.z c1))))
-                                         (m/sq dab))) Sh)))))))
+         dab (m/- C1* C2*)]
+     (m/sqrt (m/+ (m/sq (m// (m/- (.x c2) (.x c1)) SL))
+                  (m/sq (m// dab Sc))
+                  (m/sq (m// (m/safe-sqrt (m/- (m/+ (m/sq (m/- (.y c2) (.y c1)))
+                                                    (m/sq (m/- (.z c2) (.z c1))))
+                                               (m/sq dab))) Sh)))))))
 
 (defn delta-E*-euclidean
   "Returns the Euclidean distance of two colors in a colorspace, by default Oklab.
@@ -5613,7 +5457,6 @@
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:Oklab`. Use `:pass` to measure the channels as given.
 
   Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. Hue channels are treated as linear (no wrap-around)."
-  {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-E*-euclidean c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
                    :or {colorspace :Oklab}
@@ -5621,9 +5464,9 @@
    (let [to (difference-converter options colorspace)
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)]
-     (m/hypot-sqrt (- (.x c2) (.x c1))
-                   (- (.y c2) (.y c1))
-                   (- (.z c2) (.z c1))))))
+     (m/hypot-sqrt (m/- (.x c2) (.x c1))
+                   (m/- (.y c2) (.y c1))
+                   (m/- (.z c2) (.z c1))))))
 
 (defn delta-C-RGB
   "Returns the redmean color difference of two sRGB colors.
@@ -5636,20 +5479,20 @@
   ^double [c1 c2]
   (let [^Vec4 c1 (pr/to-color c1)
         ^Vec4 c2 (pr/to-color c2)
-        dR (- (.x c2) (.x c1))
-        dG (- (.y c2) (.y c1))
-        dB (- (.z c2) (.z c1))
-        r (* 0.5 (+ (.x c1) (.x c2)))]
-    (m/sqrt (+ (* (+ 2.0 (/ r 256.0)) dR dR)
-               (* 4.0 dG dG)
-               (* (+ 2.0 (/ (- 255.0 r) 256.0)) dB dB)))))
+        dR (m/- (.x c2) (.x c1))
+        dG (m/- (.y c2) (.y c1))
+        dB (m/- (.z c2) (.z c1))
+        r (m/* 0.5 (m/+ (.x c1) (.x c2)))]
+    (m/sqrt (m/+ (m/* (m/+ 2.0 (m// r 256.0)) dR dR)
+               (m/* 4.0 dG dG)
+               (m/* (m/+ 2.0 (m// (m/- 255.0 r) 256.0)) dB dB)))))
 
 (defn- diff-H
   ^double [^double h1 ^double h2]
-  (if (pos? (* h1 h2))
-    (m/abs (- h1 h2))
-    (min (+ (m/abs h1) (m/abs h2))
-         (+ (- 180.0 (m/abs h1)) (- 180.0 (m/abs h2))))))
+  (if (m/pos? (m/* h1 h2))
+    (m/abs (m/- h1 h2))
+    (m/min (m/+ (m/abs h1) (m/abs h2))
+           (m/+ (m/- 180.0 (m/abs h1)) (m/- 180.0 (m/abs h2))))))
 
 ;; Sarifuddin, Missaoui (2005), A New Perceptually Uniform Color Space with Associated Color Similarity Measure for
 ;; Content-Based Image and Video Retrieval; no reachable copy (see the docstring)
@@ -5671,12 +5514,12 @@
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)
          dH (diff-H (.x c2) (.x c1))
-         dL (- (.z c2) (.z c1))]
-     (m/sqrt (+ (m/sq (* 1.4456 dL))
-                (* (+ dH 0.16)
-                   (+ (m/sq (.y c1))
+         dL (m/- (.z c2) (.z c1))]
+     (m/sqrt (m/+ (m/sq (m/* 1.4456 dL))
+                (m/* (m/+ dH 0.16)
+                   (m/+ (m/sq (.y c1))
                       (m/sq (.y c2))
-                      (* -2.0 (.y c1) (.y c2) (m/cos (m/radians dH))))))))))
+                      (m/* -2.0 (.y c1) (.y c2) (m/cos (m/radians dH))))))))))
 
 (defn delta-E*-CMC
   "Returns the CMC l:c (1984) color difference.
@@ -5690,7 +5533,6 @@
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
 
   Returns a non-negative double. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-E*-94]], [[delta-E*-2000]]."
-  {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-E*-CMC c1 c2 nil))
   (^double [c1 c2 {:keys [^double l ^double c colorspace]
                    :or {l 1.0 c 1.0 colorspace :LAB}
@@ -5705,28 +5547,28 @@
          b1 (.z c1)
          b2 (.z c2)
          H (m/degrees (m/atan2 b1 a1))
-         H1 (if (neg? H) (+ H 360.0) H)
+         H1 (if (m/neg? H) (m/+ H 360.0) H)
          C1 (m/hypot-sqrt a1 b1)
          C2 (m/hypot-sqrt a2 b2)
-         dC (- C1 C2)
-         dL (- L1 L2)
-         da (- a1 a2)
-         db (- b1 b2)
-         dH (- (+ (m/sq da) (m/sq db)) (m/sq dC))
-         C12 (* C1 C1)
-         C14 (* C12 C12)
-         F (m/sqrt (/ C14 (+ C14 1900.0)))
-         T (if (<= 164.0 H1 345.0)
-             (+ 0.56 (m/abs (* 0.2 (m/cos (m/radians (+ H1 168.0))))))
-             (+ 0.36 (m/abs (* 0.4 (m/cos (m/radians (+ H1 35.0)))))))
-         SL (if (< L1 16.0)
+         dC (m/- C1 C2)
+         dL (m/- L1 L2)
+         da (m/- a1 a2)
+         db (m/- b1 b2)
+         dH (m/- (m/+ (m/sq da) (m/sq db)) (m/sq dC))
+         C12 (m/* C1 C1)
+         C14 (m/* C12 C12)
+         F (m/sqrt (m// C14 (m/+ C14 1900.0)))
+         T (if (m/<= 164.0 H1 345.0)
+             (m/+ 0.56 (m/abs (m/* 0.2 (m/cos (m/radians (m/+ H1 168.0))))))
+             (m/+ 0.36 (m/abs (m/* 0.4 (m/cos (m/radians (m/+ H1 35.0)))))))
+         SL (if (m/< L1 16.0)
               0.511
-              (/ (* 0.040975 L1)
-                 (inc (* 0.01765 L1))))
-         SC (+ 0.638 (/ (* 0.0638 C1)
-                        (inc (* 0.0131 C1))))
-         SH (* SC (inc (* F (dec T))))]
-     (m/sqrt (+ (m/sq (/ dL (* l SL))) (m/sq (/ dC (* c SC))) (/ dH (m/sq SH)))))))
+              (m// (m/* 0.040975 L1)
+                   (m/inc (m/* 0.01765 L1))))
+         SC (m/+ 0.638 (m// (m/* 0.0638 C1)
+                            (m/inc (m/* 0.0131 C1))))
+         SH (m/* SC (m/inc (m/* F (m/dec T))))]
+     (m/sqrt (m/+ (m/sq (m// dL (m/* l SL))) (m/sq (m// dC (m/* c SC))) (m// dH (m/sq SH)))))))
 
 (defn delta-E-z
   "Returns the Jzazbz color difference ΔEz (Safdar et al. 2017).
@@ -5738,7 +5580,6 @@
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:JAB`. Use `:pass` for colors already in Jzazbz.
 
   Returns a non-negative double, symmetric in `c1`, `c2`; small numbers (black to white about 0.17). Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-E*-2000]]."
-  {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-E-z c1 c2 nil))
   (^double [c1 c2 {:keys [colorspace]
                    :or {colorspace :JAB}
@@ -5756,21 +5597,21 @@
          C2 (m/hypot-sqrt a2 b2)
          h1 (m/atan2 b1 a1)
          h2 (m/atan2 b2 a2)]
-     (m/hypot-sqrt (- J2 J1)
-                   (- C2 C1)
-                   (* 2.0 (m/sqrt (* C1 C2)) (m/sin (* 0.5 (- h2 h1))))))))
+     (m/hypot-sqrt (m/- J2 J1)
+                   (m/- C2 C1)
+                   (m/* 2.0 (m/sqrt (m/* C1 C2)) (m/sin (m/* 0.5 (m/- h2 h1))))))))
 
-(def ^{:private true :const true :tag 'long} p25_7 (* 25 25 25 25 25 25 25))
+(def ^{:private true :const true :tag 'long} p25_7 (m/* 25 25 25 25 25 25 25))
 (def ^{:private true :const true :tag 'double} r30 (m/radians 30.0))
 (def ^{:private true :const true :tag 'double} r6 (m/radians 6.0))
 (def ^{:private true :const true :tag 'double} r63 (m/radians 63.0))
 
 (defn- de2000p7
   ^double [^double v]
-  (let [v2 (* v v)
-        v4 (* v2 v2)
-        v7 (* v4 v2 v)]
-    (m/sqrt (/ v7 (+ v7 p25_7)))))
+  (let [v2 (m/* v v)
+        v4 (m/* v2 v2)
+        v7 (m/* v4 v2 v)]
+    (m/sqrt (m// v7 (m/+ v7 p25_7)))))
 
 (defn- ciede2000-terms
   "Weighted CIEDE2000 terms of two CIELAB colors after Sharma, Wu, Dalal (2005): `[ΔL'/(kL SL) ΔC'/(kC SC) ΔH'/(kH SH) RT]`, `k` the parametric factors `[kL kC kH]`. Shared by [[delta-E*-2000]] and [[delta-E-HyCH]]."
@@ -5780,52 +5621,52 @@
         h (.z k)
         C1* (m/hypot-sqrt (.y c1) (.z c1))
         C2* (m/hypot-sqrt (.y c2) (.z c2))
-        Cm* (* 0.5 (+ C1* C2*))
-        G+ (inc (* 0.5 (- 1.0 (de2000p7 Cm*))))
-        a1' (* G+ (.y c1))
-        a2' (* G+ (.y c2))
+        Cm* (m/* 0.5 (m/+ C1* C2*))
+        G+ (m/inc (m/* 0.5 (m/- 1.0 (de2000p7 Cm*))))
+        a1' (m/* G+ (.y c1))
+        a2' (m/* G+ (.y c2))
         C1' (m/hypot-sqrt a1' (.z c1))
         C2' (m/hypot-sqrt a2' (.z c2))
         h1' (m/degrees (m/atan2 (.z c1) a1'))
-        h1' (if (neg? h1') (+ h1' 360.0) h1')
+        h1' (if (m/neg? h1') (m/+ h1' 360.0) h1')
         h2' (m/degrees (m/atan2 (.z c2) a2'))
-        h2' (if (neg? h2') (+ h2' 360.0) h2')
-        dL' (- (.x c2) (.x c1))
-        dC' (- C2' C1')
-        diffh' (- h2' h1')
+        h2' (if (m/neg? h2') (m/+ h2' 360.0) h2')
+        dL' (m/- (.x c2) (.x c1))
+        dC' (m/- C2' C1')
+        diffh' (m/- h2' h1')
         adiffh' (m/abs diffh')
-        C1'C2' (* C1' C2')
+        C1'C2' (m/* C1' C2')
         dh' (m/radians (double (cond
-                                 (zero? C1'C2') 0.0
-                                 (<= adiffh' 180.0) diffh'
-                                 (> diffh' 180.0) (- diffh' 360.0)
-                                 :else (+ diffh' 360.0))))
-        dH' (* 2.0 (m/sqrt C1'C2') (m/sin (* 0.5 dh')))
-        Lm' (* 0.5 (+ (.x c1) (.x c2)))
-        Cm' (* 0.5 (+ C1' C2'))
-        h1'+h2' (+ h1' h2')
-        ^double hm' (cond
-                      (zero? C1'C2') h1'+h2'
-                      (<= adiffh' 180.0) (* 0.5 h1'+h2')
-                      (< h1'+h2' 360.0) (* 0.5 (+ h1'+h2' 360.0))
-                      :else (* 0.5 (- h1'+h2' 360.0)))
+                                 (m/zero? C1'C2') 0.0
+                                 (m/<= adiffh' 180.0) diffh'
+                                 (m/> diffh' 180.0) (m/- diffh' 360.0)
+                                 :else (m/+ diffh' 360.0))))
+        dH' (m/* 2.0 (m/sqrt C1'C2') (m/sin (m/* 0.5 dh')))
+        Lm' (m/* 0.5 (m/+ (.x c1) (.x c2)))
+        Cm' (m/* 0.5 (m/+ C1' C2'))
+        h1'+h2' (m/+ h1' h2')
+        hm' (double (cond
+                      (m/zero? C1'C2') h1'+h2'
+                      (m/<= adiffh' 180.0) (m/* 0.5 h1'+h2')
+                      (m/< h1'+h2' 360.0) (m/* 0.5 (m/+ h1'+h2' 360.0))
+                      :else (m/* 0.5 (m/- h1'+h2' 360.0))))
         hm'r (m/radians hm')
-        T (+ 1.0
-             (* -0.17 (m/cos (- hm'r r30)))
-             (* 0.24 (m/cos (* 2.0 hm'r)))
-             (* 0.32 (m/cos (+ (* 3.0 hm'r) r6)))
-             (* -0.2 (m/cos (- (* 4.0 hm'r) r63))))
-        dtheta (* r30 (m/exp (- (m/sq (/ (- hm' 275.0) 25.0)))))
-        Rc (* 2.0 (de2000p7 Cm'))
-        Lm'-50sq (m/sq (- Lm' 50.0))
-        Sl (inc (/ (* 0.015 Lm'-50sq)
-                   (m/sqrt (+ 20.0 Lm'-50sq))))
-        Sc (inc (* 0.045 Cm'))
-        Sh (inc (* 0.015 Cm' T))
-        Rt (- (* (m/sin (* 2.0 dtheta)) Rc))
-        l' (/ dL' (* l Sl))
-        c' (/ dC' (* c Sc))
-        h' (/ dH' (* h Sh))]
+        T (m/+ 1.0
+               (m/* -0.17 (m/cos (m/- hm'r r30)))
+               (m/* 0.24 (m/cos (m/* 2.0 hm'r)))
+               (m/* 0.32 (m/cos (m/+ (m/* 3.0 hm'r) r6)))
+               (m/* -0.2 (m/cos (m/- (m/* 4.0 hm'r) r63))))
+        dtheta (m/* r30 (m/exp (m/- (m/sq (m// (m/- hm' 275.0) 25.0)))))
+        Rc (m/* 2.0 (de2000p7 Cm'))
+        Lm'-50sq (m/sq (m/- Lm' 50.0))
+        Sl (m/inc (m// (m/* 0.015 Lm'-50sq)
+                       (m/sqrt (m/+ 20.0 Lm'-50sq))))
+        Sc (m/inc (m/* 0.045 Cm'))
+        Sh (m/inc (m/* 0.015 Cm' T))
+        Rt (m/- (m/* (m/sin (m/* 2.0 dtheta)) Rc))
+        l' (m// dL' (m/* l Sl))
+        c' (m// dC' (m/* c Sc))
+        h' (m// dH' (m/* h Sh))]
     (Vec4. l' c' h' Rt)))
 
 (defn delta-E*-2000
@@ -5847,8 +5688,8 @@
          ^Vec4 c1 (to c1)
          ^Vec4 c2 (to c2)
          ^Vec4 t (ciede2000-terms c1 c2 (Vec3. l c h))]
-     (m/sqrt (+ (m/sq (.x t)) (m/sq (.y t)) (m/sq (.z t))
-                (* (.w t) (.y t) (.z t)))))))
+     (m/sqrt (m/+ (m/sq (.x t)) (m/sq (.y t)) (m/sq (.z t))
+                (m/* (.w t) (.y t) (.z t)))))))
 
 (defn delta-E-HyCH
   "Returns the HyCH color difference of Abasi, Amani Tehran and Fairchild (2020).
@@ -5861,22 +5702,21 @@
       - `:colorspace` - conversion applied to both colors, a key of [[colorspaces]] (raw values), default `:LAB`. Use `:pass` for colors already in CIELAB.
 
   Returns a non-negative double, symmetric in `c1`, `c2`. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace` or options that are not a map. See also [[delta-E-HyAB]], [[delta-E*-2000]]."
-  {:metadoc/categories #{:dist}}
   (^double [c1 c2] (delta-E-HyCH c1 c2 nil))
   (^double [c1 c2 {:keys [textiles? colorspace]
                    :or {colorspace :LAB}
                    :as options}]
    (let [to (difference-converter options colorspace)
          ^Vec4 t (ciede2000-terms (to c1) (to c2) (Vec3. (if textiles? 2.0 1.0) 1.0 1.0))]
-     (+ (m/abs (.x t)) (m/hypot-sqrt (.y t) (.z t))))))
+     (m/+ (m/abs (.x t)) (m/hypot-sqrt (.y t) (.z t))))))
 
 (defn- wcag-luminance
   "WCAG 2 relative luminance, 0-1: sRGB decoding and the weights 0.2126, 0.7152, 0.0722 as written in WCAG (not the Y row of the `to-XYZ` matrix used by [[relative-luma]])."
   ^double [c]
   (let [^Vec4 c (pr/to-color c)]
-    (+ (* 0.2126 (rgb/srgb-to-linear (/ (.x c) 255.0)))
-       (* 0.7152 (rgb/srgb-to-linear (/ (.y c) 255.0)))
-       (* 0.0722 (rgb/srgb-to-linear (/ (.z c) 255.0))))))
+    (m/+ (m/* 0.2126 (rgb/srgb-to-linear (m// (.x c) 255.0)))
+       (m/* 0.7152 (rgb/srgb-to-linear (m// (.y c) 255.0)))
+       (m/* 0.0722 (rgb/srgb-to-linear (m// (.z c) 255.0))))))
 
 (defn contrast-ratio
   "Returns the contrast of two colors, by default the WCAG 2 contrast ratio.
@@ -5894,31 +5734,30 @@
   - `options` (map, optional): `:method`, default `:wcag`
 
   Returns a double. Alpha is ignored: colors are not composited on a background. Throws `ex-info` with `{:method method}` for an unknown method and `{:options options}` when the options are not a map."
-  {:metadoc/categories #{:dist}}
   (^double [c1 c2] (contrast-ratio c1 c2 nil))
   (^double [c1 c2 {:keys [method] :or {method :wcag} :as options}]
    (check-options-map options)
    (case method
      :wcag (let [l1 (wcag-luminance c1)
                  l2 (wcag-luminance c2)]
-             (if (> l1 l2)
-               (/ (+ l1 0.05) (+ l2 0.05))
-               (/ (+ l2 0.05) (+ l1 0.05))))
-     :lstar (m/abs (- (.x ^Vec4 (to-LAB c1)) (.x ^Vec4 (to-LAB c2))))
+             (if (m/> l1 l2)
+               (m// (m/+ l1 0.05) (m/+ l2 0.05))
+               (m// (m/+ l2 0.05) (m/+ l1 0.05))))
+     :lstar (m/abs (m/- (.x ^Vec4 (to-LAB c1)) (.x ^Vec4 (to-LAB c2))))
      :weber (let [y1 (.y ^Vec4 (to-XYZ1 c1))
                   y2 (.y ^Vec4 (to-XYZ1 c2))]
-              (/ (- y1 y2) y2))
+              (m// (m/- y1 y2) y2))
      :michelson (let [y1 (.y ^Vec4 (to-XYZ1 c1))
                       y2 (.y ^Vec4 (to-XYZ1 c2))]
-                  (/ (- (max y1 y2) (min y1 y2)) (+ y1 y2)))
+                  (m// (m/- (m/max y1 y2) (m/min y1 y2)) (m/+ y1 y2)))
      (throw (ex-info (str "Unknown contrast method: " method) {:method method})))))
 
 (defn- nd-lab-interval
   "The d3-jnd noticeable-difference interval `p (A + B / s)` per CIELAB channel, `A = (10.16, 10.68, 10.70)`, `B = (1.50, 3.08, 5.74)`, as `Vec3`."
   [^double s ^double p]
-  (v/mult (Vec3. (+ 10.16 (/ 1.5 s))
-                 (+ 10.68 (/ 3.08 s))
-                 (+ 10.70 (/ 5.74 s))) p))
+  (v/mult (Vec3. (m/+ 10.16 (m// 1.5 s))
+                 (m/+ 10.68 (m// 3.08 s))
+                 (m/+ 10.70 (m// 5.74 s))) p))
 
 (defn noticeably-different?
   "Tests whether two colors are noticeably different for a given mark size.
@@ -5932,21 +5771,20 @@
       - `:colorspace` - conversion applied to both colors, default `:LAB`. Use `:pass` for colors already in CIELAB.
 
   Returns a boolean, symmetric in `c1`, `c2`. Alpha is ignored. Throws `ex-info` for an unknown `:colorspace`, options that are not a map, and with `{:s s :p p}` for `:s` not positive or `:p` outside (0, 1] (`:p` 0 made identical colors different, `:s` 0 made no colors different)."
-  {:metadoc/categories #{:dist}}
   ([c1 c2] (noticeably-different? c1 c2 nil))
   ([c1 c2 {:keys [^double s ^double p colorspace]
            :or {s 0.1 p 0.5 colorspace :LAB}
            :as options}]
-   (when-not (and (pos? s) (pos? p) (<= p 1.0))
+   (when-not (and (m/pos? s) (m/pos? p) (m/<= p 1.0))
      (throw (ex-info (str "Size :s should be positive and share :p in (0, 1], got " s ", " p) {:s s :p p})))
    (let [to (difference-converter options colorspace)
          c1 (to c1)
          c2 (to c2)
          ^Vec4 diff (v/abs (v/sub c1 c2))
          ^Vec3 nd (nd-lab-interval s p)]
-     (or (>= (.x diff) (.x nd))
-         (>= (.y diff) (.y nd))
-         (>= (.z diff) (.z nd))))))
+     (or (m/>= (.x diff) (.x nd))
+         (m/>= (.y diff) (.y nd))
+         (m/>= (.z diff) (.z nd))))))
 
 (defn- nearest-color-fn
   "Function of a color returning the entry of `pal` nearest to it by `dist-fn` (on `Vec4` values), the first one on ties, NaN distances skipped; throws `ex-info` with `{:palette-size 0}` for an empty palette and `{:distance :nan}` when every distance is NaN."
@@ -5954,17 +5792,17 @@
   (let [entries (vec pal)
         colors (mapv pr/to-color entries)
         n (count entries)]
-    (when (zero? n)
+    (when (m/zero? n)
       (throw (ex-info "Palette is empty" {:palette-size 0})))
     (fn [c]
       (let [c (pr/to-color c)]
         (loop [i 0 best -1 best-dist ##Inf]
-          (if (< i n)
+          (if (m/< i n)
             (let [d (m/abs (double (dist-fn c (colors i))))]
-              (if (or (< d best-dist) (and (neg? best) (not (m/nan? d))))
-                (recur (inc i) i d)
-                (recur (inc i) best best-dist)))
-            (if (neg? best)
+              (if (or (m/< d best-dist) (and (m/neg? best) (not (m/nan? d))))
+                (recur (m/inc i) i d)
+                (recur (m/inc i) best best-dist)))
+            (if (m/neg? best)
               (throw (ex-info "Distance to every palette color is NaN" {:distance :nan}))
               (entries best))))))))
 
@@ -5976,7 +5814,6 @@
   - `dist-fn` (optional) distance of two colors (`Vec4` values), default `fastmath.vector/dist` (Euclidean distance of R, G, B and alpha)
 
   Returns the palette entry with the smallest absolute distance to `c`, as given in the palette (e.g. a keyword), the first one on ties. NaN distances are skipped. With only `pal` returns a function of a color (default distance) and the palette is converted once; the other arities convert the palette with [[to-color]] on every call, so for many colors with a custom `dist-fn` pass a palette of `Vec4` values (cheap to convert). Throws `ex-info` with `{:palette-size 0}` for an empty palette and `{:distance :nan}` when every distance is NaN. See also [[delta-E*]], [[reduce-colors]]."
-  {:metadoc/categories #{:dist}}
   ([pal c dist-fn] ((nearest-color-fn pal dist-fn) c))
   ([pal c] ((nearest-color-fn pal v/dist) c))
   ([pal] (nearest-color-fn pal v/dist)))
@@ -5985,21 +5822,29 @@
   "Hue channels of the raw colorspaces of [[colorspaces]]: `:hue` channel index, `:lo` start and `:period` of its range, `:radial` saturation or chroma channel (or `:hwb?` for whiteness / blackness in channels 1, 2) and the `:tolerance` below which the hue is powerless (achromatic color). JCH grays reach chroma 1.6e-4, its smallest 8-bit color step 3.0e-4."
   (let [deg {:lo 0.0 :period 360.0 :tolerance 1.0e-9}
         unit {:lo 0.0 :period 1.0 :tolerance 1.0e-9}]
-    {:HSB (assoc deg :hue 0 :radial 1) :HSV (assoc deg :hue 0 :radial 1) :HSL (assoc deg :hue 0 :radial 1)
-     :HSI (assoc deg :hue 0 :radial 1) :PalettonHSV (assoc deg :hue 0 :radial 1) :Cubehelix (assoc deg :hue 0 :radial 1)
-     :Okhsl (assoc unit :hue 0 :radial 1) :Okhsv (assoc unit :hue 0 :radial 1)
-     :HWB (assoc deg :hue 0 :hwb? true) :Okhwb (assoc unit :hue 0 :hwb? true)
+    {:HSB (assoc deg :hue 0 :radial 1)
+     :HSV (assoc deg :hue 0 :radial 1)
+     :HSL (assoc deg :hue 0 :radial 1)
+     :HSI (assoc deg :hue 0 :radial 1)
+     :PalettonHSV (assoc deg :hue 0 :radial 1)
+     :Cubehelix (assoc deg :hue 0 :radial 1)
+     :Okhsl (assoc unit :hue 0 :radial 1)
+     :Okhsv (assoc unit :hue 0 :radial 1)
+     :HWB (assoc deg :hue 0 :hwb? true)
+     :Okhwb (assoc unit :hue 0 :hwb? true)
      :GLHS (assoc deg :hue 1 :radial 2)
      :HCL (assoc deg :hue 0 :radial 1 :lo -180.0)
-     :LCH (assoc deg :hue 2 :radial 1) :LCHuv (assoc deg :hue 2 :radial 1) :Oklch (assoc deg :hue 2 :radial 1)
+     :LCH (assoc deg :hue 2 :radial 1)
+     :LCHuv (assoc deg :hue 2 :radial 1)
+     :Oklch (assoc deg :hue 2 :radial 1)
      :JCH (assoc deg :hue 2 :radial 1 :tolerance 2.2e-4)}))
 
 (defn- powerless-hue?
   "Is the hue of the raw color `c` meaningless (achromatic color) by the rule of `hue-space`?"
   [{:keys [radial hwb? ^double tolerance]} ^Vec4 c]
   (if hwb?
-    (>= (+ (.y c) (.z c)) (- 1.0 tolerance))
-    (<= (m/abs (double (c radial))) tolerance)))
+    (m/>= (m/+ (.y c) (.z c)) (m/- 1.0 tolerance))
+    (m/<= (m/abs (double (c radial))) tolerance)))
 
 (defn- with-channel
   "`c` with `channel` set to `value`."
@@ -6011,12 +5856,12 @@
 (defn- hue-difference
   "Hue difference `diff` (second minus first) adjusted by the hue `mode` (CSS Color 4 hue interpolation): `:shorter` and `:longer` arc, `:increasing`, `:decreasing` hue, `:raw` as is; `period` 360 or 1."
   ^double [mode ^double diff ^double period]
-  (let [half (* 0.5 period)]
+  (let [half (m/* 0.5 period)]
     (case mode
-      :shorter (cond (> diff half) (- diff period) (< diff (- half)) (+ diff period) :else diff)
-      :longer (cond (and (pos? diff) (< diff half)) (- diff period) (and (> diff (- half)) (<= diff 0.0)) (+ diff period) :else diff)
-      :increasing (if (neg? diff) (+ diff period) diff)
-      :decreasing (if (pos? diff) (- diff period) diff)
+      :shorter (cond (m/> diff half) (m/- diff period) (m/< diff (m/- half)) (m/+ diff period) :else diff)
+      :longer (cond (and (m/pos? diff) (m/< diff half)) (m/- diff period) (and (m/> diff (m/- half)) (m/<= diff 0.0)) (m/+ diff period) :else diff)
+      :increasing (if (m/neg? diff) (m/+ diff period) diff)
+      :decreasing (if (m/pos? diff) (m/- diff period) diff)
       :raw diff)))
 
 (defn- interpolate-hue
@@ -6029,23 +5874,23 @@
         hb (double (b hue))
         h1 (if pa (if pb lo hb) ha)
         h2 (if pb (if pa lo ha) hb)
-        h (+ h1 (* t (hue-difference mode (- h2 h1) period)))]
-    (if (= mode :raw) h (m/wrap lo (+ lo period) h))))
+        h (m/+ h1 (m/* t (hue-difference mode (m/- h2 h1) period)))]
+    (if (= mode :raw) h (m/wrap lo (m/+ lo period) h))))
 
 (defn- premultiply
   "Raw color `c` with every channel but alpha and the hue (index `hue`, -1 for none) multiplied by alpha / 255."
   ^Vec4 [^Vec4 c ^long hue]
-  (let [a (/ (.w c) 255.0)
-        f (fn ^double [^long i ^double x] (if (== i hue) x (* a x)))]
+  (let [a (m// (.w c) 255.0)
+        f (fn ^double [^long i ^double x] (if (m/== i hue) x (m/* a x)))]
     (Vec4. (f 0 (.x c)) (f 1 (.y c)) (f 2 (.z c)) (.w c))))
 
 (defn- unpremultiply
   "Inverse of [[premultiply]] with the alpha of `c`; for alpha 0 the channels are kept (zeros of a premultiplied mix)."
   ^Vec4 [^Vec4 c ^long hue]
-  (let [a (/ (.w c) 255.0)]
-    (if (zero? a)
+  (let [a (m// (.w c) 255.0)]
+    (if (m/zero? a)
       c
-      (let [f (fn ^double [^long i ^double x] (if (== i hue) x (/ x a)))]
+      (let [f (fn ^double [^long i ^double x] (if (m/== i hue) x (m// x a)))]
         (Vec4. (f 0 (.x c)) (f 1 (.y c)) (f 2 (.z c)) (.w c))))))
 
 (defn- interpolate-raw
@@ -6065,36 +5910,36 @@
   ^Vec4 [{:keys [radial hwb?]} ^Vec4 c]
   (cond
     (not hwb?) (with-channel c radial 0.0)
-    (< (+ (.y c) (.z c)) 1.0) (with-channel c 1 (- 1.0 (.z c)))
+    (m/< (m/+ (.y c) (.z c)) 1.0) (with-channel c 1 (m/- 1.0 (.z c)))
     :else c))
 
 (defn- mean-raw
   "Weighted mean of raw colors `vs` (`weights` summing to `weights-total`): alpha weighted by the weights, the other channels by the weights times alpha / 255 when `premultiplied?` (as coloraide); channels 0 when those weights sum to 0. In a hue space (`hue-space` not nil) the hue is the circular mean of the colors whose hue is not powerless; no such color or a resultant below 1e-6 of the total channel weight gives the range start and an achromatic color."
   ^Vec4 [hue-space vs weights weights-total premultiplied?]
   (let [weights-total (double weights-total)
-        alpha (/ (double (reduce m/+ 0.0 (map (fn [^Vec4 c ^double w] (* w (.w c))) vs weights))) weights-total)
-        cws (if premultiplied? (map (fn [^Vec4 c ^double w] (* w (/ (.w c) 255.0))) vs weights) weights)
+        alpha (m// (double (reduce m/+ 0.0 (map (fn [^Vec4 c ^double w] (m/* w (.w c))) vs weights))) weights-total)
+        cws (if premultiplied? (map (fn [^Vec4 c ^double w] (m/* w (m// (.w c) 255.0))) vs weights) weights)
         cw-total (double (reduce m/+ 0.0 cws))
-        _ (when (and (zero? cw-total) (some (fn [^double w] (not (zero? w))) cws))
+        _ (when (and (m/zero? cw-total) (some (fn [^double w] (not (m/zero? w))) cws))
             (throw (ex-info "Sum of the alpha-weighted weights is 0 (negative weights)" {:alpha-weights-sum 0.0})))
-        avg (if (zero? cw-total)
+        avg (if (m/zero? cw-total)
               (Vec4. 0.0 0.0 0.0 alpha)
               (with-channel (v/div (reduce v/add (map v/mult vs cws)) cw-total) 3 alpha))]
     (if-not hue-space
       avg
       (let [{:keys [^long hue ^double lo ^double period]} hue-space
-            to-rad (/ m/TWO_PI period)
+            to-rad (m// m/TWO_PI period)
             [sn cs] (reduce (fn [[^double sn ^double cs] [^Vec4 c ^double w]]
                               (if (powerless-hue? hue-space c)
                                 [sn cs]
-                                (let [a (* to-rad (double (c hue)))]
-                                  [(+ sn (* w (m/sin a))) (+ cs (* w (m/cos a)))])))
+                                (let [a (m/* to-rad (double (c hue)))]
+                                  [(m/+ sn (m/* w (m/sin a))) (m/+ cs (m/* w (m/cos a)))])))
                             [0.0 0.0] (map vector vs cws))
-            sn (if (zero? cw-total) 0.0 (/ (double sn) cw-total))
-            cs (if (zero? cw-total) 0.0 (/ (double cs) cw-total))]
-        (if (and (< (m/abs sn) 1.0e-6) (< (m/abs cs) 1.0e-6))
+            sn (if (m/zero? cw-total) 0.0 (m// (double sn) cw-total))
+            cs (if (m/zero? cw-total) 0.0 (m// (double cs) cw-total))]
+        (if (and (m/< (m/abs sn) 1.0e-6) (m/< (m/abs cs) 1.0e-6))
           (make-achromatic hue-space (with-channel avg hue lo))
-          (with-channel avg hue (m/wrap lo (+ lo period) (/ (m/atan2 sn cs) to-rad))))))))
+          (with-channel avg hue (m/wrap lo (m/+ lo period) (m// (m/atan2 sn cs) to-rad))))))))
 
 (defn- check-colors-count
   "Throws `ex-info` with `{:colors 0}` for an empty sequence of colors."
@@ -6105,7 +5950,7 @@
 (defn- check-number-of-colors
   "Throws `ex-info` with `{:number-of-colors n}` when the requested number of colors `n` is below 1."
   [^long n]
-  (when (< n 1)
+  (when (m/< n 1)
     (throw (ex-info (str "Number of colors should be at least 1, got: " n) {:number-of-colors n}))))
 
 (defn- weights-sum
@@ -6116,8 +5961,8 @@
         k (count weights)]
     (when (not= n k)
       (throw (ex-info (str "Expected one weight per color, got " k " weights for " n " colors") {:colors n :weights k})))
-    (let [s (double (reduce m/+ 0.0 weights))]
-      (when (or (zero? s) (m/invalid-double? s))
+    (let [s (v/sum weights)]
+      (when (or (m/zero? s) (m/invalid-double? s))
         (throw (ex-info (str "Sum of weights should be non-zero and finite, got: " s) {:weights-sum s})))
       s)))
 
@@ -6129,7 +5974,6 @@
   - `options` (optional, map; requires `colorspace`, `:RGB` for sRGB): `:premultiplied?` - when true the colors are weighted by alpha (premultiplied alpha, as CSS `color-mix()` and coloraide; the hue channel is not premultiplied); default false (straight alpha, as chroma.js)
 
   Without `colorspace` the sRGB values are averaged as they are (chroma.js `average` in mode `rgb`; the chroma.js default is `lrgb`, square-root mixing). In colorspaces with a hue (HSx, HWB, GLHS, HCL, LCH-like, Okhsl, Okhsv, Okhwb, Cubehelix) the hue is the circular mean of the hues of the chromatic colors (as chroma.js and coloraide); when the hues cancel out, or all colors are achromatic, the result is achromatic (saturation or chroma 0, as coloraide). Returns a `Vec4`, not clamped. With premultiplied alpha fully transparent colors do not count, and colors that are all transparent give channels 0. Throws `ex-info` with `{:colors 0}` for no colors, `{:colorspace colorspace}` for an unknown colorspace and `{:options options}` for options that are not a map. See also [[weighted-average]], [[mix]]."
-  {:metadoc/categories #{:interp}}
   ([cs colorspace] (average cs colorspace nil))
   ([cs colorspace {:keys [premultiplied?] :as options}]
    (check-options-map options)
@@ -6153,7 +5997,6 @@
   - `options` (optional, map; requires `colorspace`, `:RGB` for sRGB): `:premultiplied?` - when true the colors are weighted by alpha (premultiplied alpha, as CSS `color-mix()` and coloraide; the hue channel is not premultiplied); default false (straight alpha, as chroma.js)
 
   Without `colorspace` the sRGB values are averaged as they are (chroma.js `average` in mode `rgb` with weights). Negative weights are allowed. Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colors 0}` for no colors, `{:colors n :weights m}` when the counts differ, `{:weights-sum s}` for a sum of weights that is 0 or not finite, `{:alpha-weights-sum 0.0}` when with premultiplied alpha the weights times alphas cancel out (negative weights), `{:colorspace colorspace}` for an unknown colorspace and `{:options options}` for options that are not a map. See also [[average]]."
-  {:metadoc/categories #{:interp}}
   ([cs weights colorspace] (weighted-average cs weights colorspace nil))
   ([cs weights colorspace {:keys [premultiplied?] :as options}]
    (check-options-map options)
@@ -6176,7 +6019,6 @@
   - `options` (optional, map; requires `colorspace`, `:RGB` for sRGB): `:premultiplied?` - when true the colors are weighted by alpha (premultiplied alpha, as CSS `color-mix()` and coloraide; the hue channel is not premultiplied); default false (straight alpha, as chroma.js)
 
   Without `colorspace` the sRGB values are interpolated (chroma.js `mix` in mode `rgb`). In colorspaces with a hue (HSx, HWB, GLHS, HCL, LCH-like, Okhsl, Okhsv, Okhwb, Cubehelix) the hue goes along the shorter arc (CSS `shorter`, chroma.js, coloraide); the hue of an achromatic color (powerless) is replaced by the hue of the other color. With premultiplied alpha a fully transparent color does not contribute its channels (transparent red and blue give blue at alpha 0.5), and two transparent colors give channels 0. Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace and `{:options options}` for options that are not a map. See also [[lerp-]], [[lerp+]], [[mix]], [[gradient]]."
-  {:metadoc/categories #{:interp}}
   ([c1 c2 colorspace ^double t] (lerp c1 c2 colorspace t nil))
   ([c1 c2 colorspace t {:keys [premultiplied?] :as options}]
    (check-options-map options)
@@ -6195,7 +6037,6 @@
   - `options` (optional) as in [[lerp]]
 
   The colors are interpolated with [[lerp]], then L* of the result is set to L* of `c1`. Returns a `Vec4`, not clamped (the result may leave the sRGB gamut). Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[lerp+]], [[adjust-temperature]]."
-  {:metadoc/categories #{:interp}}
   ([c1 c2 colorspace ^double amount] (lerp- c1 c2 colorspace amount nil))
   ([c1 c2 colorspace amount options]
    (set-channel (lerp c1 c2 colorspace amount options) :LAB 0 (ch0 (to-LAB c1))))
@@ -6212,27 +6053,27 @@
   - `amount` weight of `c2`, default `0.5`
   - `options` (optional) as in [[lerp]]
 
-  The same as `(lerp- c2 c1 (- 1 amount))`. Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[lerp-]]."
+  The same as `(lerp- c2 c1 (m/- 1 amount))`. Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[lerp-]]."
   ([c1 c2 colorspace ^double amount] (lerp+ c1 c2 colorspace amount nil))
   ([c1 c2 colorspace amount options]
-   (lerp- c2 c1 colorspace (- 1.0 (double amount)) options))
+   (lerp- c2 c1 colorspace (m/- 1.0 (double amount)) options))
   ([c1 c2] (lerp+ c1 c2 0.5))
   ([c1 c2 ^double amount]
-   (lerp- c2 c1 (- 1.0 amount))))
+   (lerp- c2 c1 (m/- 1.0 amount))))
 
 (defn- mix-interpolator
   ^double [^double a ^double b ^double t]
-  (m/sqrt (+ (* a a (- 1.0 t))
-             (* b b t))))
+  (m/sqrt (m/+ (m/* a a (m/- 1.0 t))
+             (m/* b b t))))
 
 (defn- mix-premultiplied
   "Square-root mixing of `c1`, `c2` with the squared channels weighted by alpha; both alphas 0 give channels 0."
   ^Vec4 [^Vec4 c1 ^Vec4 c2 ^double t]
-  (let [w1 (* (- 1.0 t) (.w c1))
-        w2 (* t (.w c2))
-        w (+ w1 w2)
+  (let [w1 (m/* (m/- 1.0 t) (.w c1))
+        w2 (m/* t (.w c2))
+        w (m/+ w1 w2)
         channel (fn ^double [^double a ^double b]
-                  (if (zero? w) 0.0 (m/sqrt (/ (+ (* w1 a a) (* w2 b b)) w))))]
+                  (if (m/zero? w) 0.0 (m/sqrt (m// (m/+ (m/* w1 a a) (m/* w2 b b)) w))))]
     (Vec4. (channel (.x c1) (.x c2)) (channel (.y c1) (.y c2)) (channel (.z c1) (.z c2)) (m/mlerp (.w c1) (.w c2) t))))
 
 (defn mix
@@ -6246,7 +6087,6 @@
   - `options` (optional) as in [[lerp]]: with `:premultiplied?` the squared channels are weighted by alpha, `sqrt(((1 - t) a1 c1^2 + t a2 c2^2) / ((1 - t) a1 + t a2))`, so a fully transparent color does not contribute
 
   Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace and `{:options options}` for options that are not a map. See also [[lerp]], [[mixbox]], [[mixsub]]."
-  {:metadoc/categories #{:interp}}
   (^Vec4 [c1 c2 colorspace ^double t] (mix c1 c2 colorspace t nil))
   (^Vec4 [c1 c2 colorspace t {:keys [premultiplied?] :as options}]
    (check-options-map options)
@@ -6283,10 +6123,10 @@
              ^int c2 (pack v2)
              argb (Mixbox/lerp c1 c2 (float t))]
          ;; channels read from the ARGB int directly: to-color reads an int with alpha 0 as opaque
-         (Vec4. (double (bit-and (bit-shift-right argb 16) 0xff))
-                (double (bit-and (bit-shift-right argb 8) 0xff))
-                (double (bit-and argb 0xff))
-                (double (bit-and (unsigned-bit-shift-right argb 24) 0xff))))))))
+         (Vec4. (double (m/bit-and (m/bit-shift-right argb 16) 0xff))
+                (double (m/bit-and (m/bit-shift-right argb 8) 0xff))
+                (double (m/bit-and argb 0xff))
+                (double (m/bit-and (unsigned-bit-shift-right argb 24) 0xff))))))))
 
 (defn negate
   "Negates a color: each channel becomes `255 - c`.
@@ -6298,10 +6138,10 @@
   (^Vec4 [c] (negate c false))
   (^Vec4 [c alpha?]
    (let [^Vec4 c (pr/to-color c)]
-     (Vec4. (- 255.0 (.x c))
-            (- 255.0 (.y c))
-            (- 255.0 (.z c))
-            (if alpha? (- 255.0 (.w c)) (.w c))))))
+     (Vec4. (m/- 255.0 (.x c))
+            (m/- 255.0 (.y c))
+            (m/- 255.0 (.z c))
+            (if alpha? (m/- 255.0 (.w c)) (.w c))))))
 
 ;; https://github.com/ProfJski/ArtColors/blob/master/RYB.cpp#L230
 (defn mixsub
@@ -6314,7 +6154,6 @@
   - `t` weight of `c2`, default `0.5`
 
   Returns a `Vec4`. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace. See also [[mix]], [[mixbox]]."
-  {:metadoc/categories #{:interp}}
   (^Vec4 [c1 c2 colorspace ^double t]
    (let [[to from] (colorspace-converters colorspaces* colorspace)]
      (from (mixsub (to c1) (to c2) t))))
@@ -6322,10 +6161,10 @@
   (^Vec4 [c1 c2 ^double t]
    (let [^Vec4 a (pr/to-color c1)
          ^Vec4 b (pr/to-color c2)
-         dist (m/sqrt (+ (m/sq (- (.x a) (.x b))) (m/sq (- (.y a) (.y b))) (m/sq (- (.z a) (.z b)))))
-         cd (* 4.0 t (- 1.0 t) (/ dist (* 255.0 m/SQRT3)))
+         dist (m/sqrt (m/+ (m/sq (m/- (.x a) (.x b))) (m/sq (m/- (.y a) (.y b))) (m/sq (m/- (.z a) (.z b)))))
+         cd (m/* 4.0 t (m/- 1.0 t) (m// dist (m/* 255.0 m/SQRT3)))
          channel (fn ^double [^double x ^double y]
-                   (m/lerp (m/lerp x y t) (max 0.0 (- (+ x y) 255.0)) cd))]
+                   (m/lerp (m/lerp x y t) (m/max 0.0 (m/- (m/+ x y) 255.0)) cd))]
      (Vec4. (channel (.x a) (.x b)) (channel (.y a) (.y b)) (channel (.z a) (.z b)) 255.0))))
 
 (declare gradient)
@@ -6339,7 +6178,6 @@
   - `tint-color` color, any type accepted by [[to-color]]
 
   Returns a function of one color returning a clamped `Vec4`."
-  {:metadoc/categories #{:pal}}
   ([tint-color]
    (let [tint (v/add (pr/to-color tint-color) vec4-one)]
      (fn [c]
@@ -6350,8 +6188,8 @@
   "The most frequent of `points` (channel vectors) with channels rounded to integers, as a `Vec4`; the average of the most frequent ones on ties."
   ^Vec4 [points]
   (let [counts (frequencies (map (fn [p] (mapv m/round p)) points))
-        top (reduce max (vals counts))]
-    (v/average-vectors (for [[p ^long n] counts :when (== n (long top))] (pr/to-color p)))))
+        top (long (reduce m/max (vals counts)))]
+    (v/average-vectors (for [[p ^long n] counts :when (m/== n top)] (pr/to-color p)))))
 
 (defn reduce-colors
   "Reduces a sequence of colors (e.g. the pixels of an image) to a palette by clustering.
@@ -6365,7 +6203,6 @@
       - other clustering options, e.g. `:max-iters`, `:distance`, `:fuzziness`, `:trials`
 
   The color of a cluster is its most frequent color (channels rounded to integers), the average of the most frequent ones on ties; alpha is kept. When there are no more distinct (rounded) colors than `number-of-colors`, they are returned without clustering; empty clusters are dropped, so fewer colors may be returned. Returns the colors sorted by [[luma]]. Throws `ex-info` with `{:colors 0}` for no colors, `{:number-of-colors n}` for fewer than 1 color, `{:options options}` for options that are not a map and `{:colorspace colorspace}` for an unknown colorspace. See also [[resample]], [[nearest-color]]."
-  {:metadoc/categories #{:pal}}
   ([xs number-of-colors] (reduce-colors xs number-of-colors nil))
   ([xs ^long number-of-colors {:keys [fuzzy? colorspace rng] :as options}]
    (check-options-map options)
@@ -6375,7 +6212,7 @@
          points (map (comp to pr/to-color) xs)
          distinct-points (distinct (map (fn [p] (mapv m/round p)) points))]
      (sort-by luma
-              (if (<= (long (bounded-count (inc number-of-colors) distinct-points)) number-of-colors)
+              (if (m/<= (long (bounded-count (m/inc number-of-colors) distinct-points)) number-of-colors)
                 (map (comp from pr/to-color) distinct-points)
                 (let [clustering-fn (if fuzzy? cl/fuzzy-kmeans cl/kmeans++)
                       options (cond-> (assoc options :clusters number-of-colors)
@@ -6392,9 +6229,9 @@
   (when (m/nan? amt)
     (throw (ex-info "Amount should be a number, got: NaN" {:amount amt})))
   (let [a (m/constrain amt -1.0 1.0)]
-    (if (neg? a)
-      (+ v (* a v))
-      (+ v (* a (- 1.0 v))))))
+    (if (m/neg? a)
+      (m/+ v (m/* a v))
+      (m/+ v (m/* a (m/- 1.0 v))))))
 
 (defn whiten
   "Moves a color toward white: the whiteness W of [[to-HWB]] goes `amt` of the way to 1 (`W + amt (1 - W)`); negative `amt` goes toward 0 (`W + amt W`).
@@ -6403,7 +6240,6 @@
   - `amt` step, default `0.2`, clamped to [-1, 1]: 1 gives W = 1, -1 gives W = 0; the step is linear in `amt` and works for pure colors (W = 0)
 
   Hue and blackness are kept; when W + B exceeds 1 the color becomes gray (HWB normalization). Returns a clamped `Vec4`. Throws `ex-info` with `{:amount amt}` for `NaN`. See also [[blacken]], [[brighten]]."
-  {:metadoc/categories meta-ops}
   (^Vec4 [col] (whiten col 0.2))
   (^Vec4 [col ^double amt]
    (let [c (to-HWB col)]
@@ -6416,7 +6252,6 @@
   - `amt` step, default `0.2`, clamped to [-1, 1]: 1 gives B = 1, -1 gives B = 0
 
   Hue and whiteness are kept; when W + B exceeds 1 the color becomes gray (HWB normalization). Returns a clamped `Vec4`. Throws `ex-info` with `{:amount amt}` for `NaN`. See also [[whiten]], [[darken]]."
-  {:metadoc/categories meta-ops}
   (^Vec4 [col] (blacken col 0.2))
   (^Vec4 [col ^double amt]
    (let [c (to-HWB col)]
@@ -6429,11 +6264,10 @@
   - `amt` number of steps, default `1.0`; negative values darken
 
   L* does not go below 0 (chroma.js lets it go negative). Returns a clamped `Vec4`. See also [[darken]], [[saturate]]."
-  {:metadoc/categories meta-ops}
   (^Vec4 [col] (brighten col 1.0))
   (^Vec4 [col ^double amt]
    (let [c (to-LAB col)]
-     (clamp (from-LAB (Vec4. (max 0.0 (+ (.x c) (* 18.0 amt))) (.y c) (.z c) (.w c)))))))
+     (clamp (from-LAB (Vec4. (m/max 0.0 (m/+ (.x c) (m/* 18.0 amt))) (.y c) (.z c) (.w c)))))))
 
 (defn darken
   "Darkens a color: subtracts `18 amt` from the CIELAB lightness L* (chroma.js `darken`, step Kn = 18).
@@ -6441,10 +6275,9 @@
   - `col` color, any type accepted by [[to-color]]
   - `amt` number of steps, default `1.0`
 
-  The same as `(brighten col (- amt))`: L* does not go below 0. Returns a clamped `Vec4`. See also [[brighten]]."
-  {:metadoc/categories meta-ops}
+  The same as `(brighten col (m/- amt))`: L* does not go below 0. Returns a clamped `Vec4`. See also [[brighten]]."
   (^Vec4 [col] (brighten col -1.0))
-  (^Vec4 [col ^double amt] (brighten col (- amt))))
+  (^Vec4 [col ^double amt] (brighten col (m/- amt))))
 
 (defn saturate
   "Saturates a color: adds `18 amt` to the chroma C of [[to-LCH]] (chroma.js `saturate`, step Kn = 18), not below 0.
@@ -6453,11 +6286,10 @@
   - `amt` number of steps, default `1.0`; negative values desaturate
 
   Grays have hue 0, so saturating a gray gives a reddish pink (as chroma.js). Returns a clamped `Vec4`. See also [[desaturate]], [[brighten]]."
-  {:metadoc/categories meta-ops}
   (^Vec4 [col] (saturate col 1.0))
   (^Vec4 [col ^double amt]
    (let [c (to-LCH col)
-         ns (max 0.0 (+ (.y c) (* 18.0 amt)))]
+         ns (m/max 0.0 (m/+ (.y c) (m/* 18.0 amt)))]
      (clamp (from-LCH (Vec4. (.x c) ns (.z c) (.w c)))))))
 
 (defn desaturate
@@ -6466,10 +6298,9 @@
   - `col` color, any type accepted by [[to-color]]
   - `amt` number of steps, default `1.0`
 
-  The same as `(saturate col (- amt))`. Returns a clamped `Vec4`. See also [[saturate]]."
-  {:metadoc/categories meta-ops}
+  The same as `(saturate col (m/- amt))`. Returns a clamped `Vec4`. See also [[saturate]]."
   (^Vec4 [col] (saturate col -1.0))
-  (^Vec4 [col ^double amt] (saturate col (- amt))))
+  (^Vec4 [col ^double amt] (saturate col (m/- amt))))
 
 (defn adjust
   "Adds `value` to one channel of a color, optionally in another colorspace.
@@ -6480,12 +6311,11 @@
   - `value` added to the channel, in the raw range of the colorspace
 
   Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace and `{:channel channel}` for a channel outside 0-3. See also [[modulate]], [[set-channel]]."
-  {:metadoc/categories meta-ops}
   (^Vec4 [col colorspace ^long channel ^double value]
    (let [[to from] (colorspace-converters colorspaces colorspace)]
-     (from (update-channel (to col) channel (fn ^double [^double v] (+ value v))))))
+     (from (update-channel (to col) channel (fn ^double [^double v] (m/+ value v))))))
   (^Vec4 [col ^long channel ^double value]
-   (update-channel (pr/to-color col) channel (fn ^double [^double v] (+ value v)))))
+   (update-channel (pr/to-color col) channel (fn ^double [^double v] (m/+ value v)))))
 
 (defn modulate
   "Multiplies one channel of a color by `amount`, optionally in another colorspace.
@@ -6496,12 +6326,11 @@
   - `amount` factor
 
   Returns a `Vec4`, not clamped. Throws `ex-info` with `{:colorspace colorspace}` for an unknown colorspace and `{:channel channel}` for a channel outside 0-3. See also [[adjust]]."
-  {:metadoc/categories meta-ops}
   (^Vec4 [col colorspace ^long channel ^double amount]
    (let [[to from] (colorspace-converters colorspaces colorspace)]
-     (from (update-channel (to col) channel (fn ^double [^double v] (* amount v))))))
+     (from (update-channel (to col) channel (fn ^double [^double v] (m/* amount v))))))
   (^Vec4 [col ^long channel ^double amount]
-   (update-channel (pr/to-color col) channel (fn ^double [^double v] (* amount v)))))
+   (update-channel (pr/to-color col) channel (fn ^double [^double v] (m/* amount v)))))
 
 (defn adjust-temperature
   "Shifts a color toward the color of a blackbody temperature, keeping its lightness.
@@ -6513,7 +6342,6 @@
   - `amount` interpolation weight, default `0.35`
 
   Returns a `Vec4`. Throws `ex-info` with `{:temperature temp}` for an invalid temperature (see [[temperature]]). See also [[temperature]], [[lerp-]]."
-  {:metadoc/categories meta-ops}
   ([c temp] (adjust-temperature c temp 0.35))
   ([c temp amount]
    (v/fmap (lerp- (pr/to-color c) (temperature temp) amount) clamp255)))
@@ -6528,27 +6356,25 @@
 (defn- options-rng
   "Random generator of `options` (`:rng`), a fresh `(fastmath.random/rng :default)` when none."
   [options]
-  (or (:rng options) (r/rng :default)))
+  (or (:rng options) r/default-rng))
 
 (defn- segment-hue-fn
   "Hue at `t` of a linear gradient of raw stops `cs` at increasing positions `xs` in a hue space: each segment by [[interpolate-hue]] (as coloraide; a powerless stop takes the hue of the other end of each of its segments); outside the positions the end hues."
   [hue-space mode xs cs]
   (let [xs (double-array xs)
-        last-segment (- (alength xs) 2)
+        last-segment (m/- (alength xs) 2)
         cs (vec cs)]
     (fn ^double [^double t]
       (let [k (long (loop [k 0]
-                      (if (and (< k last-segment) (> t (Array/aget xs (inc k)))) (recur (inc k)) k)))
+                      (if (and (m/< k last-segment) (m/> t (Array/aget xs (m/inc k)))) (recur (m/inc k)) k)))
             x0 (Array/aget xs k)
-            u (m/constrain (/ (- t x0) (- (Array/aget xs (inc k)) x0)) 0.0 1.0)]
-        (interpolate-hue hue-space mode (cs k) (cs (inc k)) u)))))
+            u (m/constrain (m// (m/- t x0) (m/- (Array/aget xs (m/inc k)) x0)) 0.0 1.0)]
+        (interpolate-hue hue-space mode (cs k) (cs (m/inc k)) u)))))
 
 (defn- unwrapped-hues
   "Hues of raw stops `cs` of a hue space made continuous by the hue `mode` (see [[hue-difference]]), each relative to the previous stop; a powerless stop keeps the previous hue (leading ones the first chromatic hue; all powerless: the range start)."
-  [{:keys [hue lo period] :as hue-space} mode cs]
-  (let [lo (double lo)
-        period (double period)
-        first-hue (if-let [c (first (remove #(powerless-hue? hue-space %) cs))] (double (c hue)) lo)]
+  [{:keys [hue ^double lo ^double period] :as hue-space} mode cs]
+  (let [first-hue (if-let [c (first (remove #(powerless-hue? hue-space %) cs))] (double (c hue)) lo)]
     (loop [[c & more] cs
            prev nil
            out []]
@@ -6558,7 +6384,7 @@
                   (powerless-hue? hue-space c) (or prev first-hue)
                   (nil? prev) (double (c hue))
                   :else (let [p (double prev)]
-                          (+ p (hue-difference mode (- (double (c hue)) (m/wrap lo (+ lo period) p)) period))))]
+                          (m/+ p (hue-difference mode (m/- (double (c hue)) (m/wrap lo (m/+ lo period) p)) period))))]
           (recur more h (conj out h)))))))
 
 (defn- interpolated-gradient
@@ -6585,11 +6411,11 @@
     (when (and easing? (not= n 2))
       (throw (ex-info (str "Easing interpolation needs 2 colors, got: " n) {:interpolation interpolation :colors n})))
     (when domain
-      (when-not (and (== (count domain) n) (every? number? domain) (apply < domain))
+      (when-not (and (m/== (count domain) n) (every? number? domain) (apply < domain))
         (throw (ex-info "Domain should be strictly increasing, one value per color" {:domain domain}))))
     (cond
       ;; one color: constant gradient
-      (== n 1)
+      (m/one? n)
       (let [c (v/fmap (from (first cpalette)) clamp255)]
         (fn ^Vec4 [^double _] c))
 
@@ -6608,21 +6434,21 @@
 
       :else
       (let [r (or domain
-                  (map (fn [^long v] (m/mnorm v 0.0 (dec n) 0.0 1.0)) (range n)))
+                  (map (fn [^long v] (m/mnorm v 0.0 (m/dec n) 0.0 1.0)) (range n)))
             ;; t limited to [0, 1] and to the domain, so every interpolator keeps the end colors
-            t-min (max 0.0 (double (first r)))
-            t-max (min 1.0 (double (last r)))
+            t-min (m/max 0.0 (double (first r)))
+            t-max (m/min 1.0 (double (last r)))
             ifn (if (keyword? interpolation) (partial i/interpolation interpolation) interpolation)
             hue-fn (when hue-space
                      (if (= interpolation :linear)
                        (segment-hue-fn hue-space hue-mode r cpalette)
                        (let [{:keys [^double lo ^double period]} hue-space
                              ih (ifn r (unwrapped-hues hue-space hue-mode cpalette))]
-                         (fn ^double [^double t] (m/wrap lo (+ lo period) (double (ih t)))))))
+                         (fn ^double [^double t] (m/wrap lo (m/+ lo period) (double (ih t)))))))
             hue-channel (long (get hue-space :hue -1))
             ;; the hue channel (not premultiplied) comes from hue-fn
             [i0 i1 i2 i3] (mapv (fn [^long ch]
-                                  (if (and hue-fn (== ch hue-channel))
+                                  (if (and hue-fn (m/== ch hue-channel))
                                     hue-fn
                                     (ifn r (map (fn [^Vec4 c] (c ch)) stops))))
                                 [0 1 2 3])]
@@ -6630,11 +6456,10 @@
           (let [ct (m/constrain (m/constrain t 0.0 1.0) t-min t-max)]
             (v/fmap (from (unpremultiplied (v/vec4 (i0 ct) (i1 ct) (i2 ct) (i3 ct)))) clamp255)))))))
 
-(def ^{:metadoc/categories #{:gr}
-     :doc "Creates a gradient in the Cubehelix colorspace from raw Cubehelix values (`[hue saturation lightness alpha]`, see [[to-Cubehelix]]), not sRGB colors: two or more stops, interpolated linearly, the hue as a number (`:hue :raw`, d3 `interpolateCubehelixLong`). Returns a gradient function as [[gradient]]."}
+(def ^{:doc "Creates a gradient in the Cubehelix colorspace from raw Cubehelix values (`[hue saturation lightness alpha]`, see [[to-Cubehelix]]), not sRGB colors: two or more stops, interpolated linearly, the hue as a number (`:hue :raw`, d3 `interpolateCubehelixLong`). Returns a gradient function as [[gradient]]."}
   gradient-cubehelix #(interpolated-gradient % {:colorspace :Cubehelix :to? false :interpolation :linear :hue :raw}))
 
-(defonce ^{:private true} basic-gradients-delay
+(def ^{:private true} basic-gradients-delay
   (delay (merge (into {} (for [[k v] {:rainbow1              [[0.5 0.5 0.5] [0.5 0.5 0.5] [1.0 1.0 1.0] [0 0.3333 0.6666]]
                                       :rainbow2              [[0.5 0.5 0.5] [0.666 0.666 0.666] [1.0 1.0 1.0] [0 0.3333 0.6666]]
                                       :rainbow3              [[0.5 0.5 0.5] [0.75 0.75 0.75] [1.0 1.0 1.0] [0 0.3333 0.6666]]
@@ -6688,16 +6513,16 @@
                  :warm (gradient-cubehelix [(Vec4. -100.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0)])
                  :cool (gradient-cubehelix [(Vec4. 260.0 0.75 0.35 255.0) (Vec4. 80.0 1.5 0.8 255.0)])
                  ;; d3 interpolateRainbow: t outside [0, 1] wraps
-                 :rainbow (fn [^double t] (let [t (if (or (< t 0.0) (> t 1.0)) (- t (m/floor t)) t)
-                                                ts (m/abs (- t 0.5))]
-                                           (v/fmap (from-Cubehelix (Vec4. (- (* t 360.0) 100.0)
-                                                                          (- 1.5 (* 1.5 ts))
-                                                                          (- 0.8 (* 0.9 ts))
+                 :rainbow (fn [^double t] (let [t (if (or (m/< t 0.0) (m/> t 1.0)) (m/- t (m/floor t)) t)
+                                               ts (m/abs (m/- t 0.5))]
+                                           (v/fmap (from-Cubehelix (Vec4. (m/- (m/* t 360.0) 100.0)
+                                                                          (m/- 1.5 (m/* 1.5 ts))
+                                                                          (m/- 0.8 (m/* 0.9 ts))
                                                                           255.0))
                                                    clamp255)))
                  :black-body (fn [^double t] (if (m/nan? t)
-                                               (Vec4. ##NaN ##NaN ##NaN 255.0)
-                                               (temperature (m/mlerp 1000.0 15000.0 (m/constrain t 0.0 1.0)))))})))
+                                              (Vec4. ##NaN ##NaN ##NaN 255.0)
+                                              (temperature (m/mlerp 1000.0 15000.0 (m/constrain t 0.0 1.0)))))})))
 
 (defn- get-gradient-from-file-
   [k]
@@ -6706,7 +6531,7 @@
       (interpolated-gradient (:c g) {:domain (:p g)})
       (interpolated-gradient g {}))))
 
-(defonce ^:private get-gradient-from-file (memoize get-gradient-from-file-))
+(def ^:private get-gradient-from-file (memoize get-gradient-from-file-))
 
 (declare gradients-list-)
 
@@ -6719,7 +6544,7 @@
     (get-gradient-from-file k)
     (@basic-gradients-delay k)))
 
-(defonce ^:private gradients-list-
+(def ^:private gradients-list-
   (delay (let [g (set (concat (keys @basic-gradients-delay)
                               (read-edn "gradients/all-gradients.edn")))]
            {:set g
@@ -6742,15 +6567,14 @@
   Built-in gradients without a namespace: the thi.ng/color cosine presets (`:rainbow1` to `:rainbow4`, `:yellow-magenta-cyan`, `:orange-blue`, `:green-magenta`, `:green-red`, `:green-cyan`, `:yellow-red`, `:blue-cyan`, `:red-blue`, `:yellow-green-blue`, `:blue-white-red`, `:cyan-magenta`, `:yellow-purple-magenta`, `:green-blue-orange`, `:orange-magenta-blue`, `:blue-magenta-orange`, `:magenta-green`), I. Quilez's cosine palettes `:iq-1` to `:iq-7`, d3-scale-chromatic `:cubehelix`, `:warm`, `:cool`, `:rainbow`, and `:black-body` ([[temperature]] from 1000 to 15000 K). Namespaced names (e.g. `:pals/kovesi.cyclic_mrybm_35_75_c68`) come from resource files.
 
   Returns a function of one double returning a `Vec4`. Throws `ex-info` with `{:gradient k}` for an unknown name, `{:colors 0}` for no colors, `{:domain d}` for a domain that is not strictly increasing or not one value per color, `{:interpolation k :colors n}` for an easing with other than 2 colors or `:iq` with other than 2 colors or 4 coefficient vectors, `{:hue h}` for an unknown hue interpolation, `{:colorspace cs}` and `{:options o}`. See also [[palette]], [[merge-gradients]], [[gradient-cubehelix]]."
-  {:metadoc/categories #{:gr}}
-  ([] (gradient (random-nth (r/rng :default) (:seq @gradients-list-))))
+  ([] (gradient (random-nth r/default-rng (:seq @gradients-list-))))
   ([palette-or-gradient-name] (gradient palette-or-gradient-name {}))
   ([palette-or-gradient-name options]
    (check-options-map options)
    (cond (keyword? palette-or-gradient-name) (get-gradient palette-or-gradient-name)
          ;; :iq - two colors, or the four cosine coefficients a, b, c, d
          (= (:interpolation options) :iq) (let [n (count palette-or-gradient-name)]
-                                            (when-not (or (== n 2) (== n 4))
+                                            (when-not (or (m/== n 2) (m/== n 4))
                                               (throw (ex-info (str "Interpolation :iq needs 2 colors or 4 coefficient vectors, got: " n)
                                                               {:interpolation :iq :colors n})))
                                             (apply iq-gradient palette-or-gradient-name))
@@ -6763,19 +6587,18 @@
   - `midpoint` (optional) default `0.5`
 
   Returns a function of `t`. See also [[gradient]]."
-  {:metadoc/categories #{:gr}}
   ([g1 g2 ^double midpoint]
-   (when-not (< 0.0 midpoint 1.0)
+   (when-not (m/< 0.0 midpoint 1.0)
      (throw (ex-info (str "Midpoint should be in (0, 1), got: " midpoint) {:midpoint midpoint})))
    (fn [^double t]
-     (if (< t midpoint)
+     (if (m/< t midpoint)
        (g1 (m/norm t 0.0 midpoint))
        (g2 (m/norm t midpoint 1.0)))))
   ([g1 g2] (merge-gradients g1 g2 0.5)))
 
 ;;
 
-(defonce ^:private palettes-list-
+(def ^:private palettes-list-
   (delay (let [p (set (read-edn "palettes/all-palettes.edn"))]
            {:set p
             :seq (vec (sort-by keyword p))})))
@@ -6785,7 +6608,7 @@
   (when (contains? (:set @palettes-list-) k)
     (mapv pr/to-color (get-palette-or-gradient "palettes/" k))))
 
-(defonce ^:private get-palette (memoize get-palette-))
+(def ^:private get-palette (memoize get-palette-))
 
 (defn palette
   "Returns a palette: a vector of colors.
@@ -6795,8 +6618,7 @@
   - `gradient-params` (optional) options of [[gradient]] used for resampling (`:colorspace` also for the average)
 
   Without arguments a random palette name is used. Returns a vector of `Vec4`. Throws `ex-info` with `{:palette p}` for an unknown name and `{:number-of-colors n}` for fewer than 1 color. See also [[resample]], [[gradient]], [[random-palette]]."
-  {:metadoc/categories #{:pal}}
-  ([] (palette (random-nth (r/rng :default) (:seq @palettes-list-))))
+  ([] (palette (random-nth r/default-rng (:seq @palettes-list-))))
   ([p]
    (cond
      (or (keyword? p)
@@ -6842,7 +6664,6 @@
   - `gradient-params` (optional) options of [[gradient]] (e.g. `:colorspace`, `:interpolation`)
 
   A palette is turned into a [[gradient]] and sampled at `number-of-colors` evenly spaced points (a gradient is sampled directly, `gradient-params` ignored); one color is the [[average]] of the palette (in `:colorspace` when given). The same as `(palette pal number-of-colors gradient-params)`. Returns a vector of `Vec4`. Throws `ex-info` with `{:number-of-colors n}` for fewer than 1 color. See also [[reduce-colors]]."
-  {:metadoc/categories #{:pal}}
   ([pal number-of-colors] (resample pal number-of-colors {}))
   ([pal number-of-colors gradient-params] (palette pal number-of-colors gradient-params)))
 
@@ -6855,23 +6676,24 @@
   [ls xs]
   (let [^double l0 (first ls)
         ^double l1 (peek ls)
-        d (m/signum (- l1 l0))
-        tolerance (* correct-luma-max-reversal (m/abs (- l1 l0)))
+        d (m/signum (m/- l1 l0))
+        tolerance (m/* correct-luma-max-reversal (m/abs (m/- l1 l0)))
         non-monotonic #(throw (ex-info "Lightness of the gradient is not monotonic" {:lightness :non-monotonic}))]
-    (when (zero? d) (non-monotonic))
-    (let [[us ps] (loop [[^double l & lr] ls
+    (when (m/zero? d) (non-monotonic))
+    (let [[us ps] (loop [[l & lr] ls
                          [x & xr] xs
                          mx ##-Inf
                          us []
                          ps []]
                     (if-not l
                       [us ps]
-                      (let [u (* d l)]
-                        (when (> (- mx u) tolerance) (non-monotonic))
-                        (if (> u mx)
+                      (let [l (double l)
+                            u (m/* d l)]
+                        (when (m/> (m/- mx u) tolerance) (non-monotonic))
+                        (if (m/> u mx)
                           (recur lr xr u (conj us u) (conj ps x))
                           (recur lr xr mx us ps)))))]
-      [(first us) (peek us) (li/linear us (assoc ps (dec (count ps)) (last xs))) d])))
+      [(first us) (peek us) (li/linear us (assoc ps (m/dec (count ps)) (last xs))) d])))
 
 (defn correct-luma
   "Makes the CIELAB lightness of a gradient or palette change linearly.
@@ -6882,7 +6704,6 @@
   - `gradient-params` (optional) options of [[gradient]] used to turn a palette into a gradient
 
   Returns a gradient for a gradient, a palette of the same size for a palette. The lightness must increase or decrease overall (a palette sorted by lightness, in either order); reversals against that direction up to 5 % of the total lightness change are smoothed out (a running maximum), larger ones, equal lightness at both ends, or a palette of fewer than 2 colors throw `ex-info` with `{:lightness :non-monotonic}`."
-  {:metadoc/categories #{:pal :gr}}
   ([palette-or-gradient] (correct-luma palette-or-gradient {}))
   ([palette-or-gradient gradient-params]
    (if (fn? palette-or-gradient) ;; gradient
@@ -6891,7 +6712,7 @@
            [^double u0 ^double u1 inverse] (lightness-inverse ls xs)]
        (fn ^Vec4 [^double t] (palette-or-gradient (inverse (m/lerp u0 u1 t)))))
      (let [n (count palette-or-gradient)
-           _ (when (< n 2)
+           _ (when (m/< n 2)
                (throw (ex-info "A palette of fewer than 2 colors has no lightness direction" {:lightness :non-monotonic})))
            g (correct-luma (gradient palette-or-gradient gradient-params))]
        (palette g n)))))
@@ -6918,16 +6739,15 @@
   - `options` (map, optional): `:rng` - random number generator (e.g. `(fastmath.random/rng :mersenne 42)` for repeatable results); none or `nil`: a fresh `(fastmath.random/rng :default)`
 
   Returns a vector of `Vec4` (3 to 15 colors or a whole palette). Throws `ex-info` with `{:options options}` for options that are not a map. See also [[random-gradient]], [[palette]]."
-  {:metadoc/categories #{:gr}}
   ([] (random-palette nil))
   ([options]
    (check-options-map options)
    (let [rng (options-rng options)]
-     (condp clojure.core/> (r/drandom rng)
+     (condp m/> (r/drandom rng)
        0.1 (resample (iq-random-gradient rng) (r/irandom rng 3 10))
        0.3 (palette (r/irandom rng 500))
        0.6 (let [p (palette (random-nth rng (:seq @palettes-list-)))]
-             (if (> (count p) 15) (resample p 15) p))
+             (if (m/> (count p) 15) (resample p 15) p))
        0.8 (resample (gradient (random-nth rng (:seq @gradients-list-))) (r/irandom rng 3 10))
        (let [h (r/drandom rng 360.0)
              t (random-nth rng [:monochromatic :triad :triad :triad :triad :triad :tetrad :tetrad :tetrad])
@@ -6943,7 +6763,6 @@
   - `options` (map, optional): `:rng` - random number generator; none or `nil`: a fresh `(fastmath.random/rng :default)`
 
   Returns a function of `t` (0-1) returning a `Vec4`. Throws `ex-info` with `{:options options}` for options that are not a map. See also [[random-palette]], [[gradient]]."
-  {:metadoc/categories #{:pal}}
   ([] (random-gradient nil))
   ([options]
    (check-options-map options)
@@ -6957,7 +6776,7 @@
                                              {:preset (random-nth rng paletton-presets-list)})) gpars)
        (gradient (random-nth rng (:seq @gradients-list-)))))))
 
-(defonce ^:private thing-presets
+(def ^:private thing-presets
   ;; L range and C range
   {:intense-light [[204.0 255.0] [229.5 255.0]]
    :intense-dark  [[51.0 89.25]  [229.5 255.0]]
@@ -6976,8 +6795,8 @@
    :gray-dark     [[0.0 76.5]    [0.0 0.0]]
    :gray          [[76.5 178.5]  [0.0 0.0]]})
 
-(defonce thing-presets-list (set (keys thing-presets)))
-(defonce ^{:doc "Sorted names of the color themes of [[apply-theme]] and [[random-color]]: thi.ng presets (lightness and chroma ranges in LCH*: `:intense-light`, `:intense-dark`, `:light`, `:dark`, `:bright`, `:weak`, `:neutral`, `:fresh`, `:soft`, `:hard`, `:warm`, `:cool`, `:all`, `:gray-light`, `:gray-dark`, `:gray`) and the presets of [[paletton]] ([[paletton-presets-list]])."}
+(def thing-presets-list (set (keys thing-presets)))
+(def ^{:doc "Sorted names of the color themes of [[apply-theme]] and [[random-color]]: thi.ng presets (lightness and chroma ranges in LCH*: `:intense-light`, `:intense-dark`, `:light`, `:dark`, `:bright`, `:weak`, `:neutral`, `:fresh`, `:soft`, `:hard`, `:warm`, `:cool`, `:all`, `:gray-light`, `:gray-dark`, `:gray`) and the presets of [[paletton]] ([[paletton-presets-list]])."}
   color-themes (sort (concat thing-presets-list paletton-presets-list)))
 
 (defn- random-channel-value
@@ -6985,7 +6804,7 @@
   ^double [rng scheme ^double value]
   (cond
     (number? scheme) (let [v (double scheme)]
-                       (r/drandom rng (- value v) (+ value v)))
+                       (r/drandom rng (m/- value v) (m/+ value v)))
     (sequential? scheme) (let [[mn mx] scheme]
                            (r/drandom rng mn mx))
     :else value))
@@ -7026,6 +6845,14 @@
                 :else (throw (ex-info (str "Unknown color theme: " color-theme) {:color-theme color-theme})))
               (apply-LCH-theme rng color color-theme))))))
 
+(defn named-colors-list
+  "Returns the names of all predefined colors.
+
+  The names are keywords: the 148 CSS Color 4 names (e.g. `:red`, `:rebeccapurple`), hyphenated variants of the multi-word CSS names (e.g. `:dark-blue`), `:amber` (a clojure2d-specific color, `#b28c00`) and `:docc/...` colors from A Dictionary of Colour Combinations by Sanzo Wada (via mattdesl/dictionary-of-colour-combinations). Every name can be used wherever a color is expected.
+
+  Returns an unordered sequence of keywords. See also [[to-color]], [[palette]]."
+  [] (keys @color-presets-delay))
+
 (defn- random-any-color
   "Random color drawn with `rng`: a named color (0.2), a color of a random palette (0.4) or a random sRGB color (0.4)."
   ^Vec4 [rng]
@@ -7044,8 +6871,7 @@
   - `options` (map): `:rng` - random number generator; none or `nil`: a fresh `(fastmath.random/rng :default)`
 
   Returns a `Vec4` (clamped for a theme). Throws `ex-info` with `{:color-theme color-theme}` for an unknown theme and `{:options options}` for options that are not a map. See also [[apply-theme]], [[random-palette]]."
-  {:metadoc/categories #{:pal}}
-  ([] (random-any-color (r/rng :default)))
+  ([] (random-any-color r/default-rng))
   ([alpha-or-color-theme-or-options]
    (let [x alpha-or-color-theme-or-options]
      (cond
@@ -7063,6 +6889,8 @@
        (not (contains? paletton-presets color-theme)) (throw (ex-info (str "Unknown color theme: " color-theme) {:color-theme color-theme}))
        :else (clamp (set-alpha (random-nth rng (paletton :monochromatic (r/drandom rng 360.0) {:preset color-theme})) alpha))))))
 
+;;
+
 (defn fe-color-matrix
   "Creates a color filter from a 4 x 5 matrix, as SVG `feColorMatrix` (type matrix) on encoded sRGB.
 
@@ -7075,10 +6903,10 @@
     ^double a1 ^double a2 ^double a3 ^double a4 ^double a5]]
   (fn [c]
     (let [^Vec4 c (pr/to-color c)]
-      (clamp (Vec4. (+ (* r1 (.x c)) (* r2 (.y c)) (* r3 (.z c)) (* r4 (.w c)) r5)
-                    (+ (* g1 (.x c)) (* g2 (.y c)) (* g3 (.z c)) (* g4 (.w c)) g5)
-                    (+ (* b1 (.x c)) (* b2 (.y c)) (* b3 (.z c)) (* b4 (.w c)) b5)
-                    (+ (* a1 (.x c)) (* a2 (.y c)) (* a3 (.z c)) (* a4 (.w c)) a5))))))
+      (clamp (Vec4. (m/+ (m/* r1 (.x c)) (m/* r2 (.y c)) (m/* r3 (.z c)) (m/* r4 (.w c)) r5)
+                    (m/+ (m/* g1 (.x c)) (m/* g2 (.y c)) (m/* g3 (.z c)) (m/* g4 (.w c)) g5)
+                    (m/+ (m/* b1 (.x c)) (m/* b2 (.y c)) (m/* b3 (.z c)) (m/* b4 (.w c)) b5)
+                    (m/+ (m/* a1 (.x c)) (m/* a2 (.y c)) (m/* a3 (.z c)) (m/* a4 (.w c)) a5))))))
 
 (defn- check-amount
   "Throws `ex-info` with `{:amount amount}` for a negative filter amount (not allowed by W3C Filter Effects) or `NaN`."
@@ -7094,10 +6922,10 @@
   Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount or `NaN`."
   ([^double amount]
    (check-amount amount)
-   (let [amount (- 1.0 (min amount 1.0))
-         a (+ 0.393 (* 0.607 amount)) b (- 0.769 (* 0.769 amount)) c (- 0.189 (* 0.189 amount))
-         d (- 0.349 (* 0.349 amount)) e (+ 0.686 (* 0.314 amount)) f (- 0.168 (* 0.168 amount))
-         g (- 0.272 (* 0.272 amount)) h (- 0.534 (* 0.534 amount)) i (+ 0.131 (* 0.869 amount))]
+   (let [amount (m/- 1.0 (m/min amount 1.0))
+         a (m/+ 0.393 (m/* 0.607 amount)) b (m/- 0.769 (m/* 0.769 amount)) c (m/- 0.189 (m/* 0.189 amount))
+         d (m/- 0.349 (m/* 0.349 amount)) e (m/+ 0.686 (m/* 0.314 amount)) f (m/- 0.168 (m/* 0.168 amount))
+         g (m/- 0.272 (m/* 0.272 amount)) h (m/- 0.534 (m/* 0.534 amount)) i (m/+ 0.131 (m/* 0.869 amount))]
      (fe-color-matrix [a b c 0.0 0.0
                        d e f 0.0 0.0
                        g h i 0.0 0.0
@@ -7111,7 +6939,7 @@
   Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount or `NaN`."
   ([^double amount]
    (check-amount amount)
-   (let [intercept (* 127.5 (- 1.0 amount))]
+   (let [intercept (m/* 127.5 (m/- 1.0 amount))]
      (fe-color-matrix [amount 0.0 0.0 0.0 intercept
                        0.0 amount 0.0 0.0 intercept
                        0.0 0.0 amount 0.0 intercept
@@ -7139,7 +6967,7 @@
 
   Returns a filter function (see [[fe-color-matrix]])."
   ([^double amount]
-   (let [amount (* 255.0 amount)]
+   (let [amount (m/* 255.0 amount)]
      (fe-color-matrix [1.0 0.0 0.0 0.0 amount
                        0.0 1.0 0.0 0.0 amount
                        0.0 0.0 1.0 0.0 amount
@@ -7149,12 +6977,12 @@
 (defn- saturation-matrix
   "Filter of the `feColorMatrix` saturate matrix (W3C Filter Effects, weights 0.213, 0.715, 0.072) for `amount` (any value)."
   ([^double amount]
-   (let [r+ (+ 0.213 (* 0.787 amount))
-         r- (- 0.213 (* 0.213 amount))
-         g+ (+ 0.715 (* 0.285 amount))
-         g- (- 0.715 (* 0.715 amount))
-         b+ (+ 0.072 (* 0.928 amount))
-         b- (- 0.072 (* 0.072 amount))]
+   (let [r+ (m/+ 0.213 (m/* 0.787 amount))
+         r- (m/- 0.213 (m/* 0.213 amount))
+         g+ (m/+ 0.715 (m/* 0.285 amount))
+         g- (m/- 0.715 (m/* 0.715 amount))
+         b+ (m/+ 0.072 (m/* 0.928 amount))
+         b- (m/- 0.072 (m/* 0.072 amount))]
      (fe-color-matrix [r+ g- b- 0.0 0.0
                        r- g+ b- 0.0 0.0
                        r- g- b+ 0.0 0.0
@@ -7180,15 +7008,15 @@
    (let [a (m/radians angle-degrees)
          sa (m/sin a)
          ca (m/cos a)
-         cr+ (+ 0.213 (* 0.787 ca))
-         cr- (+ 0.213 (* -0.213 ca))
-         cg+ (+ 0.715 (* 0.285 ca))
-         cg- (+ 0.715 (* -0.715 ca))
-         cb+ (+ 0.072 (* 0.928 ca))
-         cb- (+ 0.072 (* -0.072 ca))]
-     (fe-color-matrix [(+ cr+ (* -0.213 sa)) (+ cg- (* -0.715 sa)) (+ cb- (* 0.928 sa)) 0.0 0.0
-                       (+ cr- (* 0.143 sa)) (+ cg+ (* 0.140 sa)) (+ cb- (* -0.283 sa)) 0.0 0.0
-                       (+ cr- (* -0.787 sa)) (+ cg- (* 0.715 sa)) (+ cb+ (* 0.072 sa)) 0.0 0.0
+         cr+ (m/+ 0.213 (m/* 0.787 ca))
+         cr- (m/+ 0.213 (m/* -0.213 ca))
+         cg+ (m/+ 0.715 (m/* 0.285 ca))
+         cg- (m/+ 0.715 (m/* -0.715 ca))
+         cb+ (m/+ 0.072 (m/* 0.928 ca))
+         cb- (m/+ 0.072 (m/* -0.072 ca))]
+     (fe-color-matrix [(m/+ cr+ (m/* -0.213 sa)) (m/+ cg- (m/* -0.715 sa)) (m/+ cb- (m/* 0.928 sa)) 0.0 0.0
+                       (m/+ cr- (m/* 0.143 sa)) (m/+ cg+ (m/* 0.140 sa)) (m/+ cb- (m/* -0.283 sa)) 0.0 0.0
+                       (m/+ cr- (m/* -0.787 sa)) (m/+ cg- (m/* 0.715 sa)) (m/+ cb+ (m/* 0.072 sa)) 0.0 0.0
                        0.0 0.0 0.0 1.0 0.0]))))
 
 (defn grayscale
@@ -7199,10 +7027,10 @@
   Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount or `NaN`."
   ([^double amount]
    (check-amount amount)
-   (let [a (- 1.0 (min amount 1.0))]
-     (fe-color-matrix [(+ 0.2126 (* 0.7874 a)) (- 0.7152 (* 0.7152 a)) (- 0.0722 (* 0.0722 a)) 0.0 0.0
-                       (- 0.2126 (* 0.2126 a)) (+ 0.7152 (* 0.2848 a)) (- 0.0722 (* 0.0722 a)) 0.0 0.0
-                       (- 0.2126 (* 0.2126 a)) (- 0.7152 (* 0.7152 a)) (+ 0.0722 (* 0.9278 a)) 0.0 0.0
+   (let [a (m/- 1.0 (m/min amount 1.0))]
+     (fe-color-matrix [(m/+ 0.2126 (m/* 0.7874 a)) (m/- 0.7152 (m/* 0.7152 a)) (m/- 0.0722 (m/* 0.0722 a)) 0.0 0.0
+                       (m/- 0.2126 (m/* 0.2126 a)) (m/+ 0.7152 (m/* 0.2848 a)) (m/- 0.0722 (m/* 0.0722 a)) 0.0 0.0
+                       (m/- 0.2126 (m/* 0.2126 a)) (m/- 0.7152 (m/* 0.7152 a)) (m/+ 0.0722 (m/* 0.9278 a)) 0.0 0.0
                        0.0 0.0 0.0 1.0 0.0]))))
 
 (defn invert
@@ -7213,9 +7041,9 @@
   Returns a filter function (see [[fe-color-matrix]]). Throws `ex-info` with `{:amount amount}` for a negative amount or `NaN`."
   ([^double amount]
    (check-amount amount)
-   (let [a (min amount 1.0)
-         k (- 1.0 (* 2.0 a))
-         o (* 255.0 a)]
+   (let [a (m/min amount 1.0)
+         k (m/- 1.0 (m/* 2.0 a))
+         o (m/* 255.0 a)]
      (fe-color-matrix [k 0.0 0.0 0.0 o
                        0.0 k 0.0 0.0 o
                        0.0 0.0 k 0.0 o
@@ -7232,32 +7060,32 @@
    (fe-color-matrix [1.0 0.0 0.0 0.0 0.0
                      0.0 1.0 0.0 0.0 0.0
                      0.0 0.0 1.0 0.0 0.0
-                     0.0 0.0 0.0 (min amount 1.0) 0.0])))
+                     0.0 0.0 0.0 (m/min amount 1.0) 0.0])))
 
 ;; Color Vision Deficiency
 ;; protan, deutan: Machado, Oliveira, Fernandes (2009); tritan: Brettel, Vienot, Mollon (1997), as DaltonLens;
 ;; tables generated by utils/color/gen_filters.py
 
-(defonce ^:private cvd-tables
+(def ^:private cvd-tables
   (delay {:machado (into {} (map (fn [[k ms]] [k (mapv double-array ms)])) (read-edn "color/cvd_machado2009.edn"))
           :brettel (update-vals (:tritan (read-edn "color/cvd_brettel1997.edn")) double-array)}))
 
 (defn- mulv9
   "Product of a 3 x 3 matrix (9 values, row by row) and a `Vec3`."
   ^Vec3 [^doubles m ^Vec3 v]
-  (Vec3. (+ (* (Array/aget m 0) (.x v)) (* (Array/aget m 1) (.y v)) (* (Array/aget m 2) (.z v)))
-         (+ (* (Array/aget m 3) (.x v)) (* (Array/aget m 4) (.y v)) (* (Array/aget m 5) (.z v)))
-         (+ (* (Array/aget m 6) (.x v)) (* (Array/aget m 7) (.y v)) (* (Array/aget m 8) (.z v)))))
+  (Vec3. (m/+ (m/* (Array/aget m 0) (.x v)) (m/* (Array/aget m 1) (.y v)) (m/* (Array/aget m 2) (.z v)))
+         (m/+ (m/* (Array/aget m 3) (.x v)) (m/* (Array/aget m 4) (.y v)) (m/* (Array/aget m 5) (.z v)))
+         (m/+ (m/* (Array/aget m 6) (.x v)) (m/* (Array/aget m 7) (.y v)) (m/* (Array/aget m 8) (.z v)))))
 
 (defn- machado-matrix
   "Machado (2009) matrix (9 values) of `deficiency` (`:protanomaly`, `:deuteranomaly`) at `severity` in [0, 1], linearly interpolated between the published 0.1 steps."
   ^doubles [deficiency ^double severity]
   (let [table (get-in @cvd-tables [:machado deficiency])
-        pos (* 10.0 severity)
-        i (min (long pos) 9)
-        f (- pos i)
+        pos (m/* 10.0 severity)
+        i (m/min (long pos) 9)
+        f (m/- pos i)
         ^doubles a (table i)
-        ^doubles b (table (inc i))]
+        ^doubles b (table (m/inc i))]
     (double-array (map (fn [^long k] (m/lerp (Array/aget a k) (Array/aget b k) f)) (range 9)))))
 
 (defn- linear-srgb-filter
@@ -7265,12 +7093,12 @@
   [f]
   (fn ^Vec4 [c]
     (let [^Vec4 c (pr/to-color c)
-          ^Vec3 out (f (Vec3. (rgb/srgb-to-linear (/ (.x c) 255.0))
-                              (rgb/srgb-to-linear (/ (.y c) 255.0))
-                              (rgb/srgb-to-linear (/ (.z c) 255.0))))]
-      (Vec4. (* 255.0 (rgb/linear-to-srgb (m/constrain (.x out) 0.0 1.0)))
-             (* 255.0 (rgb/linear-to-srgb (m/constrain (.y out) 0.0 1.0)))
-             (* 255.0 (rgb/linear-to-srgb (m/constrain (.z out) 0.0 1.0)))
+          ^Vec3 out (f (Vec3. (rgb/srgb-to-linear (m// (.x c) 255.0))
+                              (rgb/srgb-to-linear (m// (.y c) 255.0))
+                              (rgb/srgb-to-linear (m// (.z c) 255.0))))]
+      (Vec4. (m/* 255.0 (rgb/linear-to-srgb (m/constrain (.x out) 0.0 1.0)))
+             (m/* 255.0 (rgb/linear-to-srgb (m/constrain (.y out) 0.0 1.0)))
+             (m/* 255.0 (rgb/linear-to-srgb (m/constrain (.z out) 0.0 1.0)))
              (.w c)))))
 
 (defn- lazy-filter
@@ -7291,10 +7119,10 @@
   (let [{:keys [^doubles wing1 ^doubles wing2 ^doubles separation]} (:brettel @cvd-tables)]
     (linear-srgb-filter
      (fn [^Vec3 rgb]
-       (let [side (+ (* (Array/aget separation 0) (.x rgb))
-                     (* (Array/aget separation 1) (.y rgb))
-                     (* (Array/aget separation 2) (.z rgb)))]
-         (v/interpolate rgb (mulv9 (if (neg? side) wing2 wing1) rgb) severity))))))
+       (let [side (m/+ (m/* (Array/aget separation 0) (.x rgb))
+                       (m/* (Array/aget separation 1) (.y rgb))
+                       (m/* (Array/aget separation 2) (.z rgb)))]
+         (v/interpolate rgb (mulv9 (if (m/neg? side) wing2 wing1) rgb) severity))))))
 
 (defn- achromatic
   "Gray of the luminance Y of a linear sRGB color (Y row of the [[to-XYZ]] matrix)."
@@ -7329,7 +7157,7 @@
      :achromatopsia (linear-srgb-filter achromatic)
      (unknown-deficiency deficiency)))
   ([deficiency ^double severity]
-   (when-not (<= 0.0 severity 1.0)
+   (when-not (m/<= 0.0 severity 1.0)
      (throw (ex-info (str "Severity should be in [0, 1], got: " severity) {:severity severity})))
    (case deficiency
      (:protanomaly :deuteranomaly) (machado-filter deficiency severity)
@@ -7361,8 +7189,8 @@
   (apply list '+
          (remove nil? (map (fn [^double a p]
                              (cond
-                               (zero? a) nil
-                               (== 1.0 a) (list p n)
+                               (m/zero? a) nil
+                               (m/one? a) (list p n)
                                :else (list '* a (list p n)))) l '[.x .y .z]))))
 
 (defn- matrix-inverse
@@ -7386,22 +7214,22 @@
          mxg (double Integer/MIN_VALUE)
          mnb (double Integer/MAX_VALUE)
          mxb (double Integer/MIN_VALUE)]
-    (let [r (bit-and 0xff (bit-shift-right cc 16))
-          g (bit-and 0xff (bit-shift-right cc 8))
-          b (bit-and 0xff cc)
+    (let [r (m/bit-and 0xff (m/bit-shift-right cc 16))
+          g (m/bit-and 0xff (m/bit-shift-right cc 8))
+          b (m/bit-and 0xff cc)
           ^Vec4 res (f (Vec4. r g b 255.0))
-          nmnr (if (< (.x res) mnr) (.x res) mnr)
-          nmxr (if (> (.x res) mxr) (.x res) mxr)
-          nmng (if (< (.y res) mng) (.y res) mng)
-          nmxg (if (> (.y res) mxg) (.y res) mxg)
-          nmnb (if (< (.z res) mnb) (.z res) mnb)
-          nmxb (if (> (.z res) mxb) (.z res) mxb)]
+          nmnr (if (m/< (.x res) mnr) (.x res) mnr)
+          nmxr (if (m/> (.x res) mxr) (.x res) mxr)
+          nmng (if (m/< (.y res) mng) (.y res) mng)
+          nmxg (if (m/> (.y res) mxg) (.y res) mxg)
+          nmnb (if (m/< (.z res) mnb) (.z res) mnb)
+          nmxb (if (m/> (.z res) mxb) (.z res) mxb)]
       (when (or (m/invalid-double? (.x res))
                 (m/invalid-double? (.y res))
                 (m/invalid-double? (.z res)))
         (println "Warning: invalid numbers in " res " for " [r g b]))
-      (if (< cc 0x1000000)
-        (recur (inc cc) (double nmnr) (double nmxr) (double nmng) (double nmxg) (double nmnb) (double nmxb))
+      (if (m/< cc 0x1000000)
+        (recur (m/inc cc) (double nmnr) (double nmxr) (double nmng) (double nmxg) (double nmnb) (double nmxb))
         {:r [nmnr nmxr] :g [nmng nmxg] :b [nmnb nmxb]}))))
 
 (defn- test-reversibility
@@ -7417,8 +7245,6 @@
                rgb (from cs)]
          :when (not= in (lclamp rgb))]
      [r g b cs (lclamp rgb) (v/dist in rgb)])))
-
-(m/unuse-primitive-operators)
 
 (comment (run! (fn [[k [to from]]]
                  (println "---")

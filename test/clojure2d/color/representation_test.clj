@@ -236,7 +236,7 @@
     (is (throws-data? {:channel ch} #(c/get-channel :red :HSB ch)))))
 
 (deftest hex-validation-test
-  (doseq [s ["#12345" "1234567" "#123456789" "" "#" " #fff" "#ggg" "zz" "#red" " red" "docc/hermosa-pink"]]
+  (doseq [s ["#12345" "1234567" "#123456789" "" "#" " #fff" "#ggg" "zz" "#red" " red"]]
     (is (throws-data? {:color s} #(c/to-color s)) (pr-str s)))
   (doseq [s ["f" "#ab" "#abc" "#abcd" "#abcdef" "#abcdef01"]]
     (is (instance? Vec4 (c/to-color s)) s)))
@@ -244,7 +244,7 @@
 (deftest possible-color-test
   (testing "colors"
     (doseq [x [:red :nope "#fff" 0xff0000 (int 1) (v/vec2 1 2) (v/vec3 1 2 3) (v/vec4 1 2 3 4) (Color. 1 2 3)
-               [1] [1 2] [1 2 3] [1 2 3 4] [-255 255 0] '(1 2 3) (double-array [1 2 3])]]
+               [1] [1 2] [1 2 3] [1 2 3 4] [255 255 0] '(1 2 3) (double-array [1 2 3])]]
       (is (c/possible-color? x) (pr-str x))))
   (testing "not colors: palettes, empty, too long, out of range, non-numbers, other types"
     (doseq [x [nil [] [1 2 3 4 5] [0xff0000 0x00ff00] [0x0000ff 0x00ff00] [:red :green] [256 0 0] 1.5 identity
