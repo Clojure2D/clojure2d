@@ -138,17 +138,23 @@
          (when close? (.closePath p))))
      p)))
 
+(defn- length-ratio
+  "`a / (a + b)` of segment lengths, 0.5 when both are 0 (coincident points)."
+  ^double [^double a ^double b]
+  (let [s (m/+ a b)] (if (m/zero? s) 0.5 (m// a s))))
+
 (defn- calculate-bezier-control-points
-  "Calculate bezier spline control points. http://www.antigrain.com/research/bezier_interpolation/index.html"
+  "Calculate bezier spline control points of the curve from `v1` to `v2` (neighbours `v0`, `v3`): the midpoints of the
+  segments, split by the ratio of the segment lengths. http://www.antigrain.com/research/bezier_interpolation/index.html"
   [v0 v1 v2 v3]
   (let [c1 (v/mult (v/add v0 v1) 0.5)
         c2 (v/mult (v/add v1 v2) 0.5)
         c3 (v/mult (v/add v2 v3) 0.5)
-        len1 (v/mag c1)
-        len2 (v/mag c2)
-        len3 (v/mag c3)
-        k1 (m// len1 (m/+ len1 len2))
-        k2 (m// len2 (m/+ len2 len3))
+        len1 (v/dist v0 v1)
+        len2 (v/dist v1 v2)
+        len3 (v/dist v2 v3)
+        k1 (length-ratio len1 len2)
+        k2 (length-ratio len2 len3)
         m1 (v/add c1 (v/mult (v/sub c2 c1) k1))
         m2 (v/add c2 (v/mult (v/sub c3 c2) k2))
         cp1 (-> c2
@@ -164,10 +170,17 @@
     [cp1 cp2]))
 
 (defn path-bezier
+  "Smooth path through the points `vs` (cubic bezier curves, antigrain control points); `close?` closes it smoothly.
+  An open path needs 2 points (2 points give a straight line), a closed one 4; fewer give an empty path."
   ([vs] (path-bezier vs false))
   ([vs close?]
-   (let [^Path2D p (Path2D$Double.)]
-     (when (m/> (count vs) 3)
+   (let [^Path2D p (Path2D$Double.)
+         n (count vs)]
+     (when (and (not close?) (m/== n 2))
+       (let [[a b] (mapv v/vec2 vs)]
+         (.moveTo p (a 0) (a 1))
+         (.lineTo p (b 0) (b 1))))
+     (when (if close? (m/> n 3) (m/> n 2))
        (let [vs (mapv v/vec2 vs)
              m0 (vs 0)
              m1 (vs 1)
