@@ -551,6 +551,67 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
     (.setRenderingHint g key v))
   true)
 
+(def ^{:doc "Single rendering hints by name: a map of a hint key to the map of its values, see [[set-rendering-hint]]."
+       :metadoc/categories #{:canvas}}
+  rendering-hint-values
+  {:antialiasing {:on RenderingHints/VALUE_ANTIALIAS_ON
+                  :off RenderingHints/VALUE_ANTIALIAS_OFF
+                  :default RenderingHints/VALUE_ANTIALIAS_DEFAULT}
+   :text-antialiasing {:on RenderingHints/VALUE_TEXT_ANTIALIAS_ON
+                       :off RenderingHints/VALUE_TEXT_ANTIALIAS_OFF
+                       :default RenderingHints/VALUE_TEXT_ANTIALIAS_DEFAULT}
+   :rendering {:speed RenderingHints/VALUE_RENDER_SPEED
+               :quality RenderingHints/VALUE_RENDER_QUALITY
+               :default RenderingHints/VALUE_RENDER_DEFAULT}
+   :interpolation {:nearest-neighbor RenderingHints/VALUE_INTERPOLATION_NEAREST_NEIGHBOR
+                   :bilinear RenderingHints/VALUE_INTERPOLATION_BILINEAR
+                   :bicubic RenderingHints/VALUE_INTERPOLATION_BICUBIC}
+   :alpha-interpolation {:speed RenderingHints/VALUE_ALPHA_INTERPOLATION_SPEED
+                         :quality RenderingHints/VALUE_ALPHA_INTERPOLATION_QUALITY
+                         :default RenderingHints/VALUE_ALPHA_INTERPOLATION_DEFAULT}
+   :color-rendering {:speed RenderingHints/VALUE_COLOR_RENDER_SPEED
+                     :quality RenderingHints/VALUE_COLOR_RENDER_QUALITY
+                     :default RenderingHints/VALUE_COLOR_RENDER_DEFAULT}
+   :fractional-metrics {:on RenderingHints/VALUE_FRACTIONALMETRICS_ON
+                        :off RenderingHints/VALUE_FRACTIONALMETRICS_OFF
+                        :default RenderingHints/VALUE_FRACTIONALMETRICS_DEFAULT}
+   :stroke-control {:pure RenderingHints/VALUE_STROKE_PURE
+                    :normalize RenderingHints/VALUE_STROKE_NORMALIZE
+                    :default RenderingHints/VALUE_STROKE_DEFAULT}})
+
+(def ^:private rendering-hint-keys
+  {:antialiasing RenderingHints/KEY_ANTIALIASING
+   :text-antialiasing RenderingHints/KEY_TEXT_ANTIALIASING
+   :rendering RenderingHints/KEY_RENDERING
+   :interpolation RenderingHints/KEY_INTERPOLATION
+   :alpha-interpolation RenderingHints/KEY_ALPHA_INTERPOLATION
+   :color-rendering RenderingHints/KEY_COLOR_RENDERING
+   :fractional-metrics RenderingHints/KEY_FRACTIONALMETRICS
+   :stroke-control RenderingHints/KEY_STROKE_CONTROL})
+
+(defn set-rendering-hint
+  "Set a single rendering hint of the canvas graphics context, leaving other hints unchanged. Should be called within context.
+
+  Hint keys and their values (see [[rendering-hint-values]]):
+
+  * `:antialiasing`, `:text-antialiasing`, `:fractional-metrics` - `:on`, `:off`, `:default`
+  * `:rendering`, `:alpha-interpolation`, `:color-rendering` - `:speed`, `:quality`, `:default`
+  * `:interpolation` - `:nearest-neighbor`, `:bilinear`, `:bicubic`
+  * `:stroke-control` - `:pure`, `:normalize`, `:default`
+
+  Throws `ex-info` for an unknown key or value. Returns canvas.
+
+  See also [[canvas]] (hint bundles), [[with-isolated-canvas]]."
+  {:metadoc/categories #{:canvas}}
+  [canvas hint value]
+  (let [k (rendering-hint-keys hint)
+        v (get-in rendering-hint-values [hint value])]
+    (when-not (and k v)
+      (throw (ex-info (str "Unknown rendering hint " hint " " value)
+                      {:hint hint :value value :hints (update-vals rendering-hint-values (comp set keys))})))
+    (.setRenderingHint ^Graphics2D (pr/graphics2d canvas) k v)
+    canvas))
+
 (defn- set-rendering-hints-by-key
   "Sets rendering hints for graphics context."
   [g hints]
@@ -593,12 +654,12 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   See also [[with-canvas]]."
   {:metadoc/categories #{:canvas}}
   [canvas & body]  
-  `(let [newcanvas# (make-graphics ~canvas)
-         result# (-> newcanvas#
-                     ~@body)]
-     (do
-       (flush-graphics newcanvas#)
-       result#)))
+  `(let [newcanvas# (make-graphics ~canvas)]
+     (try
+       (-> newcanvas#
+           ~@body)
+       (finally
+         (flush-graphics newcanvas#)))))
 
 (defmacro with-canvas
   "Macro which takes care to create and destroy `Graphics2D` object for drawings on canvas. Macro returns result of last call.
@@ -606,11 +667,34 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   See also [[with-canvas->]]." 
   {:metadoc/categories #{:canvas}}
   [[c canvas] & body]
-  `(let [~c (make-graphics ~canvas)
-         result# (do ~@body)]
-     (do
-       (flush-graphics ~c)
-       result#)))
+  `(let [~c (make-graphics ~canvas)]
+     (try
+       ~@body
+       (finally
+         (flush-graphics ~c)))))
+
+(defn isolated-graphics
+  "Create a copy of the canvas graphics context with its own transformation stack.
+
+  Do not use directly. Call [[with-isolated-canvas]] macro."
+  [canvas]
+  (assoc canvas
+         :graphics (.create ^Graphics2D (pr/graphics2d canvas))
+         :transform-stack (atom [])))
+
+(defmacro with-isolated-canvas
+  "Macro which draws `body` on a copy of the graphics context of `canvas` (already in graphics context, see [[with-canvas]]) bound to `c`. Macro returns result of last call.
+
+  Everything `body` changes - clip, transformation, color, paint, stroke, font, rendering hints - is discarded afterwards, even when `body` throws.
+
+  See also [[with-canvas]], [[push-matrix]]."
+  {:metadoc/categories #{:canvas}}
+  [[c canvas] & body]
+  `(let [~c (isolated-graphics ~canvas)]
+     (try
+       ~@body
+       (finally
+         (flush-graphics ~c)))))
 
 ;;
 
@@ -906,6 +990,18 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   [^Shape shape]
   (shape->path-seq (.getPathIterator shape nil)))
 
+(defn shape->points
+  "Points of a shape flattened to line segments, all subpaths in order.
+
+  `flatness` is the largest distance between the segments and the curve. Curves (quads, cubics, arcs) are replaced by segments, closing a subpath adds no point.
+
+  Returns a sequence of `[x y]` vectors, empty for an empty shape.
+
+  See [[shape->path-def]]"
+  [^Shape shape ^double flatness]
+  (keep (fn [[t v]] (when-not (= :close t) v))
+        (shape->path-seq (.getPathIterator shape nil flatness))))
+
 (defn- seg-moveto [^Path2D p [x1 y1]] (.moveTo p x1 y1))
 (defn- seg-lineto [^Path2D p [x1 y1]] (.lineTo p x1 y1))
 (defn- seg-quadto [^Path2D p [x1 y1 x2 y2]] (.quadTo p x1 y1 x2 y2))
@@ -923,13 +1019,14 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   * `[:close]` - close path
   * `[:shape [shape-object connect?]]` - append given shape
   
-  Winding rule can be one of `:even-odd` and `:non-zero` (default) and is optional. "
+  Winding rule can be one of `:even-odd` and `:non-zero` (default) and is optional, other values (eg. `:unknown`) are ignored. The last given rule applies to the whole path."
   [path-def]
   (let [^Path2D p (Path2D$Double.)]
     (doseq [[t v w] path-def]
-      (when w (.setWindingRule p (case t
-                                   :even-odd Path2D/WIND_EVEN_ODD
-                                   :non-zero Path2D/WIND_NON_ZERO)))
+      (case w
+        :even-odd (.setWindingRule p Path2D/WIND_EVEN_ODD)
+        :non-zero (.setWindingRule p Path2D/WIND_NON_ZERO)
+        nil)
       (case t
         :close (.closePath p)
         :line (seg-lineto p v)
@@ -942,9 +1039,9 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 ;; clip
 
 (defn clip
-  "Clip drawing to specified rectangle or shape.
+  "Clip drawing to specified rectangle or shape, replacing current clipping.
 
-  See also [[reset-clip]]."
+  See also [[add-clip]], [[reset-clip]]."
   ([canvas x y w h] 
    (.setClip ^Graphics2D (pr/graphics2d canvas) x y w h)
    canvas)
@@ -952,10 +1049,21 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    (.setClip ^Graphics2D (pr/graphics2d canvas) shape)
    canvas))
 
+(defn add-clip
+  "Intersect current clipping with specified rectangle or shape: drawing stays inside both the previous clip and the new one.
+
+  See also [[clip]], [[reset-clip]], [[with-isolated-canvas]]."
+  ([canvas x y w h]
+   (.clip ^Graphics2D (pr/graphics2d canvas) (Rectangle2D$Double. x y w h))
+   canvas)
+  ([canvas ^Shape shape]
+   (.clip ^Graphics2D (pr/graphics2d canvas) shape)
+   canvas))
+
 (defn reset-clip
   "Resets current clipping.
 
-  See also [[clip]]."
+  See also [[clip]], [[add-clip]]."
   [canvas] 
   (.setClip ^Graphics2D (pr/graphics2d canvas) 0 0 (pr/width canvas) (pr/height canvas))
   canvas)

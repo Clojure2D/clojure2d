@@ -4,9 +4,12 @@
             [fastmath.core :as m]
             [fastmath.vector :as v]
             [fastmath.grid :as grid])
-  (:import [java.awt Shape Graphics2D]
-           [java.awt.font GlyphVector]
-           [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Arc2D Arc2D$Double Area]))
+  (:import [java.awt Font RenderingHints Shape Graphics2D]
+           [java.awt.font FontRenderContext GlyphVector TextAttribute TextLayout]
+           [java.awt.geom AffineTransform Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Arc2D Arc2D$Double Area]
+           [java.io StringReader]
+           [java.text AttributedString]
+           [org.apache.batik.parser AWTPathProducer]))
 
 (set! *unchecked-math* :warn-on-boxed)
 (set! *warn-on-reflection* true)
@@ -263,3 +266,113 @@
    (.getOutline (get-glyph-vector canvas txt)))
   ([canvas txt x y]
    (.getOutline (get-glyph-vector canvas txt) (float x) (float y))))
+
+;; transformations
+
+(defn- ops->affine-transform
+  ^AffineTransform [ops]
+  (let [t (AffineTransform.)]
+    (doseq [[op a b] ops]
+      (case op
+        :translate (.translate t (double a) (double b))
+        :scale (.scale t (double a) (double (or b a)))
+        :rotate (.rotate t (double a))
+        :shear (.shear t (double a) (double b))))
+    t))
+
+(defn transform-shape
+  "Returns a new shape: `shape` transformed by `transformation`.
+
+  `transformation` is a `java.awt.geom.AffineTransform` or a sequence of operations composed like the canvas transformations (`translate`, `scale`, `rotate`, `shear`): the later operation applies first to the shape coordinates.
+
+  * `[:translate tx ty]`
+  * `[:scale s]` or `[:scale sx sy]`
+  * `[:rotate angle]` - radians
+  * `[:shear sx sy]`
+
+  For example `[[:translate x y] [:scale s]]` scales the shape around the origin, then moves it by `[x y]`."
+  ^Shape [^Shape shape transformation]
+  (.createTransformedShape (if (instance? AffineTransform transformation)
+                             ^AffineTransform transformation
+                             (ops->affine-transform transformation)) shape))
+
+;; rounded rectangle
+
+(def ^{:private true :const true :tag 'double} kappa
+  "Control point distance of a cubic Bezier quarter circle, as a fraction of the radius."
+  0.5522847498307936)
+
+(defn rounded-rect
+  "Rectangle with rounded corners, the corners quarter circles.
+
+  * `x`, `y` - top left corner, `w`, `h` - width and height
+  * `r` - corner radius: a number (all corners) or `[top-left top-right bottom-right bottom-left]`, each clamped to half of the shorter side, 0 gives a square corner
+
+  With one radius not above half of the shorter side the shape is the same as `java.awt.geom.RoundRectangle2D` with arcs `2r`."
+  ^Shape [x y w h r]
+  (let [x (double x) y (double y) w (double w) h (double h)
+        limit (m/* 0.5 (m/min w h))
+        [tl tr br bl] (if (number? r) [r r r r] r)
+        tl (m/min limit (double tl)) tr (m/min limit (double tr))
+        br (m/min limit (double br)) bl (m/min limit (double bl))
+        x1 (m/+ x w) y1 (m/+ y h)
+        p (Path2D$Double.)]
+    (.moveTo p (m/+ x tl) y)
+    (.lineTo p (m/- x1 tr) y)
+    (.curveTo p (m/+ (m/- x1 tr) (m/* kappa tr)) y x1 (m/- (m/+ y tr) (m/* kappa tr)) x1 (m/+ y tr))
+    (.lineTo p x1 (m/- y1 br))
+    (.curveTo p x1 (m/+ (m/- y1 br) (m/* kappa br)) (m/+ (m/- x1 br) (m/* kappa br)) y1 (m/- x1 br) y1)
+    (.lineTo p (m/+ x bl) y1)
+    (.curveTo p (m/- (m/+ x bl) (m/* kappa bl)) y1 x (m/+ (m/- y1 bl) (m/* kappa bl)) x (m/- y1 bl))
+    (.lineTo p x (m/+ y tl))
+    (.curveTo p x (m/- (m/+ y tl) (m/* kappa tl)) (m/- (m/+ x tl) (m/* kappa tl)) y (m/+ x tl) y)
+    (.closePath p)
+    p))
+
+;; svg path
+
+(defn svg-path
+  "Returns a shape of SVG path data (the `d` attribute of a `path` element, eg. `M0 0 L10 0 L5 8 Z`).
+
+  `winding` is `:non-zero` (default) or `:even-odd`.
+
+  Throws when the data doesn't parse."
+  (^Shape [d] (svg-path d :non-zero))
+  (^Shape [^String d winding]
+   (AWTPathProducer/createShape (StringReader. d) (case winding
+                                                    :non-zero Path2D/WIND_NON_ZERO
+                                                    :even-odd Path2D/WIND_EVEN_ODD))))
+
+;; text outline
+
+(def ^:private outline-render-context
+  (FontRenderContext. nil RenderingHints/VALUE_TEXT_ANTIALIAS_ON RenderingHints/VALUE_FRACTIONALMETRICS_ON))
+
+(defn- font-runs
+  "`[start end font]` runs of `text`: `font` where it can show the character, `fallback` elsewhere."
+  [^String text ^Font font ^Font fallback]
+  (let [n (.length text)]
+    (loop [i (long 0)
+           runs []]
+      (if (m/>= i n)
+        runs
+        (let [cp (.codePointAt text (int i))
+              j (m/long-add i (Character/charCount cp))
+              f (if (or (nil? fallback) (.canDisplay font (int cp))) font fallback)
+              [s _ g :as last-run] (peek runs)]
+          (recur j (if (and last-run (identical? g f)) (conj (pop runs) [s j f]) (conj runs [i j f]))))))))
+
+(defn text-outline
+  "Returns the outline shape of `text` laid out in `font` (a `java.awt.Font`), without a canvas.
+
+  Characters `font` can't show are taken from `fallback` font (when given), eg. an emoji font. The layout uses antialiased text and fractional metrics, the baseline starts at the origin.
+
+  Empty `text` gives an empty outline.
+
+  See also [[text-shape]] (canvas font)."
+  (^Shape [font text] (text-outline font text nil))
+  (^Shape [^Font font ^String text fallback]
+   (let [attributed (AttributedString. text)]
+     (doseq [[s e f] (font-runs text font fallback)]
+       (.addAttribute attributed TextAttribute/FONT f (int s) (int e)))
+     (.getOutline (TextLayout. (.getIterator attributed) ^FontRenderContext outline-render-context) nil))))
