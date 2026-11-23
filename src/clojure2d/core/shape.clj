@@ -6,7 +6,7 @@
             [fastmath.grid :as grid])
   (:import [java.awt Shape Graphics2D]
            [java.awt.font GlyphVector]
-           [java.awt.geom PathIterator Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Point2D Point2D$Double Arc2D Arc2D$Double Area]))
+           [java.awt.geom Ellipse2D Ellipse2D$Double Line2D Line2D$Double Path2D Path2D$Double Rectangle2D Rectangle2D$Double Arc2D Arc2D$Double Area]))
 
 (set! *unchecked-math* :warn-on-boxed)
 (set! *warn-on-reflection* true)
