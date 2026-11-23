@@ -3410,17 +3410,20 @@
 (def ^{:private true :const true :tag 'double} hcl-k2 10.153071254810268)
 
 (defn- hcl-channel-ratio
-  "Ratio `r = min / max` of the RGB channels of an HCL color with `C / L = k` (k >= 0).
+  "Ratio `r = min / max` of the RGB channels of an HCL color with `C / L = k`, always in `[r*, 1]` (NaN for NaN `k`).
 
-  r is the root of `4 Q (1 - r) - 3 k (Q + (Q - 1) r)`, `Q = exp(0.03 r)`, in `[r*, 1]`, where C / L decreases from `k-max` (4.4433) to 0. Newton's method kept in a bracket (bisection when a step leaves it), starting from `1 - 3 k / 4` (the published estimate) for `k <= 4/3` and from `r* + sqrt(k2 (k-max - k))` (square-root approximation at the maximum) above; it stops when the step is below 1e-15 or no longer shrinks (rounding noise of the flat residual near r*), 3-8 steps, at most 50. No RGB color has `k > k-max`: r* is returned, which reduces the chroma to `k-max L`."
+  r is the root of `4 Q (1 - r) - 3 k (Q + (Q - 1) r)`, `Q = exp(0.03 r)`, in `[r*, 1]`, where C / L decreases from `k-max` (4.4433) to 0. Newton's method kept in a bracket (bisection when a step leaves it), starting from `1 - 3 k / 4` (the published estimate) for `k <= 4/3` and from `r* + sqrt(k2 (k-max - k))` (square-root approximation at the maximum) above; it stops when the step is below 1e-15 or no longer shrinks (rounding noise of the flat residual near r*), 3-10 steps, at most 50. No RGB color has `k > k-max`: r* is returned, which reduces the chroma to `k-max L`. `k <= 0` (negative chroma, outside the HCL ranges) gives 1, a gray."
   ^double [^double k]
-  (if (m/>= k hcl-k-max)
-    hcl-r-star
+  (cond
+    (m/<= k 0.0) 1.0
+    (m/>= k hcl-k-max) hcl-r-star
+    (m/nan? k) k
+    :else
     (loop [iter (long 0)
-           r (if (m/<= k (m/* 2.0 m/TWO_THIRD))
-               (m/max hcl-r-star (m/- 1.0 (m/* 0.75 k)))
-               (m/min 1.0 (m/+ hcl-r-star (m/sqrt (m/* hcl-k2 (m/- hcl-k-max k))))))
-           lo (double hcl-r-star) ;; a bare :const loop init is boxed for tools.analyzer (eastwood)
+           r (double (if (m/<= k (m/* 2.0 m/TWO_THIRD))
+                       (m/- 1.0 (m/* 0.75 k))
+                       (m/min 1.0 (m/+ hcl-r-star (m/sqrt (m/* hcl-k2 (m/- hcl-k-max k)))))))
+           lo hcl-r-star ;; a bare :const loop init is boxed for tools.analyzer (eastwood)
            hi 1.0
            prev-step ##Inf]
       (let [Q (m/exp (m/* 0.03 r))
@@ -3444,7 +3447,7 @@
 (defn- hcl->max-min
   "Largest and smallest RGB channel of an HCL color.
 
-  The forward conversion gives `L = max (Q + (Q - 1) r) / 2` with `r = min / max` and `Q = exp(0.03 r)`, and C / L depends on r only ([[hcl-channel-ratio]] solves it). Exact where an RGB color exists (`C <= 4.4433 L`, also with negative channels); above, no color exists and the chroma is reduced to `4.4433 L` at the same L. The published inverse (Sarifuddin and Missaoui, colour-science) estimates Q from C / L instead and round-trips only within about 0.06. `L <= 0` gives zeros (black)."
+  The forward conversion gives `L = max (Q + (Q - 1) r) / 2` with `r = min / max` and `Q = exp(0.03 r)`, and C / L depends on r only ([[hcl-channel-ratio]] solves it). Exact where an RGB color exists (`C <= 4.4433 L`, also with negative channels); above, no color exists and the chroma is reduced to `4.4433 L` at the same L. The published inverse (Sarifuddin and Missaoui, colour-science) estimates Q from C / L instead and round-trips only within about 0.06. `L <= 0` gives zeros (black), `C <= 0` a gray."
   ^Vec2 [^double C ^double L]
   (if (m/<= L 0.0)
     (Vec2. 0.0 0.0)
@@ -3456,7 +3459,7 @@
 (defn from-HCL
   "Converts HCL to sRGB, the inverse of [[to-HCL]].
 
-  Exact inverse wherever an RGB color exists, also outside the sRGB gamut: `C <= 4.4433 L` (in the gamut `C <= 4/3 L`); the ratio of the smallest to the largest channel is solved exactly (the published inverse estimates it from C / L and round-trips only within about 0.06). Above `4.4433 L` no RGB color exists: the chroma is reduced to `4.4433 L` at the same H and L, so every input gives finite values. Black gives black.
+  Exact inverse wherever an RGB color exists, also outside the sRGB gamut: `C <= 4.4433 L` (in the gamut `C <= 4/3 L`); the ratio of the smallest to the largest channel is solved exactly (the published inverse estimates it from C / L and round-trips only within about 0.06). Above `4.4433 L` no RGB color exists: the chroma is reduced to `4.4433 L` at the same H and L, so every input in the ranges gives finite values. Black gives black; negative chroma (outside the ranges) gives the gray of chroma 0.
 
   - `c` HCL color, any type accepted by [[to-color]], with channels in the ranges of [[to-HCL]]
 

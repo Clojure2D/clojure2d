@@ -211,8 +211,9 @@
 (defn- finite-color? [c] (every? m/valid-double? (take 3 c)))
 
 (defn- hcl-round-trip-errors
-  "Errors of `to-HCL` after `from-HCL` of `[H C L]` against the expected C and L (relative, as `rel-close?`) and
-  the hue distance in degrees (0 when the channel spread is below 1e-6: hue undefined)."
+  "Errors of `to-HCL` after `from-HCL` of `[H C L]`: C against the expected C and L, both scaled by
+  `max(1, |expected|)` (as `rel-close?`), and the hue distance in degrees (0 when the channel spread is below 1e-6:
+  hue undefined)."
   [^double H ^double C ^double L ^double C-expected]
   (let [rgb (c/from-HCL [H C L])
         hcl (c/to-HCL rgb)
@@ -240,19 +241,20 @@
       (is (finite-color? (c/from-HCL* [0 16 3])))
       (is (finite-color? (c/from-HCL* [0 16 3.0000001]))))
     (testing "exact inverse where an RGB color exists (C <= k-max L)"
-      (doseq [H [-180.0 -150.0 -90.0 -30.0 0.0 45.0 90.0 135.0 179.0]
-              [C L] grid
-              :when (and (pos? L) (<= (/ C L) (* k-max (- 1.0 1.0e-9))))
-              :let [[eC eL eH] (hcl-round-trip-errors H C L C)]]
-        (when-not (and (<= eC 1.0e-9) (<= eL 1.0e-9) (<= eH 1.0e-9))
-          (is false (str [H C L] " " [eC eL eH])))))
+      ;; failing [H C L] with the errors, at most 5 reported
+      (is (empty? (take 5 (for [H [-180.0 -150.0 -90.0 -30.0 0.0 45.0 90.0 135.0 179.0]
+                                [C L] grid
+                                :when (and (pos? L) (<= (/ C L) (* k-max (- 1.0 1.0e-9))))
+                                :let [errs (hcl-round-trip-errors H C L C)]
+                                :when (some #(> % 1.0e-9) errs)]
+                            [[H C L] errs])))))
     (testing "above k-max no RGB color exists: chroma reduced to k-max L, same H and L"
-      (doseq [H [-180.0 -150.0 -90.0 -30.0 0.0 45.0 90.0 135.0 179.0]
-              [C L] grid
-              :when (and (pos? L) (> (/ C L) k-max))
-              :let [[eC eL eH] (hcl-round-trip-errors H C L (* k-max L))]]
-        (when-not (and (<= eC 1.0e-9) (<= eL 1.0e-9) (<= eH 1.0e-9))
-          (is false (str [H C L] " " [eC eL eH])))))
+      (is (empty? (take 5 (for [H [-180.0 -150.0 -90.0 -30.0 0.0 45.0 90.0 135.0 179.0]
+                                [C L] grid
+                                :when (and (pos? L) (> (/ C L) k-max))
+                                :let [errs (hcl-round-trip-errors H C L (* k-max L))]
+                                :when (some #(> % 1.0e-9) errs)]
+                            [[H C L] errs])))))
     (testing "boundaries of C / L: the maximum, just below and above it, the switch of the start at 4/3, gray"
       (doseq [k [k-max (* k-max (- 1.0 1.0e-15)) (* k-max (- 1.0 1.0e-9)) (* k-max (+ 1.0 1.0e-15))
                  (/ 4.0 3.0) (m/next-double (/ 4.0 3.0)) (m/prev-double (/ 4.0 3.0)) 1.0e-300 0.0]
@@ -265,4 +267,14 @@
     (testing "continuity across k-max and towards black"
       (is (rel-close? 1.0e-6 ((c/from-HCL [30.0 (* k-max 10.0) 10.0]) 0) ((c/from-HCL [30.0 (* k-max 10.0 (- 1.0 1.0e-15)) 10.0]) 0)))
       (is (m/<= (reduce max (map m/abs (take 3 (c/from-HCL [30.0 170.0 1.0e-12])))) 1.0e-9))
-      (is (= (c/to-color :black) (c/from-HCL [30.0 170.0 0.0]))))))
+      (is (= (c/to-color :black) (c/from-HCL [30.0 170.0 0.0]))))
+    (testing "channel ratio stays in [r*, 1] for any C / L, NaN gives NaN"
+      (let [ratio #'c/hcl-channel-ratio]
+        (doseq [k [##-Inf -1.0e300 -1.0 -1.0e-300 -0.0 0.0 1.0e-300 1.0 (/ 4.0 3.0) k-max (* 2.0 k-max) 1.0e300 ##Inf]]
+          (is (m/<= r-star (ratio k) 1.0) (str k)))
+        (is (m/nan? (ratio ##NaN)))))
+    (testing "negative chroma (outside the ranges) gives the gray of chroma 0, NaN chroma gives NaN"
+      (doseq [C [-0.0 -1.0e-300 -1.0 -170.0 -1.0e300 ##-Inf]
+              L [1.0e-300 1.0 Lmax]]
+        (is (= (c/from-HCL [30.0 0.0 L]) (c/from-HCL [30.0 C L])) (str [C L])))
+      (is (every? m/nan? (take 3 (c/from-HCL [30.0 ##NaN 50.0])))))))
