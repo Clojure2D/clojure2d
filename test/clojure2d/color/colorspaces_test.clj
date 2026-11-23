@@ -205,3 +205,64 @@
   (testing "YPbPr: Pb, Pr within 127.5"
     (is (rel-close? 1.0e-12 127.5 ((c/to-YPbPr :blue) 1)))
     (is (rel-close? 1.0e-12 127.5 ((c/to-YPbPr :red) 2)))))
+
+(def ^:private hcl-limits (delay (-> "color/hcl_limits.edn" io/resource slurp edn/read-string)))
+
+(defn- finite-color? [c] (every? m/valid-double? (take 3 c)))
+
+(defn- hcl-round-trip-errors
+  "Errors of `to-HCL` after `from-HCL` of `[H C L]` against the expected C and L (relative, as `rel-close?`) and
+  the hue distance in degrees (0 when the channel spread is below 1e-6: hue undefined)."
+  [^double H ^double C ^double L ^double C-expected]
+  (let [rgb (c/from-HCL [H C L])
+        hcl (c/to-HCL rgb)
+        spread (- (reduce max (take 3 rgb)) (reduce min (take 3 rgb)))]
+    [(/ (m/abs (- (hcl 1) C-expected)) (max 1.0 C-expected))
+     (/ (m/abs (- (hcl 2) L)) (max 1.0 L))
+     (if (< spread 1.0e-6) 0.0 (hue-distance 360.0 (hcl 0) H))]))
+
+(deftest hcl-inverse-test
+  (let [{:keys [^double k-max r-star k2]} @hcl-limits
+        Lmax 135.26590615814683
+        grid (for [ci (range 256) li (range 256)] [(* 170.0 (/ ci 255.0)) (* Lmax (/ li 255.0))])
+        rng (java.util.Random. 20261123)
+        randoms (repeatedly 10000 #(vector (* 255.0 (.nextDouble rng)) (* 255.0 (.nextDouble rng)) (* 255.0 (.nextDouble rng))))]
+    (testing "limits equal the mpmath oracle (utils/color/gen_hcl_limits.py)"
+      (is (== k-max @#'c/hcl-k-max))
+      (is (== r-star @#'c/hcl-r-star))
+      (is (== k2 @#'c/hcl-k2)))
+    (testing "from-HCL* gives finite channels for every input in [0,255]"
+      (is (empty? (for [h [0 64 128 191 255] ci (range 256) li (range 256)
+                        :let [in [h ci li]]
+                        :when (not (finite-color? (c/from-HCL* in)))]
+                    in)))
+      (is (empty? (remove (comp finite-color? c/from-HCL*) randoms)))
+      (is (finite-color? (c/from-HCL* [0 16 3])))
+      (is (finite-color? (c/from-HCL* [0 16 3.0000001]))))
+    (testing "exact inverse where an RGB color exists (C <= k-max L)"
+      (doseq [H [-180.0 -150.0 -90.0 -30.0 0.0 45.0 90.0 135.0 179.0]
+              [C L] grid
+              :when (and (pos? L) (<= (/ C L) (* k-max (- 1.0 1.0e-9))))
+              :let [[eC eL eH] (hcl-round-trip-errors H C L C)]]
+        (when-not (and (<= eC 1.0e-9) (<= eL 1.0e-9) (<= eH 1.0e-9))
+          (is false (str [H C L] " " [eC eL eH])))))
+    (testing "above k-max no RGB color exists: chroma reduced to k-max L, same H and L"
+      (doseq [H [-180.0 -150.0 -90.0 -30.0 0.0 45.0 90.0 135.0 179.0]
+              [C L] grid
+              :when (and (pos? L) (> (/ C L) k-max))
+              :let [[eC eL eH] (hcl-round-trip-errors H C L (* k-max L))]]
+        (when-not (and (<= eC 1.0e-9) (<= eL 1.0e-9) (<= eH 1.0e-9))
+          (is false (str [H C L] " " [eC eL eH])))))
+    (testing "boundaries of C / L: the maximum, just below and above it, the switch of the start at 4/3, gray"
+      (doseq [k [k-max (* k-max (- 1.0 1.0e-15)) (* k-max (- 1.0 1.0e-9)) (* k-max (+ 1.0 1.0e-15))
+                 (/ 4.0 3.0) (m/next-double (/ 4.0 3.0)) (m/prev-double (/ 4.0 3.0)) 1.0e-300 0.0]
+              L [1.0e-300 1.0e-9 1.0 50.0 Lmax]
+              :let [C (* k L)
+                    [eC eL eH] (hcl-round-trip-errors 30.0 C L (* (min k k-max) L))]]
+        (is (<= eC 1.0e-9) (str [k L]))
+        (is (<= eL 1.0e-9) (str [k L]))
+        (is (<= eH 1.0e-9) (str [k L]))))
+    (testing "continuity across k-max and towards black"
+      (is (rel-close? 1.0e-6 ((c/from-HCL [30.0 (* k-max 10.0) 10.0]) 0) ((c/from-HCL [30.0 (* k-max 10.0 (- 1.0 1.0e-15)) 10.0]) 0)))
+      (is (m/<= (reduce max (map m/abs (take 3 (c/from-HCL [30.0 170.0 1.0e-12])))) 1.0e-9))
+      (is (= (c/to-color :black) (c/from-HCL [30.0 170.0 0.0]))))))

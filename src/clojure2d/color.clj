@@ -3401,36 +3401,62 @@
             :else H)]
     (Vec4. H C L (.w c))))
 
-(defn- hcl-q-step
-  "One fixed-point step for Q of the HCL inverse: from Q to max, min (given C, L), then `exp(0.03 min / max)`."
-  ^double [^double C ^double L ^double Q]
-  (let [d (m// (m/* 1.5 C) Q)
-        mx (m// (m/+ (m/* 2.0 L) (m/* (m/dec Q) d)) (m/dec (m/* 2.0 Q)))]
-    (m/exp (m/* 0.03 (m// (m/- mx d) mx)))))
+;; Limits of the HCL inverse (utils/color/gen_hcl_limits.py): with r = min / max of the RGB channels and
+;; Q = exp(0.03 r), C / L = 4 Q (1 - r) / (3 (Q + (Q - 1) r)) depends on r only; it decreases from its maximum
+;; hcl-k-max at r = hcl-r-star to 0 at r = 1 (4/3 at r = 0, the sRGB gamut). hcl-k2 = -2 / f''(r*) gives the
+;; square-root approximation of the ratio near the maximum.
+(def ^{:private true :const true :tag 'double} hcl-r-star -4.513977851089028)
+(def ^{:private true :const true :tag 'double} hcl-k-max 4.443344742981171)
+(def ^{:private true :const true :tag 'double} hcl-k2 10.153071254810268)
+
+(defn- hcl-channel-ratio
+  "Ratio `r = min / max` of the RGB channels of an HCL color with `C / L = k` (k >= 0).
+
+  r is the root of `4 Q (1 - r) - 3 k (Q + (Q - 1) r)`, `Q = exp(0.03 r)`, in `[r*, 1]`, where C / L decreases from `k-max` (4.4433) to 0. Newton's method kept in a bracket (bisection when a step leaves it), starting from `1 - 3 k / 4` (the published estimate) for `k <= 4/3` and from `r* + sqrt(k2 (k-max - k))` (square-root approximation at the maximum) above; it stops when the step is below 1e-15 or no longer shrinks (rounding noise of the flat residual near r*), 3-8 steps, at most 50. No RGB color has `k > k-max`: r* is returned, which reduces the chroma to `k-max L`."
+  ^double [^double k]
+  (if (m/>= k hcl-k-max)
+    hcl-r-star
+    (loop [iter (long 0)
+           r (if (m/<= k (m/* 2.0 m/TWO_THIRD))
+               (m/max hcl-r-star (m/- 1.0 (m/* 0.75 k)))
+               (m/min 1.0 (m/+ hcl-r-star (m/sqrt (m/* hcl-k2 (m/- hcl-k-max k))))))
+           lo (double hcl-r-star) ;; a bare :const loop init is boxed for tools.analyzer (eastwood)
+           hi 1.0
+           prev-step ##Inf]
+      (let [Q (m/exp (m/* 0.03 r))
+            Q-1 (m/dec Q)
+            h (m/- (m/* 4.0 Q (m/- 1.0 r)) (m/* 3.0 k (m/+ Q (m/* Q-1 r))))]
+        (if (m/zero? h)
+          r
+          (let [lo (if (m/pos? h) r lo)
+                hi (if (m/pos? h) hi r)
+                dh (m/- (m/* 4.0 Q (m/dec (m/* 0.03 (m/- 1.0 r))))
+                        (m/* 3.0 k (m/+ Q-1 (m/* 0.03 Q (m/inc r)))))
+                r-next (m/- r (m// h dh))
+                r-next (if (m/<= lo r-next hi) r-next (m/* 0.5 (m/+ lo hi)))
+                step (m/abs (m/- r-next r))]
+            (if (or (m/<= step (m/* 1.0e-15 (m/max 1.0 (m/abs r))))
+                    (m/>= step prev-step)
+                    (m/>= iter 49))
+              r-next
+              (recur (m/inc iter) r-next lo hi step))))))))
 
 (defn- hcl->max-min
-  "Largest and smallest RGB channel of an HCL color, solved exactly: the forward conversion gives `max - min = 3 C / (2 Q)` and `L = (Q max + (Q - 1) min) / 2` with `Q = exp(0.03 min / max)`; Q is the fixed point of [[hcl-q-step]], found with Steffensen (Aitken) acceleration, 2-3 steps to 1e-15. The published inverse (Sarifuddin and Missaoui, colour-science) estimates Q from C / L instead and round-trips only within about 0.06. Black (L = 0) gives zeros."
+  "Largest and smallest RGB channel of an HCL color.
+
+  The forward conversion gives `L = max (Q + (Q - 1) r) / 2` with `r = min / max` and `Q = exp(0.03 r)`, and C / L depends on r only ([[hcl-channel-ratio]] solves it). Exact where an RGB color exists (`C <= 4.4433 L`, also with negative channels); above, no color exists and the chroma is reduced to `4.4433 L` at the same L. The published inverse (Sarifuddin and Missaoui, colour-science) estimates Q from C / L instead and round-trips only within about 0.06. `L <= 0` gives zeros (black)."
   ^Vec2 [^double C ^double L]
   (if (m/<= L 0.0)
     (Vec2. 0.0 0.0)
-    (let [Q (double
-             (loop [iter (long 0)
-                    Q0 (m/exp 0.015)]
-               (let [Q1 (hcl-q-step C L Q0)
-                     Q2 (hcl-q-step C L Q1)
-                     den (m/+ (m/- Q2 Q1 Q1) Q0)
-                     Q (if (m/zero? den) Q2 (m/- Q0 (m// (m/sq (m/- Q1 Q0)) den)))]
-                 (if (or (m/>= iter 20) (m/<= (m/abs (m/- Q Q0)) (m/* 1.0e-15 Q)))
-                   Q
-                   (recur (m/inc iter) Q)))))
-          d (m// (m/* 1.5 C) Q)
-          mx (m// (m/+ (m/* 2.0 L) (m/* (m/dec Q) d)) (m/dec (m/* 2.0 Q)))]
-      (Vec2. mx (m/- mx d)))))
+    (let [r (hcl-channel-ratio (m// C L))
+          Q (m/exp (m/* 0.03 r))
+          mx (m// (m/* 2.0 L) (m/+ Q (m/* (m/dec Q) r)))]
+      (Vec2. mx (m/* r mx)))))
 
 (defn from-HCL
   "Converts HCL to sRGB, the inverse of [[to-HCL]].
 
-  Q is solved exactly by fixed-point iteration (the published inverse estimates it from C / L and round-trips only within about 0.06); black gives black.
+  Exact inverse wherever an RGB color exists, also outside the sRGB gamut: `C <= 4.4433 L` (in the gamut `C <= 4/3 L`); the ratio of the smallest to the largest channel is solved exactly (the published inverse estimates it from C / L and round-trips only within about 0.06). Above `4.4433 L` no RGB color exists: the chroma is reduced to `4.4433 L` at the same H and L, so every input gives finite values. Black gives black.
 
   - `c` HCL color, any type accepted by [[to-color]], with channels in the ranges of [[to-HCL]]
 

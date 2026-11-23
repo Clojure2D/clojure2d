@@ -11,6 +11,7 @@ Oracle generators for `clojure2d.color` (color audit). Run from the repository r
 | `gen_filters.py` | colour-science 0.4.7, DaltonLens 0.1.5, numpy 2.5.2 in `/home/ts/penv`; Node with chroma-js 2.6.0 (`npm install` in `utils/color`, `package.json`, `package-lock.json`, `chroma_oracle.mjs`) | `test/resources/color/filters_reference.edn`, `resources/color/cvd_machado2009.edn`, `resources/color/cvd_brettel1997.edn` (runtime tables) |
 | `gen_mixing.py` | coloraide 8.14.1, numpy 2.5.2 in `/home/ts/penv`; Node with chroma-js 2.6.0 (as `gen_filters.py`) | `test/resources/color/mixing_reference.edn` |
 | `gen_gradients.py` | coloraide 8.14.1, numpy 2.5.2 in `/home/ts/penv`; Node with chroma-js 2.6.0 and d3-scale-chromatic 3.1.0 (`npm install` in `utils/color`); curl and network access (paletton.com bundle, sha256 pinned) | `test/resources/color/gradients_reference.edn` |
+| `gen_hcl_limits.py` | mpmath 1.3.0 in `/home/ts/penv` | `test/resources/color/hcl_limits.edn` (limits of the HCL inverse; the private constants of `hcl-channel-ratio` are set from it) |
 | `gen_normalized_ranges.clj` | clojure2d (`lein run -m clojure.main utils/color/gen_normalized_ranges.clj`) | printed table of the extrema over the sRGB cube (grid and cube edges, refined by a pattern search); the normalization literals of the `to-X*`/`from-X*` functions are set from it (hue channels: the whole period; OSA j, g mapped by an arctangent) |
 
 ```
@@ -21,6 +22,7 @@ Oracle generators for `clojure2d.color` (color audit). Run from the repository r
 (cd utils/color && npm install) && /home/ts/penv/.venv/bin/python -I utils/color/gen_filters.py
 /home/ts/penv/.venv/bin/python -I utils/color/gen_mixing.py
 /home/ts/penv/.venv/bin/python -I utils/color/gen_gradients.py
+/home/ts/penv/.venv/bin/python -I utils/color/gen_hcl_limits.py
 ```
 
 `gen_representation.py` (area A, representation): CSS Color 4 named colors and hex parsing from matplotlib, hexagonal hue from Python `colorsys`, polar hue from its formula. See the generator docstring.
@@ -36,3 +38,5 @@ Oracle generators for `clojure2d.color` (color audit). Run from the repository r
 `gen_mixing.py` (area F, mixing and reduction): chroma.js `mix` and `average` via Node (`chroma_oracle.mjs`, `mixing` job), coloraide shorter-hue interpolation, circular averages and premultiplied alpha, ProfJski ArtColors' subtractive mix re-implemented, nearest color by numpy argmin. See the generator docstring.
 
 `gen_gradients.py` (area C, palettes and gradients): chroma.js `scale().mode()` via Node (`chroma_oracle.mjs`, `scale` job), coloraide `interpolate` (hue modes, premultiplied alpha), d3-scale-chromatic cubehelix gradients (`d3_oracle.mjs`), the thi.ng/color and iq cosine presets from their formula, and the paletton.com color model run from its own code (`paletton_oracle.cjs`). The paletton.com bundle (`js/app.compiled.js`) is downloaded on every run and checked against `PALETTON_SHA256`; only the generated values are committed, not the bundle. If the hash changes, the site was updated: check its color model and update the pin. See the generator docstring.
+
+`gen_hcl_limits.py` (area B, HCL inverse): the largest C / L of any RGB color (also with negative channels), the ratio of the smallest to the largest channel where it is reached and the square-root approximation of the ratio near it, from the ratio's formula with mpmath. See the generator docstring.
