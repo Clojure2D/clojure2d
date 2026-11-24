@@ -477,6 +477,15 @@
   (let [^Vec4 v (pr/to-color c)]
     (Vec4. (.x v) (.y v) val (.w v))))
 
+(defn scale-alpha
+  "Multiplies the alpha channel of a color by `k`, other channels unchanged.
+
+  - `k` 1 keeps the color, 0.5 halves its opacity, 0 makes it transparent; the result isn't clamped (`k` in `[0, 1]` keeps alpha in range)
+
+  Returns a color (`Vec4`). See also [[set-alpha]], [[opacity]] (a filter, clamped)."
+  ^Vec4 [c ^double k]
+  (set-alpha c (m/* k (alpha c))))
+
 (defn set-awt-alpha
   "Returns the color as `java.awt.Color` with alpha set to `a`.
 

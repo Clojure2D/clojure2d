@@ -590,7 +590,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    :stroke-control RenderingHints/KEY_STROKE_CONTROL})
 
 (defn set-rendering-hint
-  "Set a single rendering hint of the canvas graphics context, leaving other hints unchanged. Should be called within context.
+  "Set a single rendering hint (or a map of them) of the canvas graphics context, leaving other hints unchanged. Should be called within context.
 
   Hint keys and their values (see [[rendering-hint-values]]):
 
@@ -599,18 +599,24 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   * `:interpolation` - `:nearest-neighbor`, `:bilinear`, `:bicubic`
   * `:stroke-control` - `:pure`, `:normalize`, `:default`
 
+  `hints` - a map of hint keys to values, sets them all.
+
+  Java's default interpolation is `:nearest-neighbor` (there is no `:default`).
+
   Throws `ex-info` for an unknown key or value. Returns canvas.
 
   See also [[canvas]] (hint bundles), [[with-isolated-canvas]]."
   {:metadoc/categories #{:canvas}}
-  [canvas hint value]
-  (let [k (rendering-hint-keys hint)
-        v (get-in rendering-hint-values [hint value])]
-    (when-not (and k v)
-      (throw (ex-info (str "Unknown rendering hint " hint " " value)
-                      {:hint hint :value value :hints (update-vals rendering-hint-values (comp set keys))})))
-    (.setRenderingHint ^Graphics2D (pr/graphics2d canvas) k v)
-    canvas))
+  ([canvas hints]
+   (reduce-kv set-rendering-hint canvas hints))
+  ([canvas hint value]
+   (let [k (rendering-hint-keys hint)
+         v (get-in rendering-hint-values [hint value])]
+     (when-not (and k v)
+       (throw (ex-info (str "Unknown rendering hint " hint " " value)
+                       {:hint hint :value value :hints (update-vals rendering-hint-values (comp set keys))})))
+     (.setRenderingHint ^Graphics2D (pr/graphics2d canvas) k v)
+     canvas)))
 
 (defn- set-rendering-hints-by-key
   "Sets rendering hints for graphics context."
@@ -993,7 +999,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 (defn shape->points
   "Points of a shape flattened to line segments, all subpaths in order.
 
-  `flatness` is the largest distance between the segments and the curve. Curves (quads, cubics, arcs) are replaced by segments, closing a subpath adds no point.
+  `flatness` is the largest distance between the segments and the curve. Curves (quads, cubics, arcs) are replaced by segments. A close segment adds no point (a shape whose path repeats its first point before closing, as a rectangle, keeps that point). Subpaths are concatenated: their boundaries are lost, so use [[shape->path-def]] for a shape of several subpaths (a ring with a hole, a text).
 
   Returns a sequence of `[x y]` vectors, empty for an empty shape.
 
@@ -1023,10 +1029,8 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
   [path-def]
   (let [^Path2D p (Path2D$Double.)]
     (doseq [[t v w] path-def]
-      (case w
-        :even-odd (.setWindingRule p Path2D/WIND_EVEN_ODD)
-        :non-zero (.setWindingRule p Path2D/WIND_NON_ZERO)
-        nil)
+      (when-let [rule (sh/winding-rules w)]
+        (.setWindingRule p (int rule)))
       (case t
         :close (.closePath p)
         :line (seg-lineto p v)
@@ -1039,7 +1043,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
 ;; clip
 
 (defn clip
-  "Clip drawing to specified rectangle or shape, replacing current clipping.
+  "Clip drawing to specified rectangle or shape, replacing current clipping. A rectangle's coordinates are whole pixels (truncated to ints), unlike [[add-clip]].
 
   See also [[add-clip]], [[reset-clip]]."
   ([canvas x y w h] 
@@ -1050,7 +1054,7 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    canvas))
 
 (defn add-clip
-  "Intersect current clipping with specified rectangle or shape: drawing stays inside both the previous clip and the new one.
+  "Intersect current clipping with specified rectangle or shape: drawing stays inside both the previous clip and the new one. A rectangle keeps fractional coordinates, unlike [[clip]].
 
   See also [[clip]], [[reset-clip]], [[with-isolated-canvas]]."
   ([canvas x y w h]
@@ -1169,6 +1173,15 @@ Default hint for Canvas is `:high`. You can set also hint for Window which means
    (shape canvas (sh/crect x y w h) stroke?))
   ([canvas x y w h] (crect canvas x y w h false))
   ([canvas [x y] w h] (crect canvas x y w h)))
+
+(defn rounded-rect
+  "Draw a rectangle with rounded corners: top-left corner `(x,y)`, width `w`, height `h`, corner radius `r` (a number or `[top-left top-right bottom-right bottom-left]`, see [[clojure2d.core.shape/rounded-rect]]). Optionally you can set `stroke?` (default: `false`) to `true` to draw the outline only.
+
+  See also: [[rect]]."
+  ([canvas x y w h r stroke?]
+   (shape canvas (sh/rounded-rect x y w h r) stroke?))
+  ([canvas x y w h r] (rounded-rect canvas x y w h r false))
+  ([canvas [x y] w h r] (rounded-rect canvas x y w h r)))
 
 (defn prect
   "Draw rectangle with top-left corner at `(x1,y1)` and bottom-right corner at `(x2,y2)`. Optionally you can set `stroke?` (default: `false`) to `true` if you don't want to fill rectangle and draw outline only.

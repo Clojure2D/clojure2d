@@ -1,0 +1,7 @@
+# Source and text files are stored with LF line endings.
+*.clj text eol=lf
+*.cljc text eol=lf
+*.cljs text eol=lf
+*.edn text eol=lf
+*.java text eol=lf
+*.md text eol=lf

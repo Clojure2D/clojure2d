@@ -420,3 +420,10 @@
             :let [xyz (c/to-XYZ rgb)]]
       (is (< (max-abs-diff (take 3 xyz) (take 3 (->xyz rgb))) 1.0e-12) (str rgb))
       (is (< (max-abs-diff (take 3 (c/from-XYZ xyz)) (take 3 (->rgb xyz))) 1.0e-12) (str rgb)))))
+
+(deftest scale-alpha-test
+  (is (= (c/color 10 20 30 100) (c/scale-alpha (c/color 10 20 30 200) 0.5)))
+  (is (= (c/color 10 20 30 200) (c/scale-alpha (c/color 10 20 30 200) 1.0)))
+  (is (zero? (c/alpha (c/scale-alpha :red 0.0))))
+  (is (= 510.0 (c/alpha (c/scale-alpha (c/color 1 2 3 255) 2.0))) "not clamped")
+  (is (= 127.5 (c/alpha (c/scale-alpha [1 2 3] 0.5))) "a vector without alpha is opaque"))

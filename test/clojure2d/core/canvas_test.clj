@@ -90,6 +90,12 @@
         (doseq [[k vs] c2d/rendering-hint-values
                 v (keys vs)]
           (is (= c (c2d/set-rendering-hint c k v)))))
+      (testing "a map of hints sets them all"
+        (is (= c (c2d/set-rendering-hint c {:antialiasing :off :rendering :speed})))
+        (is (= RenderingHints/VALUE_ANTIALIAS_OFF (.getRenderingHint g RenderingHints/KEY_ANTIALIASING)))
+        (is (= RenderingHints/VALUE_RENDER_SPEED (.getRenderingHint g RenderingHints/KEY_RENDERING)))
+        (is (= c (c2d/set-rendering-hint c {})))
+        (is (thrown? clojure.lang.ExceptionInfo (c2d/set-rendering-hint c {:antialiasing :on :rendering :fast}))))
       (testing "unknown key or value"
         (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Unknown rendering hint" (c2d/set-rendering-hint c :antialias :on)))
         (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Unknown rendering hint" (c2d/set-rendering-hint c :antialiasing :yes)))
@@ -127,4 +133,27 @@
   (testing "subpaths in order; empty shape"
     (is (= [[0.0 0.0] [1.0 0.0] [5.0 5.0] [6.0 5.0]]
            (vec (c2d/shape->points (doto (Path2D$Double.) (.moveTo 0.0 0.0) (.lineTo 1.0 0.0) (.moveTo 5.0 5.0) (.lineTo 6.0 5.0)) 0.1))))
-    (is (empty? (c2d/shape->points (Path2D$Double.) 0.1)))))
+    (is (empty? (c2d/shape->points (Path2D$Double.) 0.1))))
+  (testing "a rectangle's path repeats its first point before closing"
+    (is (= [[0.0 0.0] [1.0 0.0] [1.0 1.0] [0.0 1.0] [0.0 0.0]] (vec (c2d/shape->points (Rectangle2D$Double. 0.0 0.0 1.0 1.0) 0.1))))))
+
+(deftest clip-coordinates-test
+  (c2d/with-canvas [c (c2d/canvas 20 20)]
+    (c2d/clip c 0.6 0.6 5.5 5.5)
+    (is (= [0.0 0.0 5.0 5.0] (clip-bounds c)) "clip truncates to whole pixels")
+    (c2d/reset-clip c)
+    (c2d/add-clip c 0.6 0.6 5.5 5.5)
+    (is (every? #(< (Math/abs (double %)) 1e-6) (map - [0.6 0.6 5.5 5.5] (clip-bounds c))) "add-clip keeps fractions (Java2D stores floats)")))
+
+(deftest rounded-rect-drawing-test
+  (let [img (fn [f] (let [c (c2d/canvas 40 40)]
+                      (c2d/with-canvas-> c (c2d/set-background :white) (c2d/set-color :black) (f))
+                      (vec (.getRGB ^java.awt.image.BufferedImage (c2d/get-image c) 0 0 40 40 nil 0 40))))]
+    (is (= (img #(c2d/shape % (sh/rounded-rect 5 5 30 20 [4 0 8 2])))
+           (img #(c2d/rounded-rect % 5 5 30 20 [4 0 8 2]))
+           (img #(c2d/rounded-rect % [5 5] 30 20 [4 0 8 2]))))
+    (is (= (img #(c2d/shape % (sh/rounded-rect 5 5 30 20 4) true))
+           (img #(c2d/rounded-rect % 5 5 30 20 4 true))))))
+
+(deftest path-def-winding-map-test
+  (is (= Path2D/WIND_EVEN_ODD (.getWindingRule ^Path2D (c2d/path-def->shape [[:move [0 0] :even-odd] [:line [1 1] :bogus]])))))

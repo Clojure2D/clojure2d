@@ -90,7 +90,8 @@
   (testing "empty data - empty shape; bad data and bad winding throw"
     (is (empty? (segments (sh/svg-path ""))))
     (is (thrown? Exception (sh/svg-path "M0 0 Q")))
-    (is (thrown? IllegalArgumentException (sh/svg-path "M0 0 L1 1" :odd)))))
+    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Unknown winding rule" (sh/svg-path "M0 0 L1 1" :odd)))
+    (is (thrown? clojure.lang.ExceptionInfo (sh/svg-path "M0 0 L1 1" nil)))))
 
 (deftest text-outline-test
   (let [font (java.awt.Font. "Dialog" java.awt.Font/PLAIN 100)]
@@ -113,3 +114,17 @@
                (vec (c2d/shape->path-def (sh/text-outline font "abc" fallback)))))))
     (testing "empty text - empty outline"
       (is (empty? (c2d/shape->path-def (sh/text-outline font "")))))))
+
+(deftest rounded-rect-boundary-test
+  (testing "negative radii - square corners; negative size - square corners"
+    (is (= (segments (sh/rounded-rect 0 0 10 10 0)) (segments (sh/rounded-rect 0 0 10 10 -3))))
+    (is (= [0.0 0.0 10.0 10.0] (bounds (sh/rounded-rect 0 0 10 10 [-1 -2 -3 -4]))))
+    (is (= (segments (sh/rounded-rect 0 0 -10 10 0)) (segments (sh/rounded-rect 0 0 -10 10 2)))))
+  (testing "point arity"
+    (is (= (segments (sh/rounded-rect 1 2 10 10 3)) (segments (sh/rounded-rect [1 2] 10 10 3)))))
+  (testing "a radius that isn't a number or four numbers"
+    (doseq [r [nil [1 2 3] [1 2 3 4 5] [1 nil 2 3] :big]]
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Corner radius" (sh/rounded-rect 0 0 10 10 r)) (pr-str r)))))
+
+(deftest winding-rules-test
+  (is (= {:non-zero Path2D/WIND_NON_ZERO :even-odd Path2D/WIND_EVEN_ODD} sh/winding-rules)))

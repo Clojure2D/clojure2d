@@ -302,46 +302,61 @@
   "Control point distance of a cubic Bezier quarter circle, as a fraction of the radius."
   0.5522847498307936)
 
+(defn- corner-radii
+  "Four corner radii `[tl tr br bl]` of `r` (a number or four numbers) clamped to `[0 limit]`."
+  [r ^double limit]
+  (let [radii (cond
+                (number? r) [r r r r]
+                (and (sequential? r) (m/== 4 (count r)) (every? number? r)) r
+                :else (throw (ex-info (str "Corner radius should be a number or four numbers, got " (pr-str r)) {:radius r})))]
+    (mapv (fn [v] (m/constrain (double v) 0.0 limit)) radii)))
+
 (defn rounded-rect
   "Rectangle with rounded corners, the corners quarter circles.
 
-  * `x`, `y` - top left corner, `w`, `h` - width and height
-  * `r` - corner radius: a number (all corners) or `[top-left top-right bottom-right bottom-left]`, each clamped to half of the shorter side, 0 gives a square corner
+  * `x`, `y` - top left corner (or `[x y]`), `w`, `h` - width and height
+  * `r` - corner radius: a number (all corners) or `[top-left top-right bottom-right bottom-left]`, each clamped to `[0, half of the shorter side]`: 0 or a negative radius gives a square corner, a negative `w` or `h` square corners
 
-  With one radius not above half of the shorter side the shape is the same as `java.awt.geom.RoundRectangle2D` with arcs `2r`."
-  ^Shape [x y w h r]
-  (let [x (double x) y (double y) w (double w) h (double h)
-        limit (m/* 0.5 (m/min w h))
-        [tl tr br bl] (if (number? r) [r r r r] r)
-        tl (m/min limit (double tl)) tr (m/min limit (double tr))
-        br (m/min limit (double br)) bl (m/min limit (double bl))
-        x1 (m/+ x w) y1 (m/+ y h)
-        p (Path2D$Double.)]
-    (.moveTo p (m/+ x tl) y)
-    (.lineTo p (m/- x1 tr) y)
-    (.curveTo p (m/+ (m/- x1 tr) (m/* kappa tr)) y x1 (m/- (m/+ y tr) (m/* kappa tr)) x1 (m/+ y tr))
-    (.lineTo p x1 (m/- y1 br))
-    (.curveTo p x1 (m/+ (m/- y1 br) (m/* kappa br)) (m/+ (m/- x1 br) (m/* kappa br)) y1 (m/- x1 br) y1)
-    (.lineTo p (m/+ x bl) y1)
-    (.curveTo p (m/- (m/+ x bl) (m/* kappa bl)) y1 x (m/+ (m/- y1 bl) (m/* kappa bl)) x (m/- y1 bl))
-    (.lineTo p x (m/+ y tl))
-    (.curveTo p x (m/- (m/+ y tl) (m/* kappa tl)) (m/- (m/+ x tl) (m/* kappa tl)) y (m/+ x tl) y)
-    (.closePath p)
-    p))
+  With one radius not above half of the shorter side the shape is the same as `java.awt.geom.RoundRectangle2D` with arcs `2r`.
+
+  Throws `ex-info` when `r` isn't a number or four numbers."
+  (^Shape [[x y] w h r] (rounded-rect x y w h r))
+  (^Shape [x y w h r]
+   (let [x (double x) y (double y) w (double w) h (double h)
+         [^double tl ^double tr ^double br ^double bl] (corner-radii r (m/max 0.0 (m/* 0.5 (m/min w h))))
+         x1 (m/+ x w) y1 (m/+ y h)
+         p (Path2D$Double.)]
+     (.moveTo p (m/+ x tl) y)
+     (.lineTo p (m/- x1 tr) y)
+     (.curveTo p (m/+ (m/- x1 tr) (m/* kappa tr)) y x1 (m/- (m/+ y tr) (m/* kappa tr)) x1 (m/+ y tr))
+     (.lineTo p x1 (m/- y1 br))
+     (.curveTo p x1 (m/+ (m/- y1 br) (m/* kappa br)) (m/+ (m/- x1 br) (m/* kappa br)) y1 (m/- x1 br) y1)
+     (.lineTo p (m/+ x bl) y1)
+     (.curveTo p (m/- (m/+ x bl) (m/* kappa bl)) y1 x (m/+ (m/- y1 bl) (m/* kappa bl)) x (m/- y1 bl))
+     (.lineTo p x (m/+ y tl))
+     (.curveTo p x (m/- (m/+ y tl) (m/* kappa tl)) (m/- (m/+ x tl) (m/* kappa tl)) y (m/+ x tl) y)
+     (.closePath p)
+     p)))
 
 ;; svg path
+
+(def ^{:doc "Path winding rules by name: `:non-zero` and `:even-odd` to the `java.awt.geom.Path2D` constants."}
+  winding-rules
+  {:non-zero Path2D/WIND_NON_ZERO
+   :even-odd Path2D/WIND_EVEN_ODD})
 
 (defn svg-path
   "Returns a shape of SVG path data (the `d` attribute of a `path` element, eg. `M0 0 L10 0 L5 8 Z`).
 
-  `winding` is `:non-zero` (default) or `:even-odd`.
+  `winding` is `:non-zero` (default) or `:even-odd` (see [[winding-rules]]).
 
-  Throws when the data doesn't parse."
+  Throws `ex-info` for another winding, and when the data doesn't parse."
   (^Shape [d] (svg-path d :non-zero))
   (^Shape [^String d winding]
-   (AWTPathProducer/createShape (StringReader. d) (case winding
-                                                    :non-zero Path2D/WIND_NON_ZERO
-                                                    :even-odd Path2D/WIND_EVEN_ODD))))
+   (let [rule (winding-rules winding)]
+     (when-not rule
+       (throw (ex-info (str "Unknown winding rule " winding) {:winding winding :windings (set (keys winding-rules))})))
+     (AWTPathProducer/createShape (StringReader. d) (int rule)))))
 
 ;; text outline
 
