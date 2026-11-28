@@ -14,6 +14,8 @@ public final class LogDensity {
     public double rscaler, rscaleg, rscaleb;
 
     public double[] r,g,b,a;
+    // plain kernel weight per pixel (sample alpha ignored): splats output alpha is a / k (coverage)
+    public double[] k;
 
     public LogDensity setScalingFactor(double r, double g, double b) {
         scaler = r;
@@ -41,6 +43,7 @@ public final class LogDensity {
         g = new double[size];
         b = new double[size];
         a = new double[size];
+        k = new double[size];
 
         setScalingFactor(255.0);
     }
@@ -57,12 +60,12 @@ public final class LogDensity {
         }
     }
     
-    // pbrt way
+    // pbrt way, pixel centres on integer coordinates: the pixels within the radius of (fx, fy)
     public void setFiltered(double fx, double fy, Vec4 c) {
-        int p0x = Math.max((int)FastMath.ceil(fx-0.5-f.radius), 0);
-        int p0y = Math.max((int)FastMath.ceil(fy-0.5-f.radius), 0);
-        int p1x = Math.min((int)FastMath.floor(fx-0.5+f.radius)+1, w);
-        int p1y = Math.min((int)FastMath.floor(fy-0.5+f.radius)+1, h);
+        int p0x = Math.max((int)FastMath.ceil(fx-f.radius), 0);
+        int p0y = Math.max((int)FastMath.ceil(fy-f.radius), 0);
+        int p1x = Math.min((int)FastMath.floor(fx+f.radius)+1, w);
+        int p1y = Math.min((int)FastMath.floor(fy+f.radius)+1, h);
 
         int diffx = p1x-p0x;
         int diffy = p1y-p0y;
@@ -88,6 +91,7 @@ public final class LogDensity {
             g[off] += w*c.y*rscaleg;
             b[off] += w*c.z*rscaleb;
             a[off] += w;
+            k[off] += 1.0;
         }
     }
 
@@ -98,6 +102,7 @@ public final class LogDensity {
         g[off] += w*c.y*rscaleg;
         b[off] += w*c.z*rscaleb;
         a[off] += w;
+        k[off] += weight;
     }
 
 
@@ -153,9 +158,11 @@ public final class LogDensity {
             int rr,gg,bb;
             double hit = a[i];
             
-            if (hit > 0.0) {
+            if (hit > 0.0 && (!conf.do_splats || k[i] > 0.0)) {
                 double rhit = 1.0/hit;
                 double alpha = 0.0;
+                // splats: the output alpha is the coverage - the alpha-weighted sum over the plain kernel weight
+                double coverage = conf.do_splats ? FastMath.min(hit / k[i], 1.0) * 255.0 : 255.0;
 
                 if (!conf.do_splats) {
                     alpha = conf.do_linear ?
@@ -178,9 +185,10 @@ public final class LogDensity {
                 }
 
                 if (conf.do_splats) {
-                    rr = (int)(fr*scaler);
-                    gg = (int)(fg*scaleg);
-                    bb = (int)(fb*scaleb);                          
+                    // rounded: a flat colour comes back exactly
+                    rr = (int)(fr*scaler+0.5);
+                    gg = (int)(fg*scaleg+0.5);
+                    bb = (int)(fb*scaleb+0.5);
                 } else {
                     rr = (int)PrimitiveMath.lerp(bg.x, fr*scaler, alpha);
                     gg = (int)PrimitiveMath.lerp(bg.y, fg*scaleg, alpha);
@@ -201,9 +209,19 @@ public final class LogDensity {
                     float[] hsb = Color.RGBtoHSB(rr, gg, bb, null);
                     hsb[1] = (float)Math.min(Math.max(hsb[1]*conf.saturation, 0.0), 1.0);
                     int s = Color.HSBtoRGB(hsb[0], hsb[1], hsb[2]);
-                    Pixels.setColor(res, i, new Vec4((s>>16)&0xff, (s>>8)&0xff, s&0xff, 255.0));
-                } else {      
-                    Pixels.setColor(res, i, new Vec4(rr,gg,bb,255.0));
+                    rr = (s>>16)&0xff;
+                    gg = (s>>8)&0xff;
+                    bb = s&0xff;
+                }
+
+                if (conf.do_splats && coverage < 255.0 && bg.w > 0.0) {
+                    // a partly covered pixel lies over the background: source over
+                    double ca = coverage / 255.0;
+                    double ba = (bg.w / 255.0) * (1.0 - ca);
+                    double oa = ca + ba;
+                    Pixels.setColor(res, i, new Vec4((rr*ca + bg.x*ba)/oa, (gg*ca + bg.y*ba)/oa, (bb*ca + bg.z*ba)/oa, oa*255.0));
+                } else {
+                    Pixels.setColor(res, i, new Vec4(rr,gg,bb,coverage));
                 }
                 
             } else {
@@ -224,6 +242,7 @@ public final class LogDensity {
         case 1: mergeChannel(g,d.g); break;
         case 2: mergeChannel(b,d.b); break;
         case 3: mergeChannel(a,d.a); break;
+        case 4: mergeChannel(k,d.k); break;
         }
     }
     

@@ -822,9 +822,10 @@
   ^LDRenderer [^LDRenderer a ^LDRenderer b]
   (let [ch0 (future (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 0))
         ch1 (future (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 1))
-        ch2 (future (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 2))]
-    (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 3)
-    @ch0 @ch1 @ch2
+        ch2 (future (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 2))
+        ch3 (future (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 3))]
+    (.merge ^clojure2d.java.LogDensity (.buff a) (.buff b) 4)
+    @ch0 @ch1 @ch2 @ch3
     a))
 
 (defn merge-renderers
@@ -928,7 +929,9 @@
   [pixels ch v] (pr/set-channel! pixels ch v))
 
 (defn to-pixels
-  "Convert to Pixels. For low density rendering provide configuration. Works with Image/Canvas/Window and low density renderer."
+  "Convert to Pixels. For low density rendering provide configuration. Works with Image/Canvas/Window and low density renderer.
+
+  With `:splats? true` a low density renderer's output alpha is each pixel's coverage: the sum of its splats' kernel weights times their alpha, over the sum of their kernel weights, at most 1 (transparent splats lower it); a partly covered pixel lies over `:background` (source over) and a pixel without visible splats takes it; channels are rounded."
   {:metadoc/categories #{:pix :ld}}
   (^Pixels [pixels] (pr/to-pixels pixels))
   (^Pixels [pixels x y w h] (pr/to-pixels pixels x y w h))

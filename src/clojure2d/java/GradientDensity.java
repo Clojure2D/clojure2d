@@ -50,12 +50,12 @@ public class GradientDensity {
     }
     
     
-    // pbrt way
+    // pbrt way, pixel centres on integer coordinates: the pixels within the radius of (fx, fy)
     public void setFiltered(double fx, double fy, double v) {
-        int p0x = Math.max((int)FastMath.ceil(fx-0.5-f.radius), 0);
-        int p0y = Math.max((int)FastMath.ceil(fy-0.5-f.radius), 0);
-        int p1x = Math.min((int)FastMath.floor(fx-0.5+f.radius)+1, wdec);
-        int p1y = Math.min((int)FastMath.floor(fy-0.5+f.radius)+1, hdec);
+        int p0x = Math.max((int)FastMath.ceil(fx-f.radius), 0);
+        int p0y = Math.max((int)FastMath.ceil(fy-f.radius), 0);
+        int p1x = Math.min((int)FastMath.floor(fx+f.radius)+1, wdec);
+        int p1y = Math.min((int)FastMath.floor(fy+f.radius)+1, hdec);
 
         int diffx = p1x-p0x;
         int diffy = p1y-p0y;
