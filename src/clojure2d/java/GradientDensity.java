@@ -12,8 +12,6 @@ public class GradientDensity {
     public int w,h,size;
     public AFilter f;
 
-    private int wdec, hdec;
-    
     public double[] cnt;
 
     public GradientDensity(int w, int h, AFilter f) {
@@ -21,9 +19,6 @@ public class GradientDensity {
         this.w = w;
         this.h = h;
 
-        wdec = w - 1;
-        hdec = h - 1;
-        
         size = w * h;
 
         cnt = new double[size];
@@ -54,8 +49,8 @@ public class GradientDensity {
     public void setFiltered(double fx, double fy, double v) {
         int p0x = Math.max((int)FastMath.ceil(fx-f.radius), 0);
         int p0y = Math.max((int)FastMath.ceil(fy-f.radius), 0);
-        int p1x = Math.min((int)FastMath.floor(fx+f.radius)+1, wdec);
-        int p1y = Math.min((int)FastMath.floor(fy+f.radius)+1, hdec);
+        int p1x = Math.min((int)FastMath.floor(fx+f.radius)+1, w);
+        int p1y = Math.min((int)FastMath.floor(fy+f.radius)+1, h);
 
         int diffx = p1x-p0x;
         int diffy = p1y-p0y;
